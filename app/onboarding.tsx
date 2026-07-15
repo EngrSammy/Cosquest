@@ -19,7 +19,7 @@ export default function HomeScreen() {
       }
     >
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome to the Cosquest</ThemedText>
+        <ThemedText type="title">Onboarding</ThemedText>
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
@@ -83,8 +83,7 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
       </ThemedView>
-
-      <ThemedText type="subtitle">
+      <ThemedText type="defaultSemiBold">
         <Link href="/onboarding">Onboarding</Link>
       </ThemedText>
     </ParallaxScrollView>
