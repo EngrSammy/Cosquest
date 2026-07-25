@@ -107,20 +107,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderRadius: 30,
-    paddingVertical: 14,
+    paddingVertical: 15,
   },
-  ssoLight: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#ECECF2",
-  },
+  ssoLight: { backgroundColor: "#FFFFFF" },
   ssoDark: { backgroundColor: "#191922" },
   ssoBrand: { backgroundColor: "#C5399A" },
 
   ssoLabel: { fontSize: 15, fontWeight: "600" },
   labelDark: { color: "#191922" },
   labelLight: { color: "#FFFFFF" },
-  prefix: { fontSize: 18, fontWeight: "800", color: "#4285F4" }, // Google blue
+  prefix: { fontSize: 20, fontWeight: "800", color: "#4285F4" }, // Google blue
 
   divider: {
     flexDirection: "row",
@@ -131,10 +127,6 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
   dividerText: { color: "#675656", fontSize: 15 },
   terms: { fontSize: 12, color: "#707072", textAlign: "center", marginTop: 60 },
-  logo: {
-    width: "100%",
-    height: 56,
-  },
 });
 
 const CONTAINER: Record<Variant, object> = {
