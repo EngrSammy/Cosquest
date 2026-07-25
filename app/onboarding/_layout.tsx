@@ -1,32 +1,15 @@
-import { StyleSheet, Text, View } from "react-native";
+import { AppBackground } from "@/components/AppBackground";
+import { Stack } from "expo-router";
 
-export default function Welcome() {
+export default function OnboardingLayout() {
   return (
-    <View style={styles.screen}>
-      <Text style={styles.headline}>
-        One place for{"\n"}everything you love.
-      </Text>
-      <Text style={styles.sub}>
-        CosQuest turns your city into a fandom playground — real-world quests,
-        your people, one leaderboard. Let's get you set up.
-      </Text>
-    </View>
+    <AppBackground variant="gradient">
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+    </AppBackground>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 24, justifyContent: "center" },
-  headline: {
-    fontSize: 28,
-    fontWeight: "800",
-    textAlign: "center",
-    color: "#191922",
-  },
-  sub: {
-    fontSize: 14,
-    color: "#9C9CAA",
-    textAlign: "center",
-    marginTop: 12,
-    lineHeight: 20,
-  },
-});

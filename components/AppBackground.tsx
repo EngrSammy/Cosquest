@@ -1,20 +1,44 @@
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View } from "react-native";
-import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 
-export function AppBackground({ children }: { children: React.ReactNode }) {
+type Variant = "plain" | "gradient";
+
+export function AppBackground({
+  children,
+  variant = "plain",
+}: {
+  children: React.ReactNode;
+  variant?: Variant;
+}) {
   return (
-    <View style={{ flex: 1 }}>
-      <Svg style={StyleSheet.absoluteFill}>
-        <Defs>
-          <RadialGradient id="bg" cx="50%" cy="38%" rx="120%" ry="90%">
-            <Stop offset="0%" stopColor="white" />
-            <Stop offset="55%" stopColor="#FCEAF4" />
-            <Stop offset="100%" stopColor="#EAF0FF" />
-          </RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#bg)" />
-      </Svg>
+    <View style={styles.root}>
+      <Image
+        source={require("@/assets/images/map-texture.png")}
+        style={[StyleSheet.absoluteFill, styles.map]}
+        contentFit="cover"
+      />
+      {variant === "gradient" && (
+        <LinearGradient
+          colors={[
+            "rgba(153,28,92,0.01)",
+            "rgba(220,23,159,0.55)",
+            "rgba(51,190,239,0.39)",
+          ]}
+          locations={[0, 0.62, 0.9]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       {children}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  map: { opacity: 0.5 },
+});

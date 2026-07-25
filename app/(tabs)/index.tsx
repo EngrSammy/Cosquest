@@ -87,7 +87,7 @@ export default function HomeScreen() {
         </ThemedView>
 
         <ThemedText type="subtitle">
-          <Link href="./">Onboarding</Link>
+          <Link href="./onboarding">Onboarding</Link>
         </ThemedText>
       </ParallaxScrollView>
     </AppBackground>

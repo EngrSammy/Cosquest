@@ -41,14 +41,14 @@ export default function Welcome() {
       </Text>
       <View style={styles.buttons}>
         <SSOButton
-          label="Sign up with Google"
+          label="Sign in with Google"
           prefix="G"
           onPress={() => router.push("/onboarding/profile")}
           variant="light"
         />
 
         <SSOButton
-          label="Sign up with Apple"
+          label="Sign in with Apple"
           onPress={() => router.push("/onboarding/profile")}
           variant="dark"
         />
@@ -67,12 +67,12 @@ export default function Welcome() {
       </View>
 
       <Text style={styles.sub}>
-        Already have an account?{" "}
+        Don't have an account?{" "}
         <Text
           style={{ color: "#C5399A", fontWeight: "700" }}
-          onPress={() => router.push("/onboarding/login")}
+          onPress={() => router.push("/onboarding")}
         >
-          Sign-in
+          Sign-up
         </Text>
       </Text>
 
