@@ -1,36 +1,10 @@
 import { AppBackground } from "@/components/AppBackground";
+import { Button } from "@/components/Button";
+import { Terms } from "@/components/Terms";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-type Variant = "light" | "dark" | "brand";
-
-function SSOButton({
-  label,
-  onPress,
-  variant = "light",
-  prefix,
-}: {
-  label: string;
-  onPress: () => void;
-  variant?: Variant;
-  prefix?: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.sso,
-        CONTAINER[variant],
-        pressed && { opacity: 0.6 },
-      ]}
-    >
-      {prefix ? <Text style={[styles.prefix]}>{prefix}</Text> : null}
-      <Text style={[styles.ssoLabel, LABEL[variant]]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-export default function Welcome() {
+export default function AuthLogin() {
   return (
     <AppBackground variant="gradient">
       <View style={styles.screen}>
@@ -42,16 +16,16 @@ export default function Welcome() {
           your people, one leaderboard. Let's get you set up.
         </Text>
         <View style={styles.buttons}>
-          <SSOButton
+          <Button
             label="Sign in with Google"
             prefix="G"
-            onPress={() => router.push("/onboarding/profile")}
+            onPress={() => router.push("/onboarding/signin")}
             variant="light"
           />
 
-          <SSOButton
+          <Button
             label="Sign in with Apple"
-            onPress={() => router.push("/onboarding/profile")}
+            onPress={() => router.push("/onboarding/signin")}
             variant="dark"
           />
 
@@ -61,9 +35,9 @@ export default function Welcome() {
             <View style={styles.dividerLine} />
           </View>
 
-          <SSOButton
-            label="Sign up with email"
-            onPress={() => router.push("/onboarding/profile")}
+          <Button
+            label="Sign in with email"
+            onPress={() => router.push("/onboarding/signin")}
             variant="brand"
           />
         </View>
@@ -72,29 +46,13 @@ export default function Welcome() {
           Don't have an account?{" "}
           <Text
             style={{ color: "#C5399A", fontWeight: "700" }}
-            onPress={() => router.push("/onboarding/authentication")}
+            onPress={() => router.push("/onboarding/authSignup")}
           >
             Sign-up
           </Text>
         </Text>
 
-        <Text style={styles.terms}>
-          By continuing you agree to the{" "}
-          <Text
-            style={{ color: "#C5399A" }}
-            onPress={() => router.push("/onboarding/login")}
-          >
-            CosQuest terms
-          </Text>{" "}
-          & the{" "}
-          <Text
-            style={{ color: "#C5399A" }}
-            onPress={() => router.push("/onboarding/login")}
-          >
-            community guidelines
-          </Text>
-          .
-        </Text>
+        <Terms />
       </View>
     </AppBackground>
   );
@@ -152,14 +110,3 @@ const styles = StyleSheet.create({
     height: 56,
   },
 });
-
-const CONTAINER: Record<Variant, object> = {
-  light: styles.ssoLight,
-  dark: styles.ssoDark,
-  brand: styles.ssoBrand,
-};
-const LABEL: Record<Variant, object> = {
-  light: styles.labelDark, // dark text on white
-  dark: styles.labelLight, // white text on near-black
-  brand: styles.labelLight, // white text on magenta
-};

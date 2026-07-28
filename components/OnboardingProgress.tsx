@@ -23,7 +23,7 @@ export function OnboardingProgress({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, paddingHorizontal: 24 },
+  row: { flexDirection: "row", gap: 4, paddingHorizontal: 24 },
   segment: { flex: 1, height: 6, borderRadius: 5 },
   filled: { backgroundColor: "#C5399A" },
   empty: { backgroundColor: "#cccccc" },

@@ -1,5 +1,4 @@
 import { AppBackground } from "@/components/AppBackground";
-import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -19,7 +18,6 @@ export default function Welcome() {
   return (
     <AppBackground variant="plain">
       <View style={styles.screen}>
-        <OnboardingProgress step={1} total={6} />
         <View style={styles.body}>
           <Text style={styles.headline}>SCAN, SOLVE,{"\n"}EARN</Text>
           <Image
@@ -29,7 +27,7 @@ export default function Welcome() {
           />
           <Button
             label="Continue"
-            onPress={() => router.push("/onboarding/authentication")}
+            onPress={() => router.push("/onboarding/authSignup")}
           />
         </View>
       </View>
@@ -51,7 +49,7 @@ const styles = StyleSheet.create({
     color: "#191922",
   },
   body: { flex: 1, justifyContent: "center", gap: 15 },
-  hero: { width: "100%", height: 350, marginVertical: 24 },
+  hero: { width: "100%", height: 400, marginVertical: 24 },
   button: {
     flexDirection: "row",
     justifyContent: "center",
