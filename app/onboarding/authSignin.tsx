@@ -1,13 +1,14 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
-import { Terms } from "@/components/Terms";
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function AuthLogin() {
+  const insets = useSafeAreaInsets();
   return (
     <AppBackground variant="gradient">
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
         <Text style={styles.headline}>
           One Place for{"\n"}Everything you{"\n"}Love
         </Text>
@@ -51,15 +52,17 @@ export default function AuthLogin() {
             Sign-up
           </Text>
         </Text>
-
-        <Terms />
       </View>
     </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 25, justifyContent: "center" },
+  screen: {
+    flex: 1,
+    paddingHorizontal: 25,
+    paddingBottom: 70,
+  },
   headline: {
     fontSize: 35,
     fontWeight: "800",
@@ -70,11 +73,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 20,
     lineHeight: 20,
   },
 
-  buttons: { marginTop: 32, gap: 14 },
+  buttons: { marginTop: 40, gap: 14 },
   sso: {
     flexDirection: "row", // so prefix + label sit in a row
     justifyContent: "center",

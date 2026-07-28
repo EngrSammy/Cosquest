@@ -80,10 +80,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 20,
     lineHeight: 20,
   },
-  buttons: { marginTop: 35, gap: 14 },
+  buttons: { marginTop: 40, gap: 14 },
   divider: {
     flexDirection: "row",
     alignItems: "center",

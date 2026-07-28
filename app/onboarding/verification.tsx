@@ -6,11 +6,10 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function Signin() {
+export default function ForgetPassword() {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
-    emailOrUsername: "",
-    password: "",
+    code: "",
   });
 
   const update = (key: keyof typeof form, value: string) =>
@@ -20,35 +19,28 @@ export default function Signin() {
     <AppBackground variant="gradient">
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
-          <Text style={styles.headline}>Welcome back!</Text>
+          <Text style={styles.headline}>Verification</Text>
           <Text style={styles.sub}>
-            Sign in to your account and continue your journey in the CosQuest
-            community.
+            Enter the code sent to your email address
           </Text>
           <Field
-            label="Email or Username"
-            value={form.emailOrUsername}
-            onChangeText={(t) => update("emailOrUsername", t)}
+            label=""
+            value={form.code}
+            onChangeText={(t) => update("code", t)}
           />
-          <Field
-            label="Password"
-            value={form.password}
-            onChangeText={(t) => update("password", t)}
-            secureTextEntry
-          />
+
+          <Text style={styles.verification}>
+            <Text>Didn't receive code?</Text>
+            <Text style={styles.resend}>Resend Now</Text>
+          </Text>
+
           <View style={styles.buttons}>
             <Button
-              label="Sign in"
-              onPress={() => router.push("/")}
+              label="Verify"
+              onPress={() => router.push("/onboarding/resetPassword")}
               variant="brand"
             />
           </View>
-          <Text
-            style={styles.forgot}
-            onPress={() => router.push("/onboarding/forgetPassword")}
-          >
-            Forgot password?
-          </Text>
         </View>
       </ScrollView>
     </AppBackground>
@@ -59,7 +51,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
-    paddingBottom: 110,
+    paddingBottom: 70,
   },
   headline: {
     fontSize: 35,
@@ -75,6 +67,15 @@ const styles = StyleSheet.create({
     marginBottom: 50,
     lineHeight: 20,
   },
+  row: { flexDirection: "row", gap: 15 },
+  verification: {
+    textAlign: "center",
+    fontSize: 15,
+    color: "#2b2b2c",
+    gap: 5,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  resend: { color: "#C5399A", fontWeight: 700, fontSize: 18 },
   buttons: { marginTop: 32 },
-  forgot: { color: "#5e5e5e", textAlign: "center", marginTop: 30 },
 });

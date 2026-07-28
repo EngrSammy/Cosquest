@@ -6,11 +6,10 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function Signin() {
+export default function ForgetPassword() {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
-    emailOrUsername: "",
-    password: "",
+    email: "",
   });
 
   const update = (key: keyof typeof form, value: string) =>
@@ -20,35 +19,22 @@ export default function Signin() {
     <AppBackground variant="gradient">
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
-          <Text style={styles.headline}>Welcome back!</Text>
+          <Text style={styles.headline}>Forgot Your Password?</Text>
           <Text style={styles.sub}>
-            Sign in to your account and continue your journey in the CosQuest
-            community.
+            Enter your email address to recover your password
           </Text>
           <Field
-            label="Email or Username"
-            value={form.emailOrUsername}
-            onChangeText={(t) => update("emailOrUsername", t)}
-          />
-          <Field
-            label="Password"
-            value={form.password}
-            onChangeText={(t) => update("password", t)}
-            secureTextEntry
+            label="Email"
+            value={form.email}
+            onChangeText={(t) => update("email", t)}
           />
           <View style={styles.buttons}>
             <Button
-              label="Sign in"
-              onPress={() => router.push("/")}
+              label="Send"
+              onPress={() => router.push("/onboarding/verification")}
               variant="brand"
             />
           </View>
-          <Text
-            style={styles.forgot}
-            onPress={() => router.push("/onboarding/forgetPassword")}
-          >
-            Forgot password?
-          </Text>
         </View>
       </ScrollView>
     </AppBackground>
@@ -59,7 +45,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
-    paddingBottom: 110,
+    paddingBottom: 70,
   },
   headline: {
     fontSize: 35,
@@ -76,5 +62,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   buttons: { marginTop: 32 },
-  forgot: { color: "#5e5e5e", textAlign: "center", marginTop: 30 },
 });
