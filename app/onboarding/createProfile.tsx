@@ -1,5 +1,6 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
+import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { AVATARS } from "@/constants/avatars";
@@ -30,6 +31,35 @@ export default function CreateProfile() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const [errors, setErrors] = useState<{ [k: string]: string }>({});
+
+  function validate() {
+    const next: { [k: string]: string } = {};
+    if (!form.firstName.trim()) {
+      next.firstName = "Enter your first name";
+    }
+    if (!form.lastName.trim()) {
+      next.lastName = "Enter your last name";
+    }
+    if (!form.username.trim()) {
+      next.username = "Enter your username";
+    }
+    if (!form.email.trim()) {
+      next.email = "Enter your email address";
+    } else if (!form.email.includes("@")) next.email = "Enter a valid email";
+    if (!form.age.trim()) {
+      next.age = "Enter your age";
+    }
+    if (!form.gender.trim()) {
+      next.gender = "Choose a gender";
+    }
+    if (!form.avatar.trim()) {
+      next.avatar = "Choose an avatar";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   return (
     <AppBackground variant="gradient">
       <KeyboardAvoidingView
@@ -53,6 +83,7 @@ export default function CreateProfile() {
                 label="First Name"
                 value={form.firstName}
                 onChangeText={(t) => update("firstName", t)}
+                error={errors.firstName}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -60,6 +91,7 @@ export default function CreateProfile() {
                 label="Last Name"
                 value={form.lastName}
                 onChangeText={(t) => update("lastName", t)}
+                error={errors.lastName}
               />
             </View>
           </View>
@@ -67,12 +99,14 @@ export default function CreateProfile() {
             label="Username"
             value={form.username}
             onChangeText={(t) => update("username", t)}
+            error={errors.username}
           />
           <Field
             label="Email"
             value={form.email}
             onChangeText={(t) => update("email", t)}
             keyboardType="email-address"
+            error={errors.email}
           />
           <View style={styles.row}>
             <View style={{ flex: 0.5 }}>
@@ -81,6 +115,7 @@ export default function CreateProfile() {
                 value={form.age}
                 onChangeText={(t) => update("age", t)}
                 keyboardType="numeric"
+                error={errors.age}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -106,6 +141,7 @@ export default function CreateProfile() {
                   </Pressable>
                 ))}
               </View>
+              <ErrorText>{errors.gender}</ErrorText>
             </View>
           </View>
 
@@ -137,12 +173,15 @@ export default function CreateProfile() {
               </Pressable>
             ))}
           </View>
+          <ErrorText>{errors.avatar}</ErrorText>
 
           <View style={{ marginTop: 80 }}>
             <Button
               label="Continue"
               variant="brand"
-              onPress={() => router.push("/onboarding/faction")}
+              onPress={() => {
+                if (validate()) router.push("/onboarding/faction");
+              }}
             />
           </View>
         </ScrollView>
@@ -158,7 +197,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
-    marginTop: 50,
+    marginTop: 20,
   },
   sub: {
     fontSize: 14,

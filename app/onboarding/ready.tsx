@@ -25,15 +25,15 @@ export default function Welcome() {
       <View style={styles.buttons}>
         <SSOButton
           label="Continue with Google"
-          onPress={() => router.push("/onboarding/profile")}
+          onPress={() => router.push("/onboarding/createProfile")}
         />
         <SSOButton
           label="Continue with Apple"
-          onPress={() => router.push("/onboarding/profile")}
+          onPress={() => router.push("/onboarding/createProfile")}
         />
         <SSOButton
           label="Sign up with email"
-          onPress={() => router.push("/onboarding/profile")}
+          onPress={() => router.push("/onboarding/createProfile")}
         />
       </View>
 

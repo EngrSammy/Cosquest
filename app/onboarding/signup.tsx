@@ -1,8 +1,10 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
+import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
+import { signUp } from "@/services/auth";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -17,6 +19,47 @@ export default function Signup() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const [errors, setErrors] = useState<{ [k: string]: string }>({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  function validate() {
+    const next: { [k: string]: string } = {};
+    if (!form.emailOrUsername.trim()) {
+      next.emailOrUsername = "Type your email or username";
+    }
+    if (!form.password.trim()) {
+      next.password = "Password is required";
+    } else if (form.password.trim().length < 8) {
+      next.password = "Use at least 8 characters";
+    }
+    if (!form.confirmPassword.trim()) {
+      next.confirmPassword = "Confirm your password";
+    } else if (form.confirmPassword !== form.password) {
+      next.confirmPassword = "Passwords do not match";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  async function handleSignup() {
+    if (!validate()) return;
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      await signUp(form.emailOrUsername, form.password);
+      router.push("/onboarding/createProfile");
+    } catch (e) {
+      if (e instanceof Error && e.message === "email_taken") {
+        setErrors({ emailOrUsername: "This email is already registered" });
+      } else {
+        setSubmitError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <AppBackground variant="gradient">
       <ScrollView
@@ -28,25 +71,38 @@ export default function Signup() {
           <Text style={styles.headline}>We have a space for you.</Text>
           <Field
             label="Email or Username"
+            leftIcon="mail-outline"
+            textContentType="username"
+            autoComplete="username"
             value={form.emailOrUsername}
             onChangeText={(t) => update("emailOrUsername", t)}
+            error={errors.emailOrUsername}
           />
           <Field
             label="Password"
+            leftIcon="lock-closed-outline"
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
             value={form.password}
             onChangeText={(t) => update("password", t)}
-            secureTextEntry
+            error={errors.password}
           />
           <Field
             label="Confirm Password"
+            leftIcon="lock-closed-outline"
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
             value={form.confirmPassword}
             onChangeText={(t) => update("confirmPassword", t)}
-            secureTextEntry
+            error={errors.confirmPassword}
           />
+          <ErrorText>{submitError}</ErrorText>
           <View style={styles.buttons}>
             <Button
-              label="Sign up"
-              onPress={() => router.push("/onboarding/createProfile")}
+              label={submitting ? "Creating account…" : "Sign up"}
+              onPress={handleSignup}
               variant="brand"
             />
           </View>

@@ -1,6 +1,8 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
+import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
+import { signIn } from "@/services/auth";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -16,6 +18,33 @@ export default function Signin() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const [errors, setErrors] = useState<{ [k: string]: string }>({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  function validate() {
+    const next: { [k: string]: string } = {};
+    if (!form.emailOrUsername.trim())
+      next.emailOrUsername = "Type your email or username";
+    if (!form.password.trim()) next.password = "Password is required";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  async function handleSignin() {
+    if (!validate()) return;
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      await signIn(form.emailOrUsername, form.password);
+      router.replace("/");
+    } catch {
+      setSubmitError("Incorrect email/username or password.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <AppBackground variant="gradient">
       <ScrollView keyboardShouldPersistTaps="handled">
@@ -27,25 +56,34 @@ export default function Signin() {
           </Text>
           <Field
             label="Email or Username"
+            leftIcon="mail-outline"
+            textContentType="username"
+            autoComplete="username"
             value={form.emailOrUsername}
             onChangeText={(t) => update("emailOrUsername", t)}
+            error={errors.emailOrUsername}
           />
           <Field
             label="Password"
+            leftIcon="lock-closed-outline"
+            secureTextEntry
+            textContentType="password"
+            autoComplete="current-password"
             value={form.password}
             onChangeText={(t) => update("password", t)}
-            secureTextEntry
+            error={errors.password}
           />
+          <ErrorText>{submitError}</ErrorText>
           <View style={styles.buttons}>
             <Button
-              label="Sign in"
-              onPress={() => router.push("/")}
+              label={submitting ? "Signing in…" : "Sign in"}
+              onPress={handleSignin}
               variant="brand"
             />
           </View>
           <Text
             style={styles.forgot}
-            onPress={() => router.push("/onboarding/forgetPassword")}
+            onPress={() => router.push("/onboarding/forgotPassword")}
           >
             Forgot password?
           </Text>

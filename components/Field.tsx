@@ -1,4 +1,9 @@
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ErrorText } from "./ErrorText";
+
+type IconName = keyof typeof Ionicons.glyphMap;
 
 export function Field({
   label,
@@ -7,6 +12,10 @@ export function Field({
   secureTextEntry,
   placeholder,
   keyboardType,
+  leftIcon,
+  textContentType,
+  autoComplete,
+  error,
 }: {
   label: string;
   value: string;
@@ -14,19 +23,63 @@ export function Field({
   secureTextEntry?: boolean;
   placeholder?: string;
   keyboardType?: "default" | "numeric" | "email-address";
+  leftIcon?: IconName;
+  textContentType?:
+    | "none"
+    | "username"
+    | "password"
+    | "newPassword"
+    | "emailAddress";
+  autoComplete?:
+    | "off"
+    | "email"
+    | "password"
+    | "new-password"
+    | "current-password"
+    | "username";
+  error?: string;
 }) {
+  const [hidden, setHidden] = useState(true);
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        placeholderTextColor="#9C9CAA"
-      />
+      <View
+        style={[
+          styles.inputRow,
+          focused && styles.inputRowFocused,
+          error ? styles.inputRowError : null,
+        ]}
+      >
+        {leftIcon ? (
+          <Ionicons name={leftIcon} size={18} color="#C5399A" />
+        ) : null}
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry ? hidden : false}
+          placeholderTextColor="#9C9CAA"
+          autoCapitalize="none"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          textContentType={textContentType}
+          autoComplete={autoComplete}
+        />
+        {secureTextEntry ? (
+          <Pressable onPress={() => setHidden((h) => !h)} hitSlop={10}>
+            <Ionicons
+              name={hidden ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="#616161"
+            />
+          </Pressable>
+        ) : null}
+      </View>
+      <ErrorText>{error}</ErrorText>
     </View>
   );
 }
@@ -34,7 +87,10 @@ export function Field({
 const styles = StyleSheet.create({
   field: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: "600", color: "#191922", marginBottom: 6 },
-  input: {
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     backgroundColor: "rgba(255,255,255,0.20)",
     borderRadius: 12,
     borderWidth: 0.5,
@@ -48,4 +104,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 5 },
   },
+  inputRowError: { borderColor: "#E24D4D", borderWidth: 1 },
+  inputRowFocused: { borderColor: "#C5399A", borderWidth: 1 },
+  input: { flex: 1, fontSize: 15, color: "#191922" },
 });
