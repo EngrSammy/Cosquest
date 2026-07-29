@@ -1,0 +1,15 @@
+# Normalize line endings across the team. All text files are stored with LF
+# in the repo, regardless of each developer's OS. This prevents noisy diffs
+# where a file appears fully changed just because line endings differ.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.mp4 binary
