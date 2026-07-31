@@ -1,74 +1,51 @@
+import { AppBackground } from "@/components/AppBackground";
+import { Button } from "@/components/Button";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-function SSOButton({ label, onPress }: { label: string; onPress: () => void }) {
+export default function Ready() {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.sso, pressed && { opacity: 0.6 }]}
-    >
-      <Text style={styles.ssoLabel}>{label}</Text>
-    </Pressable>
-  );
-}
+    <AppBackground variant="plain">
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.body}>
+          <Text style={styles.small}>Welcome To</Text>
+          <Text style={styles.big}>COSQUEST</Text>
+          <Image
+            source={require("@/assets/images/ready/hero.png")}
+            style={styles.hero}
+            contentFit="contain"
+          />
+        </View>
 
-export default function Welcome() {
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.headline}>
-        One place for{"\n"}everything you love.
-      </Text>
-      <Text style={styles.sub}>
-        CosQuest turns your city into a fandom playground — real-world quests,
-        your people, one leaderboard. Let's get you set up.
-      </Text>
-      <View style={styles.buttons}>
-        <SSOButton
-          label="Continue with Google"
-          onPress={() => router.push("/onboarding/createProfile")}
-        />
-        <SSOButton
-          label="Continue with Apple"
-          onPress={() => router.push("/onboarding/createProfile")}
-        />
-        <SSOButton
-          label="Sign up with email"
-          onPress={() => router.push("/onboarding/createProfile")}
-        />
-      </View>
-
-      <Text style={styles.terms}>
-        By continuing you agree to the CosQuest terms & the community
-        guidelines.
-      </Text>
-    </View>
+        <View style={styles.btn}>
+          <Button
+            label="Continue"
+            variant="brand"
+            onPress={() => router.replace("/")}
+          />
+        </View>
+      </ScrollView>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 24, justifyContent: "center" },
-  headline: {
-    fontSize: 28,
-    fontWeight: "800",
-    textAlign: "center",
+  scroll: { paddingHorizontal: 24, paddingBottom: 40, flexGrow: 1 },
+  body: { flex: 1, justifyContent: "center", alignItems: "center" },
+  small: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#191922",
-  },
-  sub: {
-    fontSize: 14,
-    color: "#9C9CAA",
     textAlign: "center",
-    marginTop: 12,
-    lineHeight: 20,
   },
-  buttons: { marginTop: 32, gap: 12 },
-  sso: {
-    borderWidth: 1,
-    borderColor: "#ECECF2",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
+  big: {
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#191922",
+    textAlign: "center",
+    letterSpacing: 1,
   },
-  ssoLabel: { fontSize: 15, fontWeight: "600", color: "#191922" },
-  terms: { fontSize: 11, color: "#9C9CAA", textAlign: "center", marginTop: 16 },
+  hero: { width: "100%", height: 340, marginTop: 24 },
+  btn: { marginTop: "auto", paddingTop: 24 },
 });

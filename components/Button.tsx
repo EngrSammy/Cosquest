@@ -65,5 +65,5 @@ const CONTAINER: Record<Variant, object> = {
 const LABEL: Record<Variant, object> = {
   light: styles.labelDark, // dark text on white
   dark: styles.labelLight, // white text on near-black
-  brand: styles.labelBrand, // white text on magenta
+  brand: styles.labelDark, // white text on magenta
 };

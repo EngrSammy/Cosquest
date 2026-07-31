@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 30,
     backgroundColor: "#C5399A",
+    marginTop: 15,
   },
   buttonLabel: { fontSize: 17, fontWeight: "600", color: "#FFFFFF" },
 });

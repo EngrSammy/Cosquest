@@ -4,6 +4,7 @@ import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
+import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { signUp } from "@/services/auth";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -11,7 +12,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function Signup() {
   const [form, setForm] = useState({
-    emailOrUsername: "",
+    email: "",
     password: "",
     confirmPassword: "",
   });
@@ -25,9 +26,9 @@ export default function Signup() {
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (!form.emailOrUsername.trim()) {
-      next.emailOrUsername = "Type your email or username";
-    }
+    if (!form.email.trim()) {
+      next.email = "Type your email";
+    } else if (!form.email.includes("@")) next.email = "Enter a valid email";
     if (!form.password.trim()) {
       next.password = "Password is required";
     } else if (form.password.trim().length < 8) {
@@ -47,11 +48,11 @@ export default function Signup() {
     setSubmitError("");
     setSubmitting(true);
     try {
-      await signUp(form.emailOrUsername, form.password);
+      await signUp(form.email, form.password);
       router.push("/onboarding/createProfile");
     } catch (e) {
       if (e instanceof Error && e.message === "email_taken") {
-        setErrors({ emailOrUsername: "This email is already registered" });
+        setErrors({ email: "This email is already registered" });
       } else {
         setSubmitError("Something went wrong. Please try again.");
       }
@@ -67,16 +68,17 @@ export default function Signup() {
         automaticallyAdjustKeyboardInsets
       >
         <View style={styles.screen}>
-          <OnboardingProgress step={2} total={6} />
-          <Text style={styles.headline}>We have a space for you.</Text>
+          <OnboardingProgress step={STEP.account} total={ONBOARDING_TOTAL} />
+          <Text style={styles.headline}>We have a space {"\n"} for you!</Text>
           <Field
-            label="Email or Username"
+            label="Email Address"
             leftIcon="mail-outline"
-            textContentType="username"
-            autoComplete="username"
-            value={form.emailOrUsername}
-            onChangeText={(t) => update("emailOrUsername", t)}
-            error={errors.emailOrUsername}
+            textContentType="emailAddress"
+            autoComplete="email"
+            keyboardType="email-address"
+            value={form.email}
+            onChangeText={(t) => update("email", t)}
+            error={errors.email}
           />
           <Field
             label="Password"

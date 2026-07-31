@@ -4,6 +4,7 @@ import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { AVATARS } from "@/constants/avatars";
+import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -44,9 +45,6 @@ export default function CreateProfile() {
     if (!form.username.trim()) {
       next.username = "Enter your username";
     }
-    if (!form.email.trim()) {
-      next.email = "Enter your email address";
-    } else if (!form.email.includes("@")) next.email = "Enter a valid email";
     if (!form.age.trim()) {
       next.age = "Enter your age";
     }
@@ -71,7 +69,7 @@ export default function CreateProfile() {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
         >
-          <OnboardingProgress step={3} total={6} />
+          <OnboardingProgress step={STEP.profile} total={ONBOARDING_TOTAL} />
           <Text style={styles.headline}>Create Your Profile</Text>
           <Text style={styles.sub}>
             This is how you will show up in the community{"\n"}and on the Bounty
@@ -100,13 +98,6 @@ export default function CreateProfile() {
             value={form.username}
             onChangeText={(t) => update("username", t)}
             error={errors.username}
-          />
-          <Field
-            label="Email"
-            value={form.email}
-            onChangeText={(t) => update("email", t)}
-            keyboardType="email-address"
-            error={errors.email}
           />
           <View style={styles.row}>
             <View style={{ flex: 0.5 }}>
@@ -180,7 +171,7 @@ export default function CreateProfile() {
               label="Continue"
               variant="brand"
               onPress={() => {
-                if (validate()) router.push("/onboarding/faction");
+                if (validate()) router.push("/onboarding/interests");
               }}
             />
           </View>

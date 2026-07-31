@@ -2,6 +2,7 @@ import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
+import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -9,7 +10,7 @@ export default function AuthSignup() {
   return (
     <AppBackground variant="gradient">
       <View style={styles.screen}>
-        <OnboardingProgress step={1} total={6} />
+        <OnboardingProgress step={STEP.account} total={ONBOARDING_TOTAL} />
         <View style={styles.body}>
           <Text style={styles.headline}>
             One Place for{"\n"}Everything you{"\n"}Love
