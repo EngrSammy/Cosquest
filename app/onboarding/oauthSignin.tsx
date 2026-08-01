@@ -1,10 +1,14 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function AuthLogin() {
+export default function AuthSignin() {
+  function handleOAuth(provider: "Google" | "Apple") {
+    // replace with real provider auth in the OAuth milestone
+    Alert.alert(`${provider} sign-in`, "Coming soon — we're wiring this up.");
+  }
   const insets = useSafeAreaInsets();
   return (
     <AppBackground variant="gradient">
@@ -20,13 +24,13 @@ export default function AuthLogin() {
           <Button
             label="Sign in with Google"
             prefix="G"
-            onPress={() => router.push("/onboarding/signin")}
+            onPress={() => handleOAuth("Google")}
             variant="light"
           />
 
           <Button
             label="Sign in with Apple"
-            onPress={() => router.push("/onboarding/signin")}
+            onPress={() => handleOAuth("Apple")}
             variant="dark"
           />
 
@@ -47,7 +51,7 @@ export default function AuthLogin() {
           Don't have an account?{" "}
           <Text
             style={{ color: "#C5399A", fontWeight: "700" }}
-            onPress={() => router.push("/onboarding/authSignup")}
+            onPress={() => router.push("/onboarding/signup")}
           >
             Sign-up
           </Text>
@@ -76,29 +80,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     lineHeight: 20,
   },
-
   buttons: { marginTop: 40, gap: 14 },
-  sso: {
-    flexDirection: "row", // so prefix + label sit in a row
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 30,
-    paddingVertical: 14,
-  },
-  ssoLight: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#ECECF2",
-  },
-  ssoDark: { backgroundColor: "#191922" },
-  ssoBrand: { backgroundColor: "#C5399A" },
-
-  ssoLabel: { fontSize: 15, fontWeight: "600" },
-  labelDark: { color: "#191922" },
-  labelLight: { color: "#FFFFFF" },
-  prefix: { fontSize: 18, fontWeight: "800", color: "#4285F4" }, // Google blue
-
   divider: {
     flexDirection: "row",
     alignItems: "center",
@@ -107,9 +89,4 @@ const styles = StyleSheet.create({
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
   dividerText: { color: "#675656", fontSize: 15 },
-  terms: { fontSize: 12, color: "#707072", textAlign: "center", marginTop: 60 },
-  logo: {
-    width: "100%",
-    height: 56,
-  },
 });

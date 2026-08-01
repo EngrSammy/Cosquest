@@ -27,7 +27,7 @@ export default function Welcome() {
           />
           <Button
             label="Continue"
-            onPress={() => router.push("/onboarding/authSignup")}
+            onPress={() => router.push("/onboarding/oauthSignup")}
           />
         </View>
       </View>

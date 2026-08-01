@@ -7,14 +7,14 @@ export function Terms() {
       By continuing you agree to the{" "}
       <Text
         style={{ color: "#C5399A" }}
-        onPress={() => router.push("/onboarding/authSignup")}
+        onPress={() => router.push("/onboarding/oauthSignup")}
       >
         CosQuest terms
       </Text>{" "}
       & the{" "}
       <Text
         style={{ color: "#C5399A" }}
-        onPress={() => router.push("/onboarding/authSignup")}
+        onPress={() => router.push("/onboarding/oauthSignup")}
       >
         community guidelines
       </Text>

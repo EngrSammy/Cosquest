@@ -4,9 +4,13 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 export default function AuthSignup() {
+  function handleOAuth(provider: "Google" | "Apple") {
+    // replace with real provider auth in the OAuth milestone
+    Alert.alert(`${provider} sign-up`, "Coming soon — we're wiring this up.");
+  }
   return (
     <AppBackground variant="gradient">
       <View style={styles.screen}>
@@ -23,13 +27,13 @@ export default function AuthSignup() {
             <Button
               label="Sign up with Google"
               prefix="G"
-              onPress={() => router.push("/onboarding/signup")}
+              onPress={() => handleOAuth("Google")}
               variant="light"
             />
 
             <Button
               label="Sign up with Apple"
-              onPress={() => router.push("/onboarding/signup")}
+              onPress={() => handleOAuth("Apple")}
               variant="dark"
             />
 
@@ -50,7 +54,7 @@ export default function AuthSignup() {
             Already have an account?{" "}
             <Text
               style={{ color: "#C5399A", fontWeight: "700" }}
-              onPress={() => router.push("/onboarding/authSignin")}
+              onPress={() => router.push("/onboarding/signup")}
             >
               Sign-in
             </Text>
@@ -93,5 +97,4 @@ const styles = StyleSheet.create({
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
   dividerText: { color: "#675656", fontSize: 15 },
-  terms: { fontSize: 12, color: "#707072", textAlign: "center", marginTop: 60 },
 });
