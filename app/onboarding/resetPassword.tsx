@@ -23,7 +23,7 @@ export default function Signin() {
     const next: { [k: string]: string } = {};
     if (!form.password.trim()) {
       next.password = "Password is required";
-    } else if (form.password.trim().length < 8) {
+    } else if (form.password.length < 8) {
       next.password = "Use at least 8 characters";
     } else if (!/[A-Z]/.test(form.password)) {
       next.password = "Add an uppercase letter";
