@@ -33,7 +33,14 @@ export default function Signup() {
       next.password = "Password is required";
     } else if (form.password.trim().length < 8) {
       next.password = "Use at least 8 characters";
+    } else if (!/[A-Z]/.test(form.password)) {
+      next.password = "Add an uppercase letter";
+    } else if (!/[0-9]/.test(form.password)) {
+      next.password = "Add a number";
+    } else if (!/[^A-Za-z0-9]/.test(form.password)) {
+      next.password = "Add a special character";
     }
+
     if (!form.confirmPassword.trim()) {
       next.confirmPassword = "Confirm your password";
     } else if (form.confirmPassword !== form.password) {
