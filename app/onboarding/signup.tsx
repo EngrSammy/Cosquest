@@ -31,7 +31,7 @@ export default function Signup() {
     } else if (!form.email.includes("@")) next.email = "Enter a valid email";
     if (!form.password.trim()) {
       next.password = "Password is required";
-    } else if (form.password.trim().length < 8) {
+    } else if (form.password.length < 8) {
       next.password = "Use at least 8 characters";
     } else if (!/[A-Z]/.test(form.password)) {
       next.password = "Add an uppercase letter";
