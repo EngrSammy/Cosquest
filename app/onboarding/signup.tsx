@@ -5,45 +5,40 @@ import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
 import { signUp } from "@/services/auth";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function Signup() {
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-
-  const update = (key: keyof typeof form, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
-
+  const useOnboardingContext = useOnboarding();
+  const { data, update } = useOnboardingContext;
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (!form.email.trim()) {
+    if (!data.email.trim()) {
       next.email = "Type your email";
-    } else if (!form.email.includes("@")) next.email = "Enter a valid email";
-    if (!form.password.trim()) {
+    } else if (!data.email.includes("@")) next.email = "Enter a valid email";
+    if (!data.password.trim()) {
       next.password = "Password is required";
-    } else if (form.password.length < 8) {
+    } else if (data.password.length < 8) {
       next.password = "Use at least 8 characters";
-    } else if (!/[A-Z]/.test(form.password)) {
+    } else if (!/[A-Z]/.test(data.password)) {
       next.password = "Add an uppercase letter";
-    } else if (!/[0-9]/.test(form.password)) {
+    } else if (!/[0-9]/.test(data.password)) {
       next.password = "Add a number";
-    } else if (!/[^A-Za-z0-9]/.test(form.password)) {
+    } else if (!/[^A-Za-z0-9]/.test(data.password)) {
       next.password = "Add a special character";
     }
 
-    if (!form.confirmPassword.trim()) {
+    if (!confirmPassword.trim()) {
       next.confirmPassword = "Confirm your password";
-    } else if (form.confirmPassword !== form.password) {
+    } else if (confirmPassword !== data.password) {
       next.confirmPassword = "Passwords do not match";
     }
     setErrors(next);
@@ -55,7 +50,7 @@ export default function Signup() {
     setSubmitError("");
     setSubmitting(true);
     try {
-      await signUp(form.email, form.password);
+      await signUp(data.email, data.password);
       router.push("/onboarding/createProfile");
     } catch (e) {
       if (e instanceof Error && e.message === "email_taken") {
@@ -83,8 +78,8 @@ export default function Signup() {
             textContentType="emailAddress"
             autoComplete="email"
             keyboardType="email-address"
-            value={form.email}
-            onChangeText={(t) => update("email", t)}
+            value={data.email}
+            onChangeText={(t) => update({ email: t })}
             error={errors.email}
           />
           <Field
@@ -93,8 +88,8 @@ export default function Signup() {
             secureTextEntry
             textContentType="newPassword"
             autoComplete="new-password"
-            value={form.password}
-            onChangeText={(t) => update("password", t)}
+            value={data.password}
+            onChangeText={(t) => update({ password: t })}
             error={errors.password}
           />
           <Field
@@ -103,8 +98,8 @@ export default function Signup() {
             secureTextEntry
             textContentType="newPassword"
             autoComplete="new-password"
-            value={form.confirmPassword}
-            onChangeText={(t) => update("confirmPassword", t)}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
             error={errors.confirmPassword}
           />
           <ErrorText>{submitError}</ErrorText>

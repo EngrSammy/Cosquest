@@ -36,8 +36,10 @@ export default function CreateProfile() {
     if (!data.username.trim()) {
       next.username = "Enter your username";
     }
-    if (!data.age.trim()) {
+    if (data.age === null) {
       next.age = "Enter your age";
+    } else if (data.age < 13 || data.age > 120) {
+      next.age = "Please enter a valid age (13-120)";
     }
     if (!data.gender.trim()) {
       next.gender = "Choose a gender";
@@ -94,8 +96,10 @@ export default function CreateProfile() {
             <View style={{ flex: 0.5 }}>
               <Field
                 label="Age"
-                value={data.age}
-                onChangeText={(t) => update({ age: t })}
+                value={data.age === null ? "" : String(data.age)}
+                onChangeText={(t) =>
+                  update({ age: t === "" ? null : Number(t) })
+                }
                 keyboardType="numeric"
                 error={errors.age}
               />

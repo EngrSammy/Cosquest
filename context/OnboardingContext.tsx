@@ -1,29 +1,39 @@
 import { createContext, useContext, useState } from "react";
 
 export type OnboardingData = {
+  email: string;
+  password: string;
   firstName: string;
   lastName: string;
   username: string;
-  age: string;
+  age: number | null;
   gender: string;
   avatar: string;
   interests: string[];
   faction: string;
   radiusMi: number;
   locationGranted: boolean;
+  lat: number | null;
+  lng: number | null;
+  notificationsEnabled: boolean;
 };
 
 const EMPTY: OnboardingData = {
+  email: "",
+  password: "",
   firstName: "",
   lastName: "",
   username: "",
-  age: "",
+  age: null,
   gender: "",
   avatar: "",
   interests: [],
   faction: "",
   radiusMi: 50,
   locationGranted: false,
+  lat: null,
+  lng: null,
+  notificationsEnabled: false,
 };
 
 type OnboardingContextValue = {
