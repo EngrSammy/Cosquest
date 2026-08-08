@@ -46,7 +46,12 @@ export default function Permissions() {
     }
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === "granted") {
-      update({ locationGranted: true });
+      const pos = await Location.getCurrentPositionAsync({});
+      update({
+        locationGranted: true,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
       setErrors((e) => ({ ...e, location: "" }));
     } else {
       update({ locationGranted: false });
@@ -134,7 +139,10 @@ export default function Permissions() {
                 Get told when a quest drops in your area.
               </Text>
             </View>
-            <Toggle on={notifications} onToggle={toggleNotifications} />
+            <Toggle
+              on={data.notificationsEnabled}
+              onToggle={toggleNotifications}
+            />
           </View>
         </View>
 
