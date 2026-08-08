@@ -3,6 +3,7 @@ import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { Image } from "expo-image";
@@ -34,22 +35,21 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 }
 
 export default function Permissions() {
-  const [location, setLocation] = useState(false);
+  const { data, update } = useOnboarding();
   const [notifications, setNotifications] = useState(false);
-  const [radius, setRadius] = useState(50);
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
 
   async function toggleLocation() {
-    if (location) {
-      setLocation(false);
+    if (data.locationGranted) {
+      update({ locationGranted: false });
       return;
     }
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === "granted") {
-      setLocation(true);
+      update({ locationGranted: true });
       setErrors((e) => ({ ...e, location: "" }));
     } else {
-      setLocation(false);
+      update({ locationGranted: false });
       setErrors((e) => ({
         ...e,
         location:
@@ -69,7 +69,7 @@ export default function Permissions() {
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (!location) {
+    if (!data.locationGranted) {
       next.location = "Location is required to play CosQuest.";
     }
     setErrors(next);
@@ -103,21 +103,21 @@ export default function Permissions() {
                 See and play CosQuests happening near you.
               </Text>
             </View>
-            <Toggle on={location} onToggle={toggleLocation} />
+            <Toggle on={data.locationGranted} onToggle={toggleLocation} />
           </View>
           <ErrorText>{errors.location}</ErrorText>
 
           <View style={styles.radiusRow}>
             <View style={styles.radiusHeader}>
               <Text style={styles.rowTitle}>Show Quest Within</Text>
-              <Text style={styles.radiusValue}>{radius} mi</Text>
+              <Text style={styles.radiusValue}>{data.radiusMi} mi</Text>
             </View>
             <Slider
               minimumValue={5}
               maximumValue={100}
               step={5}
-              value={radius}
-              onValueChange={setRadius}
+              value={data.radiusMi}
+              onValueChange={(v) => update({ radiusMi: v })}
               minimumTrackTintColor="#C5399A"
               maximumTrackTintColor="#D5D5DC"
               thumbTintColor="#C5399A"

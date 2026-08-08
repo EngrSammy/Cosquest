@@ -5,18 +5,19 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { SelectableCard } from "@/components/SelectableCard";
 import { FACTIONS } from "@/constants/factions";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function Faction() {
-  const [faction, setFaction] = useState("");
+  const { data, update } = useOnboarding();
 
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (faction.length === 0) {
+    if (data.faction.length === 0) {
       next.faction = "Choose at least one faction";
     }
     setErrors(next);
@@ -38,8 +39,8 @@ export default function Faction() {
               key={f.id}
               label={f.label}
               image={f.image}
-              selected={faction === f.id}
-              onPress={() => setFaction(f.id)}
+              selected={data.faction === f.id}
+              onPress={() => update({ faction: f.id })}
               style={styles.card}
             />
           ))}

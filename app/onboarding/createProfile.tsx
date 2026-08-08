@@ -5,6 +5,7 @@ import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { AVATARS } from "@/constants/avatars";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -19,39 +20,29 @@ import {
 } from "react-native";
 
 export default function CreateProfile() {
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    username: "",
-    email: "",
-    age: "",
-    gender: "",
-    avatar: "",
-  });
-
-  const update = (key: keyof typeof form, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const useOnboardingContext = useOnboarding();
+  const { data, update } = useOnboardingContext;
 
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (!form.firstName.trim()) {
+    if (!data.firstName.trim()) {
       next.firstName = "Enter your first name";
     }
-    if (!form.lastName.trim()) {
+    if (!data.lastName.trim()) {
       next.lastName = "Enter your last name";
     }
-    if (!form.username.trim()) {
+    if (!data.username.trim()) {
       next.username = "Enter your username";
     }
-    if (!form.age.trim()) {
+    if (!data.age.trim()) {
       next.age = "Enter your age";
     }
-    if (!form.gender.trim()) {
+    if (!data.gender.trim()) {
       next.gender = "Choose a gender";
     }
-    if (!form.avatar.trim()) {
+    if (!data.avatar.trim()) {
       next.avatar = "Choose an avatar";
     }
     setErrors(next);
@@ -79,32 +70,32 @@ export default function CreateProfile() {
             <View style={{ flex: 1 }}>
               <Field
                 label="First Name"
-                value={form.firstName}
-                onChangeText={(t) => update("firstName", t)}
+                value={data.firstName}
+                onChangeText={(t) => update({ firstName: t })}
                 error={errors.firstName}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Field
                 label="Last Name"
-                value={form.lastName}
-                onChangeText={(t) => update("lastName", t)}
+                value={data.lastName}
+                onChangeText={(t) => update({ lastName: t })}
                 error={errors.lastName}
               />
             </View>
           </View>
           <Field
             label="Username"
-            value={form.username}
-            onChangeText={(t) => update("username", t)}
+            value={data.username}
+            onChangeText={(t) => update({ username: t })}
             error={errors.username}
           />
           <View style={styles.row}>
             <View style={{ flex: 0.5 }}>
               <Field
                 label="Age"
-                value={form.age}
-                onChangeText={(t) => update("age", t)}
+                value={data.age}
+                onChangeText={(t) => update({ age: t })}
                 keyboardType="numeric"
                 error={errors.age}
               />
@@ -117,14 +108,14 @@ export default function CreateProfile() {
                     key={g}
                     style={[
                       styles.segBtn,
-                      form.gender === g && styles.segActive,
+                      data.gender === g && styles.segActive,
                     ]}
-                    onPress={() => update("gender", g)}
+                    onPress={() => update({ gender: g })}
                   >
                     <Text
                       style={[
                         styles.segText,
-                        form.gender === g && styles.segTextActive,
+                        data.gender === g && styles.segTextActive,
                       ]}
                     >
                       {g}
@@ -152,9 +143,9 @@ export default function CreateProfile() {
                 key={a.id}
                 style={[
                   styles.avatar,
-                  form.avatar === a.id && styles.avatarActive,
+                  data.avatar === a.id && styles.avatarActive,
                 ]}
-                onPress={() => update("avatar", a.id)}
+                onPress={() => update({ avatar: a.id })}
               >
                 <Image
                   source={a.source}

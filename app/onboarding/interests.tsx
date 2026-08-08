@@ -5,23 +5,26 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { SelectableCard } from "@/components/SelectableCard";
 import { INTERESTS } from "@/constants/interests";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function Interests() {
-  const [selected, setSelected] = useState<string[]>([]);
+  const { data, update } = useOnboarding();
 
-  const toggle = (id: string) =>
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  const toggle = (id: string) => {
+    const next = data.interests.includes(id)
+      ? data.interests.filter((x) => x !== id)
+      : [...data.interests, id];
+    update({ interests: next });
+  };
 
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
 
   function validate() {
     const next: { [k: string]: string } = {};
-    if (selected.length === 0) {
+    if (data.interests.length === 0) {
       next.interests = "Choose at least one interest";
     }
     setErrors(next);
@@ -37,14 +40,13 @@ export default function Interests() {
           Pick a few — we&apos;ll surface the quests, posts, and people that
           match. You can change these anytime.
         </Text>
-
         <View style={styles.grid}>
           {INTERESTS.map((i) => (
             <SelectableCard
               key={i.id}
               label={i.label}
               image={i.image}
-              selected={selected.includes(i.id)}
+              selected={data.interests.includes(i.id)}
               onPress={() => toggle(i.id)}
             />
           ))}
@@ -52,7 +54,6 @@ export default function Interests() {
         <View style={{ alignItems: "center", marginTop: 20 }}>
           <ErrorText>{errors.interests}</ErrorText>
         </View>
-
         <View style={styles.btn}>
           <Button
             label="Continue"

@@ -7,7 +7,7 @@ import { StyleSheet, View } from "react-native";
 export default function Index() {
   useEffect(() => {
     // No auth yet → after a brief splash, enter onboarding.
-    // Later: check for a saved session and router.replace("/(tabs)") if signed in.
+    // Later: check for a saved session and router.replace("/home") if signed in.
     const t = setTimeout(() => router.replace("/onboarding"), 1500);
     return () => clearTimeout(t);
   }, []);
