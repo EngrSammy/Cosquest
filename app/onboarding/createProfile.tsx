@@ -75,6 +75,7 @@ export default function CreateProfile() {
                 value={data.firstName}
                 onChangeText={(t) => update({ firstName: t })}
                 error={errors.firstName}
+                autoCapitalize="words"
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -83,6 +84,7 @@ export default function CreateProfile() {
                 value={data.lastName}
                 onChangeText={(t) => update({ lastName: t })}
                 error={errors.lastName}
+                autoCapitalize="words"
               />
             </View>
           </View>

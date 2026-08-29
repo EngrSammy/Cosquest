@@ -15,6 +15,7 @@ export function Field({
   leftIcon,
   textContentType,
   autoComplete,
+  autoCapitalize,
   error,
 }: {
   label: string;
@@ -37,6 +38,7 @@ export function Field({
     | "new-password"
     | "current-password"
     | "username";
+  autoCapitalize?: "none" | "words" | "sentences" | "characters";
   error?: string;
 }) {
   const [hidden, setHidden] = useState(true);
@@ -63,11 +65,11 @@ export function Field({
           keyboardType={keyboardType}
           secureTextEntry={secureTextEntry ? hidden : false}
           placeholderTextColor="#9C9CAA"
-          autoCapitalize="none"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           textContentType={textContentType}
           autoComplete={autoComplete}
+          autoCapitalize={autoCapitalize}
         />
         {secureTextEntry ? (
           <Pressable onPress={() => setHidden((h) => !h)} hitSlop={10}>

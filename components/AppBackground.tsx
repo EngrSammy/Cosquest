@@ -1,8 +1,15 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View } from "react-native";
+type Variant = "plain" | "gradient" | "blueGradient" | "blueMap";
 
-type Variant = "plain" | "gradient";
+// Which map image each variant shows behind the content (null = no map).
+const MAP_SOURCES = {
+  plain: require("@/assets/images/map-texture.png"),
+  gradient: require("@/assets/images/map-texture.png"),
+  blueMap: require("@/assets/images/blue-map-texture.png"),
+  blueGradient: null,
+} as const;
 
 export function AppBackground({
   children,
@@ -11,14 +18,19 @@ export function AppBackground({
   children: React.ReactNode;
   variant?: Variant;
 }) {
+  const map = MAP_SOURCES[variant];
+
   return (
     <View style={styles.root}>
-      <Image
-        source={require("@/assets/images/map-texture.png")}
-        style={[StyleSheet.absoluteFill, styles.map]}
-        contentFit="cover"
-      />
-      {variant === "gradient" && (
+      {map ? (
+        <Image
+          source={map}
+          style={[StyleSheet.absoluteFill, styles.map]}
+          contentFit="cover"
+        />
+      ) : null}
+
+      {variant === "gradient" ? (
         <LinearGradient
           colors={[
             "rgba(153,28,92,0.01)",
@@ -28,7 +40,29 @@ export function AppBackground({
           locations={[0, 0.62, 0.9]}
           style={StyleSheet.absoluteFill}
         />
-      )}
+      ) : null}
+
+      {/* blueMap: translucent blue over the street-map image so the map shows through */}
+      {variant === "blueMap" ? (
+        <LinearGradient
+          colors={[
+            "rgba(227,240,255,0.15)",
+            "rgba(90,143,224,0.45)",
+            "rgba(59,130,246,0.35)",
+          ]}
+          locations={[0, 0.62, 0.9]}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+
+      {/* blueGradient: a clean blue gradient, no map */}
+      {variant === "blueGradient" ? (
+        <LinearGradient
+          colors={["#E3F0FF", "#9FC3F7", "#5A8FE0"]}
+          locations={[0, 0.55, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       {children}
     </View>
   );
