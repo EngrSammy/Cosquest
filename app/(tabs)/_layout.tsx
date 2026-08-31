@@ -8,7 +8,7 @@ import { StyleSheet, View } from "react-native";
 
 export default function TabLayout() {
   return (
-    <AppBackground>
+    <AppBackground variant="blueGradient">
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: "#DC179F",

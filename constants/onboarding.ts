@@ -1,9 +1,10 @@
 export const STEP = {
   account: 1, // authentication, signup
   profile: 2, // createProfile
-  interests: 3,
-  permissions: 4,
-  faction: 5,
+  uploadPicture: 3, // uploadPicture
+  interests: 4,
+  permissions: 5,
+  faction: 6,
 } as const;
 
 // Derived, never hand-maintained — always the highest step number.

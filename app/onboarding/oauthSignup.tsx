@@ -54,7 +54,7 @@ export default function AuthSignup() {
             Already have an account?{" "}
             <Text
               style={{ color: "#C5399A", fontWeight: "700" }}
-              onPress={() => router.push("/onboarding/signup")}
+              onPress={() => router.push("/onboarding/signin")}
             >
               Sign-in
             </Text>

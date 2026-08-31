@@ -37,7 +37,7 @@ export default function Signin() {
     setSubmitting(true);
     try {
       await signIn(form.emailOrUsername, form.password);
-      router.replace("/");
+      router.replace("/home");
     } catch {
       setSubmitError("Incorrect email/username or password.");
     } finally {
@@ -62,6 +62,7 @@ export default function Signin() {
             value={form.emailOrUsername}
             onChangeText={(t) => update("emailOrUsername", t)}
             error={errors.emailOrUsername}
+            autoCapitalize="none"
           />
           <Field
             label="Password"

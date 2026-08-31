@@ -7,10 +7,10 @@ import type { ImageSourcePropType } from "react-native";
 export type ProfileUser = {
   name: string;
   username: string;
-  roles: string[]; // shown as the "· "-separated tagline
-  photo: ImageSourcePropType;
-  factionBadge: ImageSourcePropType;
-  bio: string;
+  bio: string[]; // shown as the "· "-separated tagline
+  profileBanner: ImageSourcePropType;
+  profileImage: ImageSourcePropType;
+  about: string;
   followers: string;
   following: number;
   posts: number;
@@ -18,15 +18,21 @@ export type ProfileUser = {
   wins: number;
   points: number;
   postThumbs: ImageSourcePropType[];
+  contact: {
+    email: string;
+    phone: string;
+    address: string;
+  };
 };
 
 export const MOCK_USER: ProfileUser = {
   name: "Alex Rivera",
   username: "alexrivera",
-  roles: ["Cosplay maker", "Building in public"],
-  photo: require("@/assets/images/avatars/avatar_01.png"),
-  factionBadge: require("@/assets/images/avatars/avatar_05.png"),
-  bio: "Building a community around cosplay, prop-making, and creative experiments. New tutorials and behind-the-scenes every week.",
+  bio: ["Cosplay creator", "Building in public"],
+  profileBanner: require("@/assets/images/cover-avatar.png"),
+  profileImage: require("@/assets/images/dp-avatar.png"),
+  about:
+    "Building a community around cosplay, prop-making, and creative experiments. New tutorials and behind-the-scenes every week.",
   followers: "12.4k",
   following: 482,
   posts: 128,
@@ -41,4 +47,9 @@ export const MOCK_USER: ProfileUser = {
     require("@/assets/images/interests/horror.png"),
     require("@/assets/images/interests/cosplay.png"),
   ],
+  contact: {
+    email: "emaculate619@gmail.com",
+    phone: "+2348148327836",
+    address: "Business address",
+  },
 };

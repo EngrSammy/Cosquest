@@ -3,10 +3,8 @@ import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
-import { AVATARS } from "@/constants/avatars";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { useOnboarding } from "@/context/OnboardingContext";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -43,9 +41,6 @@ export default function CreateProfile() {
     }
     if (!data.gender.trim()) {
       next.gender = "Choose a gender";
-    }
-    if (!data.avatar.trim()) {
-      next.avatar = "Choose an avatar";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -133,36 +128,6 @@ export default function CreateProfile() {
             </View>
           </View>
 
-          <Text style={styles.profileLabel}>
-            <Text
-              style={{ color: "#C5399A" }}
-              onPress={() => router.push("/onboarding/uploadPicture")}
-            >
-              Profile Picture{" "}
-            </Text>
-            <Text style={styles.hint}>· take a photo or pick an avatar</Text>
-          </Text>
-
-          <View style={styles.grid}>
-            {AVATARS.map((a) => (
-              <Pressable
-                key={a.id}
-                style={[
-                  styles.avatar,
-                  data.avatar === a.id && styles.avatarActive,
-                ]}
-                onPress={() => update({ avatar: a.id })}
-              >
-                <Image
-                  source={a.source}
-                  style={styles.avatarImg}
-                  contentFit="cover"
-                />
-              </Pressable>
-            ))}
-          </View>
-          <ErrorText>{errors.avatar}</ErrorText>
-
           <View style={{ marginTop: 80 }}>
             <Button
               label="Continue"
@@ -217,23 +182,4 @@ const styles = StyleSheet.create({
   },
   segText: { fontSize: 14, fontWeight: "700", color: "#191922" },
   segTextActive: { color: "#C5399A" },
-
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  avatar: {
-    width: "18%",
-    aspectRatio: 1,
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(150,150,160,0.30)",
-  },
-  avatarActive: { borderColor: "#C5399A", borderWidth: 2 },
-  avatarImg: { width: "100%", height: "100%", transform: [{ scale: 1.12 }] },
-  profileLabel: {
-    color: "#000",
-    fontWeight: "700",
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  hint: { fontWeight: "500", color: "#4c4c4d", fontSize: 14 },
 });

@@ -16,6 +16,7 @@ export function Field({
   textContentType,
   autoComplete,
   autoCapitalize,
+  multiline,
   error,
 }: {
   label: string;
@@ -39,6 +40,7 @@ export function Field({
     | "current-password"
     | "username";
   autoCapitalize?: "none" | "words" | "sentences" | "characters";
+  multiline?: boolean;
   error?: string;
 }) {
   const [hidden, setHidden] = useState(true);
@@ -70,6 +72,7 @@ export function Field({
           textContentType={textContentType}
           autoComplete={autoComplete}
           autoCapitalize={autoCapitalize}
+          multiline={multiline}
         />
         {secureTextEntry ? (
           <Pressable onPress={() => setHidden((h) => !h)} hitSlop={10}>
@@ -88,15 +91,15 @@ export function Field({
 
 const styles = StyleSheet.create({
   field: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: "600", color: "#191922", marginBottom: 6 },
+  label: { fontSize: 13, fontWeight: "500", color: "#37373a", marginBottom: 6 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "rgba(255,255,255,0.20)",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 0.4,
+    borderColor: "rgba(255,255,255,0.6)",
     borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: "rgba(187, 165, 165, 1)",
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,

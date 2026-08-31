@@ -58,7 +58,11 @@ export function AppBackground({
       {/* blueGradient: a clean blue gradient, no map */}
       {variant === "blueGradient" ? (
         <LinearGradient
-          colors={["#E3F0FF", "#9FC3F7", "#5A8FE0"]}
+          colors={[
+            "rgba(227,240,255,0.15)",
+            "rgba(90,143,224,0.45)",
+            "rgba(59,130,246,0.35)",
+          ]}
           locations={[0, 0.55, 1]}
           style={StyleSheet.absoluteFill}
         />
