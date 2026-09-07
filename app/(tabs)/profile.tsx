@@ -1,4 +1,4 @@
-import { MOCK_USER } from "@/constants/mockUser";
+import { useUser } from "@/context/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -69,7 +69,7 @@ const TABS: { key: Tab; icon: ImageSourcePropType }[] = [
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
-  const u = MOCK_USER;
+  const { user: u } = useUser();
   const [tab, setTab] = useState<Tab>("Posts");
 
   return (

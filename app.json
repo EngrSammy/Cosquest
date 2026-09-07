@@ -38,6 +38,13 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CosQuest needs access to your photos so you can set a profile picture.",
+          "cameraPermission": "CosQuest needs access to your camera so you can take a profile picture."
+        }
       ]
     ],
     "experiments": {

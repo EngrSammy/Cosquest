@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { UserProvider } from "@/context/UserContext";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -12,8 +13,9 @@ const navTheme = {
 
 export default function RootLayout() {
   return (
-    <AppBackground variant="blueGradient">
-      <ThemeProvider value={navTheme}>
+    <UserProvider>
+      <AppBackground variant="blueGradient">
+        <ThemeProvider value={navTheme}>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -37,5 +39,6 @@ export default function RootLayout() {
         <StatusBar style="auto" />
       </ThemeProvider>
     </AppBackground>
+    </UserProvider>
   );
 }

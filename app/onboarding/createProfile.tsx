@@ -55,7 +55,6 @@ export default function CreateProfile() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
         >
           <OnboardingProgress step={STEP.profile} total={ONBOARDING_TOTAL} />
           <Text style={styles.headline}>Create Your Profile</Text>
@@ -87,6 +86,7 @@ export default function CreateProfile() {
             label="Username"
             value={data.username}
             onChangeText={(t) => update({ username: t })}
+            autoCapitalize="none"
             error={errors.username}
           />
           <View style={styles.row}>
@@ -133,7 +133,7 @@ export default function CreateProfile() {
               label="Continue"
               variant="brand"
               onPress={() => {
-                if (validate()) router.push("/onboarding/interests");
+                if (validate()) router.push("/onboarding/uploadPicture");
               }}
             />
           </View>

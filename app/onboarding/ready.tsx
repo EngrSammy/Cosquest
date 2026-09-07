@@ -1,5 +1,8 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
+import { AVATARS } from "@/constants/avatars";
+import { useOnboarding } from "@/context/OnboardingContext";
+import { useUser } from "@/context/UserContext";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
@@ -7,6 +10,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function Ready() {
   const insets = useSafeAreaInsets();
+  const { data } = useOnboarding();
+  const { updateUser } = useUser();
+
+  // Finish onboarding: push the collected data into the app-wide user, then
+  // go to the app. (Later this is where you'd POST /onboarding/complete.)
+  function handleContinue() {
+    if (data.photo) updateUser({ profileBanner: { uri: data.photo } });
+    const avatar = AVATARS.find((a) => a.id === data.avatar);
+    if (avatar) updateUser({ profileImage: avatar.source });
+    router.replace("/home");
+  }
 
   return (
     <AppBackground variant="blueMap">
@@ -60,11 +74,7 @@ export default function Ready() {
         </View>
 
         <View style={styles.btn}>
-          <Button
-            label="Continue"
-            variant="brand"
-            onPress={() => router.replace("/home")}
-          />
+          <Button label="Continue" variant="brand" onPress={handleContinue} />
         </View>
       </View>
     </AppBackground>

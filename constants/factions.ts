@@ -7,7 +7,34 @@ export type Faction = {
 };
 
 export const FACTIONS: Faction[] = [
-  { id: "marvel", label: "Marvel", image: require("@/assets/images/factions/marvel.png") },
-  { id: "dc", label: "DC", image: require("@/assets/images/factions/dc.png") },
-  { id: "anime", label: "Anime", image: require("@/assets/images/factions/anime.png") },
+  {
+    id: "ascendants",
+    label: require("@/assets/images/factions/ascendants-label.png"),
+    image: require("@/assets/images/factions/ascendants.png"),
+  },
+  {
+    id: "icons",
+    label: require("@/assets/images/factions/icons-label.png"),
+    image: require("@/assets/images/factions/icons.png"),
+  },
+  {
+    id: "controllers",
+    label: require("@/assets/images/factions/controllers-label.png"),
+    image: require("@/assets/images/factions/controllers.png"),
+  },
+  {
+    id: "controllers",
+    label: require("@/assets/images/factions/blockbusters-label.png"),
+    image: require("@/assets/images/factions/blockbusters.png"),
+  },
+  {
+    id: "controllers",
+    label: require("@/assets/images/factions/everborn-label.png"),
+    image: require("@/assets/images/factions/everborn.png"),
+  },
+  {
+    id: "controllers",
+    label: require("@/assets/images/factions/celestials-label.png"),
+    image: require("@/assets/images/factions/celestials.png"),
+  },
 ];

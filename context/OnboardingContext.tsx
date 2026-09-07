@@ -9,6 +9,7 @@ export type OnboardingData = {
   age: number | null;
   gender: string;
   avatar: string;
+  photo?: string;
   interests: string[];
   faction: string;
   radiusMi: number;
@@ -27,6 +28,7 @@ const EMPTY: OnboardingData = {
   age: null,
   gender: "",
   avatar: "",
+  photo: "",
   interests: [],
   faction: "",
   radiusMi: 50,
