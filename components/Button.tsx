@@ -7,19 +7,23 @@ export function Button({
   onPress,
   variant = "light",
   prefix,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
   variant?: Variant;
   prefix?: string;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.sso,
         CONTAINER[variant],
         pressed && { opacity: 0.6 },
+        disabled && { opacity: 0.4 },
       ]}
     >
       {prefix ? <Text style={[styles.prefix]}>{prefix}</Text> : null}

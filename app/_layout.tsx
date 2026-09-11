@@ -3,6 +3,7 @@ import { UserProvider } from "@/context/UserContext";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 // Transparent nav theme so screens don't paint white over <AppBackground/>.
@@ -13,7 +14,8 @@ const navTheme = {
 
 export default function RootLayout() {
   return (
-    <UserProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <UserProvider>
       <AppBackground variant="blueGradient">
         <ThemeProvider value={navTheme}>
         <Stack
@@ -40,5 +42,6 @@ export default function RootLayout() {
       </ThemeProvider>
     </AppBackground>
     </UserProvider>
+    </GestureHandlerRootView>
   );
 }

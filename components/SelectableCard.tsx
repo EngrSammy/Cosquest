@@ -1,5 +1,5 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import type { ImageSourcePropType, StyleProp, ViewStyle } from "react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
