@@ -58,5 +58,5 @@ const styles = StyleSheet.create({
   },
   boxActive: { borderColor: "#C5399A", borderWidth: 1 },
   digit: { fontSize: 22, fontWeight: "700", color: "#191922" },
-  hiddenInput: { ...StyleSheet.absoluteFillObject, opacity: 0 },
+  hiddenInput: { ...StyleSheet.absoluteFill, opacity: 0 },
 });

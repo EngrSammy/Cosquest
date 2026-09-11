@@ -74,7 +74,7 @@ export function AppBackground({
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     flex: 1,
     backgroundColor: "#FFFFFF",
   },

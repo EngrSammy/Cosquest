@@ -86,7 +86,7 @@ export default function TabLayout() {
 const RADIUS = 30;
 const styles = StyleSheet.create({
   barShadow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,
     shadowColor: "#000",
     shadowOpacity: 0.15,
@@ -95,12 +95,12 @@ const styles = StyleSheet.create({
     elevation: 12, // Android depth
   },
   barClip: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,
     overflow: "hidden", // clips ONLY the blur + sheen to the pill
   },
   barOutline: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.7)", // crisp rim, no overflow → no chips
