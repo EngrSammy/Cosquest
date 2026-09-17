@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { Field } from "@/components/Field";
 import { MOCK_USER } from "@/constants/mockUser";
 import { Ionicons } from "@expo/vector-icons";
@@ -49,6 +50,7 @@ export default function ContactOptions() {
   }
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
     >
@@ -89,6 +91,7 @@ export default function ContactOptions() {
         onPress={() => {}}
       />
     </ScrollView>
+    </AppBackground>
   );
 }
 

@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -41,6 +42,7 @@ export default function Settings() {
   }
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
     >
@@ -99,6 +101,7 @@ export default function Settings() {
         <Text style={styles.logoutLabel}>Log Out</Text>
       </Pressable>
     </ScrollView>
+    </AppBackground>
   );
 }
 

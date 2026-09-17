@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { useUser } from "@/context/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -74,6 +75,7 @@ export default function Profile() {
   const [tab, setTab] = useState<Tab>("Posts");
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
     >
@@ -216,6 +218,7 @@ export default function Profile() {
         <Text style={styles.empty}>Nothing here yet.</Text>
       )}
     </ScrollView>
+    </AppBackground>
   );
 }
 

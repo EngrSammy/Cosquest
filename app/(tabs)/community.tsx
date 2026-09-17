@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { Chats } from "@/components/community/Chats";
 import { Feeds } from "@/components/community/Feeds";
 import { Spotlight } from "@/components/community/Spotlight";
@@ -18,6 +19,7 @@ export default function Community() {
   const [tab, setTab] = useState<Tab>("Spotlight");
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
     >
@@ -65,6 +67,7 @@ export default function Community() {
         <Chats />
       )}
     </ScrollView>
+    </AppBackground>
   );
 }
 

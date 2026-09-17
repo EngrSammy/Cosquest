@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { Field } from "@/components/Field";
 import { MOCK_USER } from "@/constants/mockUser";
 import { Ionicons } from "@expo/vector-icons";
@@ -50,6 +51,7 @@ export default function EditProfile() {
   }
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
       keyboardShouldPersistTaps="handled"
@@ -115,6 +117,7 @@ export default function EditProfile() {
         onPress={() => router.push("/contact-options")}
       />
     </ScrollView>
+    </AppBackground>
   );
 }
 

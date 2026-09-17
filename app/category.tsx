@@ -1,3 +1,4 @@
+import { AppBackground } from "@/components/AppBackground";
 import { CATEGORIES } from "@/constants/categories";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -32,6 +33,7 @@ export default function Category() {
   }
 
   return (
+    <AppBackground variant="blueGradient">
     <ScrollView
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8 }]}
       keyboardShouldPersistTaps="handled"
@@ -96,6 +98,7 @@ export default function Category() {
         );
       })}
     </ScrollView>
+    </AppBackground>
   );
 }
 

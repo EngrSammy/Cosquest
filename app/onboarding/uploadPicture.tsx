@@ -104,11 +104,13 @@ export default function CreateProfile() {
         </View>
 
         {data.photo ? (
-          <Image
-            source={{ uri: data.photo }}
-            style={styles.preview}
-            contentFit="cover"
-          />
+          <View style={styles.previewRing}>
+            <Image
+              source={{ uri: data.photo }}
+              style={styles.preview}
+              contentFit="cover"
+            />
+          </View>
         ) : null}
         <ErrorText>{errors.photo}</ErrorText>
 
@@ -193,12 +195,18 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   rollText: { color: "#191922", fontSize: 15, fontWeight: "600" },
-  preview: {
+  previewRing: {
     alignSelf: "center",
+    padding: 3,
+    borderRadius: 110,
+    borderWidth: 2,
+    borderColor: "#C5399A",
+    marginBottom: 30,
+  },
+  preview: {
     width: 200,
     height: 200,
     borderRadius: 100,
-    marginBottom: 10,
     backgroundColor: "#EEE",
   },
 

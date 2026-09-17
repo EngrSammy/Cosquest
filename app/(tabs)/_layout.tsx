@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { BlurView } from "expo-blur";
@@ -8,14 +7,12 @@ import { StyleSheet, View } from "react-native";
 
 export default function TabLayout() {
   return (
-    <AppBackground variant="blueGradient">
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: "#DC179F",
           tabBarInactiveTintColor: "#FEFEFE",
           headerShown: false,
           tabBarButton: HapticTab,
-          sceneStyle: { backgroundColor: "transparent" },
           tabBarStyle: {
             position: "absolute",
             marginHorizontal: 20,
@@ -79,7 +76,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </AppBackground>
   );
 }
 
