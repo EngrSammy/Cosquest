@@ -194,9 +194,10 @@ const styles = StyleSheet.create({
   },
   rollText: { color: "#191922", fontSize: 15, fontWeight: "600" },
   preview: {
-    width: "100%",
-    height: 150,
-    borderRadius: 16,
+    alignSelf: "center",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     marginBottom: 10,
     backgroundColor: "#EEE",
   },

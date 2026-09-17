@@ -109,6 +109,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
-  list: { gap: 25, marginTop: 50 },
-  btn: { marginTop: 100 },
+  list: { gap: 25, marginTop: 40 },
+  btn: { marginTop: 50 },
 });

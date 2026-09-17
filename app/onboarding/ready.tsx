@@ -5,13 +5,45 @@ import { useOnboarding } from "@/context/OnboardingContext";
 import { useUser } from "@/context/UserContext";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function Ready() {
   const insets = useSafeAreaInsets();
   const { data } = useOnboarding();
   const { updateUser } = useUser();
+
+  // Drives the entrance: 0 = off-screen + transparent, 1 = resting + opaque.
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withTiming(1, {
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [p]);
+
+  const leftStyle = useAnimatedStyle(() => ({
+    opacity: p.value,
+    transform: [{ translateX: (1 - p.value) * -SCREEN_W }],
+  }));
+  const rightStyle = useAnimatedStyle(() => ({
+    opacity: p.value,
+    transform: [{ translateX: (1 - p.value) * SCREEN_W }],
+  }));
+  const mainStyle = useAnimatedStyle(() => ({
+    opacity: p.value,
+    transform: [{ translateY: (1 - p.value) * SCREEN_H * 0.5 }],
+  }));
 
   // Finish onboarding: push the collected data into the app-wide user, then
   // go to the app. (Later this is where you'd POST /onboarding/complete.)
@@ -32,22 +64,21 @@ export default function Ready() {
 
         {/* Layered scene — children are absolutely positioned within.
             The two side heroes sit behind; the main hero sits in front,
-            center-bottom. Arrow + pins overlay on top. Tune the
-            top/left/right/bottom numbers to match the mockup exactly. */}
+            center-bottom. Arrow + pins overlay on top. */}
         <View style={styles.scene}>
-          <Image
+          <AnimatedImage
             source={require("@/assets/images/ready/left_hero.png")}
-            style={styles.leftHero}
+            style={[styles.leftHero, leftStyle]}
             contentFit="contain"
           />
-          <Image
+          <AnimatedImage
             source={require("@/assets/images/ready/right_hero.png")}
-            style={styles.rightHero}
+            style={[styles.rightHero, rightStyle]}
             contentFit="contain"
           />
-          <Image
+          <AnimatedImage
             source={require("@/assets/images/ready/hero.png")}
-            style={styles.mainHero}
+            style={[styles.mainHero, mainStyle]}
             contentFit="contain"
           />
 

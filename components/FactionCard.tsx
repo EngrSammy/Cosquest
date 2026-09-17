@@ -14,15 +14,15 @@ export function FactionCard({
   onPress,
 }: FactionCardProps) {
   return (
-    <Pressable
-      style={[
-        styles.wrapper,
-        { backgroundColor: "transparent" },
-        selected && styles.cardSelected,
-        selected && { shadowColor: f.bgColour },
-      ]}
-      onPress={onPress}
-    >
+    <Pressable style={styles.wrapper} onPress={onPress}>
+      {selected ? (
+        <View
+          style={[
+            styles.glow,
+            { backgroundColor: f.glowColour, shadowColor: f.glowColour },
+          ]}
+        />
+      ) : null}
       <View style={[styles.inner, { backgroundColor: f.bgColour }]}>
         <View style={styles.left}>
           <Image source={f.label} style={styles.label} contentFit="contain" />
@@ -40,11 +40,8 @@ const styles = StyleSheet.create({
   wrapper: {
     height: 90,
     borderRadius: 12,
-    shadowColor: "#191922",
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: "transparent",
+    position: "relative",
   },
   inner: {
     flexDirection: "row",
@@ -53,41 +50,47 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     overflow: "hidden",
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: "rgba(255,255,255,0.6)",
   },
   left: {
     flex: 1,
-    padding: 12,
+    padding: 10,
   },
-  label: { height: 40, width: 150 },
+  label: { height: 40, width: 140 },
   tint: {
     alignSelf: "flex-start",
     padding: 5,
-    backgroundColor: "rgba(195, 77, 156, 0.22)",
+    backgroundColor: "rgba(195, 77, 156, 1)",
     borderTopRightRadius: 15,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    bottom: -13,
-    left: -14,
+    bottom: -12,
+    left: -10,
   },
   caption: {
     color: "rgba(94, 72, 72, 1)",
     alignSelf: "center",
     fontWeight: "600",
-    fontSize: 10,
+    fontSize: 13,
   },
   image: {
     position: "absolute",
-    width: 280,
-    height: 105,
-    right: -30,
-    bottom: 1,
+    width: 180,
+    height: 200,
+    right: -10,
+    bottom: -50,
   },
-  cardSelected: {
-    shadowOffset: { width: 0, height: 0 },
+  glow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
     shadowOpacity: 0.9,
-    shadowRadius: 15,
-    elevation: 12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 14,
   },
 });

@@ -6,6 +6,7 @@ export type Faction = {
   image: ImageSourcePropType;
   caption?: string;
   bgColour?: string;
+  glowColour?: string;
 };
 
 export const FACTIONS: Faction[] = [
@@ -15,6 +16,7 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/ascendants.png"),
     caption: "Anime Fans",
     bgColour: "rgba(195, 77, 156, 0.28)",
+    glowColour: "rgba(214, 51, 168, 1)",
   },
   {
     id: "icons",
@@ -22,6 +24,7 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/icons.png"),
     caption: "Comic Book Fans",
     bgColour: "rgba(193, 200, 251, 1)",
+    glowColour: "rgba(110, 128, 246, 1)",
   },
   {
     id: "controllers",
@@ -29,6 +32,7 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/controllers.png"),
     caption: "Gaming Fans",
     bgColour: "rgba(77, 126, 195, 0.28)",
+    glowColour: "rgba(45, 110, 210, 1)",
   },
   {
     id: "blockbusters",
@@ -36,6 +40,7 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/blockbusters.png"),
     caption: "Movie Fans",
     bgColour: "rgba(213, 228, 0, 0.28)",
+    glowColour: "rgba(200, 216, 0, 1)",
   },
   {
     id: "everborn",
@@ -43,6 +48,7 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/everborn.png"),
     caption: "Fantasy Fans",
     bgColour: "rgba(249, 64, 154, 0.28)",
+    glowColour: "rgba(249, 40, 150, 1)",
   },
   {
     id: "celestials",
@@ -50,5 +56,6 @@ export const FACTIONS: Faction[] = [
     image: require("@/assets/images/factions/celestials.png"),
     caption: "Sci-Fi Fans",
     bgColour: "rgba(255, 255, 255, 0.28)",
+    glowColour: "rgba(80, 190, 245, 1)",
   },
 ];

@@ -33,6 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="following" />
           <Stack.Screen name="category" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="notifications" />
           <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}

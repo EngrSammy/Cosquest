@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "#C5399A",
+    backgroundColor: "rgb(204, 151, 186)",
   },
   changePhoto: {
     fontSize: 13,

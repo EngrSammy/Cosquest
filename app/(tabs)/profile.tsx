@@ -1,6 +1,7 @@
 import { useUser } from "@/context/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -87,11 +88,19 @@ export default function Profile() {
 
       {/* ProfileBanner + profileImage */}
       <View style={styles.avatarWrap}>
-        <Image
-          source={u.profileBanner}
-          style={styles.banner}
-          contentFit="cover"
-        />
+        <View style={styles.bannerContainer}>
+          <Image
+            source={u.profileBanner}
+            style={styles.banner}
+            contentFit="cover"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(0, 0, 0, 0.74)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.tint}
+          />
+        </View>
         <View style={styles.profile}>
           <Image
             source={u.profileImage}
@@ -234,11 +243,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: 150,
   },
-  banner: {
+  bannerContainer: {
+    overflow: "hidden",
     width: 300,
     height: 300,
     borderRadius: 150,
     left: -80,
+  },
+  banner: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+  },
+  tint: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "50%",
+    width: 300,
   },
   profile: {
     position: "absolute",
@@ -248,9 +271,9 @@ const styles = StyleSheet.create({
     height: 65,
     borderRadius: 50,
     borderWidth: 1,
-    borderColor: "#FFFFFF",
+    borderColor: "rgba(255,255,255,0.25)",
     overflow: "hidden",
-    backgroundColor: "#C5399A",
+    backgroundColor: "rgb(207, 98, 171)",
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 6 },

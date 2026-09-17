@@ -36,7 +36,6 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 
 export default function Permissions() {
   const { data, update } = useOnboarding();
-  const [notifications, setNotifications] = useState(false);
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
 
   async function toggleLocation() {
@@ -64,12 +63,21 @@ export default function Permissions() {
   }
 
   async function toggleNotifications() {
-    if (notifications) {
-      setNotifications(false);
+    if (data.notificationsEnabled) {
+      update({ notificationsEnabled: false });
       return;
     }
-    const { status } = await Notifications.requestPermissionsAsync();
-    setNotifications(status === "granted");
+    const { status, canAskAgain } =
+      await Notifications.requestPermissionsAsync();
+    const granted = status === "granted";
+    update({ notificationsEnabled: granted });
+    setErrors((e) => ({
+      ...e,
+      notifications:
+        granted || canAskAgain
+          ? ""
+          : "Notifications are off. Enable them in Settings to get quest alerts.",
+    }));
   }
 
   function validate() {
@@ -144,6 +152,15 @@ export default function Permissions() {
               onToggle={toggleNotifications}
             />
           </View>
+          <ErrorText>{errors.notifications}</ErrorText>
+          {errors.notifications ? (
+            <Text
+              style={styles.settingsLink}
+              onPress={() => Linking.openSettings()}
+            >
+              Open Settings
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.btn}>

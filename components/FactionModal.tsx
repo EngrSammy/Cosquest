@@ -121,7 +121,7 @@ export function FactionModal({
                   <View style={styles.circle}>
                     <Ionicons
                       name="close-circle-outline"
-                      size={24}
+                      size={28}
                       color="rgba(168, 65, 118, 1)"
                     />
                   </View>
@@ -163,7 +163,7 @@ export function FactionModal({
                   <View style={styles.circle}>
                     <Ionicons
                       name="trending-up-sharp"
-                      size={24}
+                      size={28}
                       color="rgba(104, 65, 168, 1)"
                     />
                   </View>
@@ -205,7 +205,7 @@ export function FactionModal({
                   <View style={styles.circle}>
                     <Ionicons
                       name="sync"
-                      size={24}
+                      size={28}
                       color="rgba(65, 114, 168, 1)"
                     />
                   </View>
@@ -251,9 +251,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(184, 232, 255, 0.94)",
     paddingTop: 18,
     paddingBottom: 40,
-    paddingHorizontal: 18,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 50,
+    borderTopRightRadius: 50,
   },
   handle: {
     alignSelf: "center",
@@ -264,53 +264,55 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
     color: "#191922",
     marginBottom: 10,
   },
   sub: {
-    fontSize: 15,
+    fontSize: 13,
     color: "rgba(107, 73, 90, 1)",
-    lineHeight: 24,
+    lineHeight: 20,
+    fontWeight: 400,
   },
   box: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginTop: 20,
-    paddingVertical: 20,
+    marginTop: 12,
+    paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 20,
     overflow: "hidden",
     width: "100%",
   },
-  boxText: { flex: 1, paddingTop: 5, left: -5 },
+  boxText: { flex: 1, paddingTop: 5, left: -10 },
   boxTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "700",
     marginBottom: 5,
   },
   boxBody: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 12,
+    fontWeight: 500,
+    lineHeight: 19,
   },
   circle: {
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
+    borderRadius: 30,
     backgroundColor: "#fff",
-    width: 40,
-    height: 40,
+    width: 45,
+    height: 45,
+    left: 5,
   },
   cardTag: {
     alignSelf: "flex-start",
     borderTopRightRadius: 15,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginTop: 12,
-    bottom: -20,
-    left: -26,
+    marginTop: 5,
+    bottom: -10,
+    left: -20,
   },
   cardTagText: {
     fontWeight: "700",
@@ -323,5 +325,5 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   agreeText: { flex: 1, fontSize: 13, color: "#191922" },
-  btn: { marginTop: 24, width: "80%", alignSelf: "center" },
+  btn: { marginTop: 24, width: "90%", alignSelf: "center" },
 });
