@@ -1,11 +1,11 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
-import { AVATARS } from "@/constants/avatars";
 import { useOnboarding } from "@/context/OnboardingContext";
-import { useUser } from "@/context/UserContext";
+import { useAppDispatch } from "@/store/hooks";
+import { finishOnboarding } from "@/store/thunks/userThunks";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -16,15 +16,18 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function Ready() {
   const insets = useSafeAreaInsets();
   const { data } = useOnboarding();
-  const { updateUser } = useUser();
+  const dispatch = useAppDispatch();
 
-  // Drives the entrance: 0 = off-screen + transparent, 1 = resting + opaque.
+  const [saving, setSaving] = useState(false);
+
   const p = useSharedValue(0);
+
   useEffect(() => {
     p.value = withTiming(1, {
       duration: 1200,
@@ -34,48 +37,142 @@ export default function Ready() {
 
   const leftStyle = useAnimatedStyle(() => ({
     opacity: p.value,
-    transform: [{ translateX: (1 - p.value) * -SCREEN_W }],
-  }));
-  const rightStyle = useAnimatedStyle(() => ({
-    opacity: p.value,
-    transform: [{ translateX: (1 - p.value) * SCREEN_W }],
-  }));
-  const mainStyle = useAnimatedStyle(() => ({
-    opacity: p.value,
-    transform: [{ translateY: (1 - p.value) * SCREEN_H * 0.5 }],
+    transform: [
+      {
+        translateX: (1 - p.value) * -SCREEN_W,
+      },
+    ],
   }));
 
-  // Finish onboarding: push the collected data into the app-wide user, then
-  // go to the app. (Later this is where you'd POST /onboarding/complete.)
-  function handleContinue() {
-    if (data.photo) updateUser({ profileBanner: { uri: data.photo } });
-    const avatar = AVATARS.find((a) => a.id === data.avatar);
-    if (avatar) updateUser({ profileImage: avatar.source });
-    router.replace("/home");
+  const rightStyle = useAnimatedStyle(() => ({
+    opacity: p.value,
+    transform: [
+      {
+        translateX: (1 - p.value) * SCREEN_W,
+      },
+    ],
+  }));
+
+  const mainStyle = useAnimatedStyle(() => ({
+    opacity: p.value,
+    transform: [
+      {
+        translateY: (1 - p.value) * SCREEN_H * 0.5,
+      },
+    ],
+  }));
+
+  async function handleContinue() {
+    if (saving) {
+      return;
+    }
+
+    if (!data.email?.trim()) {
+      return;
+    }
+
+    if (!data.firstName?.trim()) {
+      return;
+    }
+
+    if (!data.lastName?.trim()) {
+      return;
+    }
+
+    if (!data.username?.trim()) {
+      return;
+    }
+
+    if (!data.gender?.trim()) {
+      return;
+    }
+
+    if (!data.avatar?.trim()) {
+      return;
+    }
+
+    if (!data.faction?.trim()) {
+      return;
+    }
+
+    if (!Array.isArray(data.interests) || data.interests.length === 0) {
+      return;
+    }
+
+    if (data.locationGranted && (data.lat === null || data.lng === null)) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const onboardingPayload = {
+        email: data.email.trim(),
+
+        profile: {
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          username: data.username.trim(),
+          age: data.age,
+          gender: data.gender,
+          avatar: data.avatar,
+        },
+
+        faction: data.faction,
+
+        interests: data.interests,
+
+        preferences: {
+          notificationsEnabled: data.notificationsEnabled,
+        },
+
+        location: {
+          locationEnabled: data.locationGranted,
+          radiusMiles: data.radiusMi,
+          lat: data.lat,
+          lng: data.lng,
+        },
+      };
+
+      const response = await dispatch(
+        finishOnboarding(onboardingPayload),
+      ).unwrap();
+
+      router.replace("/home");
+    } catch (error) {
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <AppBackground variant="blueMap">
-      <View style={[styles.screen, { paddingTop: insets.top + 24 }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top + 24,
+          },
+        ]}>
         <View style={styles.titleWrap}>
           <Text style={styles.small}>Welcome To</Text>
+
           <Text style={styles.big}>COSQUEST</Text>
         </View>
 
-        {/* Layered scene — children are absolutely positioned within.
-            The two side heroes sit behind; the main hero sits in front,
-            center-bottom. Arrow + pins overlay on top. */}
         <View style={styles.scene}>
           <AnimatedImage
             source={require("@/assets/images/ready/left_hero.png")}
             style={[styles.leftHero, leftStyle]}
             contentFit="contain"
           />
+
           <AnimatedImage
             source={require("@/assets/images/ready/right_hero.png")}
             style={[styles.rightHero, rightStyle]}
             contentFit="contain"
           />
+
           <AnimatedImage
             source={require("@/assets/images/ready/hero.png")}
             style={[styles.mainHero, mainStyle]}
@@ -87,16 +184,19 @@ export default function Ready() {
             style={styles.arrow}
             contentFit="contain"
           />
+
           <Image
             source={require("@/assets/images/ready/ready_pin2.png")}
             style={styles.pinLeft}
             contentFit="contain"
           />
+
           <Image
             source={require("@/assets/images/ready/ready_pin.png")}
             style={styles.pinRight}
             contentFit="contain"
           />
+
           <Image
             source={require("@/assets/images/ready/ready_pin2.png")}
             style={styles.pinBottom}
@@ -105,7 +205,12 @@ export default function Ready() {
         </View>
 
         <View style={styles.btn}>
-          <Button label="Continue" variant="brand" onPress={handleContinue} />
+          <Button
+            label={saving ? "Setting up..." : "Continue"}
+            variant="brand"
+            onPress={handleContinue}
+            disabled={saving}
+          />
         </View>
       </View>
     </AppBackground>
@@ -113,14 +218,23 @@ export default function Ready() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
-  titleWrap: { alignItems: "center" },
+  screen: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+
+  titleWrap: {
+    alignItems: "center",
+  },
+
   small: {
     fontSize: 35,
     fontWeight: "800",
     color: "#191922",
     textAlign: "center",
   },
+
   big: {
     fontSize: 44,
     fontWeight: "900",
@@ -129,9 +243,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  scene: { flex: 1, position: "relative", marginTop: 12 },
+  scene: {
+    flex: 1,
+    position: "relative",
+    marginTop: 12,
+  },
 
-  // two behind, higher up
   leftHero: {
     position: "absolute",
     top: "2%",
@@ -140,6 +257,7 @@ const styles = StyleSheet.create({
     height: "50%",
     zIndex: 1,
   },
+
   rightHero: {
     position: "absolute",
     top: "5%",
@@ -148,7 +266,7 @@ const styles = StyleSheet.create({
     height: "50%",
     zIndex: 1,
   },
-  // main in front, center-bottom, largest
+
   mainHero: {
     position: "absolute",
     left: 33,
@@ -159,7 +277,6 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
 
-  // overlays
   arrow: {
     position: "absolute",
     top: "45%",
@@ -168,6 +285,7 @@ const styles = StyleSheet.create({
     height: 100,
     zIndex: 4,
   },
+
   pinLeft: {
     position: "absolute",
     left: "3%",
@@ -176,6 +294,7 @@ const styles = StyleSheet.create({
     height: 34,
     zIndex: 4,
   },
+
   pinRight: {
     position: "absolute",
     right: "2%",
@@ -184,6 +303,7 @@ const styles = StyleSheet.create({
     height: 42,
     zIndex: 4,
   },
+
   pinBottom: {
     position: "absolute",
     left: "10%",
@@ -193,5 +313,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
 
-  btn: { paddingTop: 5, paddingBottom: 30 },
+  btn: {
+    paddingTop: 5,
+    paddingBottom: 30,
+  },
 });

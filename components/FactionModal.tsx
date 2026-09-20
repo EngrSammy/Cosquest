@@ -1,7 +1,14 @@
 import { Button } from "@/components/Button";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  Dimensions,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import {
   Gesture,
   GestureDetector,
@@ -12,7 +19,12 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
+
+// ==========================================
+// TYPES
+// ==========================================
 
 type Props = {
   visible: boolean;
@@ -22,9 +34,18 @@ type Props = {
   onClose: () => void;
 };
 
-// Drag this far down (or flick faster than this) to dismiss.
+// ==========================================
+// CONSTANTS
+// ==========================================
+
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 800;
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// ==========================================
+// COMPONENT
+// ==========================================
 
 export function FactionModal({
   visible,
@@ -33,91 +54,228 @@ export function FactionModal({
   onAgree,
   onClose,
 }: Props) {
-  // How far the sheet is dragged down, in px. Lives on the UI thread.
-  const translateY = useSharedValue(0);
+  // ==========================================
+  // ANIMATION STATE
+  // ==========================================
 
-  // Resets the drag offset every time the sheet re-opens.
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+
+  // ==========================================
+  // ERROR STATE
+  // ==========================================
+
+  const [error, setError] = useState("");
+
+  // ==========================================
+  // OPEN / RESET ANIMATION
+  // ==========================================
+
   useEffect(() => {
-    if (visible) translateY.value = 0;
+    if (visible) {
+      // Start below the screen.
+      translateY.value = SCREEN_HEIGHT;
+
+      // Animate upward.
+      translateY.value = withSpring(0, {
+        damping: 24,
+        stiffness: 150,
+      });
+
+      setError("");
+    } else {
+      // Keep it below the screen while hidden.
+      translateY.value = SCREEN_HEIGHT;
+    }
   }, [visible, translateY]);
 
+  // ==========================================
+  // CLEAR ERROR WHEN CHECKED
+  // ==========================================
+
+  useEffect(() => {
+    if (agreed) {
+      setError("");
+    }
+  }, [agreed]);
+
+  // ==========================================
+  // CLOSE WITH DOWN ANIMATION
+  // ==========================================
+
+  function closeWithAnimation(callback: () => void) {
+    translateY.value = withTiming(
+      SCREEN_HEIGHT,
+      {
+        duration: 280,
+      },
+      (finished) => {
+        if (finished) {
+          runOnJS(callback)();
+        }
+      },
+    );
+  }
+
+  // ==========================================
+  // GESTURE
+  // ==========================================
+
   const pan = Gesture.Pan()
-    .onUpdate((e) => {
-      // Only allow dragging DOWN (clamp upward drags to 0).
-      translateY.value = Math.max(0, e.translationY);
+    .onUpdate((event) => {
+      translateY.value = Math.max(0, event.translationY);
     })
-    .onEnd((e) => {
-      const dismissed =
-        e.translationY > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY;
-      if (dismissed) {
-        runOnJS(onClose)();
+    .onEnd((event) => {
+      const shouldClose =
+        event.translationY > DISMISS_DISTANCE ||
+        event.velocityY > DISMISS_VELOCITY;
+
+      if (shouldClose) {
+        translateY.value = withTiming(
+          SCREEN_HEIGHT,
+          {
+            duration: 280,
+          },
+          (finished) => {
+            if (finished) {
+              runOnJS(onClose)();
+            }
+          },
+        );
       } else {
-        // Snap back to fully open.
-        translateY.value = withSpring(0, { damping: 20 });
+        translateY.value = withSpring(0, {
+          damping: 20,
+          stiffness: 150,
+        });
       }
     });
 
+  // ==========================================
+  // ANIMATED STYLE
+  // ==========================================
+
   const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [
+      {
+        translateY: translateY.value,
+      },
+    ],
   }));
+
+  // ==========================================
+  // CONTINUE
+  // ==========================================
+
+  function handleContinue() {
+    // ----------------------------------------
+    // CHECKBOX NOT CHECKED
+    // ----------------------------------------
+
+    if (!agreed) {
+      setError("Please check the box before you can continue.");
+
+      return;
+    }
+
+    // ----------------------------------------
+    // AGREED
+    // ----------------------------------------
+
+    setError("");
+
+    console.log("FACTION CONSENT CHECKED:", agreed);
+
+    // Animate the popup DOWN first.
+    closeWithAnimation(onAgree);
+  }
+
+  // ==========================================
+  // CLOSE
+  // ==========================================
+
+  function handleClose() {
+    closeWithAnimation(onClose);
+  }
+
+  // ==========================================
+  // UI
+  // ==========================================
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      {/* gesture-handler needs its OWN root inside the Modal's separate tree */}
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
+      animationType="none"
+      onRequestClose={handleClose}>
+      <GestureHandlerRootView
+        style={{
+          flex: 1,
+        }}>
+        <Pressable style={styles.backdrop} onPress={handleClose}>
           <GestureDetector gesture={pan}>
             <Animated.View style={cardStyle}>
-              {/* swallow taps so a tap inside the card doesn't close it */}
               <Pressable style={styles.modalCard} onPress={() => {}}>
-                {/* drag handle */}
+                {/* ==================================
+                    HANDLE
+                ================================== */}
+
                 <View style={styles.handle} />
 
+                {/* ==================================
+                    TITLE
+                ================================== */}
+
                 <Text style={styles.title}>Before You Pick Your Faction</Text>
+
                 <Text style={styles.sub}>
                   Your faction is your people - a badge you carry into every
-                  CosQuest. Here's what it actually means to join one.
+                  CosQuest. Here&apos;s what it actually means to join one.
                 </Text>
+
+                {/* ==================================
+                    INFORMATION BOX 1
+                ================================== */}
 
                 <View
                   style={[
                     styles.box,
-                    { backgroundColor: "rgba(247, 223, 236, 1)" },
-                  ]}
-                >
+                    {
+                      backgroundColor: "rgba(247, 223, 236, 1)",
+                    },
+                  ]}>
                   <View style={styles.boxText}>
                     <Text style={styles.boxTitle}>Built around fandoms</Text>
+
                     <Text
                       style={[
                         styles.boxBody,
-                        { color: "rgba(107, 73, 90, 1)" },
-                      ]}
-                    >
+                        {
+                          color: "rgba(107, 73, 90, 1)",
+                        },
+                      ]}>
                       Each faction is rooted in a fandom - anime, comics,
                       gaming, movies, fantasy, sci-fi. Pick whichever feels like
                       home.
                     </Text>
+
                     <View
                       style={[
                         styles.cardTag,
-                        { backgroundColor: "rgba(236, 193, 214, 1)" },
-                      ]}
-                    >
+                        {
+                          backgroundColor: "rgba(236, 193, 214, 1)",
+                        },
+                      ]}>
                       <Text
                         style={[
                           styles.cardTagText,
-                          { color: "rgba(168, 65, 118, 1)" },
-                        ]}
-                      >
+                          {
+                            color: "rgba(168, 65, 118, 1)",
+                          },
+                        ]}>
                         Good to know
                       </Text>
                     </View>
                   </View>
+
                   <View style={styles.circle}>
                     <Ionicons
                       name="close-circle-outline"
@@ -127,39 +285,50 @@ export function FactionModal({
                   </View>
                 </View>
 
+                {/* ==================================
+                    INFORMATION BOX 2
+                ================================== */}
+
                 <View
                   style={[
                     styles.box,
-                    { backgroundColor: "rgba(228, 221, 247, 1)" },
-                  ]}
-                >
+                    {
+                      backgroundColor: "rgba(228, 221, 247, 1)",
+                    },
+                  ]}>
                   <View style={styles.boxText}>
                     <Text style={styles.boxTitle}>You rank up over time</Text>
+
                     <Text
                       style={[
                         styles.boxBody,
-                        { color: "rgba(86, 77, 110, 1)" },
-                      ]}
-                    >
+                        {
+                          color: "rgba(86, 77, 110, 1)",
+                        },
+                      ]}>
                       Ten ranks stand between Initiate and Eternal. Quests,
                       events and contributions all move you up the ladder.
                     </Text>
+
                     <View
                       style={[
                         styles.cardTag,
-                        { backgroundColor: "rgba(203, 191, 232, 1)" },
-                      ]}
-                    >
+                        {
+                          backgroundColor: "rgba(203, 191, 232, 1)",
+                        },
+                      ]}>
                       <Text
                         style={[
                           styles.cardTagText,
-                          { color: "rgba(67, 51, 107, 1)" },
-                        ]}
-                      >
+                          {
+                            color: "rgba(67, 51, 107, 1)",
+                          },
+                        ]}>
                         Progression
                       </Text>
                     </View>
                   </View>
+
                   <View style={styles.circle}>
                     <Ionicons
                       name="trending-up-sharp"
@@ -169,39 +338,51 @@ export function FactionModal({
                   </View>
                 </View>
 
+                {/* ==================================
+                    INFORMATION BOX 3
+                ================================== */}
+
                 <View
                   style={[
                     styles.box,
-                    { backgroundColor: "rgba(223, 237, 250, 1)" },
-                  ]}
-                >
+                    {
+                      backgroundColor: "rgba(223, 237, 250, 1)",
+                    },
+                  ]}>
                   <View style={styles.boxText}>
                     <Text style={styles.boxTitle}>Switching has a cost</Text>
+
                     <Text
                       style={[
                         styles.boxBody,
-                        { color: "rgba(77, 92, 112, 1)" },
-                      ]}
-                    >
+                        {
+                          color: "rgba(77, 92, 112, 1)",
+                        },
+                      ]}>
                       You can change factions later, but only during faction
-                      windows - and you'll lose rank and points when you do.
+                      windows - and you&apos;ll lose rank and points when you
+                      do.
                     </Text>
+
                     <View
                       style={[
                         styles.cardTag,
-                        { backgroundColor: "rgba(198, 219, 245, 1)" },
-                      ]}
-                    >
+                        {
+                          backgroundColor: "rgba(198, 219, 245, 1)",
+                        },
+                      ]}>
                       <Text
                         style={[
                           styles.cardTagText,
-                          { color: "rgba(40, 66, 96, 1)" },
-                        ]}
-                      >
+                          {
+                            color: "rgba(40, 66, 96, 1)",
+                          },
+                        ]}>
                         Heads up
                       </Text>
                     </View>
                   </View>
+
                   <View style={styles.circle}>
                     <Ionicons
                       name="sync"
@@ -211,24 +392,52 @@ export function FactionModal({
                   </View>
                 </View>
 
-                <Pressable style={styles.agreeRow} onPress={onToggleAgree}>
+                {/* ==================================
+                    CHECKBOX / STATE
+                ================================== */}
+
+                <Pressable
+                  style={styles.agreeRow}
+                  onPress={() => {
+                    setError("");
+
+                    onToggleAgree();
+                  }}>
                   <Ionicons
                     name={agreed ? "checkbox" : "square-outline"}
                     size={22}
                     color={agreed ? "#C5399A" : "#5b5b5e"}
                   />
-                  <Text style={styles.agreeText}>
-                    Got it — I understand my faction shapes my rank, and
-                    switching later has a cost.
-                  </Text>
+
+                  <View style={styles.agreeContent}>
+                    <Text style={styles.agreeText}>
+                      Got it — I understand my faction shapes my rank, and
+                      switching later has a cost.
+                    </Text>
+
+                    {agreed ? (
+                      <Text style={styles.agreedLabel}>
+                        ✓ Agreement confirmed
+                      </Text>
+                    ) : null}
+                  </View>
                 </Pressable>
+
+                {/* ==================================
+                    ERROR
+                ================================== */}
+
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                {/* ==================================
+                    CONTINUE BUTTON
+                ================================== */}
 
                 <View style={styles.btn}>
                   <Button
-                    label="I agree"
+                    label="Continue"
                     variant="brand"
-                    disabled={!agreed}
-                    onPress={onAgree}
+                    onPress={handleContinue}
                   />
                 </View>
               </Pressable>
@@ -240,12 +449,17 @@ export function FactionModal({
   );
 }
 
+// ==========================================
+// STYLES
+// ==========================================
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.4)",
   },
+
   modalCard: {
     width: "100%",
     backgroundColor: "rgba(184, 232, 255, 0.94)",
@@ -255,6 +469,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
   },
+
   handle: {
     alignSelf: "center",
     width: 44,
@@ -263,18 +478,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(25,25,34,0.25)",
     marginBottom: 20,
   },
+
   title: {
     fontSize: 24,
     fontWeight: "800",
     color: "#191922",
     marginBottom: 10,
   },
+
   sub: {
     fontSize: 13,
     color: "rgba(107, 73, 90, 1)",
     lineHeight: 20,
-    fontWeight: 400,
+    fontWeight: "400",
   },
+
   box: {
     flexDirection: "row",
     alignItems: "center",
@@ -285,17 +503,25 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: "100%",
   },
-  boxText: { flex: 1, paddingTop: 5, left: -10 },
+
+  boxText: {
+    flex: 1,
+    paddingTop: 5,
+    left: -10,
+  },
+
   boxTitle: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 5,
   },
+
   boxBody: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: "500",
     lineHeight: 19,
   },
+
   circle: {
     alignItems: "center",
     justifyContent: "center",
@@ -305,6 +531,7 @@ const styles = StyleSheet.create({
     height: 45,
     left: 5,
   },
+
   cardTag: {
     alignSelf: "flex-start",
     borderTopRightRadius: 15,
@@ -314,16 +541,46 @@ const styles = StyleSheet.create({
     bottom: -10,
     left: -20,
   },
+
   cardTagText: {
     fontWeight: "700",
     fontSize: 12,
   },
+
   agreeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginTop: 30,
   },
-  agreeText: { flex: 1, fontSize: 13, color: "#191922" },
-  btn: { marginTop: 24, width: "90%", alignSelf: "center" },
+
+  agreeContent: {
+    flex: 1,
+  },
+
+  agreeText: {
+    fontSize: 13,
+    color: "#191922",
+  },
+
+  agreedLabel: {
+    marginTop: 5,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#C5399A",
+  },
+
+  errorText: {
+    color: "#B42318",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 12,
+  },
+
+  btn: {
+    marginTop: 24,
+    width: "90%",
+    alignSelf: "center",
+  },
 });

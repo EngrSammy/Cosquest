@@ -8,7 +8,11 @@
     "scheme": "cosquest",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dammy0227.cosquest",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +21,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,6 +60,12 @@
       "typedRoutes": true,
       "reactCompiler": true,
       "baseUrl": "/Cosquest"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4cb596a0-3a90-4c2d-b8f7-2e090efcd80f"
+      }
     }
   }
 }

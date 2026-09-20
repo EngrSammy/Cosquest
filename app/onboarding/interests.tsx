@@ -6,6 +6,8 @@ import { SelectableCard } from "@/components/SelectableCard";
 import { INTERESTS } from "@/constants/interests";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { useOnboarding } from "@/context/OnboardingContext";
+import { useAppDispatch } from "@/store/hooks";
+import { saveUserInterests } from "@/store/thunks/userThunks";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -13,33 +15,93 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 export default function Interests() {
   const { data, update } = useOnboarding();
 
+  const dispatch = useAppDispatch();
+
+  const [errors, setErrors] = useState<{
+    [k: string]: string;
+  }>({});
+
+  const [saving, setSaving] = useState(false);
+
   const toggle = (id: string) => {
     const next = data.interests.includes(id)
       ? data.interests.filter((x) => x !== id)
       : [...data.interests, id];
-    update({ interests: next });
+
+    update({
+      interests: next,
+    });
+
+    if (next.length > 0) {
+      setErrors({});
+    }
   };
 
-  const [errors, setErrors] = useState<{ [k: string]: string }>({});
-
   function validate() {
-    const next: { [k: string]: string } = {};
+    const next: {
+      [k: string]: string;
+    } = {};
+
     if (data.interests.length === 0) {
       next.interests = "Choose at least one interest";
     }
+
     setErrors(next);
+
     return Object.keys(next).length === 0;
   }
+
+  const handleContinue = async () => {
+    if (saving) {
+      return;
+    }
+
+    if (!validate()) {
+      return;
+    }
+
+    if (!data.email.trim()) {
+      setErrors({
+        interests: "Your email is missing. Please go back and try again.",
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const result = await dispatch(
+        saveUserInterests({
+          email: data.email.trim(),
+          interests: data.interests,
+        }),
+      ).unwrap();
+
+      router.push("/onboarding/permissions");
+    } catch (error) {
+      setErrors({
+        interests:
+          error instanceof Error
+            ? error.message
+            : "Failed to save your interests. Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <AppBackground variant="gradient">
       <ScrollView contentContainerStyle={styles.scroll}>
         <OnboardingProgress step={STEP.interests} total={ONBOARDING_TOTAL} />
+
         <Text style={styles.headline}>What Are You Into?</Text>
+
         <Text style={styles.sub}>
           Pick a few — we&apos;ll surface the quests, posts, and people that
           match. You can change these anytime.
         </Text>
+
         <View style={styles.grid}>
           {INTERESTS.map((i) => (
             <SelectableCard
@@ -51,16 +113,17 @@ export default function Interests() {
             />
           ))}
         </View>
-        <View style={{ alignItems: "center", marginTop: 20 }}>
-          <ErrorText>{errors.interests}</ErrorText>
+
+        <View style={styles.errorContainer}>
+          {errors.interests ? <ErrorText>{errors.interests}</ErrorText> : null}
         </View>
+
         <View style={styles.btn}>
           <Button
-            label="Continue"
+            label={saving ? "Saving..." : "Continue"}
             variant="brand"
-            onPress={() => {
-              if (validate()) router.push("/onboarding/permissions");
-            }}
+            onPress={handleContinue}
+            disabled={saving}
           />
         </View>
       </ScrollView>
@@ -69,7 +132,11 @@ export default function Interests() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 24, paddingBottom: 60 },
+  scroll: {
+    paddingHorizontal: 24,
+    paddingBottom: 60,
+  },
+
   headline: {
     fontSize: 35,
     fontWeight: "800",
@@ -77,6 +144,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
   },
+
   sub: {
     fontSize: 14,
     color: "#2b2b2c",
@@ -85,6 +153,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -92,5 +161,14 @@ const styles = StyleSheet.create({
     rowGap: 20,
     marginTop: 50,
   },
-  btn: { marginTop: 100 },
+
+  errorContainer: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+
+  btn: {
+    marginTop: 100,
+    width: "100%",
+  },
 });

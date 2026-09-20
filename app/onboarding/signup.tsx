@@ -6,24 +6,36 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { useOnboarding } from "@/context/OnboardingContext";
-import { signUp } from "@/services/auth";
+import { registerUser } from "@/store/thunks/authThunks";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 export default function Signup() {
-  const useOnboardingContext = useOnboarding();
-  const { data, update } = useOnboardingContext;
+  const { data, update } = useOnboarding();
+
+  const dispatch = useAppDispatch();
+
+  const { loading, error } = useAppSelector((state) => state.auth);
+
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [errors, setErrors] = useState<{ [k: string]: string }>({});
-  const [submitError, setSubmitError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+
+  const [errors, setErrors] = useState<{
+    [k: string]: string;
+  }>({});
 
   function validate() {
-    const next: { [k: string]: string } = {};
+    const next: {
+      [k: string]: string;
+    } = {};
+
     if (!data.email.trim()) {
       next.email = "Type your email";
-    } else if (!data.email.includes("@")) next.email = "Enter a valid email";
+    } else if (!data.email.includes("@")) {
+      next.email = "Enter a valid email";
+    }
+
     if (!data.password.trim()) {
       next.password = "Password is required";
     } else if (data.password.length < 8) {
@@ -41,37 +53,48 @@ export default function Signup() {
     } else if (confirmPassword !== data.password) {
       next.confirmPassword = "Passwords do not match";
     }
+
     setErrors(next);
+
     return Object.keys(next).length === 0;
   }
 
   async function handleSignup() {
-    if (!validate()) return;
-    setSubmitError("");
-    setSubmitting(true);
-    try {
-      await signUp(data.email, data.password);
-      router.push("/onboarding/createProfile");
-    } catch (e) {
-      if (e instanceof Error && e.message === "email_taken") {
-        setErrors({ email: "This email is already registered" });
-      } else {
-        setSubmitError("Something went wrong. Please try again.");
-      }
-    } finally {
-      setSubmitting(false);
+    if (!validate()) {
+      return;
     }
+
+    const result = await dispatch(
+      registerUser({
+        email: data.email.trim(),
+        password: data.password,
+        confirmPassword,
+      }),
+    );
+
+    if (!registerUser.fulfilled.match(result)) {
+      return;
+    }
+
+    if (result.payload?.user?.email) {
+      update({
+        email: result.payload.user.email,
+      });
+    }
+
+    router.push("/onboarding/createProfile");
   }
 
   return (
     <AppBackground variant="gradient">
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
+        automaticallyAdjustKeyboardInsets>
         <View style={styles.screen}>
           <OnboardingProgress step={STEP.account} total={ONBOARDING_TOTAL} />
+
           <Text style={styles.headline}>We have a space {"\n"} for you!</Text>
+
           <Field
             label="Email Address"
             leftIcon="mail-outline"
@@ -81,7 +104,9 @@ export default function Signup() {
             value={data.email}
             onChangeText={(t) => update({ email: t })}
             error={errors.email}
+            autoCapitalize="none"
           />
+
           <Field
             label="Password"
             leftIcon="lock-closed-outline"
@@ -92,6 +117,7 @@ export default function Signup() {
             onChangeText={(t) => update({ password: t })}
             error={errors.password}
           />
+
           <Field
             label="Confirm Password"
             leftIcon="lock-closed-outline"
@@ -102,13 +128,24 @@ export default function Signup() {
             onChangeText={setConfirmPassword}
             error={errors.confirmPassword}
           />
-          <ErrorText>{submitError}</ErrorText>
+
+          <ErrorText>{error || ""}</ErrorText>
+
           <View style={styles.buttons}>
             <Button
-              label={submitting ? "Creating account…" : "Sign up"}
+              label={loading ? "Creating account…" : "Sign up"}
               onPress={handleSignup}
               variant="brand"
+              disabled={loading}
             />
+          </View>
+
+          <View style={styles.signinRow}>
+            <Text style={styles.signinText}>Already have an account? </Text>
+
+            <Pressable onPress={() => router.push("/onboarding/signin")}>
+              <Text style={styles.signinLink}>Sign in</Text>
+            </Pressable>
           </View>
 
           <Terms />
@@ -123,6 +160,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 25,
   },
+
   headline: {
     fontSize: 35,
     fontWeight: "800",
@@ -131,5 +169,27 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 60,
   },
-  buttons: { marginTop: 32 },
+
+  buttons: {
+    marginTop: 32,
+  },
+
+  signinRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 22,
+    marginBottom: 25,
+  },
+
+  signinText: {
+    color: "#5e5e5e",
+    fontSize: 14,
+  },
+
+  signinLink: {
+    color: "#C5399A",
+    fontSize: 14,
+    fontWeight: "700",
+  },
 });
