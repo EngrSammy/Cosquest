@@ -1,77 +1,103 @@
-import IncomingCallListener from "@/components/calls/IncomingCallListener";
-import { UserProvider } from "@/context/UserContext";
-import { useSocketConnection } from "@/hooks/useSocketConnection";
-import { store } from "@/store/store";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { registerGlobals } from "@livekit/react-native";
-import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import "react-native-reanimated";
-import { Provider } from "react-redux";
+import { HapticTab } from "@/components/haptic-tab";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { Tabs } from "expo-router";
+import { StyleSheet, View } from "react-native";
 
-// LiveKit (calls) needs this once, before any call screen is opened.
-registerGlobals();
-
-// useSocketConnection() calls useAppSelector internally, which only
-// works inside <Provider store={store}>. RootLayout below is the
-// component that CREATES that Provider, so calling the hook directly
-// in RootLayout's own body would run before the Provider exists in the
-// tree yet — this tiny component exists only to be a Provider
-// DESCENDANT, so the hook has real Redux access. Renders nothing.
-function SocketConnectionGate() {
-  useSocketConnection();
-
-  return null;
-}
-
-export default function RootLayout() {
-  // Preload the icon fonts so they resolve correctly on web
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-    ...MaterialIcons.font,
-  });
-
-  if (!fontsLoaded) return null;
-
+export default function TabLayout() {
   return (
-    <Provider store={store}>
-      <SocketConnectionGate />
-
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <UserProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="edit-profile" />
-            <Stack.Screen name="contact-options" />
-            <Stack.Screen name="followers" />
-            <Stack.Screen name="following" />
-            <Stack.Screen name="category" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="notifications" />
-            <Stack.Screen
-              name="call/[id]"
-              options={{ gestureEnabled: false, animation: "fade" }}
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: "#DC179F",
+        tabBarInactiveTintColor: "#FEFEFE",
+        headerShown: false,
+        tabBarButton: HapticTab,
+        tabBarStyle: {
+          position: "absolute",
+          marginHorizontal: 20,
+          bottom: 30,
+          height: 64,
+          borderTopWidth: 0,
+          backgroundColor: "transparent",
+          elevation: 0,
+        },
+        tabBarBackground: () => (
+          <View style={styles.barShadow}>
+            <BlurView intensity={10} tint="light" style={styles.barClip}>
+              <LinearGradient
+                colors={["rgba(30, 25, 29, 0.50)", "rgba(30, 25, 29, 0.30)"]}
+                style={StyleSheet.absoluteFill}
+              />
+            </BlurView>
+            <View pointerEvents="none" style={styles.barOutline} />
+          </View>
+        ),
+      }}>
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Cosquest",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="mappin.and.ellipse" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="live"
+        options={{
+          title: "Live",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol
+              size={28}
+              name="dot.radiowaves.left.and.right"
+              color={color}
             />
-            <Stack.Screen
-              name="modal"
-              options={{
-                presentation: "modal",
-                title: "Modal",
-              }}
-            />
-          </Stack>
-
-          {/* Ringing screen — shows on top of any screen when someone calls */}
-          <IncomingCallListener />
-
-          <StatusBar style="auto" />
-        </UserProvider>
-      </GestureHandlerRootView>
-    </Provider>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: "Community",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="bubble.left.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person.fill" color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
+
+const RADIUS = 30;
+const styles = StyleSheet.create({
+  barShadow: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 }, // iOS depth
+    elevation: 12, // Android depth
+  },
+  barClip: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS,
+    overflow: "hidden", // clips ONLY the blur + sheen to the pill
+  },
+  barOutline: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.7)", // crisp rim, no overflow → no chips
+  },
+});
