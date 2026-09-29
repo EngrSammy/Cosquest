@@ -35,6 +35,17 @@ export default function Faction() {
     data.faction || null,
   );
 
+  // Set only when "Join Faction" is actually pressed inside the
+  // description modal — separate from selectedFactionId, which changes
+  // the instant a card is tapped (used purely for the card highlight).
+  // Without this split, tapping a card then dismissing the description
+  // modal without joining still left selectedFactionId set, so the
+  // page-level Continue button would silently save a faction the user
+  // never actually confirmed.
+  const [factionConfirmed, setFactionConfirmed] = useState(
+    Boolean(data.faction),
+  );
+
   const [descriptionVisible, setDescriptionVisible] = useState(false);
 
   const consentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,7 +67,13 @@ export default function Faction() {
   }
 
   function showConsentWithDelay() {
-    clearConsentTimer();
+    // If a timer is already counting down, let it keep running instead
+    // of restarting it — previously every repeated tap while waiting
+    // reset the 2s delay back to the start, so a few impatient taps in a
+    // row meant the popup never appeared at all.
+    if (consentTimer.current) {
+      return;
+    }
 
     setConsentVisible(false);
 
@@ -67,11 +84,23 @@ export default function Faction() {
   }
 
   function showDescriptionWithDelay(id: string) {
-    clearDescriptionTimer();
+    // Same fix as showConsentWithDelay — don't restart an already-
+    // running timer just because the same or another card was tapped
+    // again while waiting.
+    if (descriptionTimer.current) {
+      setSelectedFactionId(id);
+      setFactionConfirmed(false);
+      setErrors({});
+      return;
+    }
 
     setDescriptionVisible(false);
 
     setSelectedFactionId(id);
+
+    // Selecting a (possibly different) card always requires a fresh
+    // confirmation via "Join Faction" in the modal.
+    setFactionConfirmed(false);
 
     setErrors({});
 
@@ -155,6 +184,9 @@ export default function Faction() {
       faction: "",
     }));
 
+    // This is the one place a faction selection is actually confirmed.
+    setFactionConfirmed(true);
+
     update({
       faction: selectedFactionId,
     });
@@ -170,6 +202,10 @@ export default function Faction() {
         "Please agree to the faction information before continuing.";
     } else if (!selectedFactionId) {
       next.faction = "Choose a faction.";
+    } else if (!factionConfirmed) {
+      // Tapped a card but backed out of the description modal without
+      // pressing "Join Faction" — don't let Continue silently save it.
+      next.faction = "Please confirm your faction by tapping Join Faction.";
     }
 
     setErrors(next);
@@ -201,7 +237,7 @@ export default function Faction() {
     setSaving(true);
 
     try {
-      const result = await dispatch(
+      await dispatch(
         saveUserFaction({
           email: data.email.trim(),
           factionKey: selectedFactionId,

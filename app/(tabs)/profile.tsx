@@ -1,13 +1,22 @@
 import { AppBackground } from "@/components/AppBackground";
 import { AVATARS } from "@/constants/avatars";
 import { FACTIONS } from "@/constants/factions";
+import type { FactionMemberPreview } from "@/services/faction";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import type { Post } from "@/store/slices/postSlice";
+import { fetchFactionMembers } from "@/store/thunks/factionThunks";
+import { fetchFollowers, fetchFollowing } from "@/store/thunks/followThunks";
+import { fetchPosts } from "@/store/thunks/postThunks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
+
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { useVideoPlayer, VideoView } from "expo-video";
+
 import { useEffect, useMemo, useState } from "react";
+
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,6 +27,7 @@ import {
   Text,
   View,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
@@ -37,12 +47,22 @@ const INTEREST_LABELS: Record<string, string> = {
   news: "News",
 };
 
-const FACTION_PROFILE_PREVIEW = {
-  members: "2.3k members",
+// How many faction member avatars to actually show in the card's row —
+// the rest are folded into the "+N" pill. Matches the thunk's own
+// `limit` for this fetch (see the useEffect below) so the two numbers
+// stay in sync.
+const FACTION_MEMBER_PREVIEW_LIMIT = 4;
+
+// Confirmed against the backend (User model / factionController.js):
+// there is no rank field and no faction-specific XP field anywhere on
+// User — only a global pointsBalance, unrelated to factions. "Lieutenant"
+// and the XP bar below are still mock values for exactly that reason;
+// member count and the avatar row ARE real now (see fetchFactionMembers).
+// Once a real rank/XP endpoint exists, only this object needs to change.
+const FACTION_RANK_PREVIEW = {
   rank: "Lieutenant",
   xp: 7840,
   nextRankXp: 10000,
-  extraMembers: 9,
 };
 
 function Stat({
@@ -90,20 +110,45 @@ function ActionButton({
   );
 }
 
+// Same avatar-resolution pattern already used for the signed-in user's
+// own avatar further down this file (avatarFromList / selectedAvatar) —
+// a real uploaded photo wins, otherwise fall back to the matching
+// preset from AVATARS, otherwise the default placeholder.
+function getMemberAvatarSource(member: FactionMemberPreview) {
+  if (member.avatarPhotoUrl) {
+    return { uri: member.avatarPhotoUrl };
+  }
+
+  const preset = AVATARS.find((avatar) => avatar.id === member.avatarKey);
+
+  return preset?.source || require("@/assets/images/dp-avatar.png");
+}
+
 function FactionProfileCard({
   faction,
+  memberCount,
+  memberCountLoading,
+  previewMembers,
 }: {
   faction: (typeof FACTIONS)[number];
+  // Real total from GET /api/factions/:key/members' pagination.total —
+  // undefined while the fetch hasn't resolved yet.
+  memberCount: number | undefined;
+  memberCountLoading: boolean;
+  // Real avatar-row preview (up to FACTION_MEMBER_PREVIEW_LIMIT), from
+  // that same endpoint's `users` array.
+  previewMembers: FactionMemberPreview[];
 }) {
   const progress =
-    FACTION_PROFILE_PREVIEW.nextRankXp > 0
-      ? Math.min(
-          FACTION_PROFILE_PREVIEW.xp / FACTION_PROFILE_PREVIEW.nextRankXp,
-          1,
-        )
+    FACTION_RANK_PREVIEW.nextRankXp > 0
+      ? Math.min(FACTION_RANK_PREVIEW.xp / FACTION_RANK_PREVIEW.nextRankXp, 1)
       : 0;
 
-  const memberPreviewAvatars = AVATARS.slice(0, 4);
+  const extraMembers = Math.max(0, (memberCount ?? 0) - previewMembers.length);
+
+  const memberCountLabel = memberCountLoading
+    ? "…"
+    : `${(memberCount ?? 0).toLocaleString()} members`;
 
   return (
     <View style={styles.factionCard}>
@@ -130,13 +175,11 @@ function FactionProfileCard({
             contentFit="contain"
           />
 
-          <Text style={styles.factionRank}>{FACTION_PROFILE_PREVIEW.rank}</Text>
+          <Text style={styles.factionRank}>{FACTION_RANK_PREVIEW.rank}</Text>
         </View>
 
         <View style={styles.memberCountPill}>
-          <Text style={styles.memberCountText}>
-            {FACTION_PROFILE_PREVIEW.members}
-          </Text>
+          <Text style={styles.memberCountText}>{memberCountLabel}</Text>
         </View>
       </View>
 
@@ -144,9 +187,9 @@ function FactionProfileCard({
         <Text style={styles.membersLabel}>Members</Text>
 
         <View style={styles.memberAvatars}>
-          {memberPreviewAvatars.map((avatar, index) => (
+          {previewMembers.map((member, index) => (
             <View
-              key={avatar.id}
+              key={member.id}
               style={[
                 styles.memberAvatarWrap,
                 {
@@ -154,24 +197,24 @@ function FactionProfileCard({
                 },
               ]}>
               <Image
-                source={avatar.source}
+                source={getMemberAvatarSource(member)}
                 style={styles.memberAvatar}
                 contentFit="cover"
               />
             </View>
           ))}
 
-          <View
-            style={[
-              styles.extraMembers,
-              {
-                marginLeft: -3,
-              },
-            ]}>
-            <Text style={styles.extraMembersText}>
-              +{FACTION_PROFILE_PREVIEW.extraMembers}
-            </Text>
-          </View>
+          {extraMembers > 0 ? (
+            <View
+              style={[
+                styles.extraMembers,
+                {
+                  marginLeft: previewMembers.length > 0 ? -3 : 0,
+                },
+              ]}>
+              <Text style={styles.extraMembersText}>+{extraMembers}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -180,8 +223,8 @@ function FactionProfileCard({
 
         <View style={styles.xpRight}>
           <Text style={styles.xpValue}>
-            {FACTION_PROFILE_PREVIEW.xp.toLocaleString()} /{" "}
-            {FACTION_PROFILE_PREVIEW.nextRankXp.toLocaleString()}
+            {FACTION_RANK_PREVIEW.xp.toLocaleString()} /{" "}
+            {FACTION_RANK_PREVIEW.nextRankXp.toLocaleString()}
           </Text>
         </View>
       </View>
@@ -218,14 +261,63 @@ function FactionProfileCard({
   );
 }
 
-const POST_IMAGES = [
-  require("@/assets/images/interests/anime.png"),
-  require("@/assets/images/interests/games.png"),
-  require("@/assets/images/interests/movies.png"),
-  require("@/assets/images/interests/fantasy.png"),
-  require("@/assets/images/interests/horror.png"),
-  require("@/assets/images/interests/cosplay.png"),
-];
+/**
+ * Reel item.
+ *
+ * The URL comes directly from the normalized backend post:
+ * post.image
+ *
+ * expo-video is already installed in this project.
+ */
+function ReelItem({ post }: { post: Post }) {
+  const videoUrl = post.image;
+
+  const player = useVideoPlayer(videoUrl || "", (player) => {
+    player.loop = true;
+  });
+
+  if (!videoUrl) {
+    return (
+      <View style={styles.reelUnavailable}>
+        <Ionicons name="videocam-outline" size={32} color="#9C9CAA" />
+        <Text style={styles.reelUnavailableText}>Video unavailable</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.reelItem}>
+      <VideoView
+        player={player}
+        style={styles.reelVideo}
+        contentFit="cover"
+        nativeControls
+      />
+
+      {post.content?.trim() ? (
+        <View style={styles.reelCaption}>
+          <Text style={styles.reelCaptionText} numberOfLines={3}>
+            {post.content}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ThoughtItem({ post }: { post: Post }) {
+  return (
+    <View style={styles.thoughtCard}>
+      <Text style={styles.thoughtText}>
+        {post.content?.trim() || "No thought content."}
+      </Text>
+
+      {post.createdAt ? (
+        <Text style={styles.thoughtTime}>{post.time || ""}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
@@ -237,9 +329,25 @@ export default function Profile() {
 
   const user = useAppSelector((state) => state.user.user);
 
-  const loading = useAppSelector((state) => state.user.loading);
+  const userLoading = useAppSelector((state) => state.user.loading);
 
-  const error = useAppSelector((state) => state.user.error);
+  const userError = useAppSelector((state) => state.user.error);
+
+  const token = useAppSelector((state) => state.auth.token);
+
+  const posts = useAppSelector((state) => state.post.posts);
+
+  const postsLoading = useAppSelector((state) => state.post.loading);
+
+  const postsError = useAppSelector((state) => state.post.error);
+
+  // Real followers/following counts — same source the dedicated
+  // Followers/Following screens already use (services/follow.ts via
+  // fetchFollowers/fetchFollowing), rather than guessing at fields like
+  // user.followersCount that don't actually exist on the user object.
+  const followersTotal = useAppSelector((state) => state.follow.followersTotal);
+
+  const followingTotal = useAppSelector((state) => state.follow.followingTotal);
 
   const email = authUser?.email || user?.email || "";
 
@@ -248,6 +356,17 @@ export default function Profile() {
       dispatch(fetchCurrentUser(email));
     }
   }, [dispatch, email]);
+
+  /**
+   * Load the actual posts from the backend.
+   */
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    dispatch(fetchPosts(token));
+  }, [dispatch, token]);
 
   const firstName =
     user?.profile?.firstName ||
@@ -273,14 +392,150 @@ export default function Profile() {
     authUser?.profile?.username ||
     "username";
 
+  // Load real followers/following counts for the logged-in user — this
+  // was previously never dispatched on this screen at all, which is why
+  // the numbers shown were always 0/fabricated regardless of how many
+  // followers you actually had.
+  useEffect(() => {
+    if (!username || username === "username" || !token) {
+      return;
+    }
+
+    dispatch(fetchFollowers({ username, token }));
+    dispatch(fetchFollowing({ username, token }));
+  }, [dispatch, username, token]);
+
   const factionKey = user?.faction || authUser?.faction || "";
 
   const selectedFaction = FACTIONS.find((item) => item.id === factionKey);
+
+  // Real faction card data — GET /api/factions/:key/members.
+  const factionMembersState = useAppSelector((state) =>
+    factionKey ? state.faction.membersByFaction[factionKey] : undefined,
+  );
+
+  const factionMembersLoading = useAppSelector((state) =>
+    factionKey ? !!state.faction.membersLoading[factionKey] : false,
+  );
+
+  useEffect(() => {
+    if (!factionKey) {
+      return;
+    }
+
+    dispatch(
+      fetchFactionMembers({
+        key: factionKey,
+        limit: FACTION_MEMBER_PREVIEW_LIMIT,
+      }),
+    );
+  }, [dispatch, factionKey]);
 
   const interests =
     user?.interests && user.interests.length > 0
       ? user.interests
       : authUser?.interests || [];
+
+  /**
+   * Determine the current user's ID.
+   *
+   * The backend post normalizer stores the author's
+   * ID in post.userId.
+   */
+  const currentUserId = useMemo(() => {
+    const possibleIds = [
+      (user as any)?.id,
+      (user as any)?._id,
+      (authUser as any)?.id,
+      (authUser as any)?._id,
+      (user as any)?.userId,
+      (authUser as any)?.userId,
+    ];
+
+    const found = possibleIds.find(
+      (value) =>
+        value !== undefined && value !== null && String(value).trim() !== "",
+    );
+
+    return found !== undefined ? String(found) : null;
+  }, [user, authUser]);
+
+  /**
+   * Match posts belonging to the logged-in user.
+   *
+   * We primarily use userId because the normalized
+   * Post object provides it.
+   *
+   * If the backend doesn't return userId for a post,
+   * username/handle is used as a fallback.
+   */
+  const myPosts = useMemo(() => {
+    if (!posts.length) {
+      return [];
+    }
+
+    return posts.filter((post) => {
+      if (currentUserId && post.userId) {
+        return String(post.userId) === currentUserId;
+      }
+
+      const postUsername = post.username || post.handle || "";
+
+      const normalizedPostUsername = String(postUsername)
+        .replace(/^@/, "")
+        .toLowerCase();
+
+      const normalizedCurrentUsername = String(username)
+        .replace(/^@/, "")
+        .toLowerCase();
+
+      return (
+        normalizedPostUsername !== "" &&
+        normalizedCurrentUsername !== "" &&
+        normalizedPostUsername === normalizedCurrentUsername
+      );
+    });
+  }, [posts, currentUserId, username]);
+
+  /**
+   * Image posts.
+   */
+  const imagePosts = useMemo(
+    () =>
+      myPosts.filter((post) => post.type === "image" && Boolean(post.image)),
+    [myPosts],
+  );
+
+  /**
+   * Video/reel posts.
+   */
+  const reelPosts = useMemo(
+    () => myPosts.filter((post) => post.type === "reel" && Boolean(post.image)),
+    [myPosts],
+  );
+
+  /**
+   * Text-only thought posts.
+   */
+  const thoughtPosts = useMemo(
+    () =>
+      myPosts.filter(
+        (post) => post.type === "thought" && Boolean(post.content?.trim()),
+      ),
+    [myPosts],
+  );
+
+  /**
+   * Number displayed under Posts.
+   *
+   * This is the actual number of posts returned
+   * for this user, not a hardcoded value.
+   */
+  const postCount = myPosts.length;
+
+  const quests = 0;
+  const wins = 0;
+  const points = 0;
 
   async function handleShareProfile() {
     try {
@@ -313,13 +568,9 @@ export default function Profile() {
   const about =
     user?.profile?.bio || (user as any)?.bio || authUser?.profile?.bio || "";
 
-  const followers = 0;
-  const following = 0;
-  const posts = 0;
+  const profileLoading = userLoading || postsLoading;
 
-  const quests = 0;
-  const wins = 0;
-  const points = 0;
+  const profileError = userError || postsError;
 
   return (
     <AppBackground variant="blueGradient">
@@ -341,7 +592,7 @@ export default function Profile() {
           </Pressable>
         </View>
 
-        {loading ? (
+        {profileLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator size="small" color="#C5399A" />
 
@@ -349,15 +600,22 @@ export default function Profile() {
           </View>
         ) : null}
 
-        {error && !loading ? (
+        {profileError && !profileLoading ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText}>{profileError}</Text>
 
-            {email ? (
-              <Pressable onPress={() => dispatch(fetchCurrentUser(email))}>
-                <Text style={styles.retryText}>Retry</Text>
-              </Pressable>
-            ) : null}
+            <Pressable
+              onPress={() => {
+                if (email) {
+                  dispatch(fetchCurrentUser(email));
+                }
+
+                if (token) {
+                  dispatch(fetchPosts(token));
+                }
+              }}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -404,18 +662,18 @@ export default function Profile() {
 
         <View style={styles.statsRow}>
           <Stat
-            value={followers}
+            value={followersTotal}
             label="Followers"
             onPress={() => router.push("/followers")}
           />
 
           <Stat
-            value={following}
+            value={followingTotal}
             label="Following"
             onPress={() => router.push("/following")}
           />
 
-          <Stat value={posts} label="Posts" />
+          <Stat value={postCount} label="Posts" />
         </View>
 
         <View style={styles.gameStatsWrap}>
@@ -460,7 +718,12 @@ export default function Profile() {
           <View style={styles.factionSection}>
             <Text style={styles.sectionLabel}>Faction</Text>
 
-            <FactionProfileCard faction={selectedFaction} />
+            <FactionProfileCard
+              faction={selectedFaction}
+              memberCount={factionMembersState?.pagination.total}
+              memberCountLoading={factionMembersLoading && !factionMembersState}
+              previewMembers={factionMembersState?.users || []}
+            />
           </View>
         ) : null}
 
@@ -530,20 +793,99 @@ export default function Profile() {
           })}
         </View>
 
+        {/* =====================================================
+            POSTS
+        ====================================================== */}
+
         {tab === "Posts" ? (
-          <View style={styles.grid}>
-            {POST_IMAGES.map((src, index) => (
-              <Image
-                key={index}
-                source={src}
-                style={styles.thumb}
-                contentFit="cover"
+          imagePosts.length > 0 ? (
+            <View style={styles.grid}>
+              {imagePosts.map((post) => (
+                <Pressable
+                  key={post.id}
+                  style={styles.postThumbWrap}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/post/[id]",
+                      params: {
+                        id: post.id,
+                      },
+                    });
+                  }}>
+                  <Image
+                    source={{
+                      uri: post.image!,
+                    }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons name="images-outline" size={38} color="#9C9CAA" />
+
+              <Text style={styles.emptyTitle}>No posts yet</Text>
+
+              <Text style={styles.empty}>
+                Your uploaded image posts will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
+
+        {/* =====================================================
+            REELS
+        ====================================================== */}
+
+        {tab === "Reels" ? (
+          reelPosts.length > 0 ? (
+            <View style={styles.reelsList}>
+              {reelPosts.map((post) => (
+                <ReelItem key={post.id} post={post} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons name="videocam-outline" size={38} color="#9C9CAA" />
+
+              <Text style={styles.emptyTitle}>No reels yet</Text>
+
+              <Text style={styles.empty}>
+                Your uploaded videos will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
+
+        {/* =====================================================
+            THOUGHTS
+        ====================================================== */}
+
+        {tab === "Thoughts" ? (
+          thoughtPosts.length > 0 ? (
+            <View style={styles.thoughtsList}>
+              {thoughtPosts.map((post) => (
+                <ThoughtItem key={post.id} post={post} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={38}
+                color="#9C9CAA"
               />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.empty}>Nothing here yet.</Text>
-        )}
+
+              <Text style={styles.emptyTitle}>No thoughts yet</Text>
+
+              <Text style={styles.empty}>
+                Your text-only thoughts will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
       </ScrollView>
     </AppBackground>
   );
@@ -1136,15 +1478,123 @@ const styles = StyleSheet.create({
     marginHorizontal: -H_PAD,
   },
 
-  thumb: {
+  postThumbWrap: {
     width: COL,
     height: COL,
+  },
+
+  thumb: {
+    width: "100%",
+    height: "100%",
     backgroundColor: "#EEE",
+  },
+
+  emptyContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+    marginTop: 40,
+  },
+
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#5F606B",
   },
 
   empty: {
     textAlign: "center",
     color: "#9C9CAA",
-    marginTop: 40,
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  reelsList: {
+    marginTop: 8,
+    gap: 12,
+  },
+
+  reelItem: {
+    width: "100%",
+    minHeight: 360,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#111118",
+  },
+
+  reelVideo: {
+    width: "100%",
+    height: 420,
+  },
+
+  reelCaption: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+
+  reelCaptionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+
+  reelUnavailable: {
+    width: "100%",
+    height: 220,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.45)",
+  },
+
+  reelUnavailableText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#9C9CAA",
+  },
+
+  thoughtsList: {
+    marginTop: 8,
+    gap: 10,
+  },
+
+  thoughtCard: {
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.48)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+
+    shadowColor: "#7E9CB0",
+    shadowOpacity: 0.12,
+    shadowRadius: 7,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+
+    elevation: 3,
+  },
+
+  thoughtText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#4C4C56",
+  },
+
+  thoughtTime: {
+    marginTop: 8,
+    fontSize: 10.5,
+    color: "#9C9CAA",
   },
 });

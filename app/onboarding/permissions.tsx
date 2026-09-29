@@ -15,7 +15,7 @@ import { Image } from "expo-image";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Linking,
@@ -27,6 +27,12 @@ import {
 } from "react-native";
 
 const SCREEN_H = Dimensions.get("window").height;
+
+// A last-known position older than this is treated as stale and skipped
+// in favor of a fresh fix — someone who's traveled since their last GPS
+// reading would otherwise silently get quests centered on the wrong
+// place with no indication anything was off.
+const MAX_LAST_KNOWN_POSITION_AGE_MS = 2 * 60 * 1000;
 
 function Toggle({
   on,
@@ -73,6 +79,35 @@ export default function Permissions() {
     [k: string]: string;
   }>({});
 
+  // Guards against setting state after this screen has been navigated
+  // away from while a location/notification permission request is still
+  // in flight (React warns on state updates after unmount otherwise).
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Merge-based error setter. The previous version replaced the whole
+  // errors object on every validate()/save call, which silently wiped
+  // out an unrelated field's error message (e.g. a notifications error
+  // disappearing the moment you tapped Continue, without ever actually
+  // being resolved).
+  function mergeErrors(patch: { [k: string]: string }) {
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setErrors((current) => ({
+      ...current,
+      ...patch,
+    }));
+  }
+
   async function toggleLocation() {
     if (data.locationGranted) {
       update({
@@ -81,26 +116,28 @@ export default function Permissions() {
         lng: null,
       });
 
-      setErrors((current) => ({
-        ...current,
+      mergeErrors({
         location: "",
-      }));
+      });
 
       return;
     }
 
     setLocationLoading(true);
 
-    setErrors((current) => ({
-      ...current,
+    mergeErrors({
       location: "",
-    }));
+    });
 
     try {
       const { status } = await withTimeout(
         Location.requestForegroundPermissionsAsync(),
         8000,
       );
+
+      if (!isMountedRef.current) {
+        return;
+      }
 
       if (status !== "granted") {
         update({
@@ -109,11 +146,10 @@ export default function Permissions() {
           lng: null,
         });
 
-        setErrors((current) => ({
-          ...current,
+        mergeErrors({
           location:
             "Location permission was not granted. Please enable it and try again.",
-        }));
+        });
 
         return;
       }
@@ -124,7 +160,15 @@ export default function Permissions() {
 
       let position = await Location.getLastKnownPositionAsync();
 
-      if (position) {
+      const isFresh =
+        !!position &&
+        Date.now() - position.timestamp <= MAX_LAST_KNOWN_POSITION_AGE_MS;
+
+      if (position && isFresh) {
+        if (!isMountedRef.current) {
+          return;
+        }
+
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
@@ -134,10 +178,9 @@ export default function Permissions() {
           lng,
         });
 
-        setErrors((current) => ({
-          ...current,
+        mergeErrors({
           location: "",
-        }));
+        });
 
         return;
       }
@@ -149,6 +192,10 @@ export default function Permissions() {
         6000,
       );
 
+      if (!isMountedRef.current) {
+        return;
+      }
+
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
 
@@ -158,11 +205,14 @@ export default function Permissions() {
         lng,
       });
 
-      setErrors((current) => ({
-        ...current,
+      mergeErrors({
         location: "",
-      }));
+      });
     } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       update({
         locationGranted: false,
         lat: null,
@@ -170,19 +220,19 @@ export default function Permissions() {
       });
 
       if (error instanceof Error && error.message === "LOCATION_TIMEOUT") {
-        setErrors((current) => ({
-          ...current,
+        mergeErrors({
           location:
             "We could not get your location quickly enough. Please try again.",
-        }));
+        });
       } else {
-        setErrors((current) => ({
-          ...current,
+        mergeErrors({
           location: "Unable to get your location. Please try again.",
-        }));
+        });
       }
     } finally {
-      setLocationLoading(false);
+      if (isMountedRef.current) {
+        setLocationLoading(false);
+      }
     }
   }
 
@@ -192,24 +242,26 @@ export default function Permissions() {
         notificationsEnabled: false,
       });
 
-      setErrors((current) => ({
-        ...current,
+      mergeErrors({
         notifications: "",
-      }));
+      });
 
       return;
     }
 
     setNotificationLoading(true);
 
-    setErrors((current) => ({
-      ...current,
+    mergeErrors({
       notifications: "",
-    }));
+    });
 
     try {
       const { status, canAskAgain } =
         await Notifications.requestPermissionsAsync();
+
+      if (!isMountedRef.current) {
+        return;
+      }
 
       const granted = status === "granted";
 
@@ -217,24 +269,28 @@ export default function Permissions() {
         notificationsEnabled: granted,
       });
 
-      setErrors((current) => ({
-        ...current,
+      mergeErrors({
         notifications:
           granted || canAskAgain
             ? ""
             : "Notifications are off. Enable them in Settings to get quest alerts.",
-      }));
+      });
     } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       update({
         notificationsEnabled: false,
       });
 
-      setErrors((current) => ({
-        ...current,
+      mergeErrors({
         notifications: "Unable to update notification permission.",
-      }));
+      });
     } finally {
-      setNotificationLoading(false);
+      if (isMountedRef.current) {
+        setNotificationLoading(false);
+      }
     }
   }
 
@@ -255,9 +311,15 @@ export default function Permissions() {
       next.location = "We could not get your location. Please try again.";
     }
 
-    setErrors(next);
+    // Merge rather than replace: validate() only ever checks email/
+    // location, so replacing the whole object would silently clear any
+    // existing notifications error without it ever being addressed.
+    mergeErrors({
+      general: next.general || "",
+      location: next.location || "",
+    });
 
-    return Object.keys(next).length === 0;
+    return !next.general && !next.location;
   }
 
   async function handleContinue() {
@@ -271,20 +333,23 @@ export default function Permissions() {
 
     setSaving(true);
 
-    setErrors((current) => ({
-      ...current,
+    mergeErrors({
       general: "",
-    }));
+    });
 
-    try {
-      const notificationResult = await dispatch(
+    // Two independent saves — no reason to wait on one before starting
+    // the other. Using allSettled (not Promise.all) so a failure on one
+    // doesn't hide whether the other succeeded, and so we can report
+    // specifically which one(s) failed instead of a single generic
+    // message.
+    const [notificationResult, locationResult] = await Promise.allSettled([
+      dispatch(
         saveNotificationPreference({
           email: data.email.trim(),
           notificationsEnabled: data.notificationsEnabled,
         }),
-      ).unwrap();
-
-      const locationResult = await dispatch(
+      ).unwrap(),
+      dispatch(
         saveLocationPreference({
           email: data.email.trim(),
           locationEnabled: data.locationGranted,
@@ -292,19 +357,47 @@ export default function Permissions() {
           lat: data.lat as number,
           lng: data.lng as number,
         }),
-      ).unwrap();
+      ).unwrap(),
+    ]);
 
-      router.push("/onboarding/faction");
-    } catch (error) {
-      setErrors({
-        general:
-          error instanceof Error
-            ? error.message
-            : "Failed to save your permissions. Please try again.",
-      });
-    } finally {
-      setSaving(false);
+    if (!isMountedRef.current) {
+      return;
     }
+
+    const failures: string[] = [];
+
+    if (notificationResult.status === "rejected") {
+      failures.push("notification preference");
+    }
+
+    if (locationResult.status === "rejected") {
+      failures.push("location preference");
+    }
+
+    if (failures.length > 0) {
+      const firstError = [notificationResult, locationResult].find(
+        (result) => result.status === "rejected",
+      ) as PromiseRejectedResult | undefined;
+
+      const detail =
+        firstError?.reason instanceof Error
+          ? firstError.reason.message
+          : undefined;
+
+      setSaving(false);
+
+      mergeErrors({
+        general:
+          detail ||
+          `Failed to save your ${failures.join(" and ")}. Please try again.`,
+      });
+
+      return;
+    }
+
+    setSaving(false);
+
+    router.push("/onboarding/faction");
   }
 
   return (

@@ -1,19 +1,28 @@
 import {
   addComment,
   bookmarkPost,
+  createImagePost,
   createPost,
+  createReelPost,
   deleteComment,
   deletePost,
   getComments,
   getPost,
   getPosts,
+  likeComment,
   likePost,
   removeBookmark,
   sharePost,
+  unlikeComment,
   unlikePost,
   updatePost,
 } from "@/services/posts";
+
 import { createAsyncThunk } from "@reduxjs/toolkit";
+
+/* =========================================================
+   FETCH POSTS
+========================================================= */
 
 export const fetchPosts = createAsyncThunk(
   "post/fetchPosts",
@@ -28,10 +37,23 @@ export const fetchPosts = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   CREATE THOUGHT
+========================================================= */
+
 export const createNewPost = createAsyncThunk(
   "post/createNewPost",
   async (
-    { token, data }: { token: string; data: unknown },
+    {
+      token,
+      data,
+    }: {
+      token: string;
+      data: {
+        type: "thought";
+        content: string;
+      };
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -44,10 +66,84 @@ export const createNewPost = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   CREATE IMAGE POST
+========================================================= */
+
+export const createImagePostThunk = createAsyncThunk(
+  "post/createImagePost",
+  async (
+    {
+      token,
+      content,
+      files,
+    }: {
+      token: string;
+      content: string;
+      files: {
+        uri: string;
+        name: string;
+        type: string;
+      }[];
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await createImagePost(token, content, files);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to create image post",
+      );
+    }
+  },
+);
+
+/* =========================================================
+   CREATE REEL
+========================================================= */
+
+export const createReelPostThunk = createAsyncThunk(
+  "post/createReelPost",
+  async (
+    {
+      token,
+      content,
+      file,
+    }: {
+      token: string;
+      content: string;
+      file: {
+        uri: string;
+        name: string;
+        type: string;
+      };
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await createReelPost(token, content, file);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to create video post",
+      );
+    }
+  },
+);
+
+/* =========================================================
+   FETCH SINGLE POST
+========================================================= */
+
 export const fetchPost = createAsyncThunk(
   "post/fetchPost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -60,6 +156,10 @@ export const fetchPost = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   EDIT POST
+========================================================= */
+
 export const editPost = createAsyncThunk(
   "post/editPost",
   async (
@@ -70,7 +170,9 @@ export const editPost = createAsyncThunk(
     }: {
       postId: string;
       token: string;
-      data: unknown;
+      data: {
+        content: string;
+      };
     },
     { rejectWithValue },
   ) => {
@@ -84,14 +186,25 @@ export const editPost = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   DELETE POST
+========================================================= */
+
 export const removePost = createAsyncThunk(
   "post/removePost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
       await deletePost(postId, token);
+
       return postId;
     } catch (error) {
       return rejectWithValue(
@@ -101,10 +214,20 @@ export const removePost = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   POST LIKE
+========================================================= */
+
 export const likePostThunk = createAsyncThunk(
   "post/likePost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -120,7 +243,13 @@ export const likePostThunk = createAsyncThunk(
 export const unlikePostThunk = createAsyncThunk(
   "post/unlikePost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -133,10 +262,72 @@ export const unlikePostThunk = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   COMMENT LIKE
+========================================================= */
+
+export const likeCommentThunk = createAsyncThunk(
+  "post/likeComment",
+  async (
+    {
+      postId,
+      commentId,
+      token,
+    }: {
+      postId: string;
+      commentId: string;
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await likeComment(postId, commentId, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to like comment",
+      );
+    }
+  },
+);
+
+export const unlikeCommentThunk = createAsyncThunk(
+  "post/unlikeComment",
+  async (
+    {
+      postId,
+      commentId,
+      token,
+    }: {
+      postId: string;
+      commentId: string;
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await unlikeComment(postId, commentId, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to unlike comment",
+      );
+    }
+  },
+);
+
+/* =========================================================
+   SHARE
+========================================================= */
+
 export const sharePostThunk = createAsyncThunk(
   "post/sharePost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -149,10 +340,20 @@ export const sharePostThunk = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   BOOKMARK
+========================================================= */
+
 export const bookmarkPostThunk = createAsyncThunk(
   "post/bookmarkPost",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -168,7 +369,13 @@ export const bookmarkPostThunk = createAsyncThunk(
 export const removeBookmarkThunk = createAsyncThunk(
   "post/removeBookmark",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+    }: {
+      postId: string;
+      token: string;
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -181,14 +388,26 @@ export const removeBookmarkThunk = createAsyncThunk(
   },
 );
 
+/* =========================================================
+   FETCH COMMENTS
+========================================================= */
+
 export const fetchComments = createAsyncThunk(
   "post/fetchComments",
   async (
-    { postId, token }: { postId: string; token: string },
+    {
+      postId,
+      token,
+      parentComment,
+    }: {
+      postId: string;
+      token: string;
+      parentComment?: string;
+    },
     { rejectWithValue },
   ) => {
     try {
-      return await getComments(postId, token);
+      return await getComments(postId, token, parentComment);
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to load comments",
@@ -196,6 +415,15 @@ export const fetchComments = createAsyncThunk(
     }
   },
 );
+
+/* =========================================================
+   CREATE COMMENT / REPLY
+
+   `data.file`, when present, is a recorded voice note — addComment
+   sends it as multipart form data instead of JSON. `body` is now
+   optional: a voice comment may carry no typed text at all, just the
+   recording (an optional caption alongside it is still supported).
+========================================================= */
 
 export const createComment = createAsyncThunk(
   "post/createComment",
@@ -207,7 +435,15 @@ export const createComment = createAsyncThunk(
     }: {
       postId: string;
       token: string;
-      data: unknown;
+      data: {
+        body?: string;
+        parentComment?: string;
+        file?: {
+          uri: string;
+          name: string;
+          type: string;
+        };
+      };
     },
     { rejectWithValue },
   ) => {
@@ -220,6 +456,10 @@ export const createComment = createAsyncThunk(
     }
   },
 );
+
+/* =========================================================
+   DELETE COMMENT
+========================================================= */
 
 export const removeComment = createAsyncThunk(
   "post/removeComment",
@@ -236,8 +476,13 @@ export const removeComment = createAsyncThunk(
     { rejectWithValue },
   ) => {
     try {
-      await deleteComment(postId, commentId, token);
-      return { postId, commentId };
+      const result = await deleteComment(postId, commentId, token);
+
+      return {
+        postId,
+        commentId,
+        result,
+      };
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to delete comment",

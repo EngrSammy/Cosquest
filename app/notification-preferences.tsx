@@ -1,9 +1,9 @@
 import { AppBackground } from "@/components/AppBackground";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  fetchCurrentUser,
-  saveNotificationPreference,
-} from "@/store/thunks/userThunks";
+  fetchNotificationSettings,
+  updateNotificationSettingsThunk,
+} from "@/store/thunks/settingsThunks";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -25,6 +25,17 @@ type NotificationToggleRowProps = {
   onChange: (value: boolean) => void;
   disabled?: boolean;
   showIcon?: boolean;
+};
+
+type NotificationSettings = {
+  notificationsEnabled?: boolean;
+  eventReminders?: boolean;
+  questUpdates?: boolean;
+  factionNews?: boolean;
+  friendActivity?: boolean;
+  rankChanges?: boolean;
+  emailWeeklyNewsletter?: boolean;
+  emailPromotionalEvents?: boolean;
 };
 
 function NotificationToggleRow({
@@ -64,73 +75,129 @@ export default function NotificationPreferences() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
-  const authUser = useAppSelector((state) => state.auth.user);
-  const user = useAppSelector((state) => state.user.user);
+  const token = useAppSelector((state) => state.auth.token);
 
-  const email = authUser?.email || user?.email || "";
+  const notificationSettings = useAppSelector(
+    (state) => state.settings.notifications,
+  ) as NotificationSettings | null;
 
-  // Real backend notification preference.
-  const backendNotificationsEnabled =
-    user?.preferences?.notificationsEnabled ?? true;
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    backendNotificationsEnabled,
-  );
-
-  /*
-   * These are shown in the Figma but are not currently
-   * exposed as individual backend preferences.
-   *
-   * Keep them as UI state until the backend provides
-   * separate preference fields/endpoints.
-   */
   const [eventReminders, setEventReminders] = useState(true);
+
   const [questUpdates, setQuestUpdates] = useState(true);
+
   const [factionNews, setFactionNews] = useState(false);
+
   const [friendActivity, setFriendActivity] = useState(true);
+
   const [rankChanges, setRankChanges] = useState(true);
 
   const [weeklyNewsletter, setWeeklyNewsletter] = useState(false);
+
   const [promotionalEvents, setPromotionalEvents] = useState(false);
 
-  const [saving, setSaving] = useState(false);
+  const [savingField, setSavingField] = useState<string | null>(null);
 
-  // Load the latest backend notification preference.
+  /**
+   * Load the real notification preferences
+   * from the backend when the screen opens.
+   */
   useEffect(() => {
-    if (email) {
-      dispatch(fetchCurrentUser(email));
-    }
-  }, [dispatch, email]);
-
-  // Keep the main push switch synchronized with Redux.
-  useEffect(() => {
-    setNotificationsEnabled(backendNotificationsEnabled);
-  }, [backendNotificationsEnabled]);
-
-  async function handlePushNotificationToggle(value: boolean) {
-    if (!email) {
-      Alert.alert("Error", "Your account information could not be loaded.");
+    if (!token) {
       return;
     }
 
-    const previousValue = notificationsEnabled;
+    dispatch(fetchNotificationSettings(token));
+  }, [dispatch, token]);
 
-    setNotificationsEnabled(value);
-    setSaving(true);
+  /**
+   * Synchronize local UI state with the
+   * notification settings returned by the backend.
+   */
+  useEffect(() => {
+    if (!notificationSettings) {
+      return;
+    }
+
+    if (typeof notificationSettings.notificationsEnabled === "boolean") {
+      setNotificationsEnabled(notificationSettings.notificationsEnabled);
+    }
+
+    if (typeof notificationSettings.eventReminders === "boolean") {
+      setEventReminders(notificationSettings.eventReminders);
+    }
+
+    if (typeof notificationSettings.questUpdates === "boolean") {
+      setQuestUpdates(notificationSettings.questUpdates);
+    }
+
+    if (typeof notificationSettings.factionNews === "boolean") {
+      setFactionNews(notificationSettings.factionNews);
+    }
+
+    if (typeof notificationSettings.friendActivity === "boolean") {
+      setFriendActivity(notificationSettings.friendActivity);
+    }
+
+    if (typeof notificationSettings.rankChanges === "boolean") {
+      setRankChanges(notificationSettings.rankChanges);
+    }
+
+    if (typeof notificationSettings.emailWeeklyNewsletter === "boolean") {
+      setWeeklyNewsletter(notificationSettings.emailWeeklyNewsletter);
+    }
+
+    if (typeof notificationSettings.emailPromotionalEvents === "boolean") {
+      setPromotionalEvents(notificationSettings.emailPromotionalEvents);
+    }
+  }, [notificationSettings]);
+
+  /**
+   * Generic backend update helper.
+   *
+   * The backend accepts partial updates, so changing
+   * one switch only sends that setting.
+   */
+  async function updateNotificationSetting(
+    field: keyof NotificationSettings,
+    value: boolean,
+    rollback: () => void,
+  ) {
+    if (!token) {
+      rollback();
+
+      Alert.alert(
+        "Not Signed In",
+        "Please sign in again before changing your notification preferences.",
+      );
+
+      return;
+    }
+
+    setSavingField(field);
 
     try {
       await dispatch(
-        saveNotificationPreference({
-          email,
-          notificationsEnabled: value,
+        updateNotificationSettingsThunk({
+          token,
+          data: {
+            [field]: value,
+          },
         }),
       ).unwrap();
 
-      await dispatch(fetchCurrentUser(email)).unwrap();
+      /**
+       * Refresh from the backend after saving.
+       *
+       * This ensures the UI represents what MongoDB
+       * actually accepted.
+       */
+      await dispatch(fetchNotificationSettings(token)).unwrap();
     } catch (error) {
-      console.log("NOTIFICATION PREFERENCE ERROR:", error);
+      console.error(`Failed to update notification setting ${field}:`, error);
 
-      setNotificationsEnabled(previousValue);
+      rollback();
 
       Alert.alert(
         "Unable to Save",
@@ -139,20 +206,111 @@ export default function NotificationPreferences() {
           : "We could not update your notification preference. Please try again.",
       );
     } finally {
-      setSaving(false);
+      setSavingField(null);
     }
   }
 
-  function handleUnsupportedPreference(
-    setter: (value: boolean) => void,
-    value: boolean,
-    feature: string,
-  ) {
-    setter(value);
+  /**
+   * Allow Push Notifications
+   */
+  async function handleNotificationsEnabled(value: boolean) {
+    const previousValue = notificationsEnabled;
 
-    Alert.alert(
-      "Backend Update Needed",
-      `${feature} is available in the design, but the backend does not currently expose a separate preference endpoint for it.`,
+    setNotificationsEnabled(value);
+
+    await updateNotificationSetting("notificationsEnabled", value, () =>
+      setNotificationsEnabled(previousValue),
+    );
+  }
+
+  /**
+   * Event Reminders
+   */
+  async function handleEventReminders(value: boolean) {
+    const previousValue = eventReminders;
+
+    setEventReminders(value);
+
+    await updateNotificationSetting("eventReminders", value, () =>
+      setEventReminders(previousValue),
+    );
+  }
+
+  /**
+   * Quest Updates
+   */
+  async function handleQuestUpdates(value: boolean) {
+    const previousValue = questUpdates;
+
+    setQuestUpdates(value);
+
+    await updateNotificationSetting("questUpdates", value, () =>
+      setQuestUpdates(previousValue),
+    );
+  }
+
+  /**
+   * Faction News
+   */
+  async function handleFactionNews(value: boolean) {
+    const previousValue = factionNews;
+
+    setFactionNews(value);
+
+    await updateNotificationSetting("factionNews", value, () =>
+      setFactionNews(previousValue),
+    );
+  }
+
+  /**
+   * Friend Activity
+   */
+  async function handleFriendActivity(value: boolean) {
+    const previousValue = friendActivity;
+
+    setFriendActivity(value);
+
+    await updateNotificationSetting("friendActivity", value, () =>
+      setFriendActivity(previousValue),
+    );
+  }
+
+  /**
+   * Rank Changes
+   */
+  async function handleRankChanges(value: boolean) {
+    const previousValue = rankChanges;
+
+    setRankChanges(value);
+
+    await updateNotificationSetting("rankChanges", value, () =>
+      setRankChanges(previousValue),
+    );
+  }
+
+  /**
+   * Weekly Newsletter
+   */
+  async function handleWeeklyNewsletter(value: boolean) {
+    const previousValue = weeklyNewsletter;
+
+    setWeeklyNewsletter(value);
+
+    await updateNotificationSetting("emailWeeklyNewsletter", value, () =>
+      setWeeklyNewsletter(previousValue),
+    );
+  }
+
+  /**
+   * Promotional Events
+   */
+  async function handlePromotionalEvents(value: boolean) {
+    const previousValue = promotionalEvents;
+
+    setPromotionalEvents(value);
+
+    await updateNotificationSetting("emailPromotionalEvents", value, () =>
+      setPromotionalEvents(previousValue),
     );
   }
 
@@ -177,7 +335,6 @@ export default function NotificationPreferences() {
           </Pressable>
 
           <View style={styles.headerCenter}>
-            {/* Grey notification icon container */}
             <View style={styles.headerIconContainer}>
               <Ionicons
                 name="notifications-outline"
@@ -195,26 +352,20 @@ export default function NotificationPreferences() {
         {/* PUSH NOTIFICATIONS */}
         <Text style={styles.sectionLabel}>PUSH NOTIFICATIONS</Text>
 
-        {/* Main backend-connected notification preference */}
         <NotificationToggleRow
           icon="notifications"
           label="Allow Push Notifications"
           value={notificationsEnabled}
-          onChange={handlePushNotificationToggle}
-          disabled={saving}
+          onChange={handleNotificationsEnabled}
+          disabled={savingField === "notificationsEnabled"}
         />
 
         <NotificationToggleRow
           icon="notifications-outline"
           label="Event Reminders"
           value={eventReminders}
-          onChange={(value) =>
-            handleUnsupportedPreference(
-              setEventReminders,
-              value,
-              "Event Reminders",
-            )
-          }
+          onChange={handleEventReminders}
+          disabled={savingField === "eventReminders"}
           showIcon={false}
         />
 
@@ -222,9 +373,8 @@ export default function NotificationPreferences() {
           icon="notifications-outline"
           label="Quest Updates"
           value={questUpdates}
-          onChange={(value) =>
-            handleUnsupportedPreference(setQuestUpdates, value, "Quest Updates")
-          }
+          onChange={handleQuestUpdates}
+          disabled={savingField === "questUpdates"}
           showIcon={false}
         />
 
@@ -232,9 +382,8 @@ export default function NotificationPreferences() {
           icon="notifications-outline"
           label="Faction News"
           value={factionNews}
-          onChange={(value) =>
-            handleUnsupportedPreference(setFactionNews, value, "Faction News")
-          }
+          onChange={handleFactionNews}
+          disabled={savingField === "factionNews"}
           showIcon={false}
         />
 
@@ -242,13 +391,8 @@ export default function NotificationPreferences() {
           icon="notifications-outline"
           label="Friend Activity"
           value={friendActivity}
-          onChange={(value) =>
-            handleUnsupportedPreference(
-              setFriendActivity,
-              value,
-              "Friend Activity",
-            )
-          }
+          onChange={handleFriendActivity}
+          disabled={savingField === "friendActivity"}
           showIcon={false}
         />
 
@@ -256,9 +400,8 @@ export default function NotificationPreferences() {
           icon="notifications-outline"
           label="Rank Changes"
           value={rankChanges}
-          onChange={(value) =>
-            handleUnsupportedPreference(setRankChanges, value, "Rank Changes")
-          }
+          onChange={handleRankChanges}
+          disabled={savingField === "rankChanges"}
           showIcon={false}
         />
 
@@ -271,13 +414,8 @@ export default function NotificationPreferences() {
           icon="notifications"
           label="Weekly Newsletter"
           value={weeklyNewsletter}
-          onChange={(value) =>
-            handleUnsupportedPreference(
-              setWeeklyNewsletter,
-              value,
-              "Weekly Newsletter",
-            )
-          }
+          onChange={handleWeeklyNewsletter}
+          disabled={savingField === "emailWeeklyNewsletter"}
           showIcon={false}
         />
 
@@ -285,13 +423,8 @@ export default function NotificationPreferences() {
           icon="notifications"
           label="Promotional Events"
           value={promotionalEvents}
-          onChange={(value) =>
-            handleUnsupportedPreference(
-              setPromotionalEvents,
-              value,
-              "Promotional Events",
-            )
-          }
+          onChange={handlePromotionalEvents}
+          disabled={savingField === "emailPromotionalEvents"}
           showIcon={false}
         />
       </ScrollView>

@@ -50,12 +50,11 @@ export type UserProfile = {
 // CURRENT USER
 // ============================================
 
-export async function getCurrentUser(email: string) {
-  const response = await apiRequest<any>(
+export async function getCurrentUser(email: string, token?: string) {
+  return apiRequest<any>(
     `/api/users/me?email=${encodeURIComponent(email)}`,
-  );
-
-  return response?.user || response;
+    token ? { token } : {},
+  ).then((response) => response?.user || response);
 }
 
 // ============================================
@@ -74,18 +73,22 @@ export async function checkUsername(username: string, email: string) {
 // PROFILE
 // ============================================
 
-export async function updateProfile(data: {
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  age: number;
-  gender: string;
-  bio?: string;
-}) {
+export async function updateProfile(
+  data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    age: number;
+    gender: string;
+    bio?: string;
+  },
+  token?: string,
+) {
   return apiRequest<any>("/api/users/me/profile", {
     method: "PATCH",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -99,14 +102,18 @@ export async function getProfileCategories() {
   }>("/api/meta/profile-categories");
 }
 
-export async function updateCategory(data: {
-  email: string;
-  category: string;
-  showCategoryOnProfile: boolean;
-}) {
+export async function updateCategory(
+  data: {
+    email: string;
+    category: string;
+    showCategoryOnProfile: boolean;
+  },
+  token?: string,
+) {
   return apiRequest<any>("/api/users/me/profile", {
     method: "PATCH",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -114,10 +121,17 @@ export async function updateCategory(data: {
 // AVATAR
 // ============================================
 
-export async function updateAvatar(data: { email: string; avatar: string }) {
+export async function updateAvatar(
+  data: {
+    email: string;
+    avatar: string;
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/avatar", {
     method: "PATCH",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -125,13 +139,17 @@ export async function updateAvatar(data: { email: string; avatar: string }) {
 // FACTION
 // ============================================
 
-export async function updateFaction(data: {
-  email: string;
-  factionKey: string;
-}) {
+export async function updateFaction(
+  data: {
+    email: string;
+    factionKey: string;
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/faction", {
     method: "POST",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -139,13 +157,17 @@ export async function updateFaction(data: {
 // INTERESTS
 // ============================================
 
-export async function updateInterests(data: {
-  email: string;
-  interests: string[];
-}) {
+export async function updateInterests(
+  data: {
+    email: string;
+    interests: string[];
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/interests", {
     method: "PUT",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -153,13 +175,17 @@ export async function updateInterests(data: {
 // NOTIFICATIONS
 // ============================================
 
-export async function updateNotificationPreference(data: {
-  email: string;
-  notificationsEnabled: boolean;
-}) {
+export async function updateNotificationPreference(
+  data: {
+    email: string;
+    notificationsEnabled: boolean;
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/preferences/notifications", {
     method: "PATCH",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -167,16 +193,20 @@ export async function updateNotificationPreference(data: {
 // LOCATION
 // ============================================
 
-export async function updateLocationPreference(data: {
-  email: string;
-  locationEnabled: boolean;
-  radiusMiles: number;
-  lat: number;
-  lng: number;
-}) {
+export async function updateLocationPreference(
+  data: {
+    email: string;
+    locationEnabled: boolean;
+    radiusMiles: number;
+    lat: number;
+    lng: number;
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/preferences/location", {
     method: "PATCH",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -192,7 +222,7 @@ export async function getContact(token?: string) {
       businessAddress: string;
     };
   }>("/api/users/me/contact", {
-    token,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -227,14 +257,18 @@ export async function updateContact(
 // DEVICE
 // ============================================
 
-export async function registerDevice(data: {
-  email: string;
-  pushToken: string;
-  platform: string;
-}) {
+export async function registerDevice(
+  data: {
+    email: string;
+    pushToken: string;
+    platform: string;
+  },
+  token?: string,
+) {
   return apiRequest("/api/users/me/devices", {
     method: "POST",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -242,10 +276,11 @@ export async function registerDevice(data: {
 // COMPLETE ONBOARDING
 // ============================================
 
-export async function completeOnboarding(data: unknown) {
+export async function completeOnboarding(data: unknown, token?: string) {
   return apiRequest("/api/users/me/onboarding/complete", {
     method: "POST",
     body: data,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -263,7 +298,11 @@ export async function getPoints(token: string) {
 // AVATAR PHOTO
 // ============================================
 
-export async function uploadAvatarPhoto(email: string, photoUri: string) {
+export async function uploadAvatarPhoto(
+  email: string,
+  photoUri: string,
+  token?: string,
+) {
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
   if (!BASE_URL) {
@@ -283,11 +322,19 @@ export async function uploadAvatarPhoto(email: string, photoUri: string) {
   const formData = new FormData();
 
   formData.append("email", email.trim());
-
   formData.append("photo", file as any);
+
+  const headers: Record<string, string> = {};
+
+  // Do NOT set Content-Type here.
+  // fetch will create the multipart boundary automatically.
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   const response = await fetch(`${BASE_URL}/api/users/me/avatar/photo`, {
     method: "POST",
+    headers,
     body: formData,
   });
 

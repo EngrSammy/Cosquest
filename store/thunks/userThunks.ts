@@ -1,8 +1,12 @@
+import { createAsyncThunk } from "@reduxjs/toolkit";
+
 import {
+  checkUsername,
   completeOnboarding,
   getContact,
   getCurrentUser,
-  getProfileCategories,
+  getPoints,
+  registerDevice,
   updateAvatar,
   updateCategory,
   updateContact,
@@ -14,15 +18,24 @@ import {
   uploadAvatarPhoto,
 } from "@/services/user";
 
-import { createAsyncThunk } from "@reduxjs/toolkit";
+// This file deliberately imports ONLY from services/user.ts — never from
+// store.ts, userSlice.ts, or anything that could import either of those
+// back. A thunk file importing something that eventually imports the
+// slice that imports the thunk file is exactly what produces
+// "Cannot read property 'pending' of undefined": the thunk is still
+// undefined at the moment the slice's extraReducers run, because the
+// module loading order got tangled. Keep it this way.
+
+// ==========================================
+// CURRENT USER
+// GET /api/users/me
+// ==========================================
 
 export const fetchCurrentUser = createAsyncThunk(
   "user/fetchCurrentUser",
   async (email: string, { rejectWithValue }) => {
     try {
-      const response = await getCurrentUser(email);
-
-      return response;
+      return await getCurrentUser(email);
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to get user",
@@ -31,10 +44,42 @@ export const fetchCurrentUser = createAsyncThunk(
   },
 );
 
+// ==========================================
+// USERNAME CHECK
+// GET /api/users/check-username
+// ==========================================
+
+export const checkUsernameThunk = createAsyncThunk(
+  "user/checkUsername",
+  async (
+    {
+      username,
+      email,
+    }: {
+      username: string;
+      email: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await checkUsername(username, email);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to check username",
+      );
+    }
+  },
+);
+
+// ==========================================
+// PROFILE
+// PATCH /api/users/me/profile
+// ==========================================
+
 export const saveUserProfile = createAsyncThunk(
   "user/saveUserProfile",
   async (
-    data: {
+    payload: {
       email: string;
       firstName: string;
       lastName: string;
@@ -42,81 +87,82 @@ export const saveUserProfile = createAsyncThunk(
       age: number;
       gender: string;
       bio?: string;
+      // Optional: this runs during onboarding (pre-login, identified by
+      // email — see CreateProfile.tsx) but the same thunk may also get
+      // used post-login later, so token stays supported without being
+      // required.
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateProfile(data);
-
-      return response;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update profile";
-
-      return rejectWithValue(message);
-    }
-  },
-);
-
-export const fetchProfileCategories = createAsyncThunk(
-  "user/fetchProfileCategories",
-  async (_unused: void, { rejectWithValue }) => {
-    try {
-      const response = await getProfileCategories();
-
-      return response;
+      const { token, ...data } = payload;
+      return await updateProfile(data, token);
     } catch (error) {
       return rejectWithValue(
-        error instanceof Error ? error.message : "Failed to load categories",
+        error instanceof Error ? error.message : "Failed to update profile",
       );
     }
   },
 );
 
+// ==========================================
+// CATEGORY
+// PATCH /api/users/me/profile
+// ==========================================
+
 export const saveUserCategory = createAsyncThunk(
   "user/saveUserCategory",
   async (
-    data: {
+    payload: {
       email: string;
       category: string;
       showCategoryOnProfile: boolean;
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateCategory(data);
-
-      return response;
+      const { token, ...data } = payload;
+      return await updateCategory(data, token);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save category";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to save category",
+      );
     }
   },
 );
+
+// ==========================================
+// AVATAR (preset)
+// PATCH /api/users/me/avatar
+// ==========================================
 
 export const saveUserAvatar = createAsyncThunk(
   "user/saveUserAvatar",
   async (
-    data: {
+    payload: {
       email: string;
       avatar: string;
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateAvatar(data);
-
-      return response;
+      const { token, ...data } = payload;
+      return await updateAvatar(data, token);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update avatar";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to update avatar",
+      );
     }
   },
 );
+
+// ==========================================
+// AVATAR PHOTO (upload)
+// POST /api/users/me/avatar/photo
+// ==========================================
 
 export const saveAvatarPhoto = createAsyncThunk(
   "user/saveAvatarPhoto",
@@ -124,246 +170,256 @@ export const saveAvatarPhoto = createAsyncThunk(
     {
       email,
       photoUri,
+      token,
     }: {
       email: string;
       photoUri: string;
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await uploadAvatarPhoto(email, photoUri);
-
-      return response;
+      return await uploadAvatarPhoto(email, photoUri, token);
     } catch (error) {
-      const message =
+      return rejectWithValue(
         error instanceof Error
           ? error.message
-          : "Failed to upload profile photo";
-
-      return rejectWithValue(message);
+          : "Failed to upload profile photo",
+      );
     }
   },
 );
 
-export const saveUserInterests = createAsyncThunk(
-  "user/saveUserInterests",
-  async (
-    {
-      email,
-      interests,
-    }: {
-      email: string;
-      interests: string[];
-    },
-    { rejectWithValue },
-  ) => {
-    try {
-      const response = await updateInterests({
-        email,
-        interests,
-      });
-
-      return response;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save interests";
-
-      return rejectWithValue(message);
-    }
-  },
-);
+// ==========================================
+// FACTION
+// POST /api/users/me/faction
+// ==========================================
 
 export const saveUserFaction = createAsyncThunk(
   "user/saveUserFaction",
   async (
-    {
-      email,
-      factionKey,
-    }: {
+    payload: {
       email: string;
       factionKey: string;
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateFaction({
-        email,
-        factionKey,
-      });
-
-      return response;
+      const { token, ...data } = payload;
+      return await updateFaction(data, token);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save faction";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to update faction",
+      );
     }
   },
 );
+
+// ==========================================
+// INTERESTS
+// PUT /api/users/me/interests
+// ==========================================
+
+export const saveUserInterests = createAsyncThunk(
+  "user/saveUserInterests",
+  async (
+    payload: {
+      email: string;
+      interests: string[];
+      token?: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const { token, ...data } = payload;
+      return await updateInterests(data, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to update interests",
+      );
+    }
+  },
+);
+
+// ==========================================
+// NOTIFICATION PREFERENCE
+// PATCH /api/users/me/preferences/notifications
+// ==========================================
+
+export const saveNotificationPreference = createAsyncThunk(
+  "user/saveNotificationPreference",
+  async (
+    payload: {
+      email: string;
+      notificationsEnabled: boolean;
+      token?: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const { token, ...data } = payload;
+      return await updateNotificationPreference(data, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error
+          ? error.message
+          : "Failed to update notification preference",
+      );
+    }
+  },
+);
+
+// ==========================================
+// LOCATION PREFERENCE
+// PATCH /api/users/me/preferences/location
+// ==========================================
+
+export const saveLocationPreference = createAsyncThunk(
+  "user/saveLocationPreference",
+  async (
+    payload: {
+      email: string;
+      locationEnabled: boolean;
+      radiusMiles: number;
+      lat: number;
+      lng: number;
+      token?: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const { token, ...data } = payload;
+      return await updateLocationPreference(data, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error
+          ? error.message
+          : "Failed to update location preference",
+      );
+    }
+  },
+);
+
+// ==========================================
+// CONTACT
+// GET /api/users/me/contact
+// ==========================================
 
 export const fetchUserContact = createAsyncThunk(
   "user/fetchUserContact",
-  async (token: string, { rejectWithValue }) => {
+  async (
+    {
+      token,
+    }: {
+      token?: string;
+    },
+    { rejectWithValue },
+  ) => {
     try {
-      const response = await getContact(token);
-
-      return response;
+      return await getContact(token);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to get contact details";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to load contact",
+      );
     }
   },
 );
 
+// PATCH /api/users/me/contact
 export const saveUserContact = createAsyncThunk(
   "user/saveUserContact",
   async (
     {
       token,
-      email,
-      phone,
-      businessAddress,
+      data,
     }: {
       token?: string;
-      email: string;
-      phone: string;
-      businessAddress: string;
+      data: {
+        email: string;
+        phone: string;
+        businessAddress: string;
+      };
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateContact(token, {
-        email,
-        phone,
-        businessAddress,
-      });
-
-      return response;
+      return await updateContact(token, data);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save contact";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to save contact",
+      );
     }
   },
 );
 
-export const saveNotificationPreference = createAsyncThunk(
-  "user/saveNotificationPreference",
+// ==========================================
+// DEVICE
+// POST /api/users/me/devices
+// ==========================================
+
+export const registerUserDevice = createAsyncThunk(
+  "user/registerDevice",
   async (
-    {
-      email,
-      notificationsEnabled,
-    }: {
+    payload: {
       email: string;
-      notificationsEnabled: boolean;
+      pushToken: string;
+      platform: string;
+      token?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      const response = await updateNotificationPreference({
-        email,
-        notificationsEnabled,
-      });
-
-      return response;
+      const { token, ...data } = payload;
+      return await registerDevice(data, token);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to save notification preference";
-
-      return rejectWithValue(message);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to register device",
+      );
     }
   },
 );
 
-export const saveLocationPreference = createAsyncThunk(
-  "user/saveLocationPreference",
-  async (
-    {
-      email,
-      locationEnabled,
-      radiusMiles,
-      lat,
-      lng,
-    }: {
-      email: string;
-      locationEnabled: boolean;
-      radiusMiles: number;
-      lat: number | null;
-      lng: number | null;
-    },
-    { rejectWithValue },
-  ) => {
-    try {
-      const response = await updateLocationPreference({
-        email,
-        locationEnabled,
-        radiusMiles,
-        lat: lat ?? 0,
-        lng: lng ?? 0,
-      });
-
-      return response;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to save location preference";
-
-      return rejectWithValue(message);
-    }
-  },
-);
+// ==========================================
+// COMPLETE ONBOARDING
+// POST /api/users/me/onboarding/complete
+// ==========================================
 
 export const finishOnboarding = createAsyncThunk(
   "user/finishOnboarding",
-  async (
-    data: {
-      email: string;
-
-      profile: {
-        firstName: string;
-        lastName: string;
-        username: string;
-        age: number | null;
-        gender: string;
-        avatar: string;
-      };
-
-      faction: string;
-
-      interests: string[];
-
-      preferences: {
-        notificationsEnabled: boolean;
-      };
-
-      location: {
-        locationEnabled: boolean;
-        radiusMiles: number;
-        lat: number | null;
-        lng: number | null;
-      };
-    },
-    { rejectWithValue },
-  ) => {
+  async (payload: unknown, { rejectWithValue }) => {
     try {
-      const response = await completeOnboarding(data);
-
-      return response;
+      // No token here on purpose — the actual call site
+      // (app/onboarding/ready.tsx) dispatches finishOnboarding(payload)
+      // directly, with no wrapper and no token field. The backend's
+      // completeOnboarding accepts an optional token but doesn't require
+      // one — same email-based identification every other onboarding
+      // step already relies on successfully.
+      return await completeOnboarding(payload);
     } catch (error) {
-      const message =
+      return rejectWithValue(
         error instanceof Error
           ? error.message
-          : "Failed to complete onboarding";
+          : "Failed to complete onboarding",
+      );
+    }
+  },
+);
 
-      return rejectWithValue(message);
+// ==========================================
+// POINTS
+// GET /api/users/me/points
+// ==========================================
+
+export const fetchUserPoints = createAsyncThunk(
+  "user/fetchUserPoints",
+  async (token: string, { rejectWithValue }) => {
+    try {
+      return await getPoints(token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to load points",
+      );
     }
   },
 );

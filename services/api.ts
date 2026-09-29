@@ -16,9 +16,18 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { method = "GET", body, token } = options;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
+
+  const headers: Record<string, string> = {};
+
+  /*
+   * Do not manually set Content-Type for FormData.
+   * React Native/fetch needs to add the multipart boundary.
+   */
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -27,14 +36,22 @@ export async function apiRequest<T>(
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
   });
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     const message =
-      data?.message || data?.error || "Something went wrong. Please try again.";
+      data?.message ||
+      data?.error ||
+      data?.errors?.[0] ||
+      "Something went wrong. Please try again.";
 
     throw new Error(message);
   }

@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import {
   fetchFollowers,
   fetchFollowing,
@@ -62,6 +62,36 @@ const followSlice = createSlice({
 
     clearFollowError(state) {
       state.error = null;
+    },
+
+    // ======================================
+    // SOCKET — SOMEONE FOLLOWED YOU
+    // ======================================
+    // There is no dedicated "user:followed" socket event on the
+    // backend — a follow arrives as a generic notification:new with
+    // type:"follow", handled globally in useSocketConnection.ts (not
+    // per-screen, since a follow can happen while you're anywhere in
+    // the app, not just on the Followers screen) and dispatched here.
+    //
+    // unfollowUser has no socket event at all — it's a plain DB delete
+    // on the backend, so there's genuinely nothing to react to live for
+    // an unfollow; that side stays exactly as it was; REST/refetch only.
+    socketFollowerAdded(state, action: PayloadAction<User>) {
+      const actor = action.payload;
+
+      if (!actor?.id) {
+        return;
+      }
+
+      const alreadyPresent = state.followers.some(
+        (user) => user.id === actor.id,
+      );
+
+      if (!alreadyPresent) {
+        state.followers.unshift(actor);
+      }
+
+      state.followersTotal += 1;
     },
   },
 
@@ -164,7 +194,11 @@ const followSlice = createSlice({
   },
 });
 
-export const { clearFollowers, clearFollowing, clearFollowError } =
-  followSlice.actions;
+export const {
+  clearFollowers,
+  clearFollowing,
+  clearFollowError,
+  socketFollowerAdded,
+} = followSlice.actions;
 
 export default followSlice.reducer;

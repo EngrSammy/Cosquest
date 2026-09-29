@@ -2,14 +2,23 @@ import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
 import { CodeInput } from "@/components/CodeInputs";
 import { ErrorText } from "@/components/ErrorText";
-import { resendCode, verifyCode } from "@/services/auth";
-import { router } from "expo-router";
+import { requestPasswordReset } from "@/services/auth";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function ForgetPassword() {
+// There is no separate "check this code" endpoint on the backend: the code
+// is checked in the LAST step (reset-password), together with the new
+// password. So this screen only makes sure 6 digits were typed, then
+// carries the email + code on to the Reset Password screen.
+export default function Verification() {
   const insets = useSafeAreaInsets();
+
+  // Sent here by the Forgot Password screen.
+  const params = useLocalSearchParams<{ email?: string }>();
+  const email = String(params.email || "");
+
   const [form, setForm] = useState({
     code: "",
   });
@@ -21,40 +30,58 @@ export default function ForgetPassword() {
   const [resendError, setResendError] = useState("");
   const [resending, setResending] = useState(false);
 
+  // Sends a NEW code to the same email. The previous code stops working
+  // (only the newest one is valid), and it counts towards the backend's
+  // limit of 3 codes per account per day.
   async function handleResend() {
     if (resending) return;
     setResendMsg("");
     setResendError("");
+
+    if (!email) {
+      setResendError("Go back and enter your email again.");
+      return;
+    }
+
     setResending(true);
     try {
-      await resendCode();
-      setResendMsg("A new code has been sent.");
-    } catch {
-      setResendError("Couldn't resend. Please try again.");
+      await requestPasswordReset(email);
+      setForm({ code: "" });
+      setResendMsg("A new code has been sent. Only the newest code works.");
+    } catch (error) {
+      // e.g. "Too many password reset requests for this account today..."
+      setResendError(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't resend. Please try again.",
+      );
     } finally {
       setResending(false);
     }
   }
 
-  const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState("");
 
-  async function handleVerify() {
-    if (verifying) return;
+  function handleVerify() {
     setVerifyError("");
-    if (form.code.length !== 6) {
+
+    const code = form.code.trim();
+
+    if (!/^\d{6}$/.test(code)) {
       setVerifyError("Enter the 6-digit code");
       return;
     }
-    setVerifying(true);
-    try {
-      await verifyCode(form.code);
-      router.push("/onboarding/resetPassword"); // success → advance
-    } catch {
-      setVerifyError("That code isn't right. Check and try again.");
-    } finally {
-      setVerifying(false);
+
+    if (!email) {
+      setVerifyError("Go back and enter your email again.");
+      return;
     }
+
+    // The code travels as TEXT, so a code like "049302" keeps its 0.
+    router.push({
+      pathname: "/onboarding/resetPassword",
+      params: { email, code },
+    });
   }
 
   return (
@@ -63,7 +90,13 @@ export default function ForgetPassword() {
         <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
           <Text style={styles.headline}>Verification</Text>
           <Text style={styles.sub}>
-            Enter the code sent to your email address
+            Enter the 6-digit code sent to{"\n"}
+            {email ? (
+              <Text style={styles.email}>{email}</Text>
+            ) : (
+              "your email address"
+            )}
+            {"\n"}It expires in 5 minutes.
           </Text>
           <CodeInput
             value={form.code}
@@ -77,8 +110,7 @@ export default function ForgetPassword() {
             </Text>
             <Text
               style={[styles.resend, resending && { opacity: 0.7 }]}
-              onPress={handleResend}
-            >
+              onPress={handleResend}>
               {resending ? "Sending..." : "Resend Now"}
             </Text>
             <ErrorText>{resendError}</ErrorText>
@@ -88,11 +120,7 @@ export default function ForgetPassword() {
           </View>
 
           <View style={styles.buttons}>
-            <Button
-              label={verifying ? "Verifying..." : "Verify"}
-              onPress={handleVerify}
-              variant="brand"
-            />
+            <Button label="Verify" onPress={handleVerify} variant="brand" />
           </View>
         </View>
       </ScrollView>
@@ -120,6 +148,7 @@ const styles = StyleSheet.create({
     marginBottom: 50,
     lineHeight: 20,
   },
+  email: { fontWeight: "700", color: "#191922" },
   resendWrap: { alignItems: "center", gap: 6, marginTop: 20, marginBottom: 20 },
   resendPrompt: { fontSize: 15, color: "#2b2b2c" },
   resend: { color: "#C5399A", fontWeight: "700", fontSize: 16 },

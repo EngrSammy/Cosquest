@@ -29,16 +29,37 @@ export default function ForgotPassword() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // TODO(launch): switch to neutral response — enumeration safety
+  // The backend ALWAYS answers "a code has been sent if the account
+  // exists" — on purpose, so nobody can use this screen to find out which
+  // emails have accounts. So on success we always go to the code screen,
+  // and never say "no account found".
+  //
+  // The only real errors are:
+  //   - 429: more than 3 requests for this account today
+  //   - no internet / server down
   async function handleForgot() {
     if (submitting) return;
     if (!validate()) return; // shape (empty / has "@") first
+
+    const email = form.email.trim();
+
     setSubmitting(true);
     try {
-      await requestPasswordReset(form.email);
-      router.push("/onboarding/verification");
-    } catch {
-      setErrors({ email: "No account found with that email" }); // Launch time/production change - change to "If that email is registered, we've sent a code" — and navigate to the verify code screen either way.
+      await requestPasswordReset(email);
+
+      // The email travels to the next screens so the final reset request
+      // can send it together with the code.
+      router.push({
+        pathname: "/onboarding/verification",
+        params: { email, flow: "reset" },
+      });
+    } catch (error) {
+      setErrors({
+        email:
+          error instanceof Error && error.message
+            ? error.message
+            : "Couldn't send the code. Check your connection and try again.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +71,8 @@ export default function ForgotPassword() {
         <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
           <Text style={styles.headline}>Forgot Your Password?</Text>
           <Text style={styles.sub}>
-            Enter your email address to recover your password
+            Enter your email address and we&apos;ll send you a 6-digit code to
+            reset your password
           </Text>
           <Field
             label="Email"
@@ -64,6 +86,7 @@ export default function ForgotPassword() {
               label={submitting ? "Sending..." : "Send"}
               onPress={handleForgot}
               variant="brand"
+              disabled={submitting}
             />
           </View>
         </View>

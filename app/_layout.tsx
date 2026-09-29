@@ -1,4 +1,5 @@
 import { UserProvider } from "@/context/UserContext";
+import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { store } from "@/store/store";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -8,6 +9,18 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Provider } from "react-redux";
+
+// useSocketConnection() calls useAppSelector internally, which only
+// works inside <Provider store={store}>. RootLayout below is the
+// component that CREATES that Provider, so calling the hook directly
+// in RootLayout's own body would run before the Provider exists in the
+// tree yet — this tiny component exists only to be a Provider
+// DESCENDANT, so the hook has real Redux access. Renders nothing.
+function SocketConnectionGate() {
+  useSocketConnection();
+
+  return null;
+}
 
 export default function RootLayout() {
   // Preload the icon fonts so they resolve correctly on web
@@ -20,6 +33,8 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
+      <SocketConnectionGate />
+
       <GestureHandlerRootView style={{ flex: 1 }}>
         <UserProvider>
           <Stack screenOptions={{ headerShown: false }}>

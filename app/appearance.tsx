@@ -1,8 +1,9 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+      ActivityIndicator,
       Pressable,
       ScrollView,
       StyleSheet,
@@ -12,6 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+      fetchAppearanceSettings,
+      updateAppearanceSettingsThunk,
+} from "@/store/thunks/settingsThunks";
+
 type ThemeMode = "Light" | "Dark" | "System";
 
 type FontSize = "Small" | "Medium" | "Large";
@@ -19,6 +26,17 @@ type FontSize = "Small" | "Medium" | "Large";
 type AccentColor = {
   name: string;
   value: string;
+};
+
+type BackendThemeMode = "light" | "dark" | "system";
+
+type BackendFontSize = "small" | "medium" | "large";
+
+type AppearanceSettings = {
+  themeMode: BackendThemeMode;
+  accentColor: string;
+  fontSize: BackendFontSize;
+  reduceMotion: boolean;
 };
 
 const ACCENT_COLORS: AccentColor[] = [
@@ -51,9 +69,11 @@ function SectionLabel({ children }: { children: string }) {
 function ThemeSelector({
   value,
   onChange,
+  disabled,
 }: {
   value: ThemeMode;
   onChange: (value: ThemeMode) => void;
+  disabled?: boolean;
 }) {
   const options: ThemeMode[] = ["Light", "Dark", "System"];
 
@@ -65,7 +85,8 @@ function ThemeSelector({
         return (
           <Pressable
             key={option}
-            onPress={() => onChange(option)}
+            onPress={() => !disabled && onChange(option)}
+            disabled={disabled}
             style={[
               styles.segmentOption,
               selected && styles.segmentOptionSelected,
@@ -87,20 +108,23 @@ function ThemeSelector({
 function AccentColorSelector({
   value,
   onChange,
+  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <View style={styles.card}>
       <View style={styles.accentColors}>
         {ACCENT_COLORS.map((color) => {
-          const selected = value === color.value;
+          const selected = value.toLowerCase() === color.value.toLowerCase();
 
           return (
             <Pressable
               key={color.name}
-              onPress={() => onChange(color.value)}
+              onPress={() => !disabled && onChange(color.value)}
+              disabled={disabled}
               style={[
                 styles.accentColorOuter,
                 selected && styles.accentColorSelected,
@@ -124,9 +148,11 @@ function AccentColorSelector({
 function FontSizeSelector({
   value,
   onChange,
+  disabled,
 }: {
   value: FontSize;
   onChange: (value: FontSize) => void;
+  disabled?: boolean;
 }) {
   const sizes: FontSize[] = ["Small", "Medium", "Large"];
 
@@ -166,7 +192,11 @@ function FontSizeSelector({
 
       <View style={styles.fontLabels}>
         {sizes.map((size) => (
-          <Pressable key={size} onPress={() => onChange(size)} hitSlop={8}>
+          <Pressable
+            key={size}
+            onPress={() => !disabled && onChange(size)}
+            disabled={disabled}
+            hitSlop={8}>
             <Text
               style={[
                 styles.fontLabel,
@@ -184,13 +214,261 @@ function FontSizeSelector({
 export default function Appearance() {
   const insets = useSafeAreaInsets();
 
-  const [theme, setTheme] = useState<ThemeMode>("Light");
+  const dispatch = useAppDispatch();
 
-  const [accentColor, setAccentColor] = useState("#C5399A");
+  const token = useAppSelector((state) => state.auth.token);
+  const appearanceFromStore = useAppSelector(
+    (state) => state.settings.appearance,
+  );
+
+  const [theme, setTheme] = useState<ThemeMode>("System");
+
+  const [accentColor, setAccentColor] = useState("#CA4AA0");
 
   const [fontSize, setFontSize] = useState<FontSize>("Medium");
 
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  /**
+   * Convert backend theme value to the value
+   * currently displayed by the UI.
+   */
+  const backendThemeToUI = (value?: BackendThemeMode): ThemeMode => {
+    switch (value) {
+      case "light":
+        return "Light";
+      case "dark":
+        return "Dark";
+      case "system":
+      default:
+        return "System";
+    }
+  };
+
+  /**
+   * Convert backend font size to the value
+   * currently displayed by the UI.
+   */
+  const backendFontSizeToUI = (value?: BackendFontSize): FontSize => {
+    switch (value) {
+      case "small":
+        return "Small";
+      case "large":
+        return "Large";
+      case "medium":
+      default:
+        return "Medium";
+    }
+  };
+
+  /**
+   * Convert UI theme value to the exact
+   * value expected by MongoDB/backend.
+   */
+  const uiThemeToBackend = (value: ThemeMode): BackendThemeMode => {
+    switch (value) {
+      case "Light":
+        return "light";
+      case "Dark":
+        return "dark";
+      case "System":
+      default:
+        return "system";
+    }
+  };
+
+  /**
+   * Convert UI font size to the exact
+   * value expected by MongoDB/backend.
+   */
+  const uiFontSizeToBackend = (value: FontSize): BackendFontSize => {
+    switch (value) {
+      case "Small":
+        return "small";
+      case "Large":
+        return "large";
+      case "Medium":
+      default:
+        return "medium";
+    }
+  };
+
+  /**
+   * Load Appearance settings from MongoDB.
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAppearance = async () => {
+      if (!token) {
+        if (mounted) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        await dispatch(fetchAppearanceSettings(token)).unwrap();
+      } catch (error) {
+        console.error("Failed to load appearance settings:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAppearance();
+
+    return () => {
+      mounted = false;
+    };
+  }, [dispatch, token]);
+
+  /**
+   * Sync the screen with the settings returned
+   * from the backend.
+   */
+  useEffect(() => {
+    if (!appearanceFromStore) {
+      return;
+    }
+
+    const appearance = appearanceFromStore as AppearanceSettings;
+
+    setTheme(backendThemeToUI(appearance.themeMode));
+
+    setAccentColor(appearance.accentColor || "#CA4AA0");
+
+    setFontSize(backendFontSizeToUI(appearance.fontSize));
+
+    setReduceMotion(Boolean(appearance.reduceMotion));
+  }, [appearanceFromStore]);
+
+  /**
+   * Save a single Appearance setting.
+   */
+  const saveAppearanceSetting = async (
+    field: keyof AppearanceSettings,
+    value: string | boolean,
+    previousValue: string | boolean,
+    updateLocal: () => void,
+    rollbackLocal: () => void,
+  ) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      updateLocal();
+      setSaving(true);
+
+      await dispatch(
+        updateAppearanceSettingsThunk({
+          token,
+          data: {
+            [field]: value,
+          },
+        }),
+      ).unwrap();
+    } catch (error) {
+      console.error(`Failed to update appearance setting "${field}":`, error);
+
+      rollbackLocal();
+
+      console.warn(`Appearance setting "${field}" was not saved.`, {
+        attemptedValue: value,
+        previousValue,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Theme change.
+   */
+  const handleThemeChange = (value: ThemeMode) => {
+    const previousTheme = theme;
+
+    const backendValue = uiThemeToBackend(value);
+
+    saveAppearanceSetting(
+      "themeMode",
+      backendValue,
+      uiThemeToBackend(previousTheme),
+      () => {
+        setTheme(value);
+      },
+      () => {
+        setTheme(previousTheme);
+      },
+    );
+  };
+
+  /**
+   * Accent color change.
+   */
+  const handleAccentColorChange = (value: string) => {
+    const previousColor = accentColor;
+
+    saveAppearanceSetting(
+      "accentColor",
+      value.toLowerCase(),
+      previousColor.toLowerCase(),
+      () => {
+        setAccentColor(value);
+      },
+      () => {
+        setAccentColor(previousColor);
+      },
+    );
+  };
+
+  /**
+   * Font size change.
+   */
+  const handleFontSizeChange = (value: FontSize) => {
+    const previousFontSize = fontSize;
+
+    const backendValue = uiFontSizeToBackend(value);
+
+    saveAppearanceSetting(
+      "fontSize",
+      backendValue,
+      uiFontSizeToBackend(previousFontSize),
+      () => {
+        setFontSize(value);
+      },
+      () => {
+        setFontSize(previousFontSize);
+      },
+    );
+  };
+
+  /**
+   * Reduce Motion change.
+   */
+  const handleReduceMotionChange = (value: boolean) => {
+    const previousValue = reduceMotion;
+
+    saveAppearanceSetting(
+      "reduceMotion",
+      value,
+      previousValue,
+      () => {
+        setReduceMotion(value);
+      },
+      () => {
+        setReduceMotion(previousValue);
+      },
+    );
+  };
 
   return (
     <AppBackground variant="blueGradient">
@@ -226,17 +504,29 @@ export default function Appearance() {
         {/* THEME MODE */}
         <SectionLabel>THEME MODE</SectionLabel>
 
-        <ThemeSelector value={theme} onChange={setTheme} />
+        <ThemeSelector
+          value={theme}
+          onChange={handleThemeChange}
+          disabled={loading || saving}
+        />
 
         {/* ACCENT COLOR */}
         <SectionLabel>ACCENT COLOR</SectionLabel>
 
-        <AccentColorSelector value={accentColor} onChange={setAccentColor} />
+        <AccentColorSelector
+          value={accentColor}
+          onChange={handleAccentColorChange}
+          disabled={loading || saving}
+        />
 
         {/* FONT SIZE */}
         <SectionLabel>FONT SIZE</SectionLabel>
 
-        <FontSizeSelector value={fontSize} onChange={setFontSize} />
+        <FontSizeSelector
+          value={fontSize}
+          onChange={handleFontSizeChange}
+          disabled={loading || saving}
+        />
 
         {/* ACCESSIBILITY */}
         <SectionLabel>ACCESSIBILITY</SectionLabel>
@@ -250,7 +540,8 @@ export default function Appearance() {
 
           <Switch
             value={reduceMotion}
-            onValueChange={setReduceMotion}
+            onValueChange={handleReduceMotionChange}
+            disabled={loading || saving}
             trackColor={{
               false: "#D4D4D8",
               true: "#D88CC0",
@@ -259,6 +550,12 @@ export default function Appearance() {
             ios_backgroundColor="#D4D4D8"
           />
         </View>
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#C5399A" />
+          </View>
+        )}
       </ScrollView>
     </AppBackground>
   );
@@ -498,5 +795,11 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "600",
     color: "#5B5B67",
+  },
+
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
   },
 });

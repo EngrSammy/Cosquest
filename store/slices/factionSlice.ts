@@ -1,18 +1,20 @@
+import type { Faction, FactionMembersResponse } from "@/services/faction";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { fetchFactions } from "../thunks/factionThunks";
-
-type Faction = {
-  id: string;
-  name: string;
-  description?: string;
-  image?: string;
-};
+import { fetchFactionMembers, fetchFactions } from "../thunks/factionThunks";
 
 type FactionState = {
   factions: Faction[];
   selectedFaction: string | null;
   loading: boolean;
   error: string | null;
+
+  // Keyed by faction key ("celestials", etc.) — the profile card's live
+  // member count + avatar-row preview. A record rather than one shared
+  // value so more than one faction's detail can be held at once without
+  // separate screens clobbering each other's fetch.
+  membersByFaction: Record<string, FactionMembersResponse>;
+  membersLoading: Record<string, boolean>;
+  membersError: Record<string, string | null>;
 };
 
 const initialState: FactionState = {
@@ -20,6 +22,10 @@ const initialState: FactionState = {
   selectedFaction: null,
   loading: false,
   error: null,
+
+  membersByFaction: {},
+  membersLoading: {},
+  membersError: {},
 };
 
 const factionSlice = createSlice({
@@ -55,6 +61,31 @@ const factionSlice = createSlice({
           typeof action.payload === "string"
             ? action.payload
             : "Failed to load factions";
+      })
+
+      .addCase(fetchFactionMembers.pending, (state, action) => {
+        const key = action.meta.arg.key;
+
+        state.membersLoading[key] = true;
+        state.membersError[key] = null;
+      })
+
+      .addCase(fetchFactionMembers.fulfilled, (state, action) => {
+        const key = action.meta.arg.key;
+
+        state.membersLoading[key] = false;
+        state.membersError[key] = null;
+        state.membersByFaction[key] = action.payload;
+      })
+
+      .addCase(fetchFactionMembers.rejected, (state, action) => {
+        const key = action.meta.arg.key;
+
+        state.membersLoading[key] = false;
+        state.membersError[key] =
+          typeof action.payload === "string"
+            ? action.payload
+            : "Failed to load faction members";
       });
   },
 });

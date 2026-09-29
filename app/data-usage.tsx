@@ -1,8 +1,15 @@
 import { AppBackground } from "@/components/AppBackground";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
+      fetchDataUsageSettings,
+      updateDataUsageSettingsThunk,
+} from "@/store/thunks/settingsThunks";
+import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+      ActivityIndicator,
       Alert,
       Pressable,
       ScrollView,
@@ -12,6 +19,8 @@ import {
       View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type ImageQuality = "low" | "medium" | "high" | "auto";
 
 type DownloadRowProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -43,55 +52,388 @@ function DownloadRow({ icon, label, value, onChange }: DownloadRowProps) {
   );
 }
 
+/**
+ * Convert bytes into a readable storage value.
+ *
+ * Examples:
+ * 1024 -> 1 KB
+ * 1048576 -> 1 MB
+ * 1073741824 -> 1 GB
+ */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+
+  const index = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+
+  const value = bytes / Math.pow(1024, index);
+
+  if (index === 0) {
+    return `${Math.round(value)} ${units[index]}`;
+  }
+
+  if (value >= 100) {
+    return `${Math.round(value)} ${units[index]}`;
+  }
+
+  if (value >= 10) {
+    return `${value.toFixed(1)} ${units[index]}`;
+  }
+
+  return `${value.toFixed(2)} ${units[index]}`;
+}
+
+/**
+ * Calculate the actual size of everything inside
+ * the application's cache directory.
+ */
+async function calculateCacheSize(uri: string): Promise<number> {
+  let totalSize = 0;
+
+  try {
+    const entries = await FileSystem.readDirectoryAsync(uri);
+
+    for (const entry of entries) {
+      const childUri = `${uri}${entry}`;
+
+      try {
+        const info = await FileSystem.getInfoAsync(childUri, {
+          size: true,
+        });
+
+        if (!info.exists) {
+          continue;
+        }
+
+        if (info.isDirectory) {
+          totalSize += await calculateCacheSize(
+            childUri.endsWith("/") ? childUri : `${childUri}/`,
+          );
+        } else {
+          totalSize += info.size ?? 0;
+        }
+      } catch {
+        // Ignore a cache entry that disappears while scanning.
+      }
+    }
+  } catch {
+    // Cache directory may be unavailable or empty.
+  }
+
+  return totalSize;
+}
+
+/**
+ * Delete the actual contents of the application's cache.
+ *
+ * We delete the contents rather than deleting the cache root itself,
+ * because the app may need the cache directory to continue existing.
+ */
+async function clearApplicationCache(uri: string): Promise<void> {
+  const entries = await FileSystem.readDirectoryAsync(uri);
+
+  for (const entry of entries) {
+    const childUri = `${uri}${entry}`;
+
+    try {
+      await FileSystem.deleteAsync(childUri, {
+        idempotent: true,
+      });
+    } catch {
+      // Continue clearing the remaining cache entries.
+    }
+  }
+}
+
 export default function DataUsage() {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
+
+  const token = useAppSelector((state) => state.auth.token);
+  const dataUsage = useAppSelector((state) => state.settings.dataUsage);
 
   const [wifiOnly, setWifiOnly] = useState(true);
   const [autoPlayVideos, setAutoPlayVideos] = useState(true);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("high");
 
-  const [imageQuality, setImageQuality] = useState("High");
+  const [cacheBytes, setCacheBytes] = useState(0);
+  const [totalStorageBytes, setTotalStorageBytes] = useState(0);
+  const [usedStorageBytes, setUsedStorageBytes] = useState(0);
 
-  const [cacheSize, setCacheSize] = useState("248 MB");
+  const [storageLoading, setStorageLoading] = useState(true);
+  const [cacheClearing, setCacheClearing] = useState(false);
 
-  // Design values until native device storage APIs
-  // are connected.
-  const usedStorage = "1.2 GB";
-  const totalStorage = "64 GB";
+  /**
+   * Load the backend Data Usage settings.
+   */
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
 
-  const storageProgress = 0.019;
+    dispatch(fetchDataUsageSettings(token));
+  }, [dispatch, token]);
 
-  function handleClearCache() {
-    Alert.alert(
-      "Clear Cache",
-      "Cache clearing will be connected to the device storage layer.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "OK",
-          onPress: () => {
-            setCacheSize("0 MB");
+  /**
+   * Synchronize the UI with the exact backend fields.
+   *
+   * MongoDB:
+   *
+   * downloadOverWifiOnly
+   * autoPlayVideos
+   * imageQuality
+   */
+  useEffect(() => {
+    if (!dataUsage) {
+      return;
+    }
+
+    if (typeof dataUsage.downloadOverWifiOnly === "boolean") {
+      setWifiOnly(dataUsage.downloadOverWifiOnly);
+    }
+
+    if (typeof dataUsage.autoPlayVideos === "boolean") {
+      setAutoPlayVideos(dataUsage.autoPlayVideos);
+    }
+
+    if (
+      dataUsage.imageQuality === "low" ||
+      dataUsage.imageQuality === "medium" ||
+      dataUsage.imageQuality === "high" ||
+      dataUsage.imageQuality === "auto"
+    ) {
+      setImageQuality(dataUsage.imageQuality);
+    }
+  }, [dataUsage]);
+
+  /**
+   * Read the actual device storage and actual CosQuest cache.
+   */
+  const loadDeviceStorage = useCallback(async () => {
+    try {
+      setStorageLoading(true);
+
+      const [totalDiskCapacity, freeDiskStorage] = await Promise.all([
+        FileSystem.getTotalDiskCapacityAsync(),
+        FileSystem.getFreeDiskStorageAsync(),
+      ]);
+
+      const usedDiskStorage = Math.max(totalDiskCapacity - freeDiskStorage, 0);
+
+      setTotalStorageBytes(totalDiskCapacity);
+      setUsedStorageBytes(usedDiskStorage);
+
+      const cacheDirectory = FileSystem.cacheDirectory;
+
+      if (cacheDirectory) {
+        const actualCacheSize = await calculateCacheSize(cacheDirectory);
+
+        setCacheBytes(actualCacheSize);
+      } else {
+        setCacheBytes(0);
+      }
+    } catch (error) {
+      console.error("Failed to load device storage:", error);
+    } finally {
+      setStorageLoading(false);
+    }
+  }, []);
+
+  /**
+   * Load real device information when the screen opens.
+   */
+  useEffect(() => {
+    void loadDeviceStorage();
+  }, [loadDeviceStorage]);
+
+  /**
+   * Save Download over Wi-Fi Only.
+   */
+  async function handleWifiOnlyChange(value: boolean) {
+    const previousValue = wifiOnly;
+
+    setWifiOnly(value);
+
+    if (!token) {
+      setWifiOnly(previousValue);
+
+      Alert.alert(
+        "Not Signed In",
+        "Please sign in again before changing this setting.",
+      );
+
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateDataUsageSettingsThunk({
+          token,
+          data: {
+            downloadOverWifiOnly: value,
           },
-        },
-      ],
-    );
+        }),
+      ).unwrap();
+    } catch (error) {
+      console.error("Failed to update Wi-Fi preference:", error);
+
+      setWifiOnly(previousValue);
+
+      Alert.alert(
+        "Update Failed",
+        "We could not save your Wi-Fi download preference. Please try again.",
+      );
+    }
   }
 
+  /**
+   * Save Auto-play Videos.
+   */
+  async function handleAutoPlayChange(value: boolean) {
+    const previousValue = autoPlayVideos;
+
+    setAutoPlayVideos(value);
+
+    if (!token) {
+      setAutoPlayVideos(previousValue);
+
+      Alert.alert(
+        "Not Signed In",
+        "Please sign in again before changing this setting.",
+      );
+
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateDataUsageSettingsThunk({
+          token,
+          data: {
+            autoPlayVideos: value,
+          },
+        }),
+      ).unwrap();
+    } catch (error) {
+      console.error("Failed to update auto-play preference:", error);
+
+      setAutoPlayVideos(previousValue);
+
+      Alert.alert(
+        "Update Failed",
+        "We could not save your auto-play preference. Please try again.",
+      );
+    }
+  }
+
+  /**
+   * Display backend image-quality values nicely.
+   *
+   * Backend:
+   * low
+   * medium
+   * high
+   * auto
+   *
+   * UI:
+   * Low
+   * Medium
+   * High
+   * Auto
+   */
+  function displayImageQuality(value: ImageQuality): string {
+    switch (value) {
+      case "low":
+        return "Low";
+
+      case "medium":
+        return "Medium";
+
+      case "high":
+        return "High";
+
+      case "auto":
+        return "Auto";
+
+      default:
+        return "High";
+    }
+  }
+
+  /**
+   * Save Image Quality.
+   */
+  async function saveImageQuality(value: ImageQuality) {
+    const previousValue = imageQuality;
+
+    setImageQuality(value);
+
+    if (!token) {
+      setImageQuality(previousValue);
+
+      Alert.alert(
+        "Not Signed In",
+        "Please sign in again before changing this setting.",
+      );
+
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateDataUsageSettingsThunk({
+          token,
+          data: {
+            imageQuality: value,
+          },
+        }),
+      ).unwrap();
+    } catch (error) {
+      console.error("Failed to update image quality:", error);
+
+      setImageQuality(previousValue);
+
+      Alert.alert(
+        "Update Failed",
+        "We could not save your image quality preference. Please try again.",
+      );
+    }
+  }
+
+  /**
+   * Show image quality options.
+   */
   function handleImageQuality() {
     Alert.alert("Image Quality", "Choose the image quality to use.", [
       {
         text: "Low",
-        onPress: () => setImageQuality("Low"),
+        onPress: () => {
+          void saveImageQuality("low");
+        },
       },
       {
         text: "Medium",
-        onPress: () => setImageQuality("Medium"),
+        onPress: () => {
+          void saveImageQuality("medium");
+        },
       },
       {
         text: "High",
-        onPress: () => setImageQuality("High"),
+        onPress: () => {
+          void saveImageQuality("high");
+        },
+      },
+      {
+        text: "Auto",
+        onPress: () => {
+          void saveImageQuality("auto");
+        },
       },
       {
         text: "Cancel",
@@ -99,6 +441,110 @@ export default function DataUsage() {
       },
     ]);
   }
+
+  /**
+   * Clear the REAL CosQuest application cache.
+   */
+  function handleClearCache() {
+    if (cacheClearing) {
+      return;
+    }
+
+    const currentCacheSize = formatBytes(cacheBytes);
+
+    Alert.alert(
+      "Clear Cache",
+      `This will remove ${currentCacheSize} of temporary CosQuest files from this device. Your account, posts, messages, profile, and other cloud data will not be deleted.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Clear Cache",
+          style: "destructive",
+          onPress: () => {
+            void clearCache();
+          },
+        },
+      ],
+    );
+  }
+
+  /**
+   * Actually delete cached files from the device.
+   */
+  async function clearCache() {
+    const cacheDirectory = FileSystem.cacheDirectory;
+
+    if (!cacheDirectory) {
+      Alert.alert(
+        "Cache Unavailable",
+        "The application cache directory is not available on this device.",
+      );
+
+      return;
+    }
+
+    try {
+      setCacheClearing(true);
+
+      await clearApplicationCache(cacheDirectory);
+
+      /**
+       * Read the cache again after deletion.
+       * This makes the displayed value reflect the
+       * actual device state instead of assuming 0 MB.
+       */
+      const remainingCacheSize = await calculateCacheSize(cacheDirectory);
+
+      setCacheBytes(remainingCacheSize);
+
+      Alert.alert(
+        "Cache Cleared",
+        remainingCacheSize > 0
+          ? `The cache was cleared. ${formatBytes(
+              remainingCacheSize,
+            )} of cache data remains because some temporary files are currently in use.`
+          : "The CosQuest cache has been cleared.",
+      );
+    } catch (error) {
+      console.error("Failed to clear application cache:", error);
+
+      /**
+       * Even if some files could not be deleted,
+       * recalculate the actual cache size.
+       */
+      try {
+        const remainingCacheSize = await calculateCacheSize(cacheDirectory);
+
+        setCacheBytes(remainingCacheSize);
+      } catch {
+        // Keep the current value if recalculation fails.
+      }
+
+      Alert.alert(
+        "Clear Cache Failed",
+        "Some temporary files could not be removed. Please try again.",
+      );
+    } finally {
+      setCacheClearing(false);
+    }
+  }
+
+  /**
+   * Storage progress.
+   */
+  const storageProgress =
+    totalStorageBytes > 0
+      ? Math.min(usedStorageBytes / totalStorageBytes, 1)
+      : 0;
+
+  const usedStorageText = formatBytes(usedStorageBytes);
+
+  const totalStorageText = formatBytes(totalStorageBytes);
+
+  const cacheText = formatBytes(cacheBytes);
 
   return (
     <AppBackground variant="blueGradient">
@@ -138,9 +584,13 @@ export default function DataUsage() {
           <View style={styles.storageHeader}>
             <Text style={styles.storageTitle}>Storage Space</Text>
 
-            <Text style={styles.storageValue}>
-              {usedStorage} / {totalStorage}
-            </Text>
+            {storageLoading ? (
+              <ActivityIndicator size="small" color="#C5399A" />
+            ) : (
+              <Text style={styles.storageValue}>
+                {usedStorageText} / {totalStorageText}
+              </Text>
+            )}
           </View>
 
           <View style={styles.progressBackground}>
@@ -157,7 +607,7 @@ export default function DataUsage() {
           <View style={styles.cacheInfo}>
             <View style={styles.cacheDot} />
 
-            <Text style={styles.cacheText}>App Cache ({cacheSize})</Text>
+            <Text style={styles.cacheText}>App Cache ({cacheText})</Text>
           </View>
         </View>
 
@@ -167,8 +617,13 @@ export default function DataUsage() {
         </Text>
 
         <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-          onPress={handleClearCache}>
+          style={({ pressed }) => [
+            styles.row,
+            pressed && styles.pressed,
+            cacheClearing && styles.disabledRow,
+          ]}
+          onPress={handleClearCache}
+          disabled={cacheClearing}>
           <View style={styles.rowIcon}>
             <Ionicons name="trash-outline" size={17} color="#C5399A" />
           </View>
@@ -176,22 +631,26 @@ export default function DataUsage() {
           <View style={styles.rowTextContainer}>
             <Text style={styles.rowLabel}>Clear Cache</Text>
 
-            <Text style={styles.rowValue}>{cacheSize}</Text>
+            <Text style={styles.rowValue}>
+              {cacheClearing ? "Clearing..." : cacheText}
+            </Text>
           </View>
+
+          {cacheClearing && <ActivityIndicator size="small" color="#C5399A" />}
         </Pressable>
 
         <DownloadRow
           icon="phone-portrait-outline"
           label="Download over Wi-Fi Only"
           value={wifiOnly}
-          onChange={setWifiOnly}
+          onChange={handleWifiOnlyChange}
         />
 
         <DownloadRow
           icon="play-circle-outline"
           label="Auto-play Videos"
           value={autoPlayVideos}
-          onChange={setAutoPlayVideos}
+          onChange={handleAutoPlayChange}
         />
 
         <Pressable
@@ -204,7 +663,9 @@ export default function DataUsage() {
           <View style={styles.rowTextContainer}>
             <Text style={styles.rowLabel}>Image Quality</Text>
 
-            <Text style={styles.rowValue}>{imageQuality}</Text>
+            <Text style={styles.rowValue}>
+              {displayImageQuality(imageQuality)}
+            </Text>
           </View>
 
           <Ionicons name="chevron-forward" size={17} color="#9999A3" />
@@ -401,5 +862,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.72,
     transform: [{ scale: 0.995 }],
+  },
+
+  disabledRow: {
+    opacity: 0.75,
   },
 });

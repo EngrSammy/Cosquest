@@ -1,5 +1,10 @@
 import { apiRequest } from "@/services/api";
-import { exchangeGoogleOAuthCode, signIn, signUp } from "@/services/auth";
+import {
+  exchangeGoogleOAuthCode,
+  resetPassword,
+  signIn,
+  signUp,
+} from "@/services/auth";
 import { createAsyncThunk } from "@reduxjs/toolkit";
 
 export const loginUser = createAsyncThunk(
@@ -90,6 +95,34 @@ export const exchangeGoogleCode = createAsyncThunk(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Google authentication failed";
+
+      return rejectWithValue(message);
+    }
+  },
+);
+
+// ==========================================
+// RESET PASSWORD
+// ==========================================
+// On success the backend returns { token, user } exactly like login, so
+// authSlice stores them the same way and the user is signed straight in.
+
+export const resetPasswordThunk = createAsyncThunk(
+  "auth/resetPassword",
+  async (
+    data: {
+      email: string;
+      code: string;
+      newPassword: string;
+      confirmPassword: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await resetPassword(data);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to reset password.";
 
       return rejectWithValue(message);
     }

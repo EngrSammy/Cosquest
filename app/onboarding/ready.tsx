@@ -1,12 +1,12 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
 import { useOnboarding } from "@/context/OnboardingContext";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { finishOnboarding } from "@/store/thunks/userThunks";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -21,12 +21,20 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function Ready() {
   const insets = useSafeAreaInsets();
+
   const { data } = useOnboarding();
+
   const dispatch = useAppDispatch();
+
+  const token = useAppSelector((state) => state.auth.token);
 
   const [saving, setSaving] = useState(false);
 
   const p = useSharedValue(0);
+
+  // ============================================
+  // INTRO ANIMATION
+  // ============================================
 
   useEffect(() => {
     p.value = withTiming(1, {
@@ -62,49 +70,119 @@ export default function Ready() {
     ],
   }));
 
+  // ============================================
+  // COMPLETE ONBOARDING
+  // ============================================
+
   async function handleContinue() {
     if (saving) {
       return;
     }
 
+    console.log("=================================");
+    console.log("COSQUEST - FINISH ONBOARDING");
+    console.log("=================================");
+    console.log("AUTH TOKEN EXISTS:", Boolean(token));
+    console.log("EMAIL:", data.email);
+    console.log("USERNAME:", data.username);
+    console.log("FIRST NAME:", data.firstName);
+    console.log("LAST NAME:", data.lastName);
+    console.log("GENDER:", data.gender);
+    console.log("AVATAR:", data.avatar);
+    console.log("FACTION:", data.faction);
+    console.log("INTERESTS:", data.interests);
+    console.log("LOCATION GRANTED:", data.locationGranted);
+    console.log("LAT:", data.lat);
+    console.log("LNG:", data.lng);
+    console.log("NOTIFICATIONS:", data.notificationsEnabled);
+    console.log("=================================");
+
+    // ============================================
+    // VALIDATION
+    // ============================================
+
     if (!data.email?.trim()) {
+      Alert.alert(
+        "Missing information",
+        "Your email is missing. Please go back and complete your email information.",
+      );
       return;
     }
 
     if (!data.firstName?.trim()) {
+      Alert.alert("Missing information", "Please enter your first name.");
       return;
     }
 
     if (!data.lastName?.trim()) {
+      Alert.alert("Missing information", "Please enter your last name.");
       return;
     }
 
     if (!data.username?.trim()) {
+      Alert.alert("Missing information", "Please enter your username.");
       return;
     }
 
     if (!data.gender?.trim()) {
+      Alert.alert("Missing information", "Please select your gender.");
       return;
     }
 
     if (!data.avatar?.trim()) {
+      Alert.alert("Missing information", "Please select an avatar.");
       return;
     }
 
     if (!data.faction?.trim()) {
+      Alert.alert("Missing information", "Please select a faction.");
       return;
     }
 
     if (!Array.isArray(data.interests) || data.interests.length === 0) {
+      Alert.alert(
+        "Missing information",
+        "Please select at least one interest.",
+      );
       return;
     }
 
     if (data.locationGranted && (data.lat === null || data.lng === null)) {
+      Alert.alert(
+        "Location information missing",
+        "Your location permission was granted, but your location coordinates were not found.",
+      );
       return;
+    }
+
+    // ============================================
+    // AUTH TOKEN
+    // ============================================
+    // No hard block here anymore. Every other onboarding step
+    // (profile, avatar, category, faction, interests, notifications,
+    // location) has already been completing successfully this whole
+    // flow using email-based identification with no token at all — the
+    // backend explicitly documents that it accepts "the email or
+    // username you signed up with (before login) OR an Authorization
+    // Bearer token (after login)". A token simply doesn't exist yet at
+    // this point for a brand-new signup, and that's expected, not an
+    // error state. This used to hard-stop here with "Session expired"
+    // even though the request was never actually going to be missing
+    // anything the backend requires — data.email (validated above) is
+    // enough. If a token IS available, it's still sent along below so
+    // logged-in flows use it.
+    if (!token) {
+      console.log(
+        "No auth token yet — continuing with email-based identification, same as every prior onboarding step.",
+      );
     }
 
     try {
       setSaving(true);
+
+      // ============================================
+      // ONBOARDING PAYLOAD
+      // ============================================
 
       const onboardingPayload = {
         email: data.email.trim(),
@@ -134,16 +212,58 @@ export default function Ready() {
         },
       };
 
+      console.log("ONBOARDING PAYLOAD:", onboardingPayload);
+
+      // ============================================
+      // SEND TO BACKEND
+      // ============================================
+
       const response = await dispatch(
         finishOnboarding(onboardingPayload),
       ).unwrap();
 
-      router.replace("/home");
+      console.log("=================================");
+      console.log("ONBOARDING COMPLETED SUCCESSFULLY");
+      console.log("RESPONSE:", response);
+      console.log("=================================");
+
+      // ============================================
+      // GO TO HOME
+      // ============================================
+
+      Alert.alert(
+        "Welcome to CosQuest!",
+        "Your account has been set up successfully.",
+        [
+          {
+            text: "Continue",
+            onPress: () => {
+              router.replace("/home");
+            },
+          },
+        ],
+      );
     } catch (error) {
+      console.error("=================================");
+      console.error("FINISH ONBOARDING ERROR:", error);
+      console.error("=================================");
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "We could not complete your onboarding.";
+
+      Alert.alert("Could not finish setup", message);
     } finally {
       setSaving(false);
     }
   }
+
+  // ============================================
+  // UI
+  // ============================================
 
   return (
     <AppBackground variant="blueMap">
@@ -154,11 +274,15 @@ export default function Ready() {
             paddingTop: insets.top + 24,
           },
         ]}>
+        {/* TITLE */}
+
         <View style={styles.titleWrap}>
           <Text style={styles.small}>Welcome To</Text>
 
           <Text style={styles.big}>COSQUEST</Text>
         </View>
+
+        {/* HERO SCENE */}
 
         <View style={styles.scene}>
           <AnimatedImage
@@ -204,6 +328,8 @@ export default function Ready() {
           />
         </View>
 
+        {/* CONTINUE BUTTON */}
+
         <View style={styles.btn}>
           <Button
             label={saving ? "Setting up..." : "Continue"}
@@ -216,6 +342,10 @@ export default function Ready() {
     </AppBackground>
   );
 }
+
+// ============================================
+// STYLES
+// ============================================
 
 const styles = StyleSheet.create({
   screen: {

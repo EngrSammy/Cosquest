@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   fetchCurrentUser,
   fetchUserContact,
+  finishOnboarding,
   saveAvatarPhoto,
   saveUserAvatar,
   saveUserCategory,
@@ -29,6 +30,8 @@ type User = {
 
   faction?: string;
   interests?: string[];
+
+  onboardingComplete?: boolean;
 
   profile?: {
     firstName?: string;
@@ -117,6 +120,10 @@ const userSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    // ============================================
+    // CURRENT USER
+    // ============================================
+
     builder.addCase(fetchCurrentUser.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -130,9 +137,12 @@ const userSlice = createSlice({
 
     builder.addCase(fetchCurrentUser.rejected, (state, action) => {
       state.loading = false;
-
       state.error = (action.payload as string) || "Failed to get user";
     });
+
+    // ============================================
+    // PROFILE
+    // ============================================
 
     builder.addCase(saveUserProfile.pending, (state) => {
       state.loading = true;
@@ -148,7 +158,6 @@ const userSlice = createSlice({
       }
 
       const response = action.payload as any;
-
       const updatedUser = response?.user || response;
 
       state.user = {
@@ -164,9 +173,12 @@ const userSlice = createSlice({
 
     builder.addCase(saveUserProfile.rejected, (state, action) => {
       state.loading = false;
-
       state.error = (action.payload as string) || "Failed to update profile";
     });
+
+    // ============================================
+    // CATEGORY
+    // ============================================
 
     builder.addCase(saveUserCategory.pending, (state) => {
       state.loading = true;
@@ -182,7 +194,6 @@ const userSlice = createSlice({
       }
 
       const response = action.payload as any;
-
       const updatedUser = response?.user || response;
 
       state.user = {
@@ -198,9 +209,12 @@ const userSlice = createSlice({
 
     builder.addCase(saveUserCategory.rejected, (state, action) => {
       state.loading = false;
-
       state.error = (action.payload as string) || "Failed to save category";
     });
+
+    // ============================================
+    // CONTACT
+    // ============================================
 
     builder.addCase(fetchUserContact.fulfilled, (state, action) => {
       if (!state.user) {
@@ -242,9 +256,12 @@ const userSlice = createSlice({
 
     builder.addCase(saveUserContact.rejected, (state, action) => {
       state.loading = false;
-
       state.error = (action.payload as string) || "Failed to save contact";
     });
+
+    // ============================================
+    // AVATAR
+    // ============================================
 
     builder.addCase(saveUserAvatar.fulfilled, (state, action) => {
       if (!state.user || !action.payload) {
@@ -252,7 +269,6 @@ const userSlice = createSlice({
       }
 
       const response = action.payload as any;
-
       const updatedUser = response?.user || response;
 
       state.user = {
@@ -265,6 +281,10 @@ const userSlice = createSlice({
         },
       };
     });
+
+    // ============================================
+    // AVATAR PHOTO
+    // ============================================
 
     builder.addCase(saveAvatarPhoto.pending, (state) => {
       state.loading = true;
@@ -280,7 +300,6 @@ const userSlice = createSlice({
       }
 
       const response = action.payload as any;
-
       const updatedUser = response?.user || response;
 
       state.user = {
@@ -296,9 +315,46 @@ const userSlice = createSlice({
 
     builder.addCase(saveAvatarPhoto.rejected, (state, action) => {
       state.loading = false;
-
       state.error =
         (action.payload as string) || "Failed to upload profile photo";
+    });
+
+    // ============================================
+    // COMPLETE ONBOARDING
+    // ============================================
+
+    builder.addCase(finishOnboarding.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+
+    builder.addCase(finishOnboarding.fulfilled, (state, action) => {
+      state.loading = false;
+      state.error = null;
+
+      if (!state.user) {
+        return;
+      }
+
+      const response = action.payload as any;
+      const updatedUser = response?.user || response;
+
+      state.user = {
+        ...state.user,
+        ...updatedUser,
+        onboardingComplete: true,
+
+        profile: {
+          ...(state.user.profile || {}),
+          ...(updatedUser?.profile || {}),
+        },
+      };
+    });
+
+    builder.addCase(finishOnboarding.rejected, (state, action) => {
+      state.loading = false;
+      state.error =
+        (action.payload as string) || "Failed to complete onboarding";
     });
   },
 });
