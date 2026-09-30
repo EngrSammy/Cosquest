@@ -4,11 +4,15 @@ import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
 import { useOnboarding } from "@/context/OnboardingContext";
 import { loginUser } from "@/store/thunks/authThunks";
+import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function Signin() {
   const insets = useSafeAreaInsets();
@@ -18,6 +22,11 @@ export default function Signin() {
   const { update } = useOnboarding();
 
   const { loading, error } = useAppSelector((state) => state.auth);
+
+  // Google: the same button works for everyone. If this Google account
+  // already has a CosQuest account, the backend logs them straight in
+  // (-> home); only brand-new accounts go to onboarding.
+  const { continueWithGoogle, googleLoading } = useGoogleAuth();
 
   const [form, setForm] = useState({
     emailOrUsername: "",
@@ -65,8 +74,6 @@ export default function Signin() {
       return;
     }
 
-    console.log("LOGIN RESPONSE:", result.payload);
-
     const response = result.payload;
     const loggedInUser = response?.user;
 
@@ -75,36 +82,21 @@ export default function Signin() {
       return;
     }
 
-    /*
-     * Save the logged-in user's email.
-     * Onboarding screens use this email when saving data.
-     */
+    // Onboarding screens use this email when saving data.
     update({
       email: loggedInUser.email,
     });
 
-    console.log("LOGIN USER:", loggedInUser);
-    console.log("ONBOARDING COMPLETE:", loggedInUser.onboardingComplete);
-
-    /*
-     * USER HAS NOT COMPLETED ONBOARDING
-     */
     if (loggedInUser.onboardingComplete === false) {
       router.replace("/onboarding/createProfile");
       return;
     }
 
-    /*
-     * USER HAS COMPLETED ONBOARDING
-     */
     if (loggedInUser.onboardingComplete === true) {
       router.replace("/home");
       return;
     }
 
-    /*
-     * Unexpected/missing onboarding status
-     */
     console.log("Could not determine onboarding status:", loggedInUser);
   }
 
@@ -124,6 +116,25 @@ export default function Signin() {
             Sign in to your account and continue your journey in the CosQuest
             community.
           </Text>
+
+          {/* GOOGLE — for people who signed up with Google */}
+          <Button
+            label={
+              googleLoading ? "Connecting to Google…" : "Sign in with Google"
+            }
+            prefix="G"
+            onPress={continueWithGoogle}
+            variant="light"
+            disabled={googleLoading || loading}
+          />
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+
+            <Text style={styles.dividerText}>or sign in with email</Text>
+
+            <View style={styles.dividerLine} />
+          </View>
 
           <Field
             label="Email or Username"
@@ -154,7 +165,7 @@ export default function Signin() {
               label={loading ? "Signing in…" : "Sign in"}
               onPress={handleSignin}
               variant="brand"
-              disabled={loading}
+              disabled={loading || googleLoading}
             />
           </View>
 
@@ -163,7 +174,7 @@ export default function Signin() {
           </Pressable>
 
           <View style={styles.signupRow}>
-            <Text style={styles.signupText}>Don't have an account? </Text>
+            <Text style={styles.signupText}>Don&apos;t have an account? </Text>
 
             <Pressable onPress={() => router.push("/onboarding/signup")}>
               <Text style={styles.signupLink}>Sign up</Text>
@@ -194,8 +205,27 @@ const styles = StyleSheet.create({
     color: "#2b2b2c",
     textAlign: "center",
     marginTop: 20,
-    marginBottom: 50,
+    marginBottom: 36,
     lineHeight: 20,
+  },
+
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 22,
+    marginBottom: 8,
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#c0bebe",
+  },
+
+  dividerText: {
+    color: "#675656",
+    fontSize: 13,
   },
 
   buttons: {
