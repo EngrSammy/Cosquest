@@ -14,13 +14,15 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app"
       }
     }
   },
