@@ -165,7 +165,8 @@ export function useGoogleAuth() {
       const oauthCode = readOAuthCode(parsed.queryParams);
 
       if (!oauthCode) {
-        const backendError = parsed.queryParams?.error;
+        const backendError =
+          parsed.queryParams?.oauthError ?? parsed.queryParams?.error;
 
         Alert.alert(
           "Google sign-in failed",

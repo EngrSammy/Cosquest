@@ -62,9 +62,13 @@ export default function GoogleOAuthReturn() {
     const oauthCode = readOAuthCode(params);
 
     if (!oauthCode) {
+      // The backend sends the reason as ?oauthError=... when sign-in fails
+      // (e.g. cancelled, session expired, Google refused the code).
+      const backendError = params.oauthError || params.error;
+
       setError(
-        typeof params.error === "string" && params.error
-          ? params.error
+        typeof backendError === "string" && backendError
+          ? backendError
           : "Google didn't send us a sign-in code. Please try again.",
       );
       return;
