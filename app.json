@@ -73,8 +73,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true,
-      "baseUrl": "/Cosquest"
+      "reactCompiler": true
     },
     "extra": {
       "router": {},
