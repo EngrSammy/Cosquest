@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,11 +29,17 @@ import {
 
 const SCREEN_H = Dimensions.get("window").height;
 
+const IS_WEB = Platform.OS === "web";
+
 // A last-known position older than this is treated as stale and skipped
 // in favor of a fresh fix — someone who's traveled since their last GPS
 // reading would otherwise silently get quests centered on the wrong
 // place with no indication anything was off.
 const MAX_LAST_KNOWN_POSITION_AGE_MS = 2 * 60 * 1000;
+
+// iPhone Safari's own wording, so people can find the setting.
+const WEB_LOCATION_DENIED_HELP =
+  "Location is blocked for this website. On iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App, then tap “aA” in Safari’s address bar → Website Settings → Location → Allow. On a computer: click the icon next to the website address and allow Location. Then tap Try Location Again.";
 
 function Toggle({
   on,
@@ -45,7 +52,11 @@ function Toggle({
 }) {
   return (
     <Pressable
-      style={[styles.toggle, on && styles.toggleOn]}
+      style={[
+        styles.toggle,
+        on && styles.toggleOn,
+        disabled && styles.toggleDisabled,
+      ]}
       onPress={onToggle}
       disabled={disabled}>
       <View style={[styles.knob, on && styles.knobOn]} />
@@ -62,6 +73,44 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
       }, timeoutMs);
     }),
   ]);
+}
+
+// WEBSITE ONLY: ask the browser directly. This is what makes Safari /
+// Chrome show their "Allow location?" popup. (expo-location's web version
+// asks in a way iPhone Safari answers with "not decided yet" instead of
+// showing the popup — which the screen read as "permission not granted".)
+function getWebPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("LOCATION_UNSUPPORTED"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }),
+      (error) => {
+        // 1 = denied, 2 = unavailable, 3 = timeout
+        reject(
+          new Error(
+            error.code === 1
+              ? "LOCATION_DENIED"
+              : error.code === 3
+                ? "LOCATION_TIMEOUT"
+                : "LOCATION_UNAVAILABLE",
+          ),
+        );
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: MAX_LAST_KNOWN_POSITION_AGE_MS,
+      },
+    );
+  });
 }
 
 export default function Permissions() {
@@ -92,11 +141,7 @@ export default function Permissions() {
     };
   }, []);
 
-  // Merge-based error setter. The previous version replaced the whole
-  // errors object on every validate()/save call, which silently wiped
-  // out an unrelated field's error message (e.g. a notifications error
-  // disappearing the moment you tapped Continue, without ever actually
-  // being resolved).
+  // Merge-based error setter, so one field's error never wipes another's.
   function mergeErrors(patch: { [k: string]: string }) {
     if (!isMountedRef.current) {
       return;
@@ -107,6 +152,61 @@ export default function Permissions() {
       ...patch,
     }));
   }
+
+  // ---------- LOCATION ON THE WEBSITE ----------
+
+  async function toggleLocationWeb() {
+    setLocationLoading(true);
+
+    mergeErrors({
+      location: "",
+    });
+
+    try {
+      // Called straight from the tap (no await before it), which some
+      // browsers require before they'll show the popup.
+      const { lat, lng } = await getWebPosition();
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      update({
+        locationGranted: true,
+        lat,
+        lng,
+      });
+    } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      update({
+        locationGranted: false,
+        lat: null,
+        lng: null,
+      });
+
+      const code = error instanceof Error ? error.message : "";
+
+      mergeErrors({
+        location:
+          code === "LOCATION_DENIED"
+            ? WEB_LOCATION_DENIED_HELP
+            : code === "LOCATION_TIMEOUT"
+              ? "We could not get your location quickly enough. Please try again."
+              : code === "LOCATION_UNSUPPORTED"
+                ? "This browser can't share your location. Please use Chrome or Safari."
+                : "Unable to get your location. Check that location is turned on for your device, then try again.",
+      });
+    } finally {
+      if (isMountedRef.current) {
+        setLocationLoading(false);
+      }
+    }
+  }
+
+  // ---------- LOCATION (phones + website) ----------
 
   async function toggleLocation() {
     if (data.locationGranted) {
@@ -120,6 +220,11 @@ export default function Permissions() {
         location: "",
       });
 
+      return;
+    }
+
+    if (IS_WEB) {
+      await toggleLocationWeb();
       return;
     }
 
@@ -169,13 +274,10 @@ export default function Permissions() {
           return;
         }
 
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
         update({
           locationGranted: true,
-          lat,
-          lng,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
         });
 
         mergeErrors({
@@ -196,13 +298,10 @@ export default function Permissions() {
         return;
       }
 
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
       update({
         locationGranted: true,
-        lat,
-        lng,
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
       });
 
       mergeErrors({
@@ -236,7 +335,15 @@ export default function Permissions() {
     }
   }
 
+  // ---------- NOTIFICATIONS ----------
+  // Push notifications only exist in the phone app. On the website the
+  // switch is simply unavailable (no error message).
+
   async function toggleNotifications() {
+    if (IS_WEB) {
+      return;
+    }
+
     if (data.notificationsEnabled) {
       update({
         notificationsEnabled: false,
@@ -275,7 +382,7 @@ export default function Permissions() {
             ? ""
             : "Notifications are off. Enable them in Settings to get quest alerts.",
       });
-    } catch (error) {
+    } catch {
       if (!isMountedRef.current) {
         return;
       }
@@ -311,9 +418,6 @@ export default function Permissions() {
       next.location = "We could not get your location. Please try again.";
     }
 
-    // Merge rather than replace: validate() only ever checks email/
-    // location, so replacing the whole object would silently clear any
-    // existing notifications error without it ever being addressed.
     mergeErrors({
       general: next.general || "",
       location: next.location || "",
@@ -337,16 +441,12 @@ export default function Permissions() {
       general: "",
     });
 
-    // Two independent saves — no reason to wait on one before starting
-    // the other. Using allSettled (not Promise.all) so a failure on one
-    // doesn't hide whether the other succeeded, and so we can report
-    // specifically which one(s) failed instead of a single generic
-    // message.
     const [notificationResult, locationResult] = await Promise.allSettled([
       dispatch(
         saveNotificationPreference({
           email: data.email.trim(),
-          notificationsEnabled: data.notificationsEnabled,
+          // Always off on the website (no push notifications there).
+          notificationsEnabled: IS_WEB ? false : data.notificationsEnabled,
         }),
       ).unwrap(),
       dispatch(
@@ -382,7 +482,9 @@ export default function Permissions() {
       const detail =
         firstError?.reason instanceof Error
           ? firstError.reason.message
-          : undefined;
+          : typeof firstError?.reason === "string"
+            ? firstError.reason
+            : undefined;
 
       setSaving(false);
 
@@ -481,7 +583,7 @@ export default function Permissions() {
             />
           </View>
 
-          <View style={styles.row}>
+          <View style={[styles.row, IS_WEB && styles.rowMuted]}>
             <View style={styles.iconWrap}>
               <Ionicons name="notifications" size={22} color="#C5399A" />
             </View>
@@ -490,18 +592,20 @@ export default function Permissions() {
               <Text style={styles.rowTitle}>Allow Notifications</Text>
 
               <Text style={styles.rowDetail}>
-                Get told when a quest drops in your area.
+                {IS_WEB
+                  ? "Available in the CosQuest mobile app."
+                  : "Get told when a quest drops in your area."}
               </Text>
             </View>
 
             <Toggle
-              on={data.notificationsEnabled}
+              on={!IS_WEB && data.notificationsEnabled}
               onToggle={toggleNotifications}
-              disabled={notificationLoading || saving}
+              disabled={IS_WEB || notificationLoading || saving}
             />
           </View>
 
-          {errors.notifications ? (
+          {!IS_WEB && errors.notifications ? (
             <>
               <ErrorText>{errors.notifications}</ErrorText>
 
@@ -578,6 +682,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
+  rowMuted: {
+    opacity: 0.7,
+  },
+
   iconWrap: {
     width: 40,
     height: 40,
@@ -634,6 +742,10 @@ const styles = StyleSheet.create({
 
   toggleOn: {
     backgroundColor: "#34C759",
+  },
+
+  toggleDisabled: {
+    opacity: 0.6,
   },
 
   knob: {
