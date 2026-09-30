@@ -3,126 +3,20 @@ import { Button } from "@/components/Button";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
-import { useOnboarding } from "@/context/OnboardingContext";
-import { exchangeGoogleCode } from "@/store/thunks/authThunks";
-import * as Linking from "expo-linking";
+import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useAppSelector } from "../../store/hooks";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthSignup() {
-  const dispatch = useAppDispatch();
-
-  const { update } = useOnboarding();
-
   const { loading } = useAppSelector((state) => state.auth);
 
-  const [googleLoading, setGoogleLoading] = useState(false);
-
-  async function handleGoogleSignup() {
-    if (googleLoading || loading) {
-      return;
-    }
-
-    try {
-      setGoogleLoading(true);
-
-      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-
-      if (!baseUrl) {
-        throw new Error("EXPO_PUBLIC_API_URL is not configured");
-      }
-
-      const authUrl = `${baseUrl}/api/auth/oauth/google`;
-
-      const redirectUri = Linking.createURL("oauth/google");
-
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        redirectUri,
-      );
-
-      if (result.type !== "success" || !result.url) {
-        return;
-      }
-
-      const parsed = Linking.parse(result.url);
-
-      const oauthCode =
-        typeof parsed.queryParams?.oauthCode === "string"
-          ? parsed.queryParams.oauthCode
-          : typeof parsed.queryParams?.code === "string"
-            ? parsed.queryParams.code
-            : null;
-
-      if (!oauthCode) {
-        Alert.alert(
-          "Google sign-up failed",
-          "We could not complete the Google authentication. Please try again.",
-        );
-
-        return;
-      }
-
-      const exchangeResult = await dispatch(exchangeGoogleCode(oauthCode));
-
-      if (!exchangeGoogleCode.fulfilled.match(exchangeResult)) {
-        Alert.alert(
-          "Google sign-up failed",
-          typeof exchangeResult.payload === "string"
-            ? exchangeResult.payload
-            : "We could not complete Google authentication.",
-        );
-
-        return;
-      }
-
-      const {
-        token,
-        onboardingRequired,
-        user: googleUser,
-      } = exchangeResult.payload;
-
-      if (googleUser) {
-        update({
-          email: googleUser.email || "",
-
-          firstName: googleUser.profile?.firstName || "",
-
-          lastName: googleUser.profile?.lastName || "",
-
-          username: googleUser.profile?.username || "",
-
-          age: googleUser.profile?.age ?? null,
-
-          gender: googleUser.profile?.gender || "",
-
-          avatar: googleUser.profile?.avatarKey || "",
-        });
-      }
-
-      if (onboardingRequired) {
-        router.replace("/onboarding/createProfile");
-
-        return;
-      }
-
-      router.replace("/home");
-    } catch (error) {
-      Alert.alert(
-        "Google sign-up failed",
-        error instanceof Error
-          ? error.message
-          : "Something went wrong with Google sign-up.",
-      );
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
+  // Same Google flow as the Sign in screen — the backend decides whether
+  // it's a new account (-> onboarding) or an existing one (-> home).
+  const { continueWithGoogle, googleLoading } = useGoogleAuth();
 
   return (
     <AppBackground variant="gradient">
@@ -136,7 +30,7 @@ export default function AuthSignup() {
 
           <Text style={styles.sub}>
             CosQuest turns your city into a fandom playground — real-world
-            quests, your people, one leaderboard. Let's get you set up.
+            quests, your people, one leaderboard. Let&apos;s get you set up.
           </Text>
 
           <View style={styles.buttons}>
@@ -145,7 +39,7 @@ export default function AuthSignup() {
                 googleLoading ? "Connecting to Google…" : "Sign up with Google"
               }
               prefix="G"
-              onPress={handleGoogleSignup}
+              onPress={continueWithGoogle}
               variant="light"
               disabled={googleLoading || loading}
             />

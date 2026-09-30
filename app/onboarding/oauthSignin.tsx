@@ -1,36 +1,50 @@
 import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
+import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function AuthSignin() {
-  function handleOAuth(provider: "Google" | "Apple") {
-    // replace with real provider auth in the OAuth milestone
-    Alert.alert(`${provider} sign-in`, "Coming soon — we're wiring this up.");
-  }
   const insets = useSafeAreaInsets();
+
+  // Real Google sign-in (was a "Coming soon" placeholder). Same flow as
+  // sign-up: existing accounts go straight to home.
+  const { continueWithGoogle, googleLoading } = useGoogleAuth();
+
+  function handleApple() {
+    Alert.alert("Apple sign-in", "Coming soon — we're wiring this up.");
+  }
+
   return (
     <AppBackground variant="gradient">
       <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
         <Text style={styles.headline}>
           One Place for{"\n"}Everything you{"\n"}Love
         </Text>
+
         <Text style={styles.sub}>
           CosQuest turns your city into a fandom playground — real-world quests,
-          your people, one leaderboard. Let's get you set up.
+          your people, one leaderboard. Let&apos;s get you set up.
         </Text>
+
         <View style={styles.buttons}>
           <Button
-            label="Sign in with Google"
+            label={
+              googleLoading ? "Connecting to Google…" : "Sign in with Google"
+            }
             prefix="G"
-            onPress={() => handleOAuth("Google")}
+            onPress={continueWithGoogle}
             variant="light"
+            disabled={googleLoading}
           />
 
           <Button
             label="Sign in with Apple"
-            onPress={() => handleOAuth("Apple")}
+            onPress={handleApple}
             variant="dark"
           />
 
@@ -47,12 +61,21 @@ export default function AuthSignin() {
           />
         </View>
 
+        {googleLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#C5399A" />
+
+            <Text style={styles.loadingText}>
+              Connecting your Google account...
+            </Text>
+          </View>
+        ) : null}
+
         <Text style={styles.sub}>
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Text
             style={{ color: "#C5399A", fontWeight: "700" }}
-            onPress={() => router.push("/onboarding/signup")}
-          >
+            onPress={() => router.push("/onboarding/signup")}>
             Sign-up
           </Text>
         </Text>
@@ -89,4 +112,15 @@ const styles = StyleSheet.create({
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
   dividerText: { color: "#675656", fontSize: 15 },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+    gap: 8,
+  },
+  loadingText: {
+    color: "#777985",
+    fontSize: 12,
+  },
 });
