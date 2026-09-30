@@ -1,31 +1,64 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      KeyboardAvoidingView,
-      Linking,
-      Modal,
-      Share as NativeShare,
-      Platform,
-      Pressable,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Share as NativeShare,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import {
-      createShareChat,
-      getSuggestedPeople,
-      searchPeople,
-      sendSharedPostMessage,
+  createShareChat,
+  getSuggestedPeople,
+  searchPeople,
+  sendSharedPostMessage,
 } from "@/services/share";
 import { useAppSelector } from "@/store/hooks";
+import { getPostShareLink } from "@/utils/shareLinks";
 
 import { ShareAction } from "./ShareAction";
 import { SharePerson } from "./SharePerson";
+
+// How many friends to show before searching.
+const MAX_SUGGESTIONS = 9;
+
+type Person = {
+  id?: string;
+  username: string;
+  name?: string;
+  avatarKey?: string | null;
+  avatarPhotoUrl?: string | null;
+};
+
+// Merge lists, one entry per username (later lists win, since they carry
+// fuller data), without the current user.
+function mergePeople(lists: Person[][], currentUsername: string): Person[] {
+  const me = currentUsername.replace(/^@/, "").toLowerCase();
+  const byUsername = new Map<string, Person>();
+
+  lists.forEach((list) => {
+    list.forEach((person) => {
+      const key = person?.username?.replace(/^@/, "").toLowerCase();
+
+      if (!key || key === me) {
+        return;
+      }
+
+      byUsername.set(key, { ...byUsername.get(key), ...person });
+    });
+  });
+
+  return Array.from(byUsername.values());
+}
 
 export function ShareSheet({
   visible,
@@ -39,36 +72,67 @@ export function ShareSheet({
   onClose: () => void;
 }) {
   const authUser = useAppSelector((state) => state.auth.user);
+  const user = useAppSelector((state) => state.user.user);
 
   const currentUsername =
-    authUser?.profile?.username || authUser?.username || "";
+    authUser?.profile?.username ||
+    user?.profile?.username ||
+    user?.username ||
+    "";
+
+  // Friends the app already knows about — shown instantly, no loading:
+  //   - people you've chatted with (DMs)
+  //   - people you follow
+  const conversations = useAppSelector((state) => state.chat.conversations);
+  const following = useAppSelector((state) => state.follow.following);
+
+  const knownFriends = useMemo(() => {
+    const dmPartners: Person[] = conversations
+      .filter((chat) => chat.type === "dm" && chat.otherParticipant?.username)
+      .map((chat) => ({
+        id: chat.otherParticipant?.id,
+        username: chat.otherParticipant!.username!,
+        avatarPhotoUrl: chat.otherParticipant?.avatarPhotoUrl || null,
+        avatarKey: (chat.otherParticipant as any)?.avatarKey || null,
+      }));
+
+    return mergePeople([dmPartners, following as Person[]], currentUsername);
+  }, [conversations, following, currentUsername]);
 
   const [searchText, setSearchText] = useState("");
-  const [people, setPeople] = useState<any[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [sendingUsername, setSendingUsername] = useState<string | null>(null);
   const [sent, setSent] = useState<Record<string, boolean>>({});
 
-  const postLink = `cosquest://post/${post.id}`;
+  // A normal web link (https://.../post/<id>) once the website address is
+  // known — see utils/shareLinks.ts. Anyone can open it.
+  const postLink = getPostShareLink(String(post?.id || ""));
+  const shareMessage = `Check out this post on CosQuest:\n${postLink}`;
 
   const loadSuggestions = useCallback(async () => {
-    if (!currentUsername) {
-      setPeople([]);
+    // Show the friends we already know about straight away.
+    setPeople(knownFriends);
+
+    if (!currentUsername || knownFriends.length >= MAX_SUGGESTIONS) {
       return;
     }
 
-    setLoadingPeople(true);
+    // Top up with your following list from the backend.
+    setLoadingPeople(knownFriends.length === 0);
 
     try {
       const result = await getSuggestedPeople(token, currentUsername);
 
-      setPeople(result?.users?.slice(0, 6) || []);
+      setPeople(
+        mergePeople([knownFriends, result?.users || []], currentUsername),
+      );
     } catch {
-      setPeople([]);
+      // Keep whatever we already have.
     } finally {
       setLoadingPeople(false);
     }
-  }, [token, currentUsername]);
+  }, [token, currentUsername, knownFriends]);
 
   useEffect(() => {
     if (!visible) {
@@ -78,12 +142,19 @@ export function ShareSheet({
     setSearchText("");
     setSent({});
     loadSuggestions();
-  }, [visible, loadSuggestions]);
+    // Only when the sheet opens — not every time the friend lists update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   useEffect(() => {
     const query = searchText.trim();
 
-    if (!visible || !query) {
+    if (!visible) {
+      return;
+    }
+
+    if (!query) {
+      setPeople(knownFriends);
       return;
     }
 
@@ -93,7 +164,7 @@ export function ShareSheet({
       try {
         const result = await searchPeople(token, query);
 
-        setPeople(result?.users || []);
+        setPeople(mergePeople([result?.users || []], currentUsername));
       } catch {
         setPeople([]);
       } finally {
@@ -102,9 +173,9 @@ export function ShareSheet({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchText, visible, token]);
+  }, [searchText, visible, token, currentUsername, knownFriends]);
 
-  const shareWithPerson = async (person: any) => {
+  const shareWithPerson = async (person: Person) => {
     if (!person?.username) {
       return;
     }
@@ -120,11 +191,7 @@ export function ShareSheet({
         throw new Error("Conversation could not be opened.");
       }
 
-      await sendSharedPostMessage(
-        token,
-        conversationId,
-        `Check out this post on CosQuest:\n${postLink}`,
-      );
+      await sendSharedPostMessage(token, conversationId, shareMessage);
 
       setSent((current) => ({
         ...current,
@@ -152,19 +219,12 @@ export function ShareSheet({
     }
   };
 
+  // wa.me works everywhere: opens the WhatsApp app on phones, and WhatsApp
+  // Web / Desktop on computers. (whatsapp:// only worked on phones.)
   const whatsapp = async () => {
-    const message = `Check out this post on CosQuest:\n${postLink}`;
-
-    const url = `whatsapp://send?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     try {
-      const supported = await Linking.canOpenURL(url);
-
-      if (!supported) {
-        Alert.alert("WhatsApp", "WhatsApp is not available.");
-        return;
-      }
-
       await Linking.openURL(url);
     } catch {
       Alert.alert("WhatsApp", "Unable to open WhatsApp.");
@@ -172,13 +232,23 @@ export function ShareSheet({
   };
 
   const nativeShare = async () => {
+    // Browsers without a share menu (most desktop browsers): copy instead.
+    if (
+      Platform.OS === "web" &&
+      (typeof navigator === "undefined" || !(navigator as any).share)
+    ) {
+      await copyLink();
+      return;
+    }
+
     try {
       await NativeShare.share({
         title: "Share CosQuest post",
-        message: `Check out this post on CosQuest:\n${postLink}`,
+        message: shareMessage,
+        url: postLink,
       });
     } catch {
-      // User cancelled the share dialog.
+      // User cancelled the share menu.
     }
   };
 
@@ -255,12 +325,12 @@ export function ShareSheet({
                 <Text style={styles.noPeopleText}>
                   {searchText.trim()
                     ? "No users found"
-                    : "No suggested friends yet"}
+                    : "Follow people or start a chat to share with them here"}
                 </Text>
               </View>
             ) : (
               <View style={styles.peopleGrid}>
-                {people.slice(0, 6).map((person) => (
+                {people.slice(0, MAX_SUGGESTIONS).map((person) => (
                   <SharePerson
                     key={person.id || person.username}
                     person={person}
@@ -316,7 +386,10 @@ const styles = StyleSheet.create({
   },
 
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    // Was StyleSheet.absoluteFillObject, which no longer exists in this
+    // React Native version — the dark background behind the sheet was
+    // silently missing.
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.30)",
   },
 
@@ -400,7 +473,7 @@ const styles = StyleSheet.create({
   peopleGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     rowGap: 18,
   },
 
@@ -414,12 +487,14 @@ const styles = StyleSheet.create({
     height: 170,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 20,
   },
 
   noPeopleText: {
     marginTop: 8,
     fontSize: 13,
     color: "#8B8B93",
+    textAlign: "center",
   },
 
   divider: {

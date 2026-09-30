@@ -14,6 +14,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 import { fetchPosts } from "@/store/thunks/postThunks";
 
+// Facebook-style feed: every post is full width. (The Community screen no
+// longer adds side padding around the feed — see app/(tabs)/community.tsx.)
 export function Feeds() {
   const dispatch = useAppDispatch();
 
@@ -25,6 +27,7 @@ export function Feeds() {
 
   const token = useAppSelector((state) => state.auth.token);
 
+  // Re-render every 30s so "2m" / "1h" times stay current.
   const [clock, setClock] = useState(Date.now());
 
   useEffect(() => {
@@ -82,7 +85,7 @@ export function Feeds() {
   }
 
   return (
-    <View>
+    <View style={styles.feed}>
       <CreatePost />
 
       {loading && posts.length > 0 ? (
@@ -92,7 +95,9 @@ export function Feeds() {
       ) : null}
 
       {posts.length === 0 ? (
-        <FeedEmptyState />
+        <View style={styles.padded}>
+          <FeedEmptyState />
+        </View>
       ) : (
         <View>
           {posts.map((post) => (
@@ -105,6 +110,14 @@ export function Feeds() {
 }
 
 const styles = StyleSheet.create({
+  feed: {
+    width: "100%",
+  },
+
+  padded: {
+    paddingHorizontal: 20,
+  },
+
   centerState: {
     alignItems: "center",
     justifyContent: "center",

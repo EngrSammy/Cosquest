@@ -78,6 +78,8 @@ import {
   stopTyping,
 } from "@/services/socket";
 
+import { LinkText } from "@/components/chat/LinkText";
+import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 
@@ -158,6 +160,16 @@ type Message = {
   // person has opened the chat since it was sent (serializeMessage's
   // `read` field in chatController.js).
   read?: boolean;
+
+  // Call entries (kind "call"): saved by the backend when a call finishes.
+  // The sender is always the CALLER.
+  callLog?: {
+    callId?: string;
+    type?: "audio" | "video";
+    status?: "ended" | "declined" | "missed" | "cancelled";
+    durationSeconds?: number | null;
+    callerId?: string;
+  } | null;
 };
 
 type Chat = {
@@ -507,6 +519,9 @@ function getMessageTypeLabel(message: Message) {
     case "document":
       return message.media?.name || message.media?.filename || "Document";
 
+    case "call":
+      return message.callLog?.type === "video" ? "Video call" : "Voice call";
+
     default:
       return null;
   }
@@ -717,7 +732,9 @@ function MessageMeta({
         ? "rgba(255,255,255,0.78)"
         : "#9C9CAA";
 
-  const tickState = mine ? getTickState(msg, otherParticipant) : null;
+  // No ticks on call entries (like WhatsApp).
+  const tickState =
+    mine && msg.kind !== "call" ? getTickState(msg, otherParticipant) : null;
 
   // Read gets its own fixed colour so it's clearly different from the
   // grey/white "sent"/"delivered" ticks — see READ_TICK_COLOR above.
@@ -780,6 +797,7 @@ const Bubble = memo(function Bubble({
   onReaction,
   onMediaPress,
   onReplyPress,
+  onCallBack,
   otherParticipant,
 }: {
   msg: Message;
@@ -807,6 +825,8 @@ const Bubble = memo(function Bubble({
   onMediaPress: (message: Message) => void;
 
   onReplyPress: (messageId: string) => void;
+
+  onCallBack: (type: "audio" | "video") => void;
 
   otherParticipant?: Chat["otherParticipant"];
 }) {
@@ -962,6 +982,12 @@ const Bubble = memo(function Bubble({
               style={styles.mediaPressable}>
               <ChatImage uri={mediaUrl} style={styles.messageImage} />
 
+              {msg.pending ? (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </View>
+              ) : null}
+
               {metaVariant === "overlay" ? (
                 <MessageMeta
                   msg={msg}
@@ -984,7 +1010,11 @@ const Bubble = memo(function Bubble({
               <VideoThumbnail key={mediaUrl} uri={mediaUrl} />
 
               <View style={styles.videoPlayOverlay}>
-                <Ionicons name="play-circle" size={52} color="#FFFFFF" />
+                {msg.pending ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="play-circle" size={52} color="#FFFFFF" />
+                )}
               </View>
 
               {metaVariant === "overlay" ? (
@@ -1057,6 +1087,16 @@ const Bubble = memo(function Bubble({
             </View>
           ) : null}
 
+          {/* CALL ENTRY (voice / video call history) */}
+          {!msg.deleted && msg.kind === "call" ? (
+            <CallLogContent
+              msg={msg}
+              mine={mine}
+              onCallBack={onCallBack}
+              onLongPress={() => onLongPress(msg)}
+            />
+          ) : null}
+
           {/* TEXT / CAPTION */}
           {text ? (
             <View style={hasMedia ? styles.captionWrap : undefined}>
@@ -1066,7 +1106,9 @@ const Bubble = memo(function Bubble({
                   mine && styles.bubbleTextMine,
                   msg.deleted && styles.deletedText,
                 ]}>
-                {text}
+                {/* Links in the message are clickable (post links open
+                    inside the app, other links in the browser). */}
+                {msg.deleted ? text : <LinkText text={text} mine={mine} />}
                 <Text style={styles.metaSpacer}>{spacer}</Text>
               </Text>
             </View>
@@ -1268,17 +1310,42 @@ function ChatImage({
   );
 }
 
+// Cloudinary can give the first frame of any video as a picture, just by
+// changing its link: .../video/upload/so_0,w_480,c_limit/.../clip.jpg
+// (so_0 = frame at 0 seconds, w_480 = small, .jpg = as an image).
+// Instant, cached, and works on phones AND the website — no need to
+// download the video first.
+function getCloudinaryVideoPoster(url: string): string | null {
+  if (!url.includes("res.cloudinary.com") || !url.includes("/video/upload/")) {
+    return null;
+  }
+
+  const withoutQuery = url.split("?")[0];
+
+  const withFrame = withoutQuery.replace(
+    "/video/upload/",
+    "/video/upload/so_0,w_480,c_limit/",
+  );
+
+  return withFrame.replace(/\.[a-z0-9]+$/i, ".jpg");
+}
+
 function VideoThumbnail({ uri }: { uri: string }) {
+  const posterUrl = useMemo(() => getCloudinaryVideoPoster(uri), [uri]);
+
+  const [posterFailed, setPosterFailed] = useState(false);
+
   const [thumbUri, setThumbUri] = useState<string | null>(
     videoThumbnailCache.get(uri) || null,
   );
 
+  const usePoster = !!posterUrl && !posterFailed;
+
+  // Only when there's no Cloudinary picture (e.g. a video still
+  // uploading from THIS phone): make the frame from the file itself.
+  // Not on the website — expo-video-thumbnails doesn't work there.
   useEffect(() => {
-    if (videoThumbnailCache.has(uri)) {
-      // Already covered by the initial state above — nothing to do here.
-      // (The component remounts via key={uri} at the call site whenever
-      // uri actually changes, so this effect never needs to re-sync a
-      // cache hit into state after mount.)
+    if (usePoster || Platform.OS === "web" || videoThumbnailCache.has(uri)) {
       return;
     }
 
@@ -1296,15 +1363,32 @@ function VideoThumbnail({ uri }: { uri: string }) {
           setThumbUri(thumb);
         }
       } catch {
-        // Fall back to the placeholder icon below — some remote video
-        // URLs (not yet downloaded/streamable) can't be thumbnailed.
+        // Fall back to the placeholder below.
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [uri]);
+  }, [uri, usePoster]);
+
+  if (usePoster) {
+    return (
+      <ExpoImage
+        source={{ uri: posterUrl! }}
+        style={styles.videoThumbnailImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={120}
+        onError={() => setPosterFailed(true)}
+      />
+    );
+  }
+
+  // Website: the browser draws the first frame itself.
+  if (Platform.OS === "web") {
+    return <VideoFirstFrame uri={uri} />;
+  }
 
   if (thumbUri) {
     return (
@@ -1343,6 +1427,10 @@ function VideoViewer({ uri }: { uri: string }) {
 // ==========================================
 
 const WAVE_BARS = 28;
+
+// Long voice-note transcripts fold to a few lines with "See more".
+const TRANSCRIPT_LONG_CHARS = 160;
+const TRANSCRIPT_COLLAPSED_LINES = 3;
 
 function getWaveform(seed: string) {
   let hash = 7;
@@ -1394,6 +1482,12 @@ function AudioBubble({
   const [showTranscript, setShowTranscript] = useState(false);
 
   const hasTranscriptContent = Boolean(transcript || transcribing);
+
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+
+  const transcriptIsLong = (transcript?.length || 0) > TRANSCRIPT_LONG_CHARS;
+
+  const transcriptCollapsed = transcriptIsLong && !transcriptExpanded;
 
   const togglePlayback = () => {
     if (status.playing) {
@@ -1516,6 +1610,9 @@ function AudioBubble({
             // snapping back, so the transcript still reads naturally as
             // a finished block of text.
             <Text
+              numberOfLines={
+                transcriptCollapsed ? TRANSCRIPT_COLLAPSED_LINES : undefined
+              }
               style={[
                 styles.transcriptText,
                 mine && styles.transcriptTextMine,
@@ -1547,6 +1644,9 @@ function AudioBubble({
             // existed, or if the backend didn't return any words — plain,
             // unsynced text is still better than nothing.
             <Text
+              numberOfLines={
+                transcriptCollapsed ? TRANSCRIPT_COLLAPSED_LINES : undefined
+              }
               style={[
                 styles.transcriptText,
                 mine && styles.transcriptTextMine,
@@ -1554,9 +1654,126 @@ function AudioBubble({
               {transcript}
             </Text>
           )}
+
+          {transcriptIsLong && transcript ? (
+            <Pressable
+              onPress={() => setTranscriptExpanded((current) => !current)}
+              hitSlop={6}
+              accessibilityRole="button">
+              <Text
+                style={[
+                  styles.transcriptMore,
+                  mine && styles.transcriptMoreMine,
+                ]}>
+                {transcriptExpanded ? "See less" : "See more"}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>
+  );
+}
+
+// ==========================================
+// CALL ENTRY (like WhatsApp's call history in a chat)
+// ==========================================
+// Worded from THIS person's side. The sender of a call entry is always
+// the caller, so `mine` = "I made this call".
+//
+//   what happened   caller sees                 other person sees
+//   answered        Voice call  ↗ 2:31          Voice call  ↙ 2:31
+//   rang out        Voice call  ↗ No answer     Missed voice call (red)
+//   declined        Voice call  ↗ Declined      You declined a voice call
+//   cancelled       Voice call  ↗ Cancelled     Missed voice call (red)
+//
+// Tapping it calls back (same type: voice or video).
+
+function CallLogContent({
+  msg,
+  mine,
+  onCallBack,
+  onLongPress,
+}: {
+  msg: Message;
+  mine: boolean;
+  onCallBack: (type: "audio" | "video") => void;
+  onLongPress: () => void;
+}) {
+  const log = msg.callLog || {};
+  const video = log.type === "video";
+  const status = log.status;
+  const answered = status === "ended";
+  const kindName = video ? "video call" : "voice call";
+
+  // Red "missed" style: only for the person who was called and didn't pick up.
+  const missedForMe = !mine && (status === "missed" || status === "cancelled");
+
+  const title =
+    answered || mine
+      ? video
+        ? "Video call"
+        : "Voice call"
+      : status === "declined"
+        ? `You declined a ${kindName}`
+        : `Missed ${kindName}`;
+
+  const detail = answered
+    ? formatDuration(log.durationSeconds || 0)
+    : mine
+      ? status === "declined"
+        ? "Declined"
+        : status === "missed"
+          ? "No answer"
+          : "Cancelled"
+      : "Tap to call back";
+
+  const textColor = mine ? "#FFFFFF" : missedForMe ? "#E5484D" : "#191922";
+  const subColor = mine ? "rgba(255,255,255,0.8)" : "#8A8A90";
+  const arrowColor = missedForMe ? "#E5484D" : mine ? "#FFFFFF" : "#2FB36B";
+
+  return (
+    <Pressable
+      onPress={() => onCallBack(video ? "video" : "audio")}
+      onLongPress={onLongPress}
+      delayLongPress={300}
+      style={styles.callLog}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${detail}. Tap to call back.`}>
+      <View
+        style={[
+          styles.callLogIcon,
+          mine ? styles.callLogIconMine : styles.callLogIconTheirs,
+          missedForMe && styles.callLogIconMissed,
+        ]}>
+        <Ionicons
+          name={video ? "videocam" : "call"}
+          size={18}
+          color={missedForMe ? "#E5484D" : "#C5399A"}
+        />
+      </View>
+
+      <View style={styles.callLogText}>
+        <Text
+          style={[styles.callLogTitle, { color: textColor }]}
+          numberOfLines={1}>
+          {title}
+        </Text>
+
+        <View style={styles.callLogDetailRow}>
+          {/* ↗ outgoing / ↙ incoming, like WhatsApp */}
+          <Ionicons
+            name={mine ? "arrow-up" : "arrow-down"}
+            size={12}
+            color={arrowColor}
+            style={{ transform: [{ rotate: "45deg" }] }}
+          />
+          <Text style={[styles.callLogDetail, { color: subColor }]}>
+            {detail}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -3356,65 +3573,70 @@ export default function ChatScreen() {
     setAttachmentCaption("");
   };
 
+  // WhatsApp-style: the preview closes the moment Send is tapped, the
+  // photo/video appears in the chat straight away with a spinner on it,
+  // and it uploads in the background. (Before, the preview stayed open
+  // with a spinner until the whole upload had finished.)
   const sendAttachment = async () => {
-    if (!attachmentDraft || !token || !conversationId || attachmentSending) {
+    if (!attachmentDraft || !token || !conversationId) {
       return;
     }
 
+    // Keep what we're sending, then close the preview right away.
+    const draftToSend = attachmentDraft;
+    const caption = attachmentCaption.trim();
+
+    setAttachmentDraft(null);
+    setAttachmentCaption("");
+
+    const pendingId = addPendingMessage({
+      sender: {
+        id: currentUserId,
+        username: currentUsername,
+      },
+      kind: draftToSend.kind,
+      content: caption,
+      createdAt: new Date().toISOString(),
+      media: {
+        uri: draftToSend.uri,
+        name: draftToSend.name,
+        type: draftToSend.type,
+      },
+    });
+
+    scrollToLatestIfNeeded();
+
     try {
-      setAttachmentSending(true);
-
-      const pendingId = addPendingMessage({
-        sender: {
-          id: currentUserId,
-          username: currentUsername,
-        },
-        kind: attachmentDraft.kind,
-        content: attachmentCaption.trim() || "",
-        createdAt: new Date().toISOString(),
-        media: {
-          uri: attachmentDraft.uri,
-          name: attachmentDraft.name,
-          type: attachmentDraft.type,
-        },
-      });
-
-      try {
-        await dispatch(
-          createMessage({
-            conversationId,
-            token,
-            data: {
-              kind: attachmentDraft.kind,
-              content: attachmentCaption.trim() || undefined,
-              file: {
-                uri: attachmentDraft.uri,
-                name: attachmentDraft.name,
-                type: attachmentDraft.type,
-              },
+      await dispatch(
+        createMessage({
+          conversationId,
+          token,
+          data: {
+            kind: draftToSend.kind,
+            content: caption || undefined,
+            file: {
+              uri: draftToSend.uri,
+              name: draftToSend.name,
+              type: draftToSend.type,
             },
-          }),
-        ).unwrap();
-      } catch (error) {
-        removePendingMessage(pendingId);
-        throw error;
-      }
-
-      removePendingMessage(pendingId);
-
-      setAttachmentDraft(null);
-      setAttachmentCaption("");
-      scrollToLatestIfNeeded();
+          },
+        }),
+      ).unwrap();
     } catch (error) {
       console.error("ATTACHMENT SEND ERROR:", error);
+
       Alert.alert(
         "Attachment",
-        error instanceof Error
-          ? error.message
-          : "Unable to send this attachment.",
+        typeof error === "string" && error
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Unable to send this attachment.",
       );
     } finally {
-      setAttachmentSending(false);
+      // On success the real message is already in the list (and hides
+      // this pending copy); on failure this removes the failed one.
+      removePendingMessage(pendingId);
     }
   };
 
@@ -3577,6 +3799,15 @@ export default function ChatScreen() {
   const startAudioCall = () => beginCall("audio");
 
   const startVideoCall = () => beginCall("video");
+
+  // Tapping a call entry calls back. Kept stable (same function every
+  // render) so the memoised message bubbles don't all re-render.
+  const beginCallRef = useRef(beginCall);
+  beginCallRef.current = beginCall;
+
+  const handleCallBack = useCallback((type: "audio" | "video") => {
+    beginCallRef.current(type);
+  }, []);
 
   // ========================================
   // MESSAGE PRESS / LONG PRESS
@@ -3928,7 +4159,12 @@ export default function ChatScreen() {
                   {showDate ? <DateSeparator message={item} /> : null}
 
                   <SwipeToReply
-                    enabled={!selectionMode && !item.pending && !item.deleted}
+                    enabled={
+                      !selectionMode &&
+                      !item.pending &&
+                      !item.deleted &&
+                      item.kind !== "call"
+                    }
                     onReply={() => startReply(item)}>
                     <Bubble
                       msg={item}
@@ -3952,6 +4188,7 @@ export default function ChatScreen() {
                       }}
                       onMediaPress={handleMediaPress}
                       onReplyPress={scrollToMessage}
+                      onCallBack={handleCallBack}
                       otherParticipant={conversation?.otherParticipant}
                     />
                   </SwipeToReply>
@@ -4085,6 +4322,9 @@ export default function ChatScreen() {
                   placeholder={editingMessage ? "Edit message" : "Message"}
                   placeholderTextColor="#9C9CAA"
                   multiline
+                  // Browsers make a multi-line box 2 rows tall by default,
+                  // which made the input look too tall on the website.
+                  numberOfLines={Platform.OS === "web" ? 1 : undefined}
                   maxLength={2000}
                 />
 
@@ -4911,7 +5151,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
 
-  bubbleText: { fontSize: 15, color: "#191922", lineHeight: 20 },
+  bubbleText: {
+    fontSize: 15,
+    color: "#191922",
+    lineHeight: 20,
+    // Long links / words without spaces wrap INSIDE the bubble instead of
+    // running out of it (browsers don't do this by themselves).
+    ...(Platform.OS === "web"
+      ? ({ wordBreak: "break-word", overflowWrap: "anywhere" } as object)
+      : null),
+  },
 
   bubbleTextMine: { color: "#FFFFFF" },
 
@@ -5039,6 +5288,19 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
+  // Spinner on a photo that's still uploading.
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    borderRadius: 10,
+  },
+
   videoPlayOverlay: {
     position: "absolute",
     top: 0,
@@ -5119,6 +5381,15 @@ const styles = StyleSheet.create({
 
   transcriptTextMine: { color: "rgba(255,255,255,0.9)" },
 
+  transcriptMore: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#C5399A",
+  },
+
+  transcriptMoreMine: { color: "#FFFFFF" },
+
   // The word currently being spoken, highlighted against the rest of
   // the (already-italic, muted) transcript text.
   transcriptWordActive: {
@@ -5145,6 +5416,44 @@ const styles = StyleSheet.create({
     color: "#8A8A90",
     fontStyle: "italic",
   },
+
+  // CALL ENTRY
+
+  callLog: {
+    minWidth: 210,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+    paddingRight: 6,
+  },
+
+  callLogIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  callLogIconMine: { backgroundColor: "#FFFFFF" },
+
+  callLogIconTheirs: { backgroundColor: "rgba(197,57,154,0.12)" },
+
+  callLogIconMissed: { backgroundColor: "rgba(229,72,77,0.12)" },
+
+  callLogText: { flex: 1, minWidth: 0 },
+
+  callLogTitle: { fontSize: 14.5, fontWeight: "700" },
+
+  callLogDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+
+  callLogDetail: { fontSize: 12, fontVariant: ["tabular-nums"] },
 
   // DOCUMENT
 
@@ -5318,6 +5627,9 @@ const styles = StyleSheet.create({
 
   input: {
     flex: 1,
+    // Lets the box shrink on narrow (phone-sized) browser windows, so the
+    // attach / camera icons stay inside the pill instead of being pushed out.
+    minWidth: 0,
     minHeight: 44,
     maxHeight: 120,
     paddingHorizontal: 10,
@@ -5325,6 +5637,9 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     fontSize: 16,
     color: "#191922",
+    ...(Platform.OS === "web"
+      ? ({ outlineStyle: "none", resize: "none" } as object)
+      : null),
   },
 
   pillIcon: {

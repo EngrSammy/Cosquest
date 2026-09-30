@@ -1,19 +1,12 @@
+import type { AppNotificationItem } from "@/services/notifications";
 import { createSlice } from "@reduxjs/toolkit";
 import {
   fetchNotifications,
   markNotificationsRead,
 } from "../thunks/notificationThunks";
 
-type Notification = {
-  id: string;
-  title?: string;
-  message?: string;
-  read?: boolean;
-  createdAt?: string;
-};
-
 type NotificationState = {
-  notifications: Notification[];
+  notifications: AppNotificationItem[];
   unreadCount: number;
   loading: boolean;
   error: string | null;
@@ -48,12 +41,10 @@ const notificationSlice = createSlice({
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.loading = false;
 
-        const notifications = action.payload as Notification[];
+        state.notifications = action.payload;
 
-        state.notifications = notifications;
-
-        state.unreadCount = notifications.filter(
-          (notification: Notification) => !notification.read,
+        state.unreadCount = action.payload.filter(
+          (notification) => !notification.read,
         ).length;
       })
 

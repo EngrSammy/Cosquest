@@ -5,26 +5,27 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      KeyboardAvoidingView,
-      Modal,
-      Platform,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
+import { VideoPreviewFrame } from "@/components/VideoPreviewFrame";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 import {
-      createImagePostThunk,
-      createNewPost,
-      createReelPostThunk,
-      fetchPosts,
+  createImagePostThunk,
+  createNewPost,
+  createReelPostThunk,
+  fetchPosts,
 } from "@/store/thunks/postThunks";
 
 type SelectedFile = {
@@ -41,6 +42,10 @@ const HASHTAGS = [
   "#CosplayCommunity",
   "#CosplayLife",
 ];
+
+// The picker must wait until the create-post sheet has finished opening,
+// otherwise iOS can drop it.
+const OPEN_THEN_PICK_DELAY_MS = 350;
 
 function prepareImageForUpload(
   asset: ImagePicker.ImagePickerAsset,
@@ -96,10 +101,15 @@ export function CreatePost() {
     user?.avatar ||
     "";
 
+  // Your uploaded photo first, then your preset avatar.
+  const uploadedPhoto =
+    user?.profile?.avatarPhotoUrl || authUser?.profile?.avatarPhotoUrl || "";
+
   const avatar = AVATARS.find((item) => item.id === avatarKey);
 
-  const selectedAvatar =
-    avatar?.source || require("@/assets/images/dp-avatar.png");
+  const selectedAvatar = uploadedPhoto
+    ? { uri: uploadedPhoto }
+    : avatar?.source || require("@/assets/images/dp-avatar.png");
 
   const username =
     user?.profile?.username || authUser?.profile?.username || "You";
@@ -222,9 +232,6 @@ export function CreatePost() {
 
       const asset = result.assets[0];
 
-      // No 30-second restriction.
-      // Videos longer than 30 seconds can now be selected.
-
       setMode("video");
 
       setSelectedFiles([
@@ -242,6 +249,15 @@ export function CreatePost() {
     }
   };
 
+  // Composer buttons (Photo / Reel / Gallery): open the create-post sheet
+  // and go straight to the picker.
+  const openWith = (pick: () => Promise<void>) => {
+    setVisible(true);
+    setTimeout(() => {
+      pick();
+    }, OPEN_THEN_PICK_DELAY_MS);
+  };
+
   // ==========================================
   // CREATE POST
   // ==========================================
@@ -255,10 +271,6 @@ export function CreatePost() {
 
     try {
       setPosting(true);
-
-      // ======================================
-      // THOUGHT
-      // ======================================
 
       if (mode === "thought") {
         if (!text) {
@@ -278,10 +290,6 @@ export function CreatePost() {
         ).unwrap();
       }
 
-      // ======================================
-      // PHOTO / GALLERY
-      // ======================================
-
       if (mode === "photo" || mode === "gallery") {
         if (!selectedFiles.length) {
           Alert.alert("Create Post", "Select at least one photo.");
@@ -297,10 +305,6 @@ export function CreatePost() {
           }),
         ).unwrap();
       }
-
-      // ======================================
-      // VIDEO
-      // ======================================
 
       if (mode === "video") {
         if (!selectedFiles.length) {
@@ -318,6 +322,8 @@ export function CreatePost() {
         ).unwrap();
       }
 
+      // setPosting(false) first so close() isn't blocked by `posting`.
+      setPosting(false);
       close();
 
       await dispatch(fetchPosts(token)).unwrap();
@@ -340,24 +346,47 @@ export function CreatePost() {
   return (
     <>
       {/* ==========================================
-          COMMUNITY COMPOSER
+          COMPOSER — full width, Facebook style
       ========================================== */}
 
-      <Pressable style={styles.composer} onPress={() => setVisible(true)}>
-        <Image
-          source={selectedAvatar}
-          style={styles.composerAvatar}
-          contentFit="cover"
-        />
+      <View style={styles.composer}>
+        <Pressable style={styles.composerTop} onPress={() => setVisible(true)}>
+          <Image
+            source={selectedAvatar}
+            style={styles.composerAvatar}
+            contentFit="cover"
+          />
 
-        <Text style={styles.placeholder} numberOfLines={1}>
-          Share Your Cosplay Or A Hot Take...
-        </Text>
+          <View style={styles.composerPill}>
+            <Text style={styles.placeholder} numberOfLines={1}>
+              Share your cosplay or a hot take...
+            </Text>
+          </View>
+        </Pressable>
 
-        <View style={styles.addButton}>
-          <Ionicons name="add" size={24} color="#C5399A" />
+        <View style={styles.composerOptions}>
+          <ComposerOption
+            icon="image"
+            label="Photo"
+            color="#2196F3"
+            onPress={() => openWith(pickPhoto)}
+          />
+
+          <ComposerOption
+            icon="videocam"
+            label="Reel"
+            color="#C5399A"
+            onPress={() => openWith(pickVideo)}
+          />
+
+          <ComposerOption
+            icon="images"
+            label="Gallery"
+            color="#22A679"
+            onPress={() => openWith(pickGallery)}
+          />
         </View>
-      </Pressable>
+      </View>
 
       {/* ==========================================
           CREATE POST MODAL
@@ -433,13 +462,20 @@ export function CreatePost() {
                 contentContainerStyle={styles.mediaPreviewContent}>
                 {selectedFiles.map((file, index) => (
                   <View key={`${file.uri}-${index}`} style={styles.previewItem}>
-                    <Image
-                      source={{
-                        uri: file.uri,
-                      }}
-                      style={styles.previewImage}
-                      contentFit="cover"
-                    />
+                    {mode === "video" ? (
+                      <VideoPreviewFrame
+                        uri={file.uri}
+                        style={styles.previewImage}
+                      />
+                    ) : (
+                      <Image
+                        source={{
+                          uri: file.uri,
+                        }}
+                        style={styles.previewImage}
+                        contentFit="cover"
+                      />
+                    )}
 
                     {mode === "video" ? (
                       <View style={styles.previewPlay}>
@@ -506,7 +542,36 @@ export function CreatePost() {
 }
 
 // ==========================================
-// POST OPTION
+// COMPOSER OPTION (under the "Share your cosplay" bar)
+// ==========================================
+
+function ComposerOption({
+  icon,
+  label,
+  color,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.composerOption,
+        pressed && styles.composerOptionPressed,
+      ]}
+      onPress={onPress}>
+      <Ionicons name={icon} size={20} color={color} />
+
+      <Text style={styles.composerOptionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// ==========================================
+// POST OPTION (inside the create-post sheet)
 // ==========================================
 
 function PostOption({
@@ -542,40 +607,77 @@ function PostOption({
 // ==========================================
 
 const styles = StyleSheet.create({
+  // COMPOSER (full width)
+
   composer: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#EDEDF1",
+    marginBottom: 8,
+    paddingTop: 12,
+  },
+
+  composerTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: 10,
-    marginBottom: 16,
-    backgroundColor: "rgba(255,255,255,0.72)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.9)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
 
   composerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+
+  composerPill: {
+    flex: 1,
+    minWidth: 0,
+    height: 40,
+    justifyContent: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E1E1E7",
+    paddingHorizontal: 16,
   },
 
   placeholder: {
-    flex: 1,
-    fontSize: 13.5,
-    color: "#777780",
+    fontSize: 14,
+    color: "#7A7A82",
   },
 
-  addButton: {
-    width: 35,
-    height: 35,
-    borderRadius: 11,
+  composerOptions: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: "#EDEDF1",
+    marginHorizontal: 8,
+    paddingVertical: 2,
+  },
+
+  composerOption: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(195,77,156,0.15)",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
   },
+
+  composerOptionPressed: {
+    backgroundColor: "#F2F2F5",
+  },
+
+  composerOptionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#65656D",
+  },
+
+  // CREATE POST SHEET
 
   modalRoot: {
     flex: 1,
@@ -594,6 +696,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 28 : 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   handle: {

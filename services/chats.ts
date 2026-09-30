@@ -1,4 +1,4 @@
-import { File } from "expo-file-system";
+import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
 
@@ -360,9 +360,7 @@ export async function sendMessage(
       formData.append("parentMessage", data.parentMessage);
     }
 
-    const recordedFile = new File(data.file.uri);
-
-    formData.append("media", recordedFile as any);
+    await appendFileToFormData(formData, "media", data.file);
 
     body = formData;
   }

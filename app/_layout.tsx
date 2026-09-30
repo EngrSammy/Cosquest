@@ -4,20 +4,18 @@ import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { store } from "@/store/store";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { registerGlobals } from "@livekit/react-native";
+// LiveKit setup for phones (does nothing on web — see the file itself).
+import "@/utils/livekitSetup";
+// Makes Alert.alert show real popups on the website (does nothing on phones).
+import "@/utils/webAlert";
+// Browser-only style fixes (does nothing on phones).
+import "@/utils/webGlobalStyles";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Provider } from "react-redux";
-
-// LiveKit (calls) needs this ONCE, before any call screen is opened.
-// Without it, LiveKit can't make its connection and every call ends the
-// moment it starts ("Connection lost"). Do NOT remove it to make the app
-// open in Expo Go — this app needs a development build (Expo Go can't
-// run LiveKit at all).
-registerGlobals();
 
 // useSocketConnection() calls useAppSelector internally, which only
 // works inside <Provider store={store}>. RootLayout below is the

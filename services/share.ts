@@ -4,9 +4,9 @@ export type SharePerson = {
   id: string;
   username: string;
   name?: string;
-  avatarKey?: string;
+  avatarKey?: string | null;
   avatarPhotoUrl?: string | null;
-  faction?: string;
+  faction?: string | null;
 };
 
 type PeopleResponse = {
@@ -49,18 +49,20 @@ export async function searchPeople(token: string, search: string) {
   );
 }
 
-export async function getSuggestedPeople(token: string) {
-  /*
-   * The backend's following endpoint supports
-   * an unfiltered paginated list.
-   *
-   * We use the user's own following list
-   * as the initial Share suggestions.
-   *
-   * The username is supplied by the current
-   * caller in ShareSheet if needed later.
-   */
-  throw new Error("Use searchPeople for friend suggestions.");
+// ==========================================
+// SUGGESTED PEOPLE
+// GET /api/users/:username/following
+// ==========================================
+// The people you follow — the same endpoint the Following screen uses
+// (services/follow.ts). Before, this function always threw an error on
+// purpose, which is why Share always said "No suggested friends yet".
+export async function getSuggestedPeople(token: string, username: string) {
+  return apiRequest<PeopleResponse>(
+    `/api/users/${encodeURIComponent(username)}/following?page=1&limit=20`,
+    {
+      token,
+    },
+  );
 }
 
 export async function createShareChat(token: string, username: string) {

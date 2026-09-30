@@ -38,7 +38,7 @@
       "package": "com.dammy0227.cosquest"
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/cosquest-logo.png"
     },
     "plugins": [

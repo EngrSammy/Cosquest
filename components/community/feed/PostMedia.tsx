@@ -1,270 +1,217 @@
-import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ReactNode, useState } from "react";
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { PostVideo } from "./PostVideo";
 
-function getMediaUrl(post: any) {
-  if (typeof post?.image === "string") {
-    return post.image;
-  }
+// ==========================================
+// SIZE
+// ==========================================
+// The photo fills the card's width and its HEIGHT follows the photo's real
+// shape (tall photos are tall, wide ones shorter), limited to the range
+// Facebook/Instagram use: portrait 4:5 up to wide 1.91:1.
+const TALLEST_RATIO = 4 / 5;
+const WIDEST_RATIO = 1.91;
+// Until the photo has loaded, and always for reels: portrait 4:5.
+const DEFAULT_RATIO = 4 / 5;
 
-  if (typeof post?.video === "string") {
-    return post.video;
-  }
+function clampRatio(ratio: number) {
+  return Math.min(WIDEST_RATIO, Math.max(TALLEST_RATIO, ratio));
+}
 
-  if (typeof post?.media === "string") {
-    return post.media;
-  }
+// Every photo/video link on a post, whatever shape the backend sends.
+export function getMediaUrls(post: any): string[] {
+  const urls: string[] = [];
 
-  if (
-    post?.media &&
-    typeof post.media === "object" &&
-    typeof post.media.url === "string"
-  ) {
-    return post.media.url;
-  }
+  const add = (value: any) => {
+    if (typeof value === "string" && value.trim()) {
+      urls.push(value);
+    } else if (value && typeof value.url === "string" && value.url.trim()) {
+      urls.push(value.url);
+    }
+  };
 
   if (Array.isArray(post?.media)) {
-    const first = post.media[0];
-
-    if (typeof first === "string") {
-      return first;
-    }
-
-    if (first && typeof first.url === "string") {
-      return first.url;
-    }
+    post.media.forEach(add);
+  } else {
+    add(post?.media);
   }
 
-  return null;
+  if (!urls.length) {
+    add(post?.image);
+    add(post?.video);
+  }
+
+  return urls;
 }
 
-/**
- * Get the user's REAL uploaded profile photo.
- *
- * Priority:
- * 1. post.avatar
- * 2. post.avatarPhotoUrl
- * 3. post.avatarUrl
- * 4. post.author.avatarPhotoUrl
- * 5. post.author.avatarUrl
- * 6. post.author.profile.avatarPhotoUrl
- * 7. post.author.profile.avatarUrl
- *
- * We intentionally DO NOT use the AVATARS constant here.
- */
-function getProfilePhoto(post: any) {
-  const possiblePhotos = [
-    post?.avatar,
-    post?.avatarPhotoUrl,
-    post?.avatarUrl,
-
-    post?.author?.avatarPhotoUrl,
-    post?.author?.avatarUrl,
-
-    post?.author?.profile?.avatarPhotoUrl,
-    post?.author?.profile?.avatarUrl,
-
-    post?.user?.avatarPhotoUrl,
-    post?.user?.avatarUrl,
-
-    post?.user?.profile?.avatarPhotoUrl,
-    post?.user?.profile?.avatarUrl,
-  ];
-
-  const photo = possiblePhotos.find(
-    (value) => typeof value === "string" && value.trim().length > 0,
-  );
-
-  return photo || null;
-}
-
+// The rounded photo / reel / gallery inside the post card.
+// `children` are drawn ON TOP of it (the like / comment / share panel and
+// the save button — see PostActions).
 export function PostMedia({
   post,
-  onMenuPress,
+  children,
 }: {
   post: any;
-  onMenuPress: () => void;
+  children?: ReactNode;
 }) {
-  const mediaUrl = getMediaUrl(post);
+  const urls = getMediaUrls(post);
+  const isReel = post?.type === "reel";
 
-  const isReel = post.type === "reel";
+  const [ratio, setRatio] = useState(DEFAULT_RATIO);
+  const [width, setWidth] = useState(0);
+  const [index, setIndex] = useState(0);
 
-  const username =
-    post.author?.username || post.handle || post.username || "CosQuest User";
+  if (!urls.length) {
+    return null;
+  }
 
-  const profilePhoto = getProfilePhoto(post);
+  const aspectRatio = isReel ? DEFAULT_RATIO : ratio;
+
+  const handleImageLoad = (event: {
+    source: { width: number; height: number };
+  }) => {
+    const { width: imageWidth, height: imageHeight } = event.source || {};
+
+    if (imageWidth > 0 && imageHeight > 0) {
+      setRatio(clampRatio(imageWidth / imageHeight));
+    }
+  };
+
+  const handleGalleryScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    if (!width) {
+      return;
+    }
+
+    const next = Math.round(event.nativeEvent.contentOffset.x / width);
+
+    if (next !== index) {
+      setIndex(next);
+    }
+  };
+
+  let media;
+
+  if (isReel) {
+    media = <PostVideo uri={urls[0]} />;
+  } else if (urls.length === 1) {
+    media = (
+      <Image
+        source={{ uri: urls[0] }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={150}
+        onLoad={handleImageLoad}
+      />
+    );
+  } else {
+    // GALLERY — swipe sideways; the first photo sets the height.
+    media =
+      width > 0 ? (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleGalleryScroll}
+          scrollEventThrottle={16}
+          style={StyleSheet.absoluteFill}>
+          {urls.map((url, itemIndex) => (
+            <Image
+              key={`${url}-${itemIndex}`}
+              source={{ uri: url }}
+              style={{ width, height: "100%" }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+              onLoad={itemIndex === 0 ? handleImageLoad : undefined}
+            />
+          ))}
+        </ScrollView>
+      ) : null;
+  }
 
   return (
-    <View style={styles.container}>
-      {/* POST MEDIA */}
-      {isReel && mediaUrl ? (
-        <PostVideo uri={mediaUrl} />
-      ) : mediaUrl ? (
-        <Image
-          source={{ uri: mediaUrl }}
-          style={styles.image}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={styles.placeholder}>
-          <Ionicons name="image-outline" size={42} color="#B5B5BD" />
-        </View>
-      )}
+    <View
+      style={[styles.frame, { aspectRatio }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {media}
 
-      {/* AUTHOR */}
-      <BlurView intensity={30} tint="light" style={styles.author}>
-        {profilePhoto ? (
-          <Image
-            source={{ uri: profilePhoto }}
-            style={styles.avatar}
-            contentFit="cover"
-            transition={150}
-          />
-        ) : (
-          <View style={styles.avatarFallback}>
-            <Ionicons name="person" size={14} color="#8A8A90" />
-          </View>
-        )}
-
-        <Text style={styles.authorText} numberOfLines={1}>
-          {username}
-        </Text>
-      </BlurView>
-
-      {/* MENU */}
-      <Pressable style={styles.menu} onPress={onMenuPress} hitSlop={8}>
-        <Ionicons name="ellipsis-horizontal" size={20} color="#191922" />
-      </Pressable>
-
-      {/* BOTTOM GRADIENT */}
+      {/* Soft shade at the bottom so the white icons are always readable */}
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.62)"]}
-        style={styles.gradient}
+        colors={["transparent", "rgba(0,0,0,0.35)"]}
+        style={styles.shade}
         pointerEvents="none"
       />
 
-      {/* REEL LABEL */}
       {isReel ? (
-        <View style={styles.reel}>
-          <Ionicons name="videocam" size={12} color="#FFFFFF" />
-
-          <Text style={styles.reelText}>Reel</Text>
+        <View style={[styles.label, styles.reelLabel]} pointerEvents="none">
+          <Text style={styles.labelText}>Reel</Text>
         </View>
       ) : null}
+
+      {urls.length > 1 ? (
+        <View style={[styles.label, styles.counter]} pointerEvents="none">
+          <Text style={styles.labelText}>
+            {index + 1}/{urls.length}
+          </Text>
+        </View>
+      ) : null}
+
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  frame: {
     width: "100%",
-    height: 380,
-    borderRadius: 20,
+    maxHeight: 640,
+    borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "#EEEEF1",
+    backgroundColor: "#2C2C2A",
     position: "relative",
   },
 
-  image: {
-    width: "100%",
-    height: "100%",
-  },
-
-  placeholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E9E9ED",
-  },
-
-  author: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingLeft: 6,
-    paddingRight: 14,
-    paddingVertical: 3,
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.65)",
-    zIndex: 5,
-  },
-
-  /**
-   * REAL uploaded profile photo
-   */
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#E2E2E6",
-  },
-
-  /**
-   * Only used when the backend did not provide
-   * an uploaded profile photo.
-   */
-  avatarFallback: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E2E2E6",
-  },
-
-  authorText: {
-    maxWidth: 180,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#191922",
-  },
-
-  menu: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 35,
-    height: 35,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.88)",
-    zIndex: 10,
-  },
-
-  gradient: {
+  shade: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "45%",
+    height: "35%",
   },
 
-  reel: {
+  label: {
     position: "absolute",
-    left: 14,
-    top: 55,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    top: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: "rgba(197,57,154,0.88)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
 
-  reelText: {
+  reelLabel: {
+    left: 10,
+    backgroundColor: "#C5399A",
+  },
+
+  counter: {
+    right: 10,
+  },
+
+  labelText: {
+    color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "700",
-    color: "#FFFFFF",
   },
 });

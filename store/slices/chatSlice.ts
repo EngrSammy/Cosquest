@@ -129,6 +129,14 @@ function getPreview(message: ChatMessage): string {
     return "📎 Document";
   }
 
+  // Call entry. A moment later the backend's chat:preview refresh replaces
+  // this with the exact wording for this person ("Missed voice call", etc.).
+  if (message.kind === "call") {
+    return (message as any).callLog?.type === "video"
+      ? "🎥 Video call"
+      : "📞 Voice call";
+  }
+
   return message.content || "Message";
 }
 

@@ -1,7 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
+import { useEvent } from "expo";
+import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+
+import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
 
 export function PostVideo({ uri }: { uri: string }) {
   const [muted, setMuted] = useState(true);
@@ -15,6 +19,23 @@ export function PostVideo({ uri }: { uri: string }) {
   useEffect(() => {
     player.muted = muted;
   }, [player, muted]);
+
+  // FIRST FRAME: show Cloudinary's first-frame picture straight away,
+  // instead of a black box while the video loads. Hidden for good the
+  // moment the video starts playing, so it never covers the real video.
+  const posterUrl = useMemo(() => getCloudinaryVideoPoster(uri), [uri]);
+
+  const [videoVisible, setVideoVisible] = useState(false);
+
+  const { isPlaying } = useEvent(player, "playingChange", {
+    isPlaying: player.playing,
+  });
+
+  useEffect(() => {
+    if (isPlaying) {
+      setVideoVisible(true);
+    }
+  }, [isPlaying]);
 
   return (
     <View style={styles.container}>
@@ -32,7 +53,18 @@ export function PostVideo({ uri }: { uri: string }) {
           style={styles.video}
           contentFit="cover"
           nativeControls={false}
+          onFirstFrameRender={() => setVideoVisible(true)}
         />
+
+        {posterUrl && !videoVisible ? (
+          <Image
+            source={{ uri: posterUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            pointerEvents="none"
+          />
+        ) : null}
       </Pressable>
 
       <Pressable

@@ -40,6 +40,9 @@ const RINGING_SAFETY_POLL_MS = 5000;
 // How long "Call declined" / "No answer" stays on screen before closing.
 const END_MESSAGE_MS = 1400;
 
+// Connection errors stay longer, so the real reason can be read.
+const ERROR_MESSAGE_MS = 5000;
+
 // Room settings — created ONCE here, outside the component.
 // (Written inline before, they were a brand-new object on every screen
 // update, which made LiveKit try to connect again and again — the
@@ -225,7 +228,11 @@ export default function CallScreen() {
   }, [dispatch]);
 
   const finish = useCallback(
-    (message: string | null, notifyServer: boolean) => {
+    (
+      message: string | null,
+      notifyServer: boolean,
+      delayMs: number = END_MESSAGE_MS,
+    ) => {
       if (leavingRef.current) {
         return;
       }
@@ -235,7 +242,7 @@ export default function CallScreen() {
 
       if (message) {
         setEndMessage(message);
-        setTimeout(goBack, END_MESSAGE_MS);
+        setTimeout(goBack, delayMs);
       } else {
         goBack();
       }
@@ -281,7 +288,22 @@ export default function CallScreen() {
         audio
         video={active.call.type === "video"}
         options={ROOM_OPTIONS}
-        onError={() => finish("Connection lost", true)}>
+        onError={(error) => {
+          // Show and log the REAL reason (e.g. invalid token, wrong
+          // LIVEKIT_URL, no network) instead of only "Connection lost".
+          console.error("LIVEKIT ROOM ERROR:", error);
+
+          const reason =
+            error && typeof error === "object" && "message" in error
+              ? String((error as Error).message)
+              : "";
+
+          finish(
+            reason ? `Connection lost: ${reason}` : "Connection lost",
+            true,
+            ERROR_MESSAGE_MS,
+          );
+        }}>
         <CallStage
           call={active.call}
           direction={active.direction}
@@ -681,7 +703,14 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
   },
 
-  audioStatusRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  audioStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    paddingHorizontal: 24,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
 
   audioStatus: {
     fontSize: 16,

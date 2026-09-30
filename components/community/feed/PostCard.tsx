@@ -1,31 +1,33 @@
 import { AVATARS } from "@/constants/avatars";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-      bookmarkPostThunk,
-      editPost,
-      fetchPosts,
-      likePostThunk,
-      removeBookmarkThunk,
-      removePost,
-      unlikePostThunk,
+  bookmarkPostThunk,
+  editPost,
+  fetchPosts,
+  likePostThunk,
+  removeBookmarkThunk,
+  removePost,
+  unlikePostThunk,
 } from "@/store/thunks/postThunks";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useState } from "react";
 import {
-      Alert,
-      KeyboardAvoidingView,
-      Modal,
-      Platform,
-      Pressable,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { CommentsModal } from "./CommentsModal";
 import { PostActions } from "./PostActions";
 import { PostCaption } from "./PostCaption";
-import { PostMedia } from "./PostMedia";
+import { getMediaUrls, PostMedia } from "./PostMedia";
 import { PostMenu } from "./PostMenu";
 import { ShareSheet } from "./ShareSheet";
 
@@ -33,10 +35,6 @@ import { ShareSheet } from "./ShareSheet";
    HELPERS
 ========================================================= */
 
-/**
- * Turn a list of possible values into a clean list of
- * non-empty strings.
- */
 function cleanIds(values: any[]): string[] {
   return values
     .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
@@ -108,6 +106,76 @@ function getTokenUserIds(token: string): string[] {
   }
 }
 
+// The author's real uploaded photo, then their chosen preset avatar, then
+// the default picture.
+function getAuthorAvatar(post: any) {
+  const photos = [
+    post?.avatar,
+    post?.avatarPhotoUrl,
+    post?.avatarUrl,
+    post?.author?.avatarPhotoUrl,
+    post?.author?.avatarUrl,
+    post?.author?.profile?.avatarPhotoUrl,
+    post?.author?.profile?.avatarUrl,
+    post?.user?.avatarPhotoUrl,
+    post?.user?.avatarUrl,
+    post?.user?.profile?.avatarPhotoUrl,
+    post?.user?.profile?.avatarUrl,
+  ];
+
+  const photo = photos.find(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  if (photo) {
+    return { uri: photo };
+  }
+
+  const key =
+    post?.author?.avatarKey ||
+    post?.author?.profile?.avatarKey ||
+    post?.user?.avatarKey ||
+    "";
+
+  return (
+    AVATARS.find((item) => item.id === key)?.source ||
+    require("@/assets/images/dp-avatar.png")
+  );
+}
+
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+}
+
+// The avatar ring shows the author's faction colour. Known factions get a
+// fixed colour; any other faction gets a steady colour from this palette
+// (the same faction always gets the same colour).
+const FACTION_COLORS: Record<string, string> = {
+  celestials: "#7F77DD",
+};
+
+const RING_PALETTE = ["#D85A30", "#1D9E75", "#378ADD", "#BA7517", "#D4537E"];
+
+function factionColor(faction: string) {
+  const key = faction.toLowerCase();
+
+  if (!key) {
+    return "#C5399A";
+  }
+
+  if (FACTION_COLORS[key]) {
+    return FACTION_COLORS[key];
+  }
+
+  let hash = 0;
+
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+
+  return RING_PALETTE[hash % RING_PALETTE.length];
+}
+
 export function PostCard({ post, token }: { post: any; token: string }) {
   const dispatch = useAppDispatch();
 
@@ -143,10 +211,6 @@ export function PostCard({ post, token }: { post: any; token: string }) {
 
   /* =========================================================
      CURRENT USER
-     
-     We collect EVERY possible id for the logged-in user, 
-     because auth and profile responses often use different
-     field names (id, _id, userId).
   ========================================================= */
 
   const currentUserIds = cleanIds([
@@ -181,11 +245,17 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     post?.username ||
     "";
 
-  /*
-   * Different backend responses can expose the author's ID
-   * in different places. We collect all of them and match
-   * against ANY of the current user's IDs.
-   */
+  const authorName =
+    post?.author?.name ||
+    post?.author?.displayName ||
+    post?.author?.profile?.displayName ||
+    postUsername ||
+    "CosQuest User";
+
+  const authorFaction = String(
+    post?.author?.faction || post?.user?.faction || "",
+  );
+
   const postUserIds = cleanIds([
     post?.userId,
     post?.user_id,
@@ -204,16 +274,12 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   ]);
 
   /* =========================================================
-     NORMALIZE USERNAMES
+     CHECK IF CURRENT USER OWNS POST
   ========================================================= */
 
   const normalizedCurrentUsername = normalizeUsername(currentUsername);
 
   const normalizedPostUsername = normalizeUsername(postUsername);
-
-  /* =========================================================
-     CHECK IF CURRENT USER OWNS POST
-  ========================================================= */
 
   const ownsPostById = postUserIds.some((id) => currentUserIds.includes(id));
 
@@ -222,10 +288,6 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     !!normalizedPostUsername &&
     normalizedCurrentUsername === normalizedPostUsername;
 
-  /*
-   * Some backends tell the app directly whether the post
-   * belongs to the logged-in user.
-   */
   const backendSaysMine =
     post?.isMine === true ||
     post?.isOwner === true ||
@@ -235,7 +297,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   const isMine = backendSaysMine || ownsPostById || ownsPostByUsername;
 
   /* =========================================================
-     CURRENT USER AVATAR
+     CURRENT USER AVATAR (for the comments box)
   ========================================================= */
 
   const avatarKey =
@@ -252,7 +314,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
       require("@/assets/images/dp-avatar.png");
 
   /* =========================================================
-     LIKE POST
+     LIKE / BOOKMARK
   ========================================================= */
 
   const handleLike = () => {
@@ -261,28 +323,11 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     }
 
     if (post.liked) {
-      dispatch(
-        unlikePostThunk({
-          postId: post.id,
-          token,
-        }),
-      );
+      dispatch(unlikePostThunk({ postId: post.id, token }));
     } else {
-      dispatch(
-        likePostThunk({
-          postId: post.id,
-          token,
-        }),
-      );
+      dispatch(likePostThunk({ postId: post.id, token }));
     }
   };
-
-  /* =========================================================
-     BOOKMARK
-
-     Bookmark remains inside PostActions.
-     It is NOT part of the three-dot menu.
-  ========================================================= */
 
   const handleBookmark = () => {
     if (!post?.id) {
@@ -290,30 +335,17 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     }
 
     if (post.bookmarked) {
-      dispatch(
-        removeBookmarkThunk({
-          postId: post.id,
-          token,
-        }),
-      );
+      dispatch(removeBookmarkThunk({ postId: post.id, token }));
     } else {
-      dispatch(
-        bookmarkPostThunk({
-          postId: post.id,
-          token,
-        }),
-      );
+      dispatch(bookmarkPostThunk({ postId: post.id, token }));
     }
   };
 
   /* =========================================================
-     OPEN EDIT
+     EDIT
   ========================================================= */
 
   const startEdit = () => {
-    /*
-     * Only the owner should be able to edit.
-     */
     if (!isMine) {
       return;
     }
@@ -324,10 +356,6 @@ export function PostCard({ post, token }: { post: any; token: string }) {
 
     setEditing(true);
   };
-
-  /* =========================================================
-     SAVE EDIT
-  ========================================================= */
 
   const saveEdit = async () => {
     const text = editText.trim();
@@ -373,15 +401,8 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         }),
       ).unwrap();
 
-      /*
-       * Close edit modal after successful update.
-       */
       setEditing(false);
 
-      /*
-       * Refresh posts so the updated content
-       * comes directly from the backend.
-       */
       await dispatch(fetchPosts(token)).unwrap();
     } catch (error) {
       Alert.alert(
@@ -394,13 +415,10 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   };
 
   /* =========================================================
-     DELETE POST
+     DELETE
   ========================================================= */
 
   const deletePost = () => {
-    /*
-     * Only the owner should be able to delete.
-     */
     if (!isMine) {
       return;
     }
@@ -444,10 +462,6 @@ export function PostCard({ post, token }: { post: any; token: string }) {
               }),
             ).unwrap();
 
-            /*
-             * Refresh the feed after successful
-             * deletion.
-             */
             await dispatch(fetchPosts(token)).unwrap();
           } catch (error) {
             Alert.alert(
@@ -463,70 +477,112 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   };
 
   /* =========================================================
-     OPEN THREE-DOT MENU
-  ========================================================= */
-
-  const openPostMenu = () => {
-    setMenuVisible(true);
-  };
-
-  /* =========================================================
      RENDER
   ========================================================= */
 
+  const hasMedia = getMediaUrls(post).length > 0;
+
+  // Under the name: the post's place if it has one, otherwise the handle.
+  const placeName =
+    (typeof post?.location === "string"
+      ? post.location
+      : post?.location?.name) ||
+    post?.locationName ||
+    "";
+
+  const subtitle =
+    placeName ||
+    (post?.type === "reel" ? "Reel" : postUsername ? `@${postUsername}` : "");
+
+  const actions = (overlay: boolean) => (
+    <PostActions
+      overlay={overlay}
+      likes={Number(post?.likes || 0)}
+      comments={commentsCount}
+      shares={Number(post?.shares || 0)}
+      saves={Number(post?.saves || 0)}
+      liked={!!post?.liked}
+      bookmarked={!!post?.bookmarked}
+      createdAt={post?.createdAt}
+      onLike={handleLike}
+      onComment={() => setCommentsVisible(true)}
+      onShare={() => setShareVisible(true)}
+      onBookmark={handleBookmark}
+    />
+  );
+
   return (
     <View style={styles.card}>
-      <View style={styles.mediaContainer}>
-        {/* =================================================
-            POST MEDIA
-        ================================================= */}
+      {/* HEADER — avatar with faction ring, name, faction, place, ⋯ */}
+      <View style={styles.header}>
+        <View
+          style={[styles.ring, { borderColor: factionColor(authorFaction) }]}>
+          <Image
+            source={getAuthorAvatar(post)}
+            style={styles.avatar}
+            contentFit="cover"
+            transition={150}
+          />
+        </View>
 
-        {/*
-          The three-dot button only appears on the user's own posts.
-          When onMenuPress is undefined, PostMedia hides the button.
-        */}
-        <PostMedia
-          post={post}
-          onMenuPress={isMine ? openPostMenu : undefined}
-        />
+        <View style={styles.headerText}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {authorName}
+            </Text>
 
-        {/* =================================================
-            POST ACTIONS
-        ================================================= */}
+            {authorFaction ? (
+              <View style={styles.factionChip}>
+                <Text style={styles.factionText}>
+                  {capitalize(authorFaction)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
-        <PostActions
-          likes={Number(post?.likes || 0)}
-          comments={commentsCount}
-          shares={Number(post?.shares || 0)}
-          saves={Number(post?.saves || 0)}
-          liked={!!post?.liked}
-          bookmarked={!!post?.bookmarked}
-          createdAt={post?.createdAt}
-          onLike={handleLike}
-          onComment={() => setCommentsVisible(true)}
-          onShare={() => setShareVisible(true)}
-          onBookmark={handleBookmark}
-        />
+          {subtitle ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* ⋯ only on your own posts (edit / delete) */}
+        {isMine ? (
+          <Pressable
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Post options">
+            <Ionicons name="ellipsis-horizontal" size={20} color="#65656D" />
+          </Pressable>
+        ) : null}
       </View>
 
-      {/* ===================================================
-          CAPTION
-      =================================================== */}
+      {/* MEDIA with Like · Comment · Share + Save on it */}
+      {hasMedia ? (
+        <View style={styles.mediaWrap}>
+          <PostMedia post={post}>{actions(true)}</PostMedia>
+        </View>
+      ) : null}
 
+      {/* CAPTION + hashtag chips */}
       <PostCaption username={postUsername} content={post?.content} />
 
-      {/* ===================================================
-          THREE-DOT MENU
+      {/* Text-only posts: the same buttons as a row */}
+      {!hasMedia ? actions(false) : null}
 
-          OWN POST:
-          - Edit post
-          - Delete post
-          - Cancel
+      {/* COMMENTS LINK */}
+      <Pressable onPress={() => setCommentsVisible(true)} hitSlop={6}>
+        <Text style={styles.footer}>
+          {commentsCount > 0
+            ? `View ${commentsCount === 1 ? "1 comment" : `all ${commentsCount} comments`}`
+            : "Be the first to comment"}
+        </Text>
+      </Pressable>
 
-          OTHER USER'S POST:
-          - Cancel
-      =================================================== */}
-
+      {/* THREE-DOT MENU */}
       <PostMenu
         visible={menuVisible}
         isMine={isMine}
@@ -535,10 +591,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         onDelete={deletePost}
       />
 
-      {/* ===================================================
-          EDIT POST MODAL
-      =================================================== */}
-
+      {/* EDIT POST MODAL */}
       <Modal
         visible={editing}
         transparent
@@ -603,10 +656,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ===================================================
-          COMMENTS
-      =================================================== */}
-
+      {/* COMMENTS */}
       <CommentsModal
         visible={commentsVisible}
         onClose={() => setCommentsVisible(false)}
@@ -620,10 +670,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         onCountChange={setCommentsCount}
       />
 
-      {/* ===================================================
-          SHARE
-      =================================================== */}
-
+      {/* SHARE */}
       <ShareSheet
         visible={shareVisible}
         post={post}
@@ -639,17 +686,94 @@ export function PostCard({ post, token }: { post: any; token: string }) {
 ========================================================= */
 
 const styles = StyleSheet.create({
+  // Floating rounded card; the photo sits inside it.
   card: {
-    marginBottom: 24,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#EDEDF1",
+    padding: 12,
+    paddingBottom: 14,
+    marginBottom: 16,
   },
 
-  mediaContainer: {
-    position: "relative",
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 
-  /* =======================================================
-     EDIT MODAL
-  ======================================================= */
+  // Faction-coloured ring around the avatar.
+  ring: {
+    padding: 2,
+    borderRadius: 24,
+    borderWidth: 2,
+  },
+
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F1E4EE",
+  },
+
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  name: {
+    flexShrink: 1,
+    fontSize: 14.5,
+    fontWeight: "700",
+    color: "#1C1C22",
+  },
+
+  factionChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "#EEEDFE",
+  },
+
+  factionText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#3C3489",
+  },
+
+  meta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#8A8A93",
+  },
+
+  menuButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mediaWrap: {
+    marginTop: 12,
+  },
+
+  footer: {
+    marginTop: 10,
+    paddingHorizontal: 4,
+    fontSize: 12.5,
+    color: "#8A8A93",
+  },
+
+  /* EDIT MODAL */
 
   editRoot: {
     flex: 1,
@@ -657,7 +781,9 @@ const styles = StyleSheet.create({
   },
 
   editOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    // Was absoluteFillObject, which no longer exists in this React Native
+    // version (the dark background was silently missing).
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.28)",
   },
 

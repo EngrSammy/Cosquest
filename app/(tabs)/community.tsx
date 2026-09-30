@@ -66,60 +66,72 @@ export default function Community() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.push("/profile")} hitSlop={10}>
-            <View style={styles.avatarWrap}>
-              <Image
-                source={selectedAvatar}
-                style={styles.profileImg}
-                contentFit="cover"
-              />
-            </View>
-          </Pressable>
+        {/* Keeps everything a comfortable width on big computer screens,
+            like Facebook on desktop. Full width on phones. */}
+        <View style={styles.column}>
+          {/* HEADER */}
+          <View style={[styles.header, styles.padded]}>
+            <Pressable onPress={() => router.push("/profile")} hitSlop={10}>
+              <View style={styles.avatarWrap}>
+                <Image
+                  source={selectedAvatar}
+                  style={styles.profileImg}
+                  contentFit="cover"
+                />
+              </View>
+            </Pressable>
 
-          <Text style={styles.headerTitle}>Community</Text>
+            <Text style={styles.headerTitle}>Community</Text>
 
-          <Pressable onPress={() => router.push("/notifications")} hitSlop={10}>
-            <Ionicons name="notifications" size={24} color="#C5399A" />
-          </Pressable>
-        </View>
-
-        {/* LOADING */}
-        {loading && !user ? (
-          <View style={styles.loading}>
-            <ActivityIndicator size="small" color="#C5399A" />
+            <Pressable
+              onPress={() => router.push("/notifications")}
+              hitSlop={10}>
+              <Ionicons name="notifications" size={24} color="#C5399A" />
+            </Pressable>
           </View>
-        ) : null}
 
-        {/* COMMUNITY TABS */}
-        <View style={styles.tabs}>
-          {TABS.map((key) => {
-            const active = tab === key;
+          {/* LOADING */}
+          {loading && !user ? (
+            <View style={styles.loading}>
+              <ActivityIndicator size="small" color="#C5399A" />
+            </View>
+          ) : null}
 
-            return (
-              <Pressable
-                key={key}
-                style={styles.tab}
-                onPress={() => setTab(key)}>
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                  {key}
-                </Text>
+          {/* COMMUNITY TABS */}
+          <View style={styles.tabs}>
+            {TABS.map((key) => {
+              const active = tab === key;
 
-                {active ? <View style={styles.tabIndicator} /> : null}
-              </Pressable>
-            );
-          })}
+              return (
+                <Pressable
+                  key={key}
+                  style={styles.tab}
+                  onPress={() => setTab(key)}>
+                  <Text
+                    style={[styles.tabText, active && styles.tabTextActive]}>
+                    {key}
+                  </Text>
+
+                  {active ? <View style={styles.tabIndicator} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* CONTENT — the feed is full width (Facebook style); chats and
+              spotlight keep their side padding. */}
+          {tab === "Feeds" ? (
+            <Feeds />
+          ) : tab === "Chats" ? (
+            <View style={styles.padded}>
+              <Chats />
+            </View>
+          ) : (
+            <View style={styles.padded}>
+              <Spotlight />
+            </View>
+          )}
         </View>
-
-        {/* CONTENT */}
-        {tab === "Feeds" ? (
-          <Feeds />
-        ) : tab === "Chats" ? (
-          <Chats />
-        ) : (
-          <Spotlight />
-        )}
       </ScrollView>
     </AppBackground>
   );
@@ -127,8 +139,17 @@ export default function Community() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: 20,
     paddingBottom: 140,
+  },
+
+  column: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  padded: {
+    paddingHorizontal: 20,
   },
 
   header: {
@@ -168,7 +189,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 34,
     height: 40,
-    marginBottom: 4,
+    marginBottom: 8,
   },
 
   tab: {

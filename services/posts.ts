@@ -1,4 +1,4 @@
-import { File } from "expo-file-system";
+import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
 
@@ -41,9 +41,7 @@ export async function createImagePost(
   formData.append("content", content);
 
   for (const fileInfo of files) {
-    const file = new File(fileInfo.uri);
-
-    formData.append("media", file);
+    await appendFileToFormData(formData, "media", fileInfo);
   }
 
   return apiRequest("/api/posts", {
@@ -67,9 +65,7 @@ export async function createReelPost(
   formData.append("type", "reel");
   formData.append("content", content);
 
-  const file = new File(fileInfo.uri);
-
-  formData.append("media", file);
+  await appendFileToFormData(formData, "media", fileInfo);
 
   return apiRequest("/api/posts", {
     method: "POST",
@@ -204,9 +200,7 @@ export async function addComment(
       formData.append("parentComment", data.parentComment);
     }
 
-    const file = new File(data.file.uri);
-
-    formData.append("media", file);
+    await appendFileToFormData(formData, "media", data.file);
 
     return apiRequest(`/api/posts/${postId}/comments`, {
       method: "POST",

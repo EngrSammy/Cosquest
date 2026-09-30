@@ -1,4 +1,4 @@
-import { File } from "expo-file-system";
+import { appendFileToFormData } from "@/utils/appendFileToFormData";
 import { apiRequest } from "./api";
 
 export type ProfileCategory = {
@@ -317,12 +317,15 @@ export async function uploadAvatarPhoto(
     throw new Error("Photo URI is required.");
   }
 
-  const file = new File(photoUri);
-
   const formData = new FormData();
 
   formData.append("email", email.trim());
-  formData.append("photo", file as any);
+
+  await appendFileToFormData(formData, "photo", {
+    uri: photoUri,
+    name: "profile-photo.jpg",
+    type: "image/jpeg",
+  });
 
   const headers: Record<string, string> = {};
 

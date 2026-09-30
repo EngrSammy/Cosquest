@@ -219,6 +219,16 @@ export default function DataUsage() {
     try {
       setStorageLoading(true);
 
+      // Browsers cannot read device storage - only phones can.
+
+      if (Platform.OS === "web") {
+
+        return;
+
+      }
+
+      
+
       const [totalDiskCapacity, freeDiskStorage] = await Promise.all([
         FileSystem.getTotalDiskCapacityAsync(),
         FileSystem.getFreeDiskStorageAsync(),
