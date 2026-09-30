@@ -3,14 +3,14 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      Modal,
-      Pressable,
-      StyleSheet,
-      Text,
-      Vibration,
-      View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,12 +19,13 @@ import { acceptCall, declineCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions, getAvatarSource } from "@/utils/callHelpers";
 
 import {
-      AnimatedDots,
-      CALL_COLORS,
-      CallAvatar,
-      CallBackground,
-      CallLogo,
+  AnimatedDots,
+  CALL_COLORS,
+  CallAvatar,
+  CallBackground,
+  CallLogo,
 } from "./CallVisuals";
+import { useCallTone } from "./useCallTone";
 
 // Shows full screen whenever state.call.incoming is set. That happens
 // through the call:incoming socket event (useSocketConnection), or the
@@ -52,6 +53,9 @@ export default function IncomingCallListener() {
       Vibration.cancel();
     };
   }, [incoming]);
+
+  // Ringtone while it rings (stops once you tap Accept, or the call ends).
+  useCallTone("ringtone", !!incoming && !answering);
 
   if (!incoming || !token) {
     return null;

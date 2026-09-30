@@ -34,6 +34,7 @@ import {
       CallControl,
       CallLogo,
 } from "@/components/calls/CallVisuals";
+import { useCallTone } from "@/components/calls/useCallTone";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
@@ -354,6 +355,12 @@ export default function CallScreenWeb() {
   // ---------- connection state ----------
 
   const answered = answeredAt !== null;
+
+  // Caller hears "brr-brr" until the other person picks up.
+  useCallTone(
+    "ringback",
+    active?.direction === "outgoing" && !answered && !endMessage,
+  );
 
   useEffect(() => {
     if (remoteCount > 0 && answeredAt === null) {

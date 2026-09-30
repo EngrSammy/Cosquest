@@ -24,6 +24,7 @@ import {
   CallControl,
   CallLogo,
 } from "@/components/calls/CallVisuals";
+import { useCallTone } from "@/components/calls/useCallTone";
 import type { Call } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
@@ -368,6 +369,9 @@ function CallStage({
 
   const answered = answeredAt !== null;
   const remoteCount = remoteParticipants.length;
+
+  // Caller hears "brr-brr" until the other person picks up.
+  useCallTone("ringback", direction === "outgoing" && !answered && !endMessage);
 
   const myCameraOn = isCameraEnabled && !!localTrack;
 
