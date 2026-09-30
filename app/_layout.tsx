@@ -1,3 +1,5 @@
+import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";
+import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
 import { UserProvider } from "@/context/UserContext";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
@@ -44,24 +46,30 @@ export default function RootLayout() {
 
       <GestureHandlerRootView style={{ flex: 1 }}>
         <UserProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="edit-profile" />
-            <Stack.Screen name="contact-options" />
-            <Stack.Screen name="followers" />
-            <Stack.Screen name="following" />
-            <Stack.Screen name="category" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="notifications" />
+          {/* Green "Tap to return to call" bar while a call is minimized */}
+          <CallBannerFrame>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="edit-profile" />
+              <Stack.Screen name="contact-options" />
+              <Stack.Screen name="followers" />
+              <Stack.Screen name="following" />
+              <Stack.Screen name="category" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="notifications" />
 
-            {/* Audio/video call screen */}
-            <Stack.Screen
-              name="call/[id]"
-              options={{ gestureEnabled: false, animation: "fade" }}
-            />
-          </Stack>
+              {/* Audio/video call screen */}
+              <Stack.Screen
+                name="call/[id]"
+                options={{ gestureEnabled: false, animation: "fade" }}
+              />
+            </Stack>
+          </CallBannerFrame>
+
+          {/* The ongoing call - stays mounted, so minimizing never ends it */}
+          <ActiveCallOverlay />
 
           {/* Ringing screen — shows on top of any screen when someone calls */}
           <IncomingCallListener />

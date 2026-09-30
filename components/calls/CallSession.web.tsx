@@ -13,7 +13,6 @@
 //   - ringing when the website is closed (no push notifications)
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
 import {
       LocalVideoTrack,
       RemoteTrack,
@@ -59,14 +58,6 @@ function formatDuration(totalSeconds: number) {
   return hours > 0
     ? `${hours}:${minutes.toString().padStart(2, "0")}:${rest}`
     : `${minutes.toString().padStart(2, "0")}:${rest}`;
-}
-
-function goBack() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace("/");
-  }
 }
 
 // ==========================================
@@ -121,12 +112,14 @@ function WebVideo({
 // CALL SCREEN
 // ==========================================
 
-export default function CallScreenWeb() {
+// The live call. Mounted ONCE for the whole app by ActiveCallOverlay
+// (app/_layout.tsx), not as its own screen - so it keeps running while the
+// person minimizes it and uses the rest of the app (chat, feed, ...).
+export default function CallSession() {
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
 
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const callId = Array.isArray(id) ? id[0] : id;
+  const callId = useAppSelector((state) => state.call.active?.call.id);
 
   const token = useAppSelector((state) => state.auth.token);
   const active = useAppSelector((state) => state.call.active);
@@ -157,6 +150,12 @@ export default function CallScreenWeb() {
   const cleanupRef = useRef({ callId, token });
   cleanupRef.current = { callId, token };
 
+  // Closing the call = clearing it; ActiveCallOverlay then unmounts this,
+  // and the cleanup below tells the backend.
+  const closeCall = useCallback(() => {
+    dispatch(clearActiveCall());
+  }, [dispatch]);
+
   const finish = useCallback(
     (
       message: string | null,
@@ -172,21 +171,13 @@ export default function CallScreenWeb() {
 
       if (message) {
         setEndMessage(message);
-        setTimeout(goBack, delayMs);
+        setTimeout(closeCall, delayMs);
       } else {
-        goBack();
+        closeCall();
       }
     },
-    [],
+    [closeCall],
   );
-
-  // Opened without a matching call (stale tab, refreshed page, deep link).
-  useEffect(() => {
-    if ((!active || active.call.id !== callId) && !leavingRef.current) {
-      leavingRef.current = true;
-      goBack();
-    }
-  }, [active, callId]);
 
   // Tell the backend + clear the call however this screen closes.
   useEffect(() => {
@@ -482,11 +473,7 @@ export default function CallScreenWeb() {
   // ---------- render ----------
 
   if (!active || active.call.id !== callId || !token) {
-    return (
-      <View style={styles.blank}>
-        <Stack.Screen options={{ headerShown: false }} />
-      </View>
-    );
+    return <View style={styles.blank}></View>;
   }
 
   const otherPerson =
@@ -522,8 +509,6 @@ export default function CallScreenWeb() {
   if (videoLayout) {
     return (
       <View style={styles.videoRoot}>
-        <Stack.Screen options={{ headerShown: false }} />
-
         <View style={StyleSheet.absoluteFill}>
           {remoteVideo ? (
             <WebVideo track={remoteVideo} />
@@ -587,8 +572,6 @@ export default function CallScreenWeb() {
 
   return (
     <CallBackground>
-      <Stack.Screen options={{ headerShown: false }} />
-
       <View style={[styles.audioTop, { paddingTop: insets.top + 24 }]}>
         <CallLogo />
       </View>

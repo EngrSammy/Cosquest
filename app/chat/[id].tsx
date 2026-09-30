@@ -3786,7 +3786,9 @@ export default function ChatScreen() {
         startCall({ conversationId, type, token }),
       ).unwrap();
 
-      router.push({ pathname: "/call/[id]", params: { id: result.call.id } });
+      // The call opens full screen by itself (ActiveCallOverlay in the
+      // app layout) and keeps going if you minimize it to chat.
+      void result;
     } catch (error) {
       // Thunks reject with a plain string, not an Error.
       Alert.alert(

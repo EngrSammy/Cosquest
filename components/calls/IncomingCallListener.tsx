@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -87,7 +86,8 @@ export default function IncomingCallListener() {
         acceptCall({ callId: incoming.id, token }),
       ).unwrap();
 
-      router.push({ pathname: "/call/[id]", params: { id: result.call.id } });
+      // The call opens full screen by itself (ActiveCallOverlay).
+      void result;
     } catch (error) {
       Alert.alert(
         "Call",
