@@ -78,8 +78,12 @@ import {
   stopTyping,
 } from "@/services/socket";
 
+import { ChatWallpaperBackground } from "@/components/chat/ChatWallpaperBackground";
 import { LinkText } from "@/components/chat/LinkText";
+import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
 import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
+import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
+import type { Wallpaper } from "@/constants/wallpapers";
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 
@@ -1927,6 +1931,15 @@ export default function ChatScreen() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const [infoMessage, setInfoMessage] = useState<Message | null>(null);
+
+  // CHAT WALLPAPER: this chat's saved wallpaper, plus a live preview while
+  // the picker is open.
+  const savedWallpaper = useChatWallpaper(conversationId);
+  const [wallpaperPreview, setWallpaperPreview] = useState<Wallpaper | null>(
+    null,
+  );
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  const shownWallpaper = wallpaperPreview || savedWallpaper;
   const [infoLoading, setInfoLoading] = useState(false);
 
   // Tracks whether the keyboard is currently up so the composer's bottom
@@ -3940,6 +3953,16 @@ export default function ChatScreen() {
       // lives inside this same KeyboardAvoidingView, adding insets.top here
       // double-counted space and contributed to the oversized keyboard gap.
       keyboardVerticalOffset={0}>
+      {/* Chat wallpaper behind everything */}
+      <ChatWallpaperBackground
+        key={
+          shownWallpaper.kind === "photo"
+            ? shownWallpaper.uri.slice(0, 80)
+            : shownWallpaper.id
+        }
+        wallpaper={shownWallpaper}
+      />
+
       {/* ================================== */}
       {/* HEADER */}
       {/* ================================== */}
@@ -4057,6 +4080,16 @@ export default function ChatScreen() {
                   </Pressable>
                 </>
               ) : null}
+
+              {/* ⋮ → Wallpaper */}
+              <Pressable
+                hitSlop={10}
+                style={{ marginLeft: 16 }}
+                onPress={() => setShowWallpaperPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Chat options: wallpaper">
+                <Ionicons name="ellipsis-vertical" size={20} color="#4B4B53" />
+              </Pressable>
             </>
           )}
         </View>
@@ -4895,6 +4928,14 @@ export default function ChatScreen() {
           </View>
         </Pressable>
       </Modal>
+      {/* CHAT WALLPAPER PICKER */}
+      <WallpaperPicker
+        visible={showWallpaperPicker}
+        conversationId={conversationId}
+        current={savedWallpaper}
+        onPreview={setWallpaperPreview}
+        onClose={() => setShowWallpaperPicker(false)}
+      />
     </KeyboardAvoidingView>
   );
 }

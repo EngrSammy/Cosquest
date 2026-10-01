@@ -80,6 +80,22 @@ const authSlice = createSlice({
       state.error = null;
     },
 
+    // STAY LOGGED IN: the saved login key, loaded when the app opens
+    // (components/SessionGate). `user` comes a moment later, once the
+    // profile has been refreshed from the server.
+    restoreSession(
+      state,
+      action: PayloadAction<{ token: string; user?: User | null }>,
+    ) {
+      state.token = action.payload.token;
+      state.isAuthenticated = true;
+      state.error = null;
+
+      if (action.payload.user) {
+        state.user = action.payload.user;
+      }
+    },
+
     updateAuthUser(state, action: PayloadAction<AuthUserUpdate>) {
       if (!state.user) {
         return;
@@ -194,9 +210,7 @@ const authSlice = createSlice({
     // RESET PASSWORD
     // ======================================
     // reset-password returns the same { token, user } as login, so the
-    // user is signed straight in — no trip back to the login screen.
-    // The reset screen shows its own error messages, so errors aren't
-    // stored here (that would also show up on the Sign In screen).
+    // user is signed straight in. The reset screen shows its own errors.
 
     builder.addCase(resetPasswordThunk.pending, (state) => {
       state.loading = true;
@@ -220,20 +234,8 @@ const authSlice = createSlice({
     // ======================================
     // FINISH ONBOARDING
     // ======================================
-    // registerUser.fulfilled above only conditionally sets a token
-    // ("if action.payload?.token") — meaning signup doesn't necessarily
-    // hand back a usable session up front, which matches the app's own
-    // behavior: every onboarding step in between (profile, avatar,
-    // faction, interests, notifications, location) has been running on
-    // email-based identification with state.auth.token empty the whole
-    // time. If the backend issues a real session token at the point
-    // onboarding actually completes (the natural place to "activate"
-    // a full account), this is the only place that ever stores it —
-    // finishOnboarding lives in userThunks and, before this, nothing
-    // wired its result back into the auth slice at all, so the token
-    // would be silently dropped even if the backend sent one.
-    // Defensive the same way registerUser.fulfilled is: does nothing if
-    // the response has no token, so this is safe either way.
+    // Stores a session token if the backend issues one when onboarding
+    // completes (does nothing if the response has no token).
     builder.addCase(finishOnboarding.fulfilled, (state, action) => {
       const payload = action.payload as
         | {
@@ -255,6 +257,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearAuthError, updateAuthUser } = authSlice.actions;
+export const { logout, clearAuthError, updateAuthUser, restoreSession } =
+  authSlice.actions;
 
 export default authSlice.reducer;

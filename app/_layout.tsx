@@ -1,6 +1,7 @@
 import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
+import SessionGate from "@/components/SessionGate";
 import { UserProvider } from "@/context/UserContext";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { store } from "@/store/store";
@@ -42,41 +43,44 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <SocketConnectionGate />
+      {/* Stay logged in: loads the saved login before the screens show */}
+      <SessionGate>
+        <SocketConnectionGate />
 
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <UserProvider>
-          {/* Green "Tap to return to call" bar while a call is minimized */}
-          <CallBannerFrame>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="onboarding" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="edit-profile" />
-              <Stack.Screen name="contact-options" />
-              <Stack.Screen name="followers" />
-              <Stack.Screen name="following" />
-              <Stack.Screen name="category" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="notifications" />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <UserProvider>
+            {/* Green "Tap to return to call" bar while a call is minimized */}
+            <CallBannerFrame>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="edit-profile" />
+                <Stack.Screen name="contact-options" />
+                <Stack.Screen name="followers" />
+                <Stack.Screen name="following" />
+                <Stack.Screen name="category" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="notifications" />
 
-              {/* Audio/video call screen */}
-              <Stack.Screen
-                name="call/[id]"
-                options={{ gestureEnabled: false, animation: "fade" }}
-              />
-            </Stack>
-          </CallBannerFrame>
+                {/* Audio/video call screen */}
+                <Stack.Screen
+                  name="call/[id]"
+                  options={{ gestureEnabled: false, animation: "fade" }}
+                />
+              </Stack>
+            </CallBannerFrame>
 
-          {/* The ongoing call - stays mounted, so minimizing never ends it */}
-          <ActiveCallOverlay />
+            {/* The ongoing call - stays mounted, so minimizing never ends it */}
+            <ActiveCallOverlay />
 
-          {/* Ringing screen — shows on top of any screen when someone calls */}
-          <IncomingCallListener />
+            {/* Ringing screen — shows on top of any screen when someone calls */}
+            <IncomingCallListener />
 
-          <StatusBar style="auto" />
-        </UserProvider>
-      </GestureHandlerRootView>
+            <StatusBar style="auto" />
+          </UserProvider>
+        </GestureHandlerRootView>
+      </SessionGate>
     </Provider>
   );
 }
