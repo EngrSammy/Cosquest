@@ -5,25 +5,26 @@
 // the chat behind the sheet; "This chat" / "All chats" saves it.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
-      Alert,
-      Modal,
-      Platform,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      View,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-      WALLPAPER_PRESETS,
-      type Wallpaper,
-      type WallpaperPreset,
+  WALLPAPER_PRESETS,
+  type Wallpaper,
+  type WallpaperPreset,
 } from "@/constants/wallpapers";
 
 import { setAllChatsWallpaper, setChatWallpaper } from "./useChatWallpaper";
@@ -148,10 +149,7 @@ export function WallpaperPicker({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
-        // The website keeps the photo itself (as text) so it survives a
-        // refresh; a smaller copy keeps it within the browser's storage.
-        quality: Platform.OS === "web" ? 0.45 : 0.8,
-        base64: Platform.OS === "web",
+        quality: 1,
       });
 
       if (result.canceled || !result.assets?.[0]) {
@@ -160,10 +158,23 @@ export function WallpaperPicker({
 
       const asset = result.assets[0];
 
+      // Make a phone-screen-sized copy (max 1080px wide). On the website the
+      // photo itself is saved in the browser, which only has a few MB of
+      // room - a full-size photo didn't fit, so it was quietly forgotten.
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: Math.min(asset.width || 1080, 1080) } }],
+        {
+          compress: 0.6,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: Platform.OS === "web",
+        },
+      );
+
       const uri =
-        Platform.OS === "web" && asset.base64
-          ? `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`
-          : asset.uri;
+        Platform.OS === "web" && resized.base64
+          ? `data:image/jpeg;base64,${resized.base64}`
+          : resized.uri;
 
       pick({ kind: "photo", uri });
     } catch {
@@ -179,14 +190,22 @@ export function WallpaperPicker({
     try {
       setSaving(true);
 
-      if (scope === "chat") {
-        await setChatWallpaper(conversationId, choice);
-      } else {
-        await setAllChatsWallpaper(choice, conversationId);
-      }
+      const saved =
+        scope === "chat"
+          ? await setChatWallpaper(conversationId, choice)
+          : await setAllChatsWallpaper(choice, conversationId);
 
       onPreview(null);
       onClose();
+
+      if (!saved) {
+        Alert.alert(
+          "Wallpaper",
+          choice.kind === "photo"
+            ? "This photo is too large to remember on this device. It's shown now, but pick a smaller photo (or a colour) so it stays next time."
+            : "Couldn't save the wallpaper on this device. It's shown now but won't be remembered.",
+        );
+      }
     } finally {
       setSaving(false);
     }

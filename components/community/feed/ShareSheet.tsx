@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,13 +16,15 @@ import {
   View,
 } from "react-native";
 
+import { sharePost } from "@/services/posts";
 import {
   createShareChat,
   getSuggestedPeople,
   searchPeople,
   sendSharedPostMessage,
 } from "@/services/share";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { shareToFeedThunk } from "@/store/thunks/shareToFeedThunk";
 import { getPostShareLink } from "@/utils/shareLinks";
 
 import { ShareAction } from "./ShareAction";
@@ -60,16 +62,33 @@ function mergePeople(lists: Person[][], currentUsername: string): Person[] {
   return Array.from(byUsername.values());
 }
 
+// The backend's reply to "count a share" may name the new total in
+// different ways; null when it doesn't say.
+function readShareCount(result: any): number | null {
+  const value =
+    result?.shares ??
+    result?.shareCount ??
+    result?.count ??
+    result?.post?.shares ??
+    result?.post?.shareCount;
+
+  return typeof value === "number" ? value : null;
+}
+
 export function ShareSheet({
   visible,
   post,
   token,
   onClose,
+  onShared,
 }: {
   visible: boolean;
   post: any;
   token: string;
   onClose: () => void;
+  // Called after a share was counted: the new total if the backend sent
+  // it, otherwise null (the post then just adds 1).
+  onShared?: (newTotal: number | null) => void;
 }) {
   const authUser = useAppSelector((state) => state.auth.user);
   const user = useAppSelector((state) => state.user.user);
@@ -104,6 +123,40 @@ export function ShareSheet({
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [sendingUsername, setSendingUsername] = useState<string | null>(null);
   const [sent, setSent] = useState<Record<string, boolean>>({});
+
+  const dispatch = useAppDispatch();
+
+  // SHARE TO FEED: a caption box, then a new post in the feed with this
+  // post inside it (like Facebook's "Share now").
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [sharingToFeed, setSharingToFeed] = useState(false);
+
+  // SHARE COUNT: tell the backend each time the post is actually shared.
+  // Each friend / app counts once per opening of this sheet (copying the
+  // same link five times isn't five shares).
+  const countedRef = useRef<Set<string>>(new Set());
+
+  const recordShare = useCallback(
+    async (method: string) => {
+      const postId = String(post?.id || "");
+
+      if (!postId || !token || countedRef.current.has(method)) {
+        return;
+      }
+
+      countedRef.current.add(method);
+
+      try {
+        const result = await sharePost(postId, token);
+        onShared?.(readShareCount(result));
+      } catch {
+        // Counting failed - the share itself still worked. Allow a retry.
+        countedRef.current.delete(method);
+      }
+    },
+    [post?.id, token, onShared],
+  );
 
   // A normal web link (https://.../post/<id>) once the website address is
   // known — see utils/shareLinks.ts. Anyone can open it.
@@ -141,6 +194,7 @@ export function ShareSheet({
 
     setSearchText("");
     setSent({});
+    countedRef.current = new Set();
     loadSuggestions();
     // Only when the sheet opens — not every time the friend lists update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,6 +252,8 @@ export function ShareSheet({
         [person.username]: true,
       }));
 
+      recordShare(`person:${person.username}`);
+
       Alert.alert("Shared", `Post shared with @${person.username}.`);
     } catch (error) {
       Alert.alert(
@@ -213,6 +269,8 @@ export function ShareSheet({
     try {
       await Clipboard.setStringAsync(postLink);
 
+      recordShare("copy");
+
       Alert.alert("Copied", "Post link copied.");
     } catch {
       Alert.alert("Copy link", "Unable to copy the post link.");
@@ -226,6 +284,8 @@ export function ShareSheet({
 
     try {
       await Linking.openURL(url);
+
+      recordShare("whatsapp");
     } catch {
       Alert.alert("WhatsApp", "Unable to open WhatsApp.");
     }
@@ -242,21 +302,62 @@ export function ShareSheet({
     }
 
     try {
-      await NativeShare.share({
+      const result = await NativeShare.share({
         title: "Share CosQuest post",
         message: shareMessage,
         url: postLink,
       });
+
+      // Only count it if they didn't cancel the share menu.
+      if (result?.action !== NativeShare.dismissedAction) {
+        recordShare("system");
+      }
     } catch {
       // User cancelled the share menu.
     }
   };
 
-  const addStory = () => {
-    Alert.alert(
-      "Add to Story",
-      "Story publishing is not connected to the current backend yet.",
-    );
+  const openFeedComposer = () => {
+    setCaption("");
+    setComposerOpen(true);
+  };
+
+  const shareToFeed = async () => {
+    const postId = String(post?.id || "");
+
+    if (!postId || !token || sharingToFeed) {
+      return;
+    }
+
+    try {
+      setSharingToFeed(true);
+
+      const result = await dispatch(
+        shareToFeedThunk({ postId, token, content: caption }),
+      ).unwrap();
+
+      setComposerOpen(false);
+      setCaption("");
+
+      // The backend already counted this share - just show the new number.
+      onShared?.(
+        typeof result?.shareCount === "number" ? result.shareCount : null,
+      );
+
+      onClose();
+      Alert.alert("Shared", "The post was shared to your feed.");
+    } catch (error) {
+      Alert.alert(
+        "Share to feed",
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Could not share the post.",
+      );
+    } finally {
+      setSharingToFeed(false);
+    }
   };
 
   const waStatus = async () => {
@@ -350,9 +451,9 @@ export function ShareSheet({
             <ShareAction icon="link" label="Copy link" onPress={copyLink} />
 
             <ShareAction
-              icon="star-outline"
-              label="Add to story"
-              onPress={addStory}
+              icon="repeat"
+              label="Share to feed"
+              onPress={openFeedComposer}
             />
 
             <ShareAction
@@ -374,12 +475,156 @@ export function ShareSheet({
             />
           </View>
         </View>
+
+        {/* SHARE TO FEED: optional caption */}
+        {composerOpen ? (
+          <View style={styles.composerLayer}>
+            <Pressable
+              style={styles.overlay}
+              onPress={() => !sharingToFeed && setComposerOpen(false)}
+            />
+
+            <View style={styles.composer}>
+              <View style={styles.composerHeader}>
+                <Text style={styles.composerTitle}>Share to your feed</Text>
+
+                <Pressable
+                  onPress={() => setComposerOpen(false)}
+                  hitSlop={10}
+                  disabled={sharingToFeed}
+                  accessibilityLabel="Close">
+                  <Ionicons name="close" size={22} color="#191922" />
+                </Pressable>
+              </View>
+
+              <TextInput
+                value={caption}
+                onChangeText={setCaption}
+                placeholder="Say something about this… (optional)"
+                placeholderTextColor="#9C9CAA"
+                style={styles.composerInput}
+                multiline
+                maxLength={2200}
+                autoFocus
+              />
+
+              {post?.content ? (
+                <Text style={styles.composerPreview} numberOfLines={2}>
+                  {post.content}
+                </Text>
+              ) : null}
+
+              <View style={styles.composerButtons}>
+                <Pressable
+                  style={[styles.composerButton, styles.composerCancel]}
+                  onPress={() => setComposerOpen(false)}
+                  disabled={sharingToFeed}>
+                  <Text style={styles.composerCancelText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.composerButton, styles.composerShare]}
+                  onPress={shareToFeed}
+                  disabled={sharingToFeed}>
+                  {sharingToFeed ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.composerShareText}>Share</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  composerLayer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+  },
+
+  composer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 28,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  composerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  composerTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#191922",
+  },
+
+  composerInput: {
+    minHeight: 90,
+    maxHeight: 180,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#F5F3F8",
+    fontSize: 15,
+    color: "#191922",
+    textAlignVertical: "top",
+  },
+
+  composerPreview: {
+    marginTop: 10,
+    paddingLeft: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "#C5399A",
+    fontSize: 13,
+    color: "#6B6B72",
+  },
+
+  composerButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  composerButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  composerCancel: {
+    backgroundColor: "#F2F2F5",
+  },
+
+  composerCancelText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#55555E",
+  },
+
+  composerShare: {
+    backgroundColor: "#C5399A",
+  },
+
+  composerShareText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
   root: {
     flex: 1,
     justifyContent: "flex-end",

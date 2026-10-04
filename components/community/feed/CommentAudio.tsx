@@ -2,12 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useMemo, useState } from "react";
 import {
-      ActivityIndicator,
-      Pressable,
-      StyleSheet,
-      Text,
-      View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+
+import {
+  applySpeed,
+  getRememberedSpeed,
+  nextSpeed,
+  SpeedPill,
+} from "@/components/chat/VoiceSpeed";
 
 export type CommentMedia = {
   url?: string;
@@ -20,8 +27,7 @@ export type CommentMedia = {
 };
 
 // Same bar count/sizing as chat's AudioBubble, so a voice comment reads
-// as the same component family as a voice message, not a separate,
-// smaller-looking thing.
+// as the same component family as a voice message.
 const WAVE_BARS = 28;
 
 function getWaveform(seed: string) {
@@ -57,6 +63,9 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
 
   const [showTranscript, setShowTranscript] = useState(false);
 
+  // 1× / 1.5× / 2× - remembered for the next voice notes.
+  const [speed, setSpeed] = useState(getRememberedSpeed);
+
   if (!url) {
     return null;
   }
@@ -88,7 +97,14 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
       player.seekTo(0);
     }
 
+    applySpeed(player, speed);
     player.play();
+  };
+
+  const changeSpeed = () => {
+    const next = nextSpeed(speed);
+    setSpeed(next);
+    applySpeed(player, next);
   };
 
   return (
@@ -126,11 +142,17 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
             ))}
           </View>
 
-          <Text style={styles.audioText}>
-            {formatDuration(
-              status.playing || currentTime > 0 ? currentTime : duration,
-            )}
-          </Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.audioText}>
+              {formatDuration(
+                status.playing || currentTime > 0 ? currentTime : duration,
+              )}
+            </Text>
+
+            {status.playing || currentTime > 0 ? (
+              <SpeedPill speed={speed} onPress={changeSpeed} />
+            ) : null}
+          </View>
         </View>
 
         {hasTranscriptContent ? (
@@ -169,9 +191,6 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
 }
 
 const styles = StyleSheet.create({
-  // Same proportions as chat's audioWrap/audioMessage — a comment's
-  // voice player should read as the same component, not a scaled-down
-  // variant.
   audioWrap: {
     marginTop: 6,
     minWidth: 220,
@@ -211,10 +230,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 1,
+  },
+
   audioText: {
     fontSize: 11,
     color: "#777783",
-    marginTop: 1,
   },
 
   transcriptToggle: {

@@ -82,8 +82,19 @@ import { ChatWallpaperBackground } from "@/components/chat/ChatWallpaperBackgrou
 import { LinkText } from "@/components/chat/LinkText";
 import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
 import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
+import {
+  SpeedPill,
+  applySpeed,
+  getRememberedSpeed,
+  nextSpeed,
+} from "@/components/chat/VoiceSpeed";
 import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
 import type { Wallpaper } from "@/constants/wallpapers";
+import {
+  blockUser,
+  getBlockedUsernames,
+  unblockUser,
+} from "@/services/publicProfile";
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 
@@ -220,6 +231,13 @@ type SeenPerson = {
 };
 
 const EMPTY_MESSAGES: Message[] = [];
+
+// Long-press menu: ignore taps for a moment after it opens, so lifting the
+// finger that opened it can't press an option underneath by accident.
+const MENU_TAP_GUARD_MS = 450;
+
+// The backend only allows "Delete for everyone" this soon after sending.
+const DELETE_FOR_EVERYONE_WINDOW_MS = 5 * 60 * 1000;
 const EMPTY_MESSAGE_IDS: string[] = [];
 
 const REACTION_EMOJIS = ["❤️", "😂", "😍", "😮", "😢", "😡", "👍", "👎"];
@@ -1493,6 +1511,9 @@ function AudioBubble({
 
   const transcriptCollapsed = transcriptIsLong && !transcriptExpanded;
 
+  // 1× / 1.5× / 2× - remembered for the next voice notes.
+  const [speed, setSpeed] = useState(getRememberedSpeed);
+
   const togglePlayback = () => {
     if (status.playing) {
       player.pause();
@@ -1512,7 +1533,14 @@ function AudioBubble({
       setShowTranscript(true);
     }
 
+    applySpeed(player, speed);
     player.play();
+  };
+
+  const changeSpeed = () => {
+    const next = nextSpeed(speed);
+    setSpeed(next);
+    applySpeed(player, next);
   };
 
   const seekTo = (locationX: number) => {
@@ -1563,11 +1591,18 @@ function AudioBubble({
             ))}
           </Pressable>
 
-          <Text style={[styles.audioText, mine && styles.audioTextMine]}>
-            {formatDuration(
-              status.playing || currentTime > 0 ? currentTime : duration,
-            )}
-          </Text>
+          <View style={styles.audioMetaRow}>
+            <Text style={[styles.audioText, mine && styles.audioTextMine]}>
+              {formatDuration(
+                status.playing || currentTime > 0 ? currentTime : duration,
+              )}
+            </Text>
+
+            {/* Speed pill while playing (or paused partway), like WhatsApp */}
+            {status.playing || currentTime > 0 ? (
+              <SpeedPill speed={speed} onPress={changeSpeed} light={mine} />
+            ) : null}
+          </View>
         </View>
 
         {hasTranscriptContent ? (
@@ -1908,11 +1943,22 @@ export default function ChatScreen() {
 
   const [showActions, setShowActions] = useState(false);
 
+  // When the long-press menu opened (see MENU_TAP_GUARD_MS) and a short
+  // "Copied ✓" note shown inside it.
+  const menuOpenedAtRef = useRef(0);
+  const [menuNotice, setMenuNotice] = useState("");
+
+  // The "Delete for everyone / Delete for me" sheet (one or several messages).
+  const [deleteSheet, setDeleteSheet] = useState<{
+    messages: Message[];
+    single: boolean;
+  } | null>(null);
+
   const [showAttachments, setShowAttachments] = useState(false);
   const [attachmentDraft, setAttachmentDraft] =
     useState<AttachmentDraft | null>(null);
   const [attachmentCaption, setAttachmentCaption] = useState("");
-  const [attachmentSending, setAttachmentSending] = useState(false);
+  const [attachmentSending] = useState(false);
 
   const [mediaViewer, setMediaViewer] = useState<Message | null>(null);
 
@@ -1940,6 +1986,113 @@ export default function ChatScreen() {
   );
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const shownWallpaper = wallpaperPreview || savedWallpaper;
+
+  // ⋮ CHAT MENU, PROFILE AND BLOCK (DMs)
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  // The username (lower-case) I've blocked in this chat, if any.
+  const [blockedName, setBlockedName] = useState<string | null>(null);
+  const [blockBusy, setBlockBusy] = useState(false);
+
+  const otherUsername = (
+    conversation?.type === "dm"
+      ? conversation.otherParticipant?.username || ""
+      : ""
+  ).replace(/^@/, "");
+
+  const iBlockedThem =
+    !!otherUsername && blockedName === otherUsername.toLowerCase();
+
+  // Did I block this person? (Then the message box is replaced.)
+  // State is only set after the server answers (React Compiler rule).
+  useEffect(() => {
+    if (!token || !otherUsername) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getBlockedUsernames(token)
+      .then((names) => {
+        if (!cancelled) {
+          const name = otherUsername.toLowerCase();
+          setBlockedName(names.has(name) ? name : null);
+        }
+      })
+      .catch(() => {
+        // Can't tell - leave the chat as it is.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, otherUsername]);
+
+  const openTheirProfile = () => {
+    if (!otherUsername) {
+      return;
+    }
+
+    setShowChatMenu(false);
+    router.push({
+      pathname: "/user/[username]",
+      params: { username: otherUsername },
+    });
+  };
+
+  const confirmBlock = () => {
+    setShowChatMenu(false);
+
+    if (!token || !otherUsername) {
+      return;
+    }
+
+    Alert.alert(
+      `Block @${otherUsername}?`,
+      "They won't be able to message you, call you or see your profile. They won't be told you blocked them.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setBlockBusy(true);
+              await blockUser(otherUsername, token);
+              setBlockedName(otherUsername.toLowerCase());
+            } catch (error) {
+              Alert.alert(
+                "Block",
+                error instanceof Error ? error.message : "Could not block.",
+              );
+            } finally {
+              setBlockBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const doUnblock = async () => {
+    setShowChatMenu(false);
+
+    if (!token || !otherUsername) {
+      return;
+    }
+
+    try {
+      setBlockBusy(true);
+      await unblockUser(otherUsername, token);
+      setBlockedName(null);
+    } catch (error) {
+      Alert.alert(
+        "Unblock",
+        error instanceof Error ? error.message : "Could not unblock.",
+      );
+    } finally {
+      setBlockBusy(false);
+    }
+  };
   const [infoLoading, setInfoLoading] = useState(false);
 
   // Tracks whether the keyboard is currently up so the composer's bottom
@@ -3018,68 +3171,31 @@ export default function ChatScreen() {
   };
 
   // WhatsApp-style: one "Delete" entry, then choose who to delete for.
+  // WhatsApp-style: one "Delete" entry, then choose who to delete for -
+  // in our own sheet (works the same on phones and the website).
   const deletePrompt = (message: Message) => {
     setShowActions(false);
-
-    if (isMyMessage(message)) {
-      Alert.alert("Delete message?", undefined, [
-        {
-          text: "Delete for everyone",
-          style: "destructive",
-          onPress: () => deleteForEveryone(message),
-        },
-        {
-          text: "Delete for me",
-          style: "destructive",
-          onPress: () => deleteForMe(message),
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => setSelectedMessage(null),
-        },
-      ]);
-
-      return;
-    }
-
-    Alert.alert("Delete message?", "This will remove it from your chat.", [
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setSelectedMessage(null),
-      },
-      {
-        text: "Delete for me",
-        style: "destructive",
-        onPress: () => deleteForMe(message),
-      },
-    ]);
+    setDeleteSheet({ messages: [message], single: true });
   };
 
   // ========================================
   // COPY
   // ========================================
 
+  // Stays in the menu (shows "Copied ✓") so you can do more.
   const copyMessage = async (message: Message) => {
     const text = message.content?.trim();
 
-    setShowActions(false);
-
-    setSelectedMessage(null);
-
     if (!text) {
-      Alert.alert("Copy", "There is no text to copy.");
-
+      showMenuNotice("No text to copy");
       return;
     }
 
     try {
       await Clipboard.setStringAsync(text);
-
-      Alert.alert("Copied", "Message copied to clipboard.");
+      showMenuNotice("Copied ✓");
     } catch {
-      Alert.alert("Copy", "Unable to copy the message.");
+      showMenuNotice("Couldn't copy");
     }
   };
 
@@ -3107,11 +3223,8 @@ export default function ChatScreen() {
 
       await Clipboard.setStringAsync(link);
 
-      setShowActions(false);
-
-      setSelectedMessage(null);
-
-      Alert.alert("Copied", "Message link copied.");
+      // Stays in the menu so you can do more.
+      showMenuNotice("Link copied ✓");
     } catch (error) {
       Alert.alert(
         "Copy link",
@@ -3214,9 +3327,8 @@ export default function ChatScreen() {
         ).unwrap();
       }
 
-      setShowActions(false);
-
-      setSelectedMessage(null);
+      // Stays in the menu (the label switches to Pin / Unpin).
+      showMenuNotice(currentlyPinned ? "Unpinned" : "Pinned ✓");
     } catch (error) {
       Alert.alert(
         "Pin message",
@@ -3530,44 +3642,7 @@ export default function ChatScreen() {
       return;
     }
 
-    const count = selectedMessages.length;
-
-    const allMine = selectedMessages.every((message) => isMyMessage(message));
-
-    const title = `Delete ${count} message${count === 1 ? "" : "s"}?`;
-
-    if (allMine) {
-      Alert.alert(title, undefined, [
-        {
-          text: "Delete for everyone",
-          style: "destructive",
-          onPress: () => deleteSelectedFor("everyone"),
-        },
-        {
-          text: "Delete for me",
-          style: "destructive",
-          onPress: () => deleteSelectedFor("me"),
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ]);
-
-      return;
-    }
-
-    Alert.alert(title, "This will remove them from your chat.", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Delete for me",
-        style: "destructive",
-        onPress: () => deleteSelectedFor("me"),
-      },
-    ]);
+    setDeleteSheet({ messages: selectedMessages, single: false });
   };
 
   // ========================================
@@ -3849,9 +3924,31 @@ export default function ChatScreen() {
       return;
     }
 
+    menuOpenedAtRef.current = Date.now();
+    setMenuNotice("");
     setSelectedMessage(message);
 
     setShowActions(true);
+  };
+
+  const closeMenu = () => {
+    setShowActions(false);
+    setSelectedMessage(null);
+  };
+
+  // Wraps a menu action: ignored right after the menu opens (the finger
+  // that long-pressed is still lifting off).
+  const menuTap = (action: () => void) => () => {
+    if (Date.now() - menuOpenedAtRef.current < MENU_TAP_GUARD_MS) {
+      return;
+    }
+
+    action();
+  };
+
+  const showMenuNotice = (text: string) => {
+    setMenuNotice(text);
+    setTimeout(() => setMenuNotice(""), 1600);
   };
 
   const handleMediaPress = (message: Message) => {
@@ -4020,41 +4117,49 @@ export default function ChatScreen() {
                 <Ionicons name="chevron-back" size={27} color="#191922" />
               </Pressable>
 
-              <View style={styles.headerAvatarWrap}>
-                <View style={styles.headerAvatar}>
-                  {headerAvatar ? (
-                    <ExpoImage
-                      source={{
-                        uri: headerAvatar,
-                      }}
-                      style={styles.headerAvatarImage}
-                      cachePolicy="memory-disk"
-                    />
-                  ) : (
-                    <Ionicons
-                      name={groupChat ? "people-outline" : "person"}
-                      size={20}
-                      color="#C5399A"
-                    />
-                  )}
+              {/* Tap their photo or name to see their profile (DMs) */}
+              <Pressable
+                style={styles.headerProfileTap}
+                onPress={openTheirProfile}
+                disabled={!otherUsername}
+                accessibilityRole="button"
+                accessibilityLabel="View profile">
+                <View style={styles.headerAvatarWrap}>
+                  <View style={styles.headerAvatar}>
+                    {headerAvatar ? (
+                      <ExpoImage
+                        source={{
+                          uri: headerAvatar,
+                        }}
+                        style={styles.headerAvatarImage}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <Ionicons
+                        name={groupChat ? "people-outline" : "person"}
+                        size={20}
+                        color="#C5399A"
+                      />
+                    )}
+                  </View>
+
+                  {/* Green dot while they're online (DMs only) */}
+                  {conversation?.type === "dm" &&
+                  conversation.otherParticipant?.isOnline ? (
+                    <View style={styles.headerOnlineDot} />
+                  ) : null}
                 </View>
 
-                {/* Green dot while they're online (DMs only) */}
-                {conversation?.type === "dm" &&
-                conversation.otherParticipant?.isOnline ? (
-                  <View style={styles.headerOnlineDot} />
-                ) : null}
-              </View>
+                <View style={styles.headerText}>
+                  <Text style={styles.headerName} numberOfLines={1}>
+                    {headerName}
+                  </Text>
 
-              <View style={styles.headerText}>
-                <Text style={styles.headerName} numberOfLines={1}>
-                  {headerName}
-                </Text>
-
-                <Text style={styles.headerStatus} numberOfLines={1}>
-                  {headerStatus}
-                </Text>
-              </View>
+                  <Text style={styles.headerStatus} numberOfLines={1}>
+                    {headerStatus}
+                  </Text>
+                </View>
+              </Pressable>
 
               {canCall ? (
                 <>
@@ -4085,9 +4190,9 @@ export default function ChatScreen() {
               <Pressable
                 hitSlop={10}
                 style={{ marginLeft: 16 }}
-                onPress={() => setShowWallpaperPicker(true)}
+                onPress={() => setShowChatMenu(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Chat options: wallpaper">
+                accessibilityLabel="Chat options">
                 <Ionicons name="ellipsis-vertical" size={20} color="#4B4B53" />
               </Pressable>
             </>
@@ -4327,7 +4432,31 @@ export default function ChatScreen() {
       {/* COMPOSER */}
       {/* ================================== */}
 
-      {!selectionMode ? (
+      {/* Blocked: no message box, an Unblock button instead */}
+      {!selectionMode && iBlockedThem ? (
+        <View
+          style={[
+            styles.blockedBar,
+            { paddingBottom: (keyboardVisible ? 0 : insets.bottom) + 12 },
+          ]}>
+          <Text style={styles.blockedText}>
+            You blocked @{otherUsername}. Unblock to send messages.
+          </Text>
+
+          <Pressable
+            style={styles.blockedButton}
+            onPress={doUnblock}
+            disabled={blockBusy}>
+            {blockBusy ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.blockedButtonText}>Unblock</Text>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!selectionMode && !iBlockedThem ? (
         <View
           style={[
             styles.composer,
@@ -4534,16 +4663,8 @@ export default function ChatScreen() {
         visible={showActions && !!selectedMessage}
         transparent
         animationType="fade"
-        onRequestClose={() => {
-          setShowActions(false);
-          setSelectedMessage(null);
-        }}>
-        <Pressable
-          style={styles.menuBackdrop}
-          onPress={() => {
-            setShowActions(false);
-            setSelectedMessage(null);
-          }}>
+        onRequestClose={closeMenu}>
+        <Pressable style={styles.menuBackdrop} onPress={menuTap(closeMenu)}>
           <Pressable
             style={styles.menuColumn}
             onPress={(event) => event.stopPropagation()}>
@@ -4558,11 +4679,11 @@ export default function ChatScreen() {
                       findMyReaction(selectedMessage)?.emoji === emoji &&
                       styles.quickReactionActive,
                   ]}
-                  onPress={() => {
+                  onPress={menuTap(() => {
                     if (selectedMessage) {
                       reactToMessage(selectedMessage, emoji);
                     }
-                  }}>
+                  })}>
                   <Text style={styles.quickReactionText}>{emoji}</Text>
                 </Pressable>
               ))}
@@ -4572,36 +4693,54 @@ export default function ChatScreen() {
             <View style={styles.menuCard}>
               {selectedMessage ? (
                 <View style={styles.menuPreview}>
-                  <Text numberOfLines={1} style={styles.menuPreviewText}>
-                    {selectedMessage.content ||
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.menuPreviewText,
+                      menuNotice ? styles.menuNoticeText : null,
+                    ]}>
+                    {menuNotice ||
+                      selectedMessage.content ||
                       getMessageTypeLabel(selectedMessage) ||
                       "Message"}
                   </Text>
+
+                  {/* ✕ back to the chat */}
+                  <Pressable
+                    onPress={closeMenu}
+                    hitSlop={10}
+                    style={styles.menuClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close menu">
+                    <Ionicons name="close" size={18} color="#55555E" />
+                  </Pressable>
                 </View>
               ) : null}
 
               <MenuItem
                 icon="arrow-undo-outline"
                 label="Reply"
-                onPress={() => selectedMessage && startReply(selectedMessage)}
+                onPress={menuTap(
+                  () => selectedMessage && startReply(selectedMessage),
+                )}
               />
 
               {selectedMessage?.content?.trim() ? (
                 <MenuItem
                   icon="copy-outline"
                   label="Copy"
-                  onPress={() =>
-                    selectedMessage && copyMessage(selectedMessage)
-                  }
+                  onPress={menuTap(
+                    () => selectedMessage && copyMessage(selectedMessage),
+                  )}
                 />
               ) : null}
 
               <MenuItem
                 icon="arrow-redo-outline"
                 label="Forward"
-                onPress={() =>
-                  selectedMessage && forwardMessage(selectedMessage)
-                }
+                onPress={menuTap(
+                  () => selectedMessage && forwardMessage(selectedMessage),
+                )}
               />
 
               <MenuItem
@@ -4615,16 +4754,18 @@ export default function ChatScreen() {
                     ? "Unpin"
                     : "Pin"
                 }
-                onPress={() => selectedMessage && pinMessage(selectedMessage)}
+                onPress={menuTap(
+                  () => selectedMessage && pinMessage(selectedMessage),
+                )}
               />
 
               {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
                 <MenuItem
                   icon="create-outline"
                   label="Edit"
-                  onPress={() =>
-                    selectedMessage && startEditing(selectedMessage)
-                  }
+                  onPress={menuTap(
+                    () => selectedMessage && startEditing(selectedMessage),
+                  )}
                 />
               ) : null}
 
@@ -4632,35 +4773,143 @@ export default function ChatScreen() {
                 <MenuItem
                   icon="information-circle-outline"
                   label="Info"
-                  onPress={() =>
-                    selectedMessage && openMessageInfo(selectedMessage)
-                  }
+                  onPress={menuTap(
+                    () => selectedMessage && openMessageInfo(selectedMessage),
+                  )}
                 />
               ) : null}
 
               <MenuItem
                 icon="link-outline"
                 label="Copy link"
-                onPress={() =>
-                  selectedMessage && copyMessageLink(selectedMessage)
-                }
+                onPress={menuTap(
+                  () => selectedMessage && copyMessageLink(selectedMessage),
+                )}
               />
 
               <MenuItem
                 icon="checkmark-circle-outline"
                 label="Select"
-                onPress={() =>
-                  selectedMessage && selectMessage(selectedMessage)
-                }
+                onPress={menuTap(
+                  () => selectedMessage && selectMessage(selectedMessage),
+                )}
               />
 
               <MenuItem
                 icon="trash-outline"
                 label="Delete"
                 danger
-                onPress={() => selectedMessage && deletePrompt(selectedMessage)}
+                onPress={menuTap(
+                  () => selectedMessage && deletePrompt(selectedMessage),
+                )}
               />
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ================================== */}
+      {/* DELETE SHEET */}
+      {/* ================================== */}
+
+      <Modal
+        visible={!!deleteSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDeleteSheet(null)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setDeleteSheet(null)}>
+          <Pressable
+            style={styles.actionSheet}
+            onPress={(event) => event.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+
+            {deleteSheet
+              ? (() => {
+                  const items = deleteSheet.messages;
+                  const count = items.length;
+                  const allMine = items.every((item) => isMyMessage(item));
+                  const recent = items.every(
+                    (item) =>
+                      Date.now() - new Date(item.createdAt || 0).getTime() <
+                      DELETE_FOR_EVERYONE_WINDOW_MS,
+                  );
+                  const canEveryone = allMine && recent;
+
+                  const closeSheet = () => setDeleteSheet(null);
+
+                  const forEveryone = () => {
+                    closeSheet();
+
+                    if (deleteSheet.single) {
+                      deleteForEveryone(items[0]);
+                    } else {
+                      deleteSelectedFor("everyone");
+                    }
+                  };
+
+                  const forMe = () => {
+                    closeSheet();
+
+                    if (deleteSheet.single) {
+                      deleteForMe(items[0]);
+                    } else {
+                      deleteSelectedFor("me");
+                    }
+                  };
+
+                  return (
+                    <>
+                      <Text style={styles.actionTitle}>
+                        {count === 1
+                          ? "Delete message?"
+                          : `Delete ${count} messages?`}
+                      </Text>
+
+                      <Text style={styles.deleteHint}>
+                        {canEveryone
+                          ? "Delete for everyone removes it for both of you."
+                          : allMine
+                            ? "Delete for everyone is only possible within 5 minutes of sending. You can still delete it for yourself."
+                            : "This removes it from your chat only."}
+                      </Text>
+
+                      {canEveryone ? (
+                        <Pressable
+                          style={styles.deleteOption}
+                          onPress={forEveryone}>
+                          <Ionicons
+                            name="trash-outline"
+                            size={20}
+                            color="#D64545"
+                          />
+                          <Text style={styles.deleteOptionText}>
+                            Delete for everyone
+                          </Text>
+                        </Pressable>
+                      ) : null}
+
+                      <Pressable style={styles.deleteOption} onPress={forMe}>
+                        <Ionicons
+                          name="trash-bin-outline"
+                          size={20}
+                          color="#D64545"
+                        />
+                        <Text style={styles.deleteOptionText}>
+                          Delete for me
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.cancelButton}
+                        onPress={closeSheet}>
+                        <Text style={styles.cancelText}>Cancel</Text>
+                      </Pressable>
+                    </>
+                  );
+                })()
+              : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -4928,6 +5177,60 @@ export default function ChatScreen() {
           </View>
         </Pressable>
       </Modal>
+      {/* ⋮ CHAT MENU */}
+      <Modal
+        visible={showChatMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowChatMenu(false)}>
+        <Pressable
+          style={styles.chatMenuBackdrop}
+          onPress={() => setShowChatMenu(false)}>
+          <View style={[styles.chatMenu, { top: insets.top + 52 }]}>
+            {otherUsername ? (
+              <Pressable style={styles.chatMenuItem} onPress={openTheirProfile}>
+                <Ionicons
+                  name="person-circle-outline"
+                  size={20}
+                  color="#191922"
+                />
+                <Text style={styles.chatMenuText}>View profile</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={styles.chatMenuItem}
+              onPress={() => {
+                setShowChatMenu(false);
+                setShowWallpaperPicker(true);
+              }}>
+              <Ionicons name="image-outline" size={20} color="#191922" />
+              <Text style={styles.chatMenuText}>Wallpaper</Text>
+            </Pressable>
+
+            {otherUsername ? (
+              iBlockedThem ? (
+                <Pressable style={styles.chatMenuItem} onPress={doUnblock}>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={20}
+                    color="#191922"
+                  />
+                  <Text style={styles.chatMenuText}>Unblock</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.chatMenuItem} onPress={confirmBlock}>
+                  <Ionicons name="ban-outline" size={20} color="#D64545" />
+                  <Text style={[styles.chatMenuText, styles.dangerText]}>
+                    Block
+                  </Text>
+                </Pressable>
+              )
+            ) : null}
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* CHAT WALLPAPER PICKER */}
       <WallpaperPicker
         visible={showWallpaperPicker}
@@ -5012,6 +5315,80 @@ const styles = StyleSheet.create({
   headerAvatarImage: { width: "100%", height: "100%" },
 
   headerAvatarWrap: { marginLeft: 4, position: "relative" },
+
+  // Photo + name together: tap to open their profile.
+  headerProfileTap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+  },
+
+  chatMenuBackdrop: {
+    flex: 1,
+  },
+
+  chatMenu: {
+    position: "absolute",
+    right: 12,
+    minWidth: 190,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDEDF1",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+
+  chatMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  chatMenuText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#191922",
+  },
+
+  blockedBar: {
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(150,150,160,0.18)",
+  },
+
+  blockedText: {
+    fontSize: 13,
+    color: "#6B6B72",
+    textAlign: "center",
+  },
+
+  blockedButton: {
+    minWidth: 120,
+    height: 40,
+    paddingHorizontal: 22,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#C5399A",
+  },
+
+  blockedButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
 
   headerOnlineDot: {
     position: "absolute",
@@ -5395,6 +5772,13 @@ const styles = StyleSheet.create({
   },
 
   audioText: { fontSize: 11, color: "#777783", marginTop: 1 },
+
+  audioMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 1,
+  },
 
   audioTextMine: { color: "rgba(255,255,255,0.85)" },
 
@@ -5801,6 +6185,8 @@ const styles = StyleSheet.create({
   },
 
   menuPreview: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderBottomWidth: 1,
@@ -5808,7 +6194,41 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
 
-  menuPreviewText: { fontSize: 12, color: "#8A8A90" },
+  menuPreviewText: { flex: 1, fontSize: 12, color: "#8A8A90" },
+
+  menuNoticeText: { color: "#1FA855", fontWeight: "700" },
+
+  menuClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F2F2F5",
+    marginLeft: 10,
+  },
+
+  deleteHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#6B6B72",
+    marginBottom: 6,
+  },
+
+  deleteOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F3",
+  },
+
+  deleteOptionText: {
+    fontSize: 15.5,
+    fontWeight: "700",
+    color: "#D64545",
+  },
 
   menuItem: {
     flexDirection: "row",

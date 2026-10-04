@@ -2,7 +2,7 @@ import { AppBackground } from "@/components/AppBackground";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
-import { AVATARS } from "@/constants/avatars";
+import { useAvatarList } from "@/constants/avatars";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
 import { useOnboarding } from "@/context/OnboardingContext";
 import { saveAvatarPhoto, saveUserAvatar } from "@/store/thunks/userThunks";
@@ -20,6 +20,10 @@ export default function UploadPicture() {
   const dispatch = useAppDispatch();
 
   const { loading } = useAppSelector((state) => state.user);
+
+  // All avatars: the built-in ones straight away, plus the backend's
+  // (GET /api/meta/avatars) as soon as they arrive.
+  const avatars = useAvatarList();
 
   const [saving, setSaving] = useState(false);
 
@@ -122,7 +126,7 @@ export default function UploadPicture() {
 
     try {
       if (data.photo) {
-        const photoResult = await dispatch(
+        await dispatch(
           saveAvatarPhoto({
             email: data.email.trim(),
             photoUri: data.photo,
@@ -130,7 +134,7 @@ export default function UploadPicture() {
         ).unwrap();
       }
 
-      const avatarResult = await dispatch(
+      await dispatch(
         saveUserAvatar({
           email: data.email.trim(),
           avatar: data.avatar,
@@ -212,7 +216,7 @@ export default function UploadPicture() {
         <ErrorText>{errors.photo}</ErrorText>
 
         <View style={styles.grid}>
-          {AVATARS.map((avatar) => (
+          {avatars.map((avatar) => (
             <Pressable
               key={avatar.id}
               style={[
@@ -229,11 +233,14 @@ export default function UploadPicture() {
                   avatar: "",
                 }));
               }}
-              disabled={isSaving}>
+              disabled={isSaving}
+              accessibilityLabel={avatar.label || avatar.id}>
               <Image
                 source={avatar.source}
                 style={styles.avatarImg}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={150}
               />
             </Pressable>
           ))}
@@ -374,6 +381,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(150,150,160,0.30)",
+    // Shows while a backend avatar is still loading.
+    backgroundColor: "rgba(197,57,154,0.08)",
   },
 
   avatarActive: {

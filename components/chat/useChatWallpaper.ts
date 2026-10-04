@@ -1,6 +1,6 @@
 // Which wallpaper a chat uses: its own choice, otherwise the "all chats"
 // choice, otherwise the default. Saved on this device only.
-import { useEffect, useReducer } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { DEFAULT_WALLPAPER, type Wallpaper } from "@/constants/wallpapers";
 import { getPref, setPref } from "@/utils/prefsStorage";
@@ -53,27 +53,39 @@ async function ensureLoaded(key: string) {
   emit();
 }
 
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function currentFor(conversationId: string): Wallpaper {
+  return (
+    (conversationId ? cache.get(conversationId) : null) ||
+    cache.get(ALL_CHATS) ||
+    DEFAULT_WALLPAPER
+  );
+}
+
+// useSyncExternalStore (not a plain read) so React - and the React
+// Compiler, which remembers results inside screens - always shows the
+// latest saved wallpaper. A plain read was remembered as "Default" and
+// never updated once the saved wallpaper finished loading.
 export function useChatWallpaper(conversationId: string): Wallpaper {
-  const [, rerender] = useReducer((count: number) => count + 1, 0);
-
   useEffect(() => {
-    listeners.add(rerender);
-
     ensureLoaded(ALL_CHATS);
 
     if (conversationId) {
       ensureLoaded(conversationId);
     }
-
-    return () => {
-      listeners.delete(rerender);
-    };
   }, [conversationId]);
 
-  return (
-    (conversationId ? cache.get(conversationId) : null) ||
-    cache.get(ALL_CHATS) ||
-    DEFAULT_WALLPAPER
+  return useSyncExternalStore(
+    subscribe,
+    () => currentFor(conversationId),
+    () => currentFor(conversationId),
   );
 }
 
@@ -84,7 +96,7 @@ export async function setChatWallpaper(
 ) {
   cache.set(conversationId, wallpaper);
   emit();
-  await setPref(storageKey(conversationId), JSON.stringify(wallpaper));
+  return setPref(storageKey(conversationId), JSON.stringify(wallpaper));
 }
 
 // Save for every chat (and let this chat follow it, too).
@@ -100,5 +112,5 @@ export async function setAllChatsWallpaper(
   }
 
   emit();
-  await setPref(storageKey(ALL_CHATS), JSON.stringify(wallpaper));
+  return setPref(storageKey(ALL_CHATS), JSON.stringify(wallpaper));
 }

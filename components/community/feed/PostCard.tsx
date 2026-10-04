@@ -29,6 +29,7 @@ import { PostActions } from "./PostActions";
 import { PostCaption } from "./PostCaption";
 import { getMediaUrls, PostMedia } from "./PostMedia";
 import { PostMenu } from "./PostMenu";
+import { SharedPostEmbed } from "./SharedPostEmbed";
 import { ShareSheet } from "./ShareSheet";
 
 /* =========================================================
@@ -206,6 +207,12 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   );
 
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Shares shown on the post; goes up as soon as you share it (see the
+  // ShareSheet's onShared below), without waiting for the feed to reload.
+  const [sharesCount, setSharesCount] = useState(
+    Number(post?.shares ?? post?.shareCount ?? 0),
+  );
 
   const [deletingPost, setDeletingPost] = useState(false);
 
@@ -491,15 +498,21 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     "";
 
   const subtitle =
-    placeName ||
-    (post?.type === "reel" ? "Reel" : postUsername ? `@${postUsername}` : "");
+    post?.type === "share"
+      ? "shared a post"
+      : placeName ||
+        (post?.type === "reel"
+          ? "Reel"
+          : postUsername
+            ? `@${postUsername}`
+            : "");
 
   const actions = (overlay: boolean) => (
     <PostActions
       overlay={overlay}
       likes={Number(post?.likes || 0)}
       comments={commentsCount}
-      shares={Number(post?.shares || 0)}
+      shares={sharesCount}
       saves={Number(post?.saves || 0)}
       liked={!!post?.liked}
       bookmarked={!!post?.bookmarked}
@@ -568,7 +581,14 @@ export function PostCard({ post, token }: { post: any; token: string }) {
       ) : null}
 
       {/* CAPTION + hashtag chips */}
-      <PostCaption username={postUsername} content={post?.content} />
+      {post?.content?.trim() ? (
+        <PostCaption username={postUsername} content={post?.content} />
+      ) : null}
+
+      {/* SHARED POST: the original, in a frame */}
+      {post?.type === "share" ? (
+        <SharedPostEmbed shared={post?.sharedPost} />
+      ) : null}
 
       {/* Text-only posts: the same buttons as a row */}
       {!hasMedia ? actions(false) : null}
@@ -676,6 +696,11 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         post={post}
         token={token}
         onClose={() => setShareVisible(false)}
+        onShared={(newTotal) =>
+          setSharesCount((current) =>
+            typeof newTotal === "number" ? newTotal : current + 1,
+          )
+        }
       />
     </View>
   );

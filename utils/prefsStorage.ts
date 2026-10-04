@@ -16,14 +16,21 @@ export async function getPref(key: string): Promise<string | null> {
   }
 }
 
-export async function setPref(key: string, value: string | null) {
+// Returns true when it was saved.
+export async function setPref(
+  key: string,
+  value: string | null,
+): Promise<boolean> {
   try {
     if (value === null) {
       await SecureStore.deleteItemAsync(safeKey(key));
     } else {
       await SecureStore.setItemAsync(safeKey(key), value);
     }
+
+    return true;
   } catch {
     // Couldn't save - the setting just won't be remembered.
+    return false;
   }
 }

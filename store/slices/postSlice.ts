@@ -13,15 +13,56 @@ import {
   sharePostThunk,
   unlikePostThunk,
 } from "../thunks/postThunks";
+import { shareToFeedThunk } from "../thunks/shareToFeedThunk";
+
+// The author as the backend sends it (kept so cards can show the real name,
+// avatar and faction).
+export type PostAuthor = {
+  id?: string;
+  username?: string;
+  name?: string;
+  avatarKey?: string | null;
+  avatarPhotoUrl?: string | null;
+  faction?: string | null;
+};
+
+export type PostMediaItem = {
+  url: string;
+  resourceType?: string;
+  width?: number | null;
+  height?: number | null;
+};
+
+// The original post inside a shared post. `unavailable` when it was deleted.
+export type SharedPost =
+  | { unavailable: true }
+  | {
+      unavailable?: false;
+      id: string;
+      type?: "thought" | "image" | "reel";
+      content?: string;
+      image?: string | null;
+      media?: PostMediaItem[];
+      author?: PostAuthor;
+      likes?: number;
+      comments?: number;
+      shares?: number;
+      createdAt?: string;
+      time?: string;
+    };
 
 export type Post = {
   id: string;
 
-  type?: "thought" | "image" | "reel";
+  // "share" = this post shares another post (see sharedPost).
+  type?: "thought" | "image" | "reel" | "share";
 
   content?: string;
 
   image?: string | null;
+
+  // Every photo/video of the post (the first one is also in `image`).
+  media?: PostMediaItem[];
 
   avatar?: string | null;
 
@@ -29,6 +70,8 @@ export type Post = {
   handle?: string;
 
   userId?: string;
+
+  author?: PostAuthor;
 
   likes?: number;
   comments?: number;
@@ -42,6 +85,9 @@ export type Post = {
 
   createdAt?: string;
   time?: string;
+
+  // For type "share": the original post.
+  sharedPost?: SharedPost | null;
 };
 
 type PostState = {
@@ -132,6 +178,53 @@ function extractMediaUrl(raw: Record<string, any>) {
   return null;
 }
 
+// Every media item with a URL (keeps galleries and photo sizes).
+function extractMedia(raw: Record<string, any>): PostMediaItem[] {
+  if (!Array.isArray(raw.media)) {
+    return [];
+  }
+
+  return raw.media
+    .map((item: unknown) => {
+      if (typeof item === "string") {
+        return { url: item };
+      }
+
+      if (isObject(item) && typeof item.url === "string") {
+        return {
+          url: item.url,
+          resourceType: item.resourceType,
+          width: item.width ?? null,
+          height: item.height ?? null,
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean) as PostMediaItem[];
+}
+
+function extractAuthor(raw: Record<string, any>): PostAuthor | undefined {
+  const author = isObject(raw.author)
+    ? raw.author
+    : isObject(raw.user)
+      ? raw.user
+      : null;
+
+  if (!author) {
+    return undefined;
+  }
+
+  return {
+    id: author.id !== undefined ? String(author.id) : undefined,
+    username: author.username,
+    name: author.name,
+    avatarKey: author.avatarKey ?? null,
+    avatarPhotoUrl: author.avatarPhotoUrl ?? null,
+    faction: author.faction ?? null,
+  };
+}
+
 function formatTime(createdAt?: string) {
   if (!createdAt) {
     return "";
@@ -170,6 +263,42 @@ function formatTime(createdAt?: string) {
   }
 
   return date.toLocaleDateString();
+}
+
+function normalizeSharedPost(raw: unknown): SharedPost | null {
+  if (!isObject(raw)) {
+    return null;
+  }
+
+  if (raw.unavailable) {
+    return { unavailable: true };
+  }
+
+  const id = String(raw.id ?? "");
+
+  if (!id) {
+    return { unavailable: true };
+  }
+
+  const createdAt =
+    typeof raw.createdAt === "string" ? raw.createdAt : undefined;
+
+  return {
+    id,
+    type:
+      raw.type === "image" || raw.type === "reel" || raw.type === "thought"
+        ? raw.type
+        : undefined,
+    content: typeof raw.content === "string" ? raw.content : "",
+    image: extractMediaUrl(raw),
+    media: extractMedia(raw),
+    author: extractAuthor(raw),
+    likes: Number(raw.likeCount ?? raw.likes ?? 0),
+    comments: Number(raw.commentCount ?? raw.comments ?? 0),
+    shares: Number(raw.shareCount ?? raw.shares ?? 0),
+    createdAt,
+    time: formatTime(createdAt),
+  };
 }
 
 function normalizePost(raw: unknown): Post | null {
@@ -223,22 +352,38 @@ function normalizePost(raw: unknown): Post | null {
             ? author.avatarUrl
             : null;
 
-  const liked = typeof raw.liked === "boolean" ? raw.liked : false;
+  const liked =
+    typeof raw.liked === "boolean"
+      ? raw.liked
+      : typeof raw.likedByMe === "boolean"
+        ? raw.likedByMe
+        : false;
 
   const bookmarked =
-    typeof raw.bookmarked === "boolean" ? raw.bookmarked : false;
+    typeof raw.bookmarked === "boolean"
+      ? raw.bookmarked
+      : typeof raw.bookmarkedByMe === "boolean"
+        ? raw.bookmarkedByMe
+        : false;
+
+  const type =
+    raw.type === "image" ||
+    raw.type === "reel" ||
+    raw.type === "thought" ||
+    raw.type === "share"
+      ? raw.type
+      : undefined;
 
   return {
     id,
 
-    type:
-      raw.type === "image" || raw.type === "reel" || raw.type === "thought"
-        ? raw.type
-        : undefined,
+    type,
 
     content,
 
     image,
+
+    media: extractMedia(raw),
 
     avatar,
 
@@ -252,6 +397,8 @@ function normalizePost(raw: unknown): Post | null {
         : author.id !== undefined
           ? String(author.id)
           : undefined,
+
+    author: extractAuthor(raw),
 
     likes: Number(raw.likeCount ?? raw.likes ?? 0),
 
@@ -270,6 +417,11 @@ function normalizePost(raw: unknown): Post | null {
     createdAt,
 
     time: formatTime(createdAt),
+
+    sharedPost:
+      type === "share"
+        ? normalizeSharedPost(raw.sharedPost) || { unavailable: true }
+        : null,
   };
 }
 
@@ -346,6 +498,30 @@ const postSlice = createSlice({
       // CREATE REEL
       .addCase(createReelPostThunk.fulfilled, (state, action) => {
         addCreatedPost(state, action.payload);
+      })
+
+      // SHARE TO FEED: the new shared post goes on top, and the original's
+      // share count updates straight away.
+      .addCase(shareToFeedThunk.fulfilled, (state, action) => {
+        addCreatedPost(state, action.payload);
+
+        const { originalPostId, shareCount } = action.payload || {};
+
+        if (originalPostId && typeof shareCount === "number") {
+          state.posts.forEach((post) => {
+            if (post.id === originalPostId) {
+              post.shares = shareCount;
+            }
+
+            if (
+              post.sharedPost &&
+              !post.sharedPost.unavailable &&
+              post.sharedPost.id === originalPostId
+            ) {
+              post.sharedPost.shares = shareCount;
+            }
+          });
+        }
       })
 
       // FETCH SINGLE POST

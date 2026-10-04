@@ -1,3 +1,4 @@
+import AvatarCatalogLoader from "@/components/AvatarCatalogLoader";
 import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
@@ -46,6 +47,9 @@ export default function RootLayout() {
       {/* Stay logged in: loads the saved login before the screens show */}
       <SessionGate>
         <SocketConnectionGate />
+
+        {/* Loads all the backend's avatars (GET /api/meta/avatars) */}
+        <AvatarCatalogLoader />
 
         <GestureHandlerRootView style={{ flex: 1 }}>
           <UserProvider>
