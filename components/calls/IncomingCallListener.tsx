@@ -13,7 +13,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  inviterOf,
+  otherActiveMembers,
+  personName,
+  userIdFromToken,
+} from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setCallUserId } from "@/store/slices/callSlice";
 import { acceptCall, declineCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions, getAvatarSource } from "@/utils/callHelpers";
 
@@ -36,8 +43,15 @@ export default function IncomingCallListener() {
 
   const token = useAppSelector((state) => state.auth.token);
   const incoming = useAppSelector((state) => state.call.incoming);
+  const myUserId = useAppSelector((state) => state.call.myUserId);
 
   const [answering, setAnswering] = useState(false);
+
+  // Tell the call slice who "you" are (from your sign-in token), so in a
+  // group call it rings only while YOU are ringing.
+  useEffect(() => {
+    dispatch(setCallUserId(userIdFromToken(token)));
+  }, [dispatch, token]);
 
   // Vibrate while ringing; stops automatically when the call is
   // answered, declined, cancelled or missed (incoming becomes null).
@@ -60,11 +74,33 @@ export default function IncomingCallListener() {
     return null;
   }
 
-  const callerName =
-    incoming.caller?.name || incoming.caller?.username || "Someone";
+  // Who's ringing you: the caller, or whoever added you to a group call.
+  const inviter = inviterOf(incoming, myUserId);
+  const callerName = personName(inviter);
 
-  const callLabel =
-    incoming.type === "video" ? "Incoming video call" : "Incoming voice call";
+  // Everyone else already in (or ringing in) the call.
+  const others = otherActiveMembers(incoming, myUserId).filter(
+    (member) => member.user.id !== inviter.id,
+  );
+
+  const isGroup = incoming.isGroup || others.length > 0;
+
+  const callLabel = isGroup
+    ? incoming.type === "video"
+      ? "Group video call"
+      : "Group voice call"
+    : incoming.type === "video"
+      ? "Incoming video call"
+      : "Incoming voice call";
+
+  const groupLine = isGroup
+    ? others.length
+      ? `with ${others
+          .slice(0, 3)
+          .map((member) => personName(member.user).split(" ")[0])
+          .join(", ")}${others.length > 3 ? ` +${others.length - 3}` : ""}`
+      : "added you to a call"
+    : null;
 
   const accept = async () => {
     if (answering) {
@@ -114,15 +150,27 @@ export default function IncomingCallListener() {
         </View>
 
         <View style={styles.center}>
-          <CallAvatar source={getAvatarSource(incoming.caller)} />
+          <CallAvatar source={getAvatarSource(inviter)} />
 
           <Text style={styles.name} numberOfLines={1}>
             {callerName}
           </Text>
 
+          {groupLine ? (
+            <Text style={styles.groupLine} numberOfLines={1}>
+              {groupLine}
+            </Text>
+          ) : null}
+
           <View style={styles.statusRow}>
             <Ionicons
-              name={incoming.type === "video" ? "videocam" : "call"}
+              name={
+                isGroup
+                  ? "people"
+                  : incoming.type === "video"
+                    ? "videocam"
+                    : "call"
+              }
               size={15}
               color={CALL_COLORS.muted}
             />
@@ -197,6 +245,15 @@ const styles = StyleSheet.create({
   },
 
   status: { fontSize: 16, color: CALL_COLORS.muted },
+
+  groupLine: {
+    marginTop: 6,
+    maxWidth: "90%",
+    fontSize: 15,
+    fontWeight: "600",
+    color: CALL_COLORS.text,
+    opacity: 0.85,
+  },
 
   card: {
     marginHorizontal: 20,

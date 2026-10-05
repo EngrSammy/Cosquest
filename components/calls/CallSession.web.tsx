@@ -14,26 +14,31 @@
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
-      LocalVideoTrack,
-      RemoteTrack,
-      Room,
-      RoomEvent,
-      Track,
-      VideoTrack,
+  LocalVideoTrack,
+  RemoteTrack,
+  Room,
+  RoomEvent,
+  Track,
+  VideoTrack,
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
 import {
-      AnimatedDots,
-      CALL_COLORS,
-      CallAvatar,
-      CallBackground,
-      CallControl,
-      CallLogo,
+  AnimatedDots,
+  CALL_COLORS,
+  CallAvatar,
+  CallBackground,
+  CallControl,
+  CallLogo,
 } from "@/components/calls/CallVisuals";
+import GroupCallMembers, {
+  groupCallTitle,
+} from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
+import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
@@ -130,8 +135,19 @@ export default function CallSession() {
       : undefined,
   );
 
+  const myUserId = useAppSelector((state) => state.call.myUserId);
+
   const [endMessage, setEndMessage] = useState<string | null>(null);
   const [remoteCount, setRemoteCount] = useState(0);
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  // Who's talking right now (LiveKit identities are user ids).
+  const [speakingIds, setSpeakingIds] = useState<string[]>([]);
+
+  // A group call: someone was added, or more than one other person is in it.
+  const isGroup =
+    !!active &&
+    (active.call.isGroup ||
+      otherActiveMembers(active.call, myUserId).length > 1);
   const [answeredAt, setAnsweredAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [micOn, setMicOn] = useState(true);
@@ -275,6 +291,9 @@ export default function CallSession() {
     };
 
     room
+      .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        setSpeakingIds(speakers.map((speaker) => speaker.identity));
+      })
       .on(RoomEvent.ParticipantConnected, updateRemoteCount)
       .on(RoomEvent.ParticipantDisconnected, updateRemoteCount)
       .on(RoomEvent.TrackSubscribed, handleTrackSubscribed)
@@ -359,11 +378,14 @@ export default function CallSession() {
     }
   }, [remoteCount, answeredAt]);
 
+  // One-to-one: the other person left after answering → end.
+  // Group calls keep going while anyone is left; the backend ends the call
+  // when the last person leaves (and tells us with call:updated).
   useEffect(() => {
-    if (answered && remoteCount === 0) {
+    if (!isGroup && answered && remoteCount === 0) {
       finish("Call ended", true);
     }
-  }, [answered, remoteCount, finish]);
+  }, [isGroup, answered, remoteCount, finish]);
 
   useEffect(() => {
     if (answeredAt === null) {
@@ -481,12 +503,22 @@ export default function CallSession() {
       ? active.call.caller
       : conversation?.otherParticipant || null;
 
-  const displayName =
-    active.direction === "incoming"
+  const displayName = isGroup
+    ? groupCallTitle(active.call, myUserId)
+    : active.direction === "incoming"
       ? active.call.caller?.name || active.call.caller?.username || "Call"
       : conversation?.title ||
         conversation?.otherParticipant?.username ||
         "Call";
+
+  const addPeopleSheet = (
+    <AddPeopleSheet
+      visible={addPeopleOpen}
+      call={active.call}
+      myUserId={myUserId}
+      onClose={() => setAddPeopleOpen(false)}
+    />
+  );
 
   const waiting = !answered && !endMessage;
 
@@ -531,6 +563,17 @@ export default function CallSession() {
           {audioTapButton}
         </View>
 
+        {isGroup ? (
+          <View style={[styles.groupStrip, { top: insets.top + 76 }]}>
+            <GroupCallMembers
+              call={active.call}
+              myUserId={myUserId}
+              speakingIds={speakingIds}
+              compact
+            />
+          </View>
+        ) : null}
+
         {localVideo && remoteVideo ? (
           <View style={[styles.selfPreview, { top: insets.top + 84 }]}>
             <WebVideo track={localVideo} mirror />
@@ -553,6 +596,13 @@ export default function CallSession() {
             active={cameraOn}
             onPress={toggleCamera}
           />
+          <CallControl
+            variant="solid"
+            icon="person-add-outline"
+            label="Add"
+            onPress={() => setAddPeopleOpen(true)}
+            disabled={!!endMessage}
+          />
 
           <View style={styles.endItem}>
             <Pressable
@@ -566,6 +616,8 @@ export default function CallSession() {
             <Text style={styles.endLabel}>End</Text>
           </View>
         </View>
+
+        {addPeopleSheet}
       </View>
     );
   }
@@ -577,7 +629,15 @@ export default function CallSession() {
       </View>
 
       <View style={styles.audioCenter}>
-        <CallAvatar source={getAvatarSource(otherPerson)} />
+        {isGroup ? (
+          <GroupCallMembers
+            call={active.call}
+            myUserId={myUserId}
+            speakingIds={speakingIds}
+          />
+        ) : (
+          <CallAvatar source={getAvatarSource(otherPerson)} />
+        )}
 
         <Text style={styles.audioName} numberOfLines={1}>
           {displayName}
@@ -605,6 +665,12 @@ export default function CallSession() {
             active={cameraOn}
             onPress={toggleCamera}
           />
+          <CallControl
+            icon="person-add-outline"
+            label="Add"
+            onPress={() => setAddPeopleOpen(true)}
+            disabled={!!endMessage}
+          />
         </View>
 
         <Pressable
@@ -615,12 +681,16 @@ export default function CallSession() {
           accessibilityLabel={answered ? "End call" : "Cancel call"}>
           <MaterialIcons name="call-end" size={22} color="#FFFFFF" />
           <Text style={styles.endPillText}>
-            {answered || active.direction === "incoming"
-              ? "End Call"
-              : "Cancel Call"}
+            {isGroup
+              ? "Leave Call"
+              : answered || active.direction === "incoming"
+                ? "End Call"
+                : "Cancel Call"}
           </Text>
         </Pressable>
       </View>
+
+      {addPeopleSheet}
     </CallBackground>
   );
 }
@@ -710,6 +780,14 @@ const styles = StyleSheet.create({
   endPillText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
 
   videoRoot: { flex: 1, backgroundColor: "#0D0D12" },
+
+  groupStrip: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    alignItems: "center",
+    zIndex: 2,
+  },
 
   topPillRow: {
     position: "absolute",

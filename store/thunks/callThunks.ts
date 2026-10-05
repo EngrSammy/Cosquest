@@ -1,12 +1,14 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 
 import {
-      acceptCallRequest,
-      declineCallRequest,
-      endCallRequest,
-      getCall,
-      getIncomingCall,
-      startCallRequest,
+  acceptCallRequest,
+  declineCallRequest,
+  endCallRequest,
+  getCall,
+  getIncomingCall,
+  inviteToCallRequest,
+  rejoinCallRequest,
+  startCallRequest,
 } from "@/services/calls";
 
 import type { CallType } from "@/services/calls";
@@ -162,6 +164,64 @@ export const refreshCall = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to load call",
+      );
+    }
+  },
+);
+
+// ==========================================
+// ADD PEOPLE TO THE CALL (group calls)
+// ==========================================
+
+export const inviteToCall = createAsyncThunk(
+  "call/inviteToCall",
+  async (
+    {
+      callId,
+      userIds,
+      usernames,
+      token,
+    }: {
+      callId: string;
+      userIds?: string[];
+      usernames?: string[];
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await inviteToCallRequest(callId, { userIds, usernames }, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error
+          ? error.message
+          : "Couldn't add people to the call",
+      );
+    }
+  },
+);
+
+// ==========================================
+// REJOIN an ongoing call you left or missed
+// ==========================================
+
+export const rejoinCall = createAsyncThunk(
+  "call/rejoinCall",
+  async (
+    {
+      callId,
+      token,
+    }: {
+      callId: string;
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      return await rejoinCallRequest(callId, token);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Couldn't join the call",
       );
     }
   },

@@ -1,14 +1,15 @@
+import { FONTS } from "@/constants/fonts";
 import { Ionicons } from "@expo/vector-icons";
 import { useId, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { FONTS } from "@/constants/fonts";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
 // ==========================================
 // FIGMA MEASUREMENTS (card = 355.42 x 384.19)
 // ==========================================
-// Read off the Figma at 203% zoom, converted back to design units.
-const PANEL_HEIGHT = 64; // dark shape is ~64 tall on the left
+// The dark shape at the bottom of the photo. Tall enough for the icons, the
+// counts AND the date underneath (it was 64, which cut the date off).
+const PANEL_HEIGHT = 84;
 
 // Shape, as fractions of the card width. The dark box is flat over the
 // buttons, then it quickly slims down and FADES OUT before the right edge.
@@ -18,10 +19,10 @@ const CURVE_C1 = 0.56; // curve handles
 const CURVE_C2 = 0.68;
 
 // Positions inside the panel (design units):
-const STATS_LEFT = 24; // heart / comment / share start (centres at 44, 84, 123)
-const STATS_TOP = 9; // icons start 9 below the top of the panel
-const SAVE_RIGHT = 20; // bookmark sits ~32 from the right edge (centre)
-const SAVE_BOTTOM = 7;
+const STATS_LEFT = 24; // heart / comment / share start
+const STATS_TOP = 12; // icons start 12 below the top of the panel
+const SAVE_RIGHT = 20; // bookmark on the right
+const SAVE_BOTTOM = 14; // lifted to line up with the other counts
 
 function getRelativeTime(createdAt?: string) {
   if (!createdAt) {
@@ -308,17 +309,21 @@ const styles = StyleSheet.create({
     marginRight: 22,
   },
 
+  // Fixed line heights keep the counts and date compact (Poppins' default
+  // line height is tall, which pushed the date off the photo).
   count: {
-    marginTop: 1,
+    marginTop: 2,
     fontSize: 10.5,
+    lineHeight: 14,
     fontFamily: FONTS.medium,
     color: "#FFFFFF",
   },
 
   time: {
-    marginTop: 3,
+    marginTop: 6,
     marginLeft: 8,
-    fontSize: 10,
+    fontSize: 10.5,
+    lineHeight: 14,
     fontFamily: FONTS.regular,
     color: "#FFFFFF",
   },

@@ -1,30 +1,35 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { TrackReference } from "@livekit/react-native";
 import {
-      AndroidAudioTypePresets,
-      AudioSession,
-      LiveKitRoom,
-      VideoTrack,
-      isTrackReference,
-      useLocalParticipant,
-      useRemoteParticipants,
-      useTracks,
+  AndroidAudioTypePresets,
+  AudioSession,
+  LiveKitRoom,
+  VideoTrack,
+  isTrackReference,
+  useLocalParticipant,
+  useRemoteParticipants,
+  useTracks,
 } from "@livekit/react-native";
 import { LocalVideoTrack, RoomOptions, Track } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
 import {
-      AnimatedDots,
-      CALL_COLORS,
-      CallAvatar,
-      CallBackground,
-      CallControl,
-      CallLogo,
+  AnimatedDots,
+  CALL_COLORS,
+  CallAvatar,
+  CallBackground,
+  CallControl,
+  CallLogo,
 } from "@/components/calls/CallVisuals";
+import GroupCallMembers, {
+  groupCallTitle,
+} from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
 import type { Call } from "@/services/calls";
+import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
@@ -153,6 +158,8 @@ export default function CallSession() {
       : undefined,
   );
 
+  const myUserId = useAppSelector((state) => state.call.myUserId);
+
   const [endMessage, setEndMessage] = useState<string | null>(null);
 
   const leavingRef = useRef(false);
@@ -252,8 +259,13 @@ export default function CallSession() {
       ? active.call.caller
       : conversation?.otherParticipant || null;
 
-  const displayName =
-    active.direction === "incoming"
+  // A group call: someone was added, or more than one other person is in it.
+  const isGroup =
+    active.call.isGroup || otherActiveMembers(active.call, myUserId).length > 1;
+
+  const displayName = isGroup
+    ? groupCallTitle(active.call, myUserId)
+    : active.direction === "incoming"
       ? active.call.caller?.name || active.call.caller?.username || "Call"
       : conversation?.title ||
         conversation?.otherParticipant?.username ||
@@ -292,6 +304,8 @@ export default function CallSession() {
           endMessage={endMessage}
           authToken={token}
           onFinish={finish}
+          isGroup={isGroup}
+          myUserId={myUserId}
         />
       </LiveKitRoom>
     </View>
@@ -310,6 +324,8 @@ function CallStage({
   endMessage,
   authToken,
   onFinish,
+  isGroup,
+  myUserId,
 }: {
   call: Call;
   direction: "outgoing" | "incoming";
@@ -318,6 +334,8 @@ function CallStage({
   endMessage: string | null;
   authToken: string;
   onFinish: (message: string | null, notifyServer: boolean) => void;
+  isGroup: boolean;
+  myUserId: string | null;
 }) {
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
@@ -346,8 +364,16 @@ function CallStage({
   const [speakerOn, setSpeakerOn] = useState(call.type === "video");
   const [facing, setFacing] = useState<"user" | "environment">("user");
 
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+
   const answered = answeredAt !== null;
   const remoteCount = remoteParticipants.length;
+
+  // Who's talking right now (LiveKit identities are user ids).
+  const speakingIds = [
+    ...remoteParticipants.filter((p) => p.isSpeaking).map((p) => p.identity),
+    ...(localParticipant?.isSpeaking && myUserId ? [myUserId] : []),
+  ];
 
   // Caller hears "brr-brr" until the other person picks up.
   useCallTone("ringback", direction === "outgoing" && !answered && !endMessage);
@@ -368,12 +394,14 @@ function CallStage({
     }
   }, [remoteCount, answeredAt]);
 
-  // They left after answering → end (DM calls only have two people).
+  // One-to-one: the other person left after answering → end.
+  // Group calls keep going while anyone is left; the backend ends the call
+  // when the last person leaves (and tells us with call:updated).
   useEffect(() => {
-    if (answered && remoteCount === 0) {
+    if (!isGroup && answered && remoteCount === 0) {
       onFinish("Call ended", true);
     }
-  }, [answered, remoteCount, onFinish]);
+  }, [isGroup, answered, remoteCount, onFinish]);
 
   // Call timer.
   useEffect(() => {
@@ -489,6 +517,17 @@ function CallStage({
 
   const hangUp = () => onFinish(null, true);
 
+  const openAddPeople = () => setAddPeopleOpen(true);
+
+  const addPeopleSheet = (
+    <AddPeopleSheet
+      visible={addPeopleOpen}
+      call={call}
+      myUserId={myUserId}
+      onClose={() => setAddPeopleOpen(false)}
+    />
+  );
+
   // ---------- status text ----------
 
   const waiting = !answered && !endMessage;
@@ -539,6 +578,18 @@ function CallStage({
           </View>
         </View>
 
+        {/* Group call: everyone, small, under the name */}
+        {isGroup ? (
+          <View style={[styles.groupStrip, { top: insets.top + 76 }]}>
+            <GroupCallMembers
+              call={call}
+              myUserId={myUserId}
+              speakingIds={speakingIds}
+              compact
+            />
+          </View>
+        ) : null}
+
         {/* Your own camera, top-right */}
         {myCameraOn && remoteTrack ? (
           <View style={[styles.selfPreview, { top: insets.top + 84 }]}>
@@ -583,6 +634,13 @@ function CallStage({
             active={speakerOn}
             onPress={() => setSpeakerOn((current) => !current)}
           />
+          <CallControl
+            variant="solid"
+            icon="person-add-outline"
+            label="Add"
+            onPress={openAddPeople}
+            disabled={!!endMessage}
+          />
 
           <View style={styles.endItem}>
             <Pressable
@@ -596,6 +654,8 @@ function CallStage({
             <Text style={styles.endLabel}>End</Text>
           </View>
         </View>
+
+        {addPeopleSheet}
       </View>
     );
   }
@@ -611,7 +671,15 @@ function CallStage({
       </View>
 
       <View style={styles.audioCenter}>
-        <CallAvatar source={avatarSource} />
+        {isGroup ? (
+          <GroupCallMembers
+            call={call}
+            myUserId={myUserId}
+            speakingIds={speakingIds}
+          />
+        ) : (
+          <CallAvatar source={avatarSource} />
+        )}
 
         <Text style={styles.audioName} numberOfLines={1}>
           {displayName}
@@ -642,6 +710,12 @@ function CallStage({
             label="Video"
             onPress={toggleCamera}
           />
+          <CallControl
+            icon="person-add-outline"
+            label="Add"
+            onPress={openAddPeople}
+            disabled={!!endMessage}
+          />
         </View>
 
         <Pressable
@@ -652,10 +726,16 @@ function CallStage({
           accessibilityLabel={answered ? "End call" : "Cancel call"}>
           <MaterialIcons name="call-end" size={22} color="#FFFFFF" />
           <Text style={styles.endPillText}>
-            {answered || direction === "incoming" ? "End Call" : "Cancel Call"}
+            {isGroup
+              ? "Leave Call"
+              : answered || direction === "incoming"
+                ? "End Call"
+                : "Cancel Call"}
           </Text>
         </Pressable>
       </View>
+
+      {addPeopleSheet}
     </CallBackground>
   );
 }
@@ -737,6 +817,14 @@ const styles = StyleSheet.create({
   videoRoot: { flex: 1, backgroundColor: "#0D0D12" },
 
   topPillRow: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+
+  groupStrip: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    alignItems: "center",
+    zIndex: 2,
+  },
 
   topPill: {
     alignItems: "center",
