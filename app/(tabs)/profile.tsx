@@ -183,7 +183,7 @@ function FactionProfileCard({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.factionShield}>
-          <Ionicons name="shield-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="shield-outline" size={24} color="#FFFFFF" />
         </LinearGradient>
 
         <View style={styles.factionIdentity}>
@@ -1096,11 +1096,13 @@ const styles = StyleSheet.create({
   factionCard: {
     marginTop: 8,
     width: "100%",
+    minHeight: 168,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#C34D9C33",
-    padding: 12,
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 16,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.35)",
 
@@ -1117,9 +1119,9 @@ const styles = StyleSheet.create({
   },
 
   factionShield: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 46,
+    height: 46,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1130,27 +1132,27 @@ const styles = StyleSheet.create({
   },
 
   factionWordmark: {
-    width: 64,
-    height: 16,
+    width: 84,
+    height: 20,
   },
 
   factionRank: {
-    marginTop: 1,
+    marginTop: 2,
     fontFamily: FONTS.medium,
-    fontSize: 10,
+    fontSize: 12,
     color: PINK,
   },
 
   memberCountPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
     backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   memberCountText: {
     fontFamily: FONTS.medium,
-    fontSize: 9.5,
+    fontSize: 11,
     color: PINK,
   },
 
@@ -1162,7 +1164,7 @@ const styles = StyleSheet.create({
 
   factionSmallLabel: {
     fontFamily: FONTS.regular,
-    fontSize: 9.5,
+    fontSize: 11.5,
     color: "#6F7480",
   },
 
@@ -1172,9 +1174,9 @@ const styles = StyleSheet.create({
   },
 
   memberAvatarWrap: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     overflow: "hidden",
     backgroundColor: "#D8D8E0",
   },
@@ -1187,7 +1189,7 @@ const styles = StyleSheet.create({
   extraMembersText: {
     marginLeft: 6,
     fontFamily: FONTS.medium,
-    fontSize: 9,
+    fontSize: 10.5,
     color: PINK,
   },
 
@@ -1199,16 +1201,16 @@ const styles = StyleSheet.create({
 
   xpValue: {
     fontFamily: FONTS.medium,
-    fontSize: 9.5,
+    fontSize: 11.5,
     color: PINK,
   },
 
   // Thin bar.
   xpTrack: {
     width: "100%",
-    height: 5,
-    marginTop: -4,
-    borderRadius: 3,
+    height: 7,
+    marginTop: -6,
+    borderRadius: 4,
     backgroundColor: "rgba(195,77,156,0.15)",
     overflow: "hidden",
   },

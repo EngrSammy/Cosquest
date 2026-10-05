@@ -826,7 +826,9 @@ const styles = StyleSheet.create({
   // Text-only / shared posts.
   textCard: {
     marginHorizontal: 24,
-    padding: 14,
+    padding: 16,
+    paddingBottom: 22,
+    minHeight: 150,
     borderRadius: 24,
     backgroundColor: "rgba(255,255,255,0.85)",
     borderWidth: 1,

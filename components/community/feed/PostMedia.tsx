@@ -19,7 +19,7 @@ import { PostVideo } from "./PostVideo";
 // width 355.42, height 384.19, left 24, no rotation, opacity 1,
 // box-shadow: 0px 4px 4px 0px #00000040
 const CARD_WIDTH = 355.42;
-const CARD_HEIGHT = 384.19;
+const CARD_HEIGHT = 440;
 const CARD_RATIO = CARD_WIDTH / CARD_HEIGHT;
 const CARD_MARGIN = 24; // "left: 24px" - same gap on the right
 const CARD_RADIUS = 24; // corner radius (adjust if the Figma shows another)

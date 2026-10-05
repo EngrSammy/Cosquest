@@ -21,6 +21,7 @@ export function ChatWallpaperBackground({
           source={{ uri: wallpaper.uri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          blurRadius={3}
           onError={() => setPhotoFailed(true)}
         />
         {/* A soft veil so messages stay easy to read on busy photos */}
@@ -64,6 +65,6 @@ export function ChatWallpaperBackground({
 
 const styles = StyleSheet.create({
   photoVeil: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(0,0,0,0.32)",
   },
 });
