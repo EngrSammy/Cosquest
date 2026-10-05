@@ -1,5 +1,4 @@
-import { AppBackground } from "@/components/AppBackground";
-import { Field } from "@/components/Field";
+import { FONTS } from "@/constants/fonts";
 
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -13,6 +12,7 @@ import { updateAuthUser } from "@/store/slices/authSlice";
 import { updateUser } from "@/store/slices/userSlice";
 
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 
@@ -28,16 +28,22 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
 import MapView, { MapPressEvent, Marker, Region } from "react-native-maps";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
+
+const PINK = "#C34D9C";
 
 export default function ContactOptions() {
   const insets = useSafeAreaInsets();
@@ -107,7 +113,7 @@ export default function ContactOptions() {
       return;
     }
 
-    dispatch(fetchUserContact(token));
+    dispatch(fetchUserContact({ token }));
   }, [dispatch, token]);
 
   useEffect(() => {
@@ -154,7 +160,7 @@ export default function ContactOptions() {
     }
 
     try {
-      return new AsYouType(countryCode).input(form.phone);
+      return new AsYouType(countryCode as any).input(form.phone);
     } catch {
       return form.phone;
     }
@@ -194,7 +200,7 @@ export default function ContactOptions() {
     }
 
     try {
-      const parsed = parsePhoneNumber(digits, selectedCountry);
+      const parsed = parsePhoneNumber(digits, selectedCountry as any);
 
       if (parsed?.country && parsed.country !== selectedCountry) {
         setPhoneError("This number does not match the selected country.");
@@ -388,7 +394,7 @@ export default function ContactOptions() {
       }
 
       try {
-        const parsed = parsePhoneNumber(form.phone, countryCode);
+        const parsed = parsePhoneNumber(form.phone, countryCode as any);
 
         if (!parsed) {
           Alert.alert("Invalid phone number", "Please check the phone number.");
@@ -410,15 +416,7 @@ export default function ContactOptions() {
       setSaving(true);
 
       const contactResult = await dispatch(
-        saveUserContact({
-          token: token || undefined,
-
-          email,
-
-          phone: phoneForBackend,
-
-          businessAddress,
-        }),
+        saveUserContact({ token: token || undefined, data: { email, phone: phoneForBackend, businessAddress } }),
       ).unwrap();
 
       const savedContact = (contactResult as any)?.contact || {
@@ -475,7 +473,7 @@ export default function ContactOptions() {
         [
           {
             text: "OK",
-            onPress: () => router.back(),
+            onPress: () => safeBack(),
           },
         ],
       );
@@ -493,359 +491,489 @@ export default function ContactOptions() {
 
   const formattedPhone = displayedPhone ? phonePreview : "";
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      safeBack();
+    } else {
+      router.replace("/edit-profile");
+    }
+  };
+
   return (
-    <AppBackground variant="blueGradient">
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingTop: insets.top + 8,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
-            <Ionicons name="chevron-back" size={26} color="#191922" />
+    <View style={styles.screen}>
+      {/* Same background as the Figma screens */}
+      <LinearGradient
+        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        locations={[0.0459, 0.677]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* HEADER */}
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <Pressable
+            onPress={goBack}
+            hitSlop={10}
+            style={styles.headerSide}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="chevron-back" size={24} color="#191922" />
           </Pressable>
 
           <Text style={styles.headerTitle}>Contact options</Text>
 
-          <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
+          <Pressable
+            onPress={handleSave}
+            hitSlop={10}
+            disabled={saving}
+            style={[styles.headerSide, styles.headerRight]}
+            accessibilityRole="button"
+            accessibilityLabel="Save">
             {saving ? (
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={PINK} />
             ) : (
               <Text style={styles.save}>Save</Text>
             )}
           </Pressable>
         </View>
 
-        <Field
-          label="Email"
-          leftIcon="mail-outline"
-          value={form.email}
-          onChangeText={(text) => update("email", text)}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          textContentType="emailAddress"
-          autoComplete="email"
-        />
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: insets.bottom + 60 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {/* Gap 20 between every part, like the Figma screens */}
+          <View style={styles.form}>
+            {/* EMAIL */}
+            <View>
+              <Text style={styles.label}>Email</Text>
 
-        <Text style={styles.fieldLabel}>Phone</Text>
+              <View style={[styles.field, styles.iconField]}>
+                <Ionicons name="mail-outline" size={19} color={PINK} />
 
-        <View
-          style={[
-            styles.phoneContainer,
-            phoneError && styles.phoneErrorBorder,
-          ]}>
-          <View style={styles.countryBox}>
-            <CountryPicker
-              countryCode={countryCode}
-              withFilter
-              withFlag
-              withEmoji
-              withCallingCode
-              onSelect={handleCountrySelect}
-              theme={{
-                backgroundColor: "#FFFFFF",
-                onBackgroundTextColor: "#191922",
-                fontSize: 14,
-              }}
-            />
-
-            <Text style={styles.callingCode}>+{callingCode}</Text>
-
-            <Ionicons name="chevron-down" size={15} color="#777780" />
-          </View>
-
-          <View style={styles.phoneInputWrap}>
-            <Ionicons name="call-outline" size={20} color="#C5399A" />
-
-            <View style={styles.phoneInputContent}>
-              <Field
-                value={formattedPhone}
-                onChangeText={handlePhoneChange}
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-                placeholder="Phone number"
-                placeholderTextColor="#9999A2"
-              />
+                <TextInput
+                  value={form.email}
+                  onChangeText={(text) => update("email", text)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  textContentType="emailAddress"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  placeholderTextColor="#9C9CAA"
+                  style={styles.input}
+                />
+              </View>
             </View>
-          </View>
-        </View>
 
-        {phoneError ? (
-          <Text style={styles.phoneErrorText}>{phoneError}</Text>
-        ) : (
-          <Text style={styles.phoneHint}>
-            {country?.name
-              ? `${country.name} number`
-              : "Select your country and enter your phone number"}
-          </Text>
-        )}
+            {/* PHONE: country + number in one milky field */}
+            <View>
+              <Text style={styles.label}>Phone</Text>
 
-        <Field
-          label="Location / Address"
-          leftIcon="location-outline"
-          value={form.businessAddress}
-          onChangeText={(text) => update("businessAddress", text)}
-          autoCapitalize="words"
-          placeholder="Enter your address"
-          placeholderTextColor="#9999A2"
-        />
+              <View
+                style={[
+                  styles.field,
+                  styles.phoneField,
+                  phoneError && styles.fieldError,
+                ]}>
+                <View style={styles.countryBox}>
+                  <CountryPicker
+                    countryCode={countryCode}
+                    withFilter
+                    withFlag
+                    withEmoji
+                    withCallingCode
+                    onSelect={handleCountrySelect}
+                    theme={{
+                      backgroundColor: "#FFFFFF",
+                      onBackgroundTextColor: "#191922",
+                      fontSize: 14,
+                      fontFamily: FONTS.regular,
+                    }}
+                  />
 
-        <View style={styles.mapActions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryAction,
-              pressed && {
-                opacity: 0.75,
-              },
-            ]}
-            onPress={useCurrentLocation}
-            disabled={gettingLocation}>
-            {gettingLocation ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Ionicons name="navigate" size={18} color="#FFFFFF" />
-            )}
+                  <Text style={styles.callingCode}>+{callingCode}</Text>
 
-            <Text style={styles.primaryActionText}>
-              {gettingLocation ? "Finding you..." : "Use my current location"}
-            </Text>
-          </Pressable>
+                  <Ionicons name="chevron-down" size={14} color="#777780" />
+                </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryAction,
-              pressed && {
-                opacity: 0.75,
-              },
-            ]}
-            onPress={findTypedAddress}
-            disabled={findingAddress}>
-            {findingAddress ? (
-              <ActivityIndicator size="small" color="#C5399A" />
-            ) : (
-              <Ionicons name="search-outline" size={18} color="#C5399A" />
-            )}
+                <Ionicons
+                  name="call-outline"
+                  size={18}
+                  color={PINK}
+                  style={styles.phoneIcon}
+                />
 
-            <Text style={styles.secondaryActionText}>
-              {findingAddress ? "Finding..." : "Find this address"}
-            </Text>
-          </Pressable>
-        </View>
+                <TextInput
+                  value={formattedPhone}
+                  onChangeText={handlePhoneChange}
+                  keyboardType="phone-pad"
+                  autoCapitalize="none"
+                  placeholder="Phone number"
+                  placeholderTextColor="#9C9CAA"
+                  style={styles.input}
+                />
+              </View>
 
-        <Text style={styles.mapTitle}>Choose your location</Text>
+              {phoneError ? (
+                <Text style={styles.phoneErrorText}>{phoneError}</Text>
+              ) : (
+                <Text style={styles.phoneHint}>
+                  {country?.name
+                    ? `${country.name} number`
+                    : "Select your country and enter your phone number"}
+                </Text>
+              )}
+            </View>
 
-        <Text style={styles.mapSubtitle}>
-          Tap anywhere on the map or drag the marker. The address above will
-          update automatically.
-        </Text>
+            {/* ADDRESS */}
+            <View>
+              <Text style={styles.label}>Location / Address</Text>
 
-        <View style={styles.mapContainer}>
-          {mapRegion ? (
-            <MapView
-              style={styles.map}
-              region={mapRegion}
-              onRegionChangeComplete={setMapRegion}
-              onPress={handleMapPress}
-              showsUserLocation
-              showsMyLocationButton
-              showsCompass
-              rotateEnabled
-              scrollEnabled
-              zoomEnabled>
-              {marker ? (
-                <Marker
-                  coordinate={marker}
-                  title="Selected location"
-                  description={form.businessAddress || "Your selected location"}
-                  draggable
-                  onDragEnd={async (event) => {
-                    const { latitude, longitude } =
-                      event.nativeEvent.coordinate;
+              <View style={[styles.field, styles.iconField]}>
+                <Ionicons name="location-outline" size={19} color={PINK} />
 
-                    await setMapLocation(latitude, longitude);
-                  }}>
-                  <View style={styles.marker}>
-                    <Ionicons name="location" size={36} color="#C5399A" />
-                  </View>
-                </Marker>
-              ) : null}
-            </MapView>
-          ) : (
-            <View style={styles.emptyMap}>
-              <Ionicons name="map-outline" size={40} color="#C5399A" />
+                <TextInput
+                  value={form.businessAddress}
+                  onChangeText={(text) => update("businessAddress", text)}
+                  autoCapitalize="words"
+                  placeholder="Enter your address"
+                  placeholderTextColor="#9C9CAA"
+                  style={styles.input}
+                />
+              </View>
+            </View>
 
-              <Text style={styles.emptyMapTitle}>No location selected</Text>
+            {/* MAP BUTTONS */}
+            <View style={styles.mapActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryAction,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={useCurrentLocation}
+                disabled={gettingLocation}>
+                {gettingLocation ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="navigate" size={17} color="#FFFFFF" />
+                )}
 
-              <Text style={styles.emptyMapText}>
-                Tap "Use my current location" or search an address.
+                <Text style={styles.primaryActionText}>
+                  {gettingLocation ? "Finding you..." : "Use my location"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.field,
+                  styles.secondaryAction,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={findTypedAddress}
+                disabled={findingAddress}>
+                {findingAddress ? (
+                  <ActivityIndicator size="small" color={PINK} />
+                ) : (
+                  <Ionicons name="search-outline" size={17} color={PINK} />
+                )}
+
+                <Text style={styles.secondaryActionText}>
+                  {findingAddress ? "Finding..." : "Find this address"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* MAP */}
+            <View>
+              <Text style={styles.mapTitle}>Choose your location</Text>
+
+              <Text style={styles.mapSubtitle}>
+                Tap anywhere on the map or drag the marker. The address above
+                updates automatically.
               </Text>
+
+              <View style={styles.mapContainer}>
+                {mapRegion ? (
+                  <MapView
+                    style={styles.map}
+                    region={mapRegion}
+                    onRegionChangeComplete={setMapRegion}
+                    onPress={handleMapPress}
+                    showsUserLocation
+                    showsMyLocationButton
+                    showsCompass
+                    rotateEnabled
+                    scrollEnabled
+                    zoomEnabled>
+                    {marker ? (
+                      <Marker
+                        coordinate={marker}
+                        title="Selected location"
+                        description={
+                          form.businessAddress || "Your selected location"
+                        }
+                        draggable
+                        onDragEnd={async (event) => {
+                          const { latitude, longitude } =
+                            event.nativeEvent.coordinate;
+
+                          await setMapLocation(latitude, longitude);
+                        }}>
+                        <View style={styles.marker}>
+                          <Ionicons name="location" size={36} color={PINK} />
+                        </View>
+                      </Marker>
+                    ) : null}
+                  </MapView>
+                ) : (
+                  <View style={styles.emptyMap}>
+                    <Ionicons name="map-outline" size={38} color={PINK} />
+
+                    <Text style={styles.emptyMapTitle}>
+                      No location selected
+                    </Text>
+
+                    <Text style={styles.emptyMapText}>
+                      Tap &quot;Use my location&quot; or search an address.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {marker ? (
+                <View style={[styles.field, styles.coordinatesBox]}>
+                  <Ionicons name="location-outline" size={16} color={PINK} />
+
+                  <Text style={styles.coordinatesText}>
+                    {marker.latitude.toFixed(6)}
+                    {" , "}
+                    {marker.longitude.toFixed(6)}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          )}
-        </View>
-
-        {marker ? (
-          <View style={styles.coordinatesBox}>
-            <Ionicons name="location-outline" size={17} color="#C5399A" />
-
-            <Text style={styles.coordinatesText}>
-              {marker.latitude.toFixed(6)}
-              {" , "}
-              {marker.longitude.toFixed(6)}
-            </Text>
           </View>
-        ) : null}
-      </ScrollView>
-    </AppBackground>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
+// The milky, pressed-in field used on every Figma screen:
+// background #0000000D, radius 14, padding 14, shadow 0 4 4 #00000017,
+// plus a white rim.
+const MILKY_FIELD = {
+  minHeight: 51,
+  paddingHorizontal: 14,
+  paddingVertical: 14,
+  borderRadius: 14,
+  backgroundColor: "#0000000D",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.75)",
+
+  shadowColor: "#000000",
+  shadowOpacity: 0.09,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+
 const styles = StyleSheet.create({
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
+  flex: {
+    flex: 1,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  headerSide: {
+    width: 60,
+    height: 36,
+    justifyContent: "center",
+  },
+
+  headerRight: {
+    alignItems: "flex-end",
   },
 
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#191922",
+    flex: 1,
+    textAlign: "center",
+    fontFamily: FONTS.semibold,
+    fontSize: 18,
+    color: "#000000",
   },
 
   save: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.medium,
+    fontSize: 15,
+    color: PINK,
   },
 
-  fieldLabel: {
-    fontSize: 13,
-    color: "#37373A",
+  scroll: {
+    paddingTop: 14,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  // Padding 20 left / right, gap 20 between every part.
+  form: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+
+  label: {
     marginBottom: 8,
-    marginTop: 4,
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: "#7A7A84",
   },
 
-  phoneContainer: {
+  field: MILKY_FIELD,
+
+  fieldError: {
+    borderColor: "#D92D20",
+  },
+
+  // Icon + text inside a milky field.
+  iconField: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 58,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderWidth: 0.6,
-    borderColor: "rgba(255,255,255,0.35)",
+    gap: 10,
+    paddingVertical: 0,
   },
 
-  phoneErrorBorder: {
-    borderColor: "#D92D20",
+  input: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 49,
+    paddingVertical: 0,
+    fontFamily: FONTS.regular,
+    fontSize: 14.5,
+    color: "#191922",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  },
+
+  phoneField: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 0,
+    paddingLeft: 6,
   },
 
   countryBox: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 10,
     paddingRight: 8,
-    borderRightWidth: 0.5,
-    borderRightColor: "rgba(130,130,140,0.25)",
+    marginRight: 8,
+    borderRightWidth: 1,
+    borderRightColor: "rgba(130,130,140,0.22)",
   },
 
   callingCode: {
     marginLeft: 2,
+    marginRight: 3,
+    fontFamily: FONTS.medium,
     fontSize: 14,
-    fontWeight: "600",
     color: "#33333B",
   },
 
-  phoneInputWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 10,
-  },
-
-  phoneInputContent: {
-    flex: 1,
-    marginLeft: 2,
+  phoneIcon: {
+    marginRight: 8,
   },
 
   phoneErrorText: {
     marginTop: 6,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#D92D20",
   },
 
   phoneHint: {
     marginTop: 6,
-    fontSize: 12,
-    color: "#777780",
+    fontFamily: FONTS.regular,
+    fontSize: 11.5,
+    color: "#7A7A84",
   },
 
   mapActions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 6,
-    marginBottom: 18,
   },
 
   primaryAction: {
     flex: 1,
-    minHeight: 46,
-    borderRadius: 12,
+    minHeight: 48,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    gap: 7,
     paddingHorizontal: 12,
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
+
+    shadowColor: PINK,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   primaryActionText: {
-    marginLeft: 7,
+    fontFamily: FONTS.semibold,
+    fontSize: 12.5,
     color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
   },
 
+  // Milky, with pink text.
   secondaryAction: {
     flex: 1,
-    minHeight: 46,
-    borderRadius: 12,
+    minHeight: 48,
+    paddingVertical: 0,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    paddingHorizontal: 12,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    borderWidth: 0.5,
-    borderColor: "#C5399A",
+    gap: 7,
   },
 
   secondaryActionText: {
-    marginLeft: 7,
-    color: "#C5399A",
-    fontSize: 12,
-    fontWeight: "700",
+    fontFamily: FONTS.semibold,
+    fontSize: 12.5,
+    color: PINK,
   },
 
   mapTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 15,
-    fontWeight: "700",
     color: "#191922",
-    marginBottom: 4,
   },
 
   mapSubtitle: {
+    marginTop: 2,
+    marginBottom: 10,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     lineHeight: 18,
-    color: "#777780",
-    marginBottom: 10,
+    color: "#7A7A84",
   },
 
   mapContainer: {
@@ -853,8 +981,9 @@ const styles = StyleSheet.create({
     height: 270,
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.25)",
-    marginBottom: 12,
+    backgroundColor: "#0000000D",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
   },
 
   map: {
@@ -871,17 +1000,18 @@ const styles = StyleSheet.create({
 
   emptyMapTitle: {
     marginTop: 10,
+    fontFamily: FONTS.semibold,
     fontSize: 15,
-    fontWeight: "700",
     color: "#33333B",
   },
 
   emptyMapText: {
-    marginTop: 5,
+    marginTop: 4,
     textAlign: "center",
-    fontSize: 13,
+    fontFamily: FONTS.regular,
+    fontSize: 12.5,
     lineHeight: 18,
-    color: "#777780",
+    color: "#7A7A84",
   },
 
   marker: {
@@ -890,17 +1020,16 @@ const styles = StyleSheet.create({
   },
 
   coordinatesBox: {
+    marginTop: 12,
+    minHeight: 44,
+    paddingVertical: 0,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    marginBottom: 8,
+    gap: 7,
   },
 
   coordinatesText: {
-    marginLeft: 7,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#6F6F79",
   },

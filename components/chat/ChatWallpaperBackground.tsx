@@ -40,8 +40,10 @@ export function ChatWallpaperBackground({
       {preset.gradient ? (
         <LinearGradient
           colors={preset.gradient}
+          locations={preset.locations}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          // vertical = top to bottom (Figma), otherwise corner to corner
+          end={preset.vertical ? { x: 0, y: 1 } : { x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
       ) : null}

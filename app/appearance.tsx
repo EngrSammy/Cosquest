@@ -1,32 +1,29 @@
-import { AppBackground } from "@/components/AppBackground";
+import { PinkSwitch } from "@/components/ui/PinkSwitch";
+import { FONTS } from "@/constants/fonts";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  fetchAppearanceSettings,
+  updateAppearanceSettingsThunk,
+} from "@/store/thunks/settingsThunks";
+import { safeBack } from "@/utils/safeBack";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
-      ActivityIndicator,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Switch,
-      Text,
-      View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import {
-      fetchAppearanceSettings,
-      updateAppearanceSettingsThunk,
-} from "@/store/thunks/settingsThunks";
+const PINK = "#C34D9C";
 
 type ThemeMode = "Light" | "Dark" | "System";
 
 type FontSize = "Small" | "Medium" | "Large";
-
-type AccentColor = {
-  name: string;
-  value: string;
-};
 
 type BackendThemeMode = "light" | "dark" | "system";
 
@@ -39,32 +36,26 @@ type AppearanceSettings = {
   reduceMotion: boolean;
 };
 
-const ACCENT_COLORS: AccentColor[] = [
-  {
-    name: "Pink",
-    value: "#C5399A",
-  },
-  {
-    name: "Blue",
-    value: "#29B6E8",
-  },
-  {
-    name: "Green",
-    value: "#45D56A",
-  },
-  {
-    name: "Orange",
-    value: "#FF9500",
-  },
-  {
-    name: "Red",
-    value: "#FF3B30",
-  },
+const ACCENT_COLORS = [
+  { name: "Pink", value: "#C5399A" },
+  { name: "Blue", value: "#29B6E8" },
+  { name: "Green", value: "#45D56A" },
+  { name: "Orange", value: "#FF9500" },
+  { name: "Red", value: "#FF3B30" },
 ];
 
-function SectionLabel({ children }: { children: string }) {
-  return <Text style={styles.sectionLabel}>{children}</Text>;
-}
+const MILKY = {
+  borderRadius: 14,
+  backgroundColor: "#0000000D",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.75)",
+
+  shadowColor: "#000000",
+  shadowOpacity: 0.09,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
 
 function ThemeSelector({
   value,
@@ -125,17 +116,13 @@ function AccentColorSelector({
               key={color.name}
               onPress={() => !disabled && onChange(color.value)}
               disabled={disabled}
+              accessibilityLabel={`${color.name} accent`}
               style={[
                 styles.accentColorOuter,
                 selected && styles.accentColorSelected,
               ]}>
               <View
-                style={[
-                  styles.accentColor,
-                  {
-                    backgroundColor: color.value,
-                  },
-                ]}
+                style={[styles.accentColor, { backgroundColor: color.value }]}
               />
             </Pressable>
           );
@@ -144,6 +131,13 @@ function AccentColorSelector({
     </View>
   );
 }
+
+// Figma: Small (small text) · Medium (bold) · Large (bigger text).
+const FONT_LABEL_SIZE: Record<FontSize, number> = {
+  Small: 11,
+  Medium: 13.5,
+  Large: 15.5,
+};
 
 function FontSizeSelector({
   value,
@@ -156,38 +150,14 @@ function FontSizeSelector({
 }) {
   const sizes: FontSize[] = ["Small", "Medium", "Large"];
 
-  const selectedIndex = sizes.indexOf(value);
+  const position = ["4%", "62%", "96%"][sizes.indexOf(value)] as `${number}%`;
 
   return (
-    <View style={styles.fontCard}>
+    <View style={[styles.card, styles.fontCard]}>
       <View style={styles.sliderTrack}>
-        <View
-          style={[
-            styles.sliderProgress,
-            {
-              width:
-                selectedIndex === 0
-                  ? "16%"
-                  : selectedIndex === 1
-                    ? "50%"
-                    : "86%",
-            },
-          ]}
-        />
+        <View style={[styles.sliderProgress, { width: position }]} />
 
-        <View
-          style={[
-            styles.sliderThumb,
-            {
-              left:
-                selectedIndex === 0
-                  ? "16%"
-                  : selectedIndex === 1
-                    ? "50%"
-                    : "86%",
-            },
-          ]}
-        />
+        <View style={[styles.sliderThumb, { left: position }]} />
       </View>
 
       <View style={styles.fontLabels}>
@@ -196,10 +166,11 @@ function FontSizeSelector({
             key={size}
             onPress={() => !disabled && onChange(size)}
             disabled={disabled}
-            hitSlop={8}>
+            hitSlop={10}>
             <Text
               style={[
                 styles.fontLabel,
+                { fontSize: FONT_LABEL_SIZE[size] },
                 value === size && styles.fontLabelSelected,
               ]}>
               {size}
@@ -232,73 +203,19 @@ export default function Appearance() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  /**
-   * Convert backend theme value to the value
-   * currently displayed by the UI.
-   */
-  const backendThemeToUI = (value?: BackendThemeMode): ThemeMode => {
-    switch (value) {
-      case "light":
-        return "Light";
-      case "dark":
-        return "Dark";
-      case "system":
-      default:
-        return "System";
-    }
-  };
+  const backendThemeToUI = (value?: BackendThemeMode): ThemeMode =>
+    value === "light" ? "Light" : value === "dark" ? "Dark" : "System";
 
-  /**
-   * Convert backend font size to the value
-   * currently displayed by the UI.
-   */
-  const backendFontSizeToUI = (value?: BackendFontSize): FontSize => {
-    switch (value) {
-      case "small":
-        return "Small";
-      case "large":
-        return "Large";
-      case "medium":
-      default:
-        return "Medium";
-    }
-  };
+  const backendFontSizeToUI = (value?: BackendFontSize): FontSize =>
+    value === "small" ? "Small" : value === "large" ? "Large" : "Medium";
 
-  /**
-   * Convert UI theme value to the exact
-   * value expected by MongoDB/backend.
-   */
-  const uiThemeToBackend = (value: ThemeMode): BackendThemeMode => {
-    switch (value) {
-      case "Light":
-        return "light";
-      case "Dark":
-        return "dark";
-      case "System":
-      default:
-        return "system";
-    }
-  };
+  const uiThemeToBackend = (value: ThemeMode): BackendThemeMode =>
+    value === "Light" ? "light" : value === "Dark" ? "dark" : "system";
 
-  /**
-   * Convert UI font size to the exact
-   * value expected by MongoDB/backend.
-   */
-  const uiFontSizeToBackend = (value: FontSize): BackendFontSize => {
-    switch (value) {
-      case "Small":
-        return "small";
-      case "Large":
-        return "large";
-      case "Medium":
-      default:
-        return "medium";
-    }
-  };
+  const uiFontSizeToBackend = (value: FontSize): BackendFontSize =>
+    value === "Small" ? "small" : value === "Large" ? "large" : "medium";
 
-  /**
-   * Load Appearance settings from MongoDB.
-   */
+  // Load the saved appearance settings.
   useEffect(() => {
     let mounted = true;
 
@@ -330,10 +247,7 @@ export default function Appearance() {
     };
   }, [dispatch, token]);
 
-  /**
-   * Sync the screen with the settings returned
-   * from the backend.
-   */
+  // Show what the backend returned.
   useEffect(() => {
     if (!appearanceFromStore) {
       return;
@@ -350,13 +264,10 @@ export default function Appearance() {
     setReduceMotion(Boolean(appearance.reduceMotion));
   }, [appearanceFromStore]);
 
-  /**
-   * Save a single Appearance setting.
-   */
+  // Saves one setting; rolls back if the save fails.
   const saveAppearanceSetting = async (
     field: keyof AppearanceSettings,
     value: string | boolean,
-    previousValue: string | boolean,
     updateLocal: () => void,
     rollbackLocal: () => void,
   ) => {
@@ -380,204 +291,181 @@ export default function Appearance() {
       console.error(`Failed to update appearance setting "${field}":`, error);
 
       rollbackLocal();
-
-      console.warn(`Appearance setting "${field}" was not saved.`, {
-        attemptedValue: value,
-        previousValue,
-      });
     } finally {
       setSaving(false);
     }
   };
 
-  /**
-   * Theme change.
-   */
   const handleThemeChange = (value: ThemeMode) => {
-    const previousTheme = theme;
-
-    const backendValue = uiThemeToBackend(value);
+    const previous = theme;
 
     saveAppearanceSetting(
       "themeMode",
-      backendValue,
-      uiThemeToBackend(previousTheme),
-      () => {
-        setTheme(value);
-      },
-      () => {
-        setTheme(previousTheme);
-      },
+      uiThemeToBackend(value),
+      () => setTheme(value),
+      () => setTheme(previous),
     );
   };
 
-  /**
-   * Accent color change.
-   */
   const handleAccentColorChange = (value: string) => {
-    const previousColor = accentColor;
+    const previous = accentColor;
 
     saveAppearanceSetting(
       "accentColor",
       value.toLowerCase(),
-      previousColor.toLowerCase(),
-      () => {
-        setAccentColor(value);
-      },
-      () => {
-        setAccentColor(previousColor);
-      },
+      () => setAccentColor(value),
+      () => setAccentColor(previous),
     );
   };
 
-  /**
-   * Font size change.
-   */
   const handleFontSizeChange = (value: FontSize) => {
-    const previousFontSize = fontSize;
-
-    const backendValue = uiFontSizeToBackend(value);
+    const previous = fontSize;
 
     saveAppearanceSetting(
       "fontSize",
-      backendValue,
-      uiFontSizeToBackend(previousFontSize),
-      () => {
-        setFontSize(value);
-      },
-      () => {
-        setFontSize(previousFontSize);
-      },
+      uiFontSizeToBackend(value),
+      () => setFontSize(value),
+      () => setFontSize(previous),
     );
   };
 
-  /**
-   * Reduce Motion change.
-   */
   const handleReduceMotionChange = (value: boolean) => {
-    const previousValue = reduceMotion;
+    const previous = reduceMotion;
 
     saveAppearanceSetting(
       "reduceMotion",
       value,
-      previousValue,
-      () => {
-        setReduceMotion(value);
-      },
-      () => {
-        setReduceMotion(previousValue);
-      },
+      () => setReduceMotion(value),
+      () => setReduceMotion(previous),
     );
   };
 
+  const busy = loading || saving;
+
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}>
-        {/* Header */}
+        {/* HEADER: back arrow, then the Figma eye chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={() => safeBack("/settings")}
+            hitSlop={10}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <View style={styles.headerCenter}>
-            <View style={styles.headerIconContainer}>
-              <Ionicons name="eye-outline" size={16} color="#C5399A" />
+            <View style={styles.headerIcon}>
+              <Ionicons name="eye-outline" size={16} color={PINK} />
             </View>
 
             <Text style={styles.headerTitle}>Appearance</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.backButton} />
         </View>
 
-        {/* THEME MODE */}
-        <SectionLabel>THEME MODE</SectionLabel>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>THEME MODE</Text>
 
-        <ThemeSelector
-          value={theme}
-          onChange={handleThemeChange}
-          disabled={loading || saving}
-        />
-
-        {/* ACCENT COLOR */}
-        <SectionLabel>ACCENT COLOR</SectionLabel>
-
-        <AccentColorSelector
-          value={accentColor}
-          onChange={handleAccentColorChange}
-          disabled={loading || saving}
-        />
-
-        {/* FONT SIZE */}
-        <SectionLabel>FONT SIZE</SectionLabel>
-
-        <FontSizeSelector
-          value={fontSize}
-          onChange={handleFontSizeChange}
-          disabled={loading || saving}
-        />
-
-        {/* ACCESSIBILITY */}
-        <SectionLabel>ACCESSIBILITY</SectionLabel>
-
-        <View style={styles.preferenceRow}>
-          <View style={styles.preferenceIcon}>
-            <Ionicons name="ellipse" size={14} color="#C5399A" />
-          </View>
-
-          <Text style={styles.preferenceLabel}>Reduce Motion</Text>
-
-          <Switch
-            value={reduceMotion}
-            onValueChange={handleReduceMotionChange}
-            disabled={loading || saving}
-            trackColor={{
-              false: "#D4D4D8",
-              true: "#D88CC0",
-            }}
-            thumbColor={reduceMotion ? "#C5399A" : "#F4F4F5"}
-            ios_backgroundColor="#D4D4D8"
+          <ThemeSelector
+            value={theme}
+            onChange={handleThemeChange}
+            disabled={busy}
           />
         </View>
 
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#C5399A" />
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCENT COLOR</Text>
+
+          <AccentColorSelector
+            value={accentColor}
+            onChange={handleAccentColorChange}
+            disabled={busy}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>FONT SIZE</Text>
+
+          <FontSizeSelector
+            value={fontSize}
+            onChange={handleFontSizeChange}
+            disabled={busy}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCESSIBILITY</Text>
+
+          <View style={styles.row}>
+            <View style={styles.rowIcon}>
+              <Ionicons name="ellipse" size={13} color={PINK} />
+            </View>
+
+            <Text style={styles.rowLabel}>Reduce Motion</Text>
+
+            <PinkSwitch
+              value={reduceMotion}
+              onChange={handleReduceMotionChange}
+              disabled={busy}
+            />
           </View>
-        )}
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={PINK} />
+          </View>
+        ) : null}
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 4,
   },
 
   backButton: {
     width: 36,
     height: 36,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
 
@@ -586,71 +474,63 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
 
-  headerIconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  // Figma: 35 x 36, radius 100, padding 8, background #0000000A
+  headerIcon: {
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    backgroundColor: "#0000000A",
   },
 
   headerTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
-  headerSpacer: {
-    width: 36,
+  section: {
+    paddingTop: 18,
+    gap: 12,
   },
 
   sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8D8D98",
-    letterSpacing: 0.5,
-    marginBottom: 9,
-    marginTop: 14,
-    marginLeft: 2,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
+  // Milky selector with a pink pill.
   segmentContainer: {
-    height: 44,
+    ...MILKY,
+    height: 46,
     flexDirection: "row",
     alignItems: "center",
-    padding: 3,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.52)",
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    elevation: 2,
+    padding: 4,
   },
 
   segmentOption: {
     flex: 1,
-    height: 38,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
+    borderRadius: 10,
   },
 
   segmentOptionSelected: {
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
   },
 
   segmentText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6D6D78",
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: "#55555E",
   },
 
   segmentTextSelected: {
@@ -658,143 +538,112 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    minHeight: 55,
+    ...MILKY,
+    minHeight: 58,
     justifyContent: "center",
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    backgroundColor: "rgba(255,255,255,0.48)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 3,
+    paddingHorizontal: 14,
   },
 
   accentColors: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
+    gap: 14,
   },
 
   accentColorOuter: {
-    width: 31,
-    height: 31,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
 
+  // Dark ring around the chosen colour (Figma).
   accentColorSelected: {
     borderWidth: 2,
     borderColor: "#191922",
   },
 
   accentColor: {
-    width: 27,
-    height: 27,
+    width: 28,
+    height: 28,
     borderRadius: 14,
   },
 
   fontCard: {
-    minHeight: 66,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.48)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 3,
+    minHeight: 72,
+    paddingVertical: 14,
   },
 
   sliderTrack: {
     height: 4,
     borderRadius: 3,
-    backgroundColor: "#E1E1E5",
+    backgroundColor: "rgba(195,77,156,0.15)",
     position: "relative",
-    marginHorizontal: 1,
   },
 
   sliderProgress: {
     height: 4,
     borderRadius: 3,
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
   },
 
   sliderThumb: {
     position: "absolute",
-    top: -6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginLeft: -8,
+    top: -7,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginLeft: -9,
     backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: "#C5399A",
+    borderColor: PINK,
   },
 
   fontLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    alignItems: "flex-end",
+    marginTop: 12,
   },
 
   fontLabel: {
-    fontSize: 11,
-    color: "#777780",
+    fontFamily: FONTS.regular,
+    color: "#6B6B72",
   },
 
   fontLabelSelected: {
-    fontWeight: "700",
+    fontFamily: FONTS.semibold,
     color: "#191922",
   },
 
-  preferenceRow: {
-    minHeight: 53,
+  // Milky row.
+  row: {
+    ...MILKY,
+    minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.48)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 3,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
 
-  preferenceIcon: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
-  preferenceLabel: {
+  rowLabel: {
     flex: 1,
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: "#5B5B67",
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
+    color: "#3B3B42",
   },
 
   loadingContainer: {

@@ -1,25 +1,31 @@
-import { AppBackground } from "@/components/AppBackground";
+import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-      fetchCurrentUser,
-      saveAvatarPhoto,
-      saveUserProfile,
+  fetchCurrentUser,
+  saveAvatarPhoto,
+  saveUserProfile,
 } from "@/store/thunks/userThunks";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-      Alert,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const PINK = "#C34D9C";
 
 type AccountInfoRowProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -30,6 +36,8 @@ type AccountInfoRowProps = {
   keyboardType?: "default" | "email-address" | "phone-pad";
 };
 
+// Figma row: milky card, pink icon on a soft pink circle, small grey label,
+// bold value.
 function AccountInfoRow({
   icon,
   label,
@@ -41,7 +49,7 @@ function AccountInfoRow({
   return (
     <View style={styles.infoCard}>
       <View style={styles.infoIcon}>
-        <Ionicons name={icon} size={17} color="#C5399A" />
+        <Ionicons name={icon} size={15} color={PINK} />
       </View>
 
       <View style={styles.infoContent}>
@@ -103,6 +111,9 @@ export default function AccountInformation() {
   const backendPhoto =
     user?.profile?.avatarPhotoUrl || authUser?.profile?.avatarPhotoUrl || null;
 
+  const avatarKey =
+    user?.profile?.avatarKey || authUser?.profile?.avatarKey || "";
+
   const [displayName, setDisplayName] = useState("");
 
   const [username, setUsername] = useState("");
@@ -137,9 +148,25 @@ export default function AccountInformation() {
     setPhoto(backendPhoto);
   }, [backendPhoto]);
 
-  const profilePhoto = useMemo(() => {
-    return photo || null;
-  }, [photo]);
+  // Figma: your avatar character in the pink ring (a just-picked photo, or
+  // your photo if you have no avatar, otherwise).
+  const avatarSource = useMemo(() => {
+    if (photo && photo !== backendPhoto) {
+      return { uri: photo };
+    }
+
+    const preset = AVATARS.find((avatar) => avatar.id === avatarKey);
+
+    if (preset?.source) {
+      return preset.source;
+    }
+
+    if (photo) {
+      return { uri: photo };
+    }
+
+    return null;
+  }, [photo, backendPhoto, avatarKey]);
 
   async function handleChangePhoto() {
     if (!email) {
@@ -162,7 +189,7 @@ export default function AccountInformation() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
@@ -214,8 +241,6 @@ export default function AccountInformation() {
     const trimmedName = displayName.trim();
 
     const trimmedUsername = username.trim();
-
-    const trimmedPhone = phone.trim();
 
     if (!trimmedName) {
       Alert.alert("Missing Display Name", "Please enter your display name.");
@@ -294,117 +319,118 @@ export default function AccountInformation() {
     }
   }
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/settings");
+    }
+  };
+
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
+        {/* HEADER (Figma: pink icon on the left - tap it to go back) */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={goBack}
+            hitSlop={10}
+            style={styles.headerIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="person-outline" size={16} color={PINK} />
           </Pressable>
 
-          <View style={styles.headerCenter}>
-            <View style={styles.headerIcon}>
-              <Ionicons name="person-outline" size={16} color="#C5399A" />
-            </View>
-
-            <Text style={styles.headerTitle}>Account Information</Text>
-          </View>
+          <Text style={styles.headerTitle}>Account Information</Text>
 
           <View style={styles.headerSpacer} />
         </View>
 
+        {/* PHOTO in a pink ring */}
         <View style={styles.photoSection}>
           <View style={styles.photoRing}>
             <View style={styles.photoInner}>
-              {profilePhoto ? (
+              {avatarSource ? (
                 <Image
-                  source={{ uri: profilePhoto }}
+                  source={avatarSource}
                   style={styles.profilePhoto}
                   contentFit="cover"
                 />
               ) : (
-                <View style={styles.emptyPhoto}>
-                  <Ionicons name="person" size={42} color="#A5A5AF" />
-                </View>
+                <Ionicons name="person" size={38} color="#A5A5AF" />
               )}
             </View>
           </View>
 
-          <Pressable
-            onPress={handleChangePhoto}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.changePhotoButton,
-              pressed && styles.pressed,
-            ]}>
+          <Pressable onPress={handleChangePhoto} disabled={saving} hitSlop={8}>
             <Text style={styles.changePhotoText}>Change Profile Photo</Text>
           </Pressable>
         </View>
 
-        <AccountInfoRow
-          icon="person-outline"
-          label="Display Name"
-          value={displayName}
-          editable
-          onChangeText={setDisplayName}
-        />
+        {/* ROWS (Figma: 362 wide, gap 12) */}
+        <View style={styles.list}>
+          <AccountInfoRow
+            icon="person-outline"
+            label="Display Name"
+            value={displayName}
+            editable
+            onChangeText={setDisplayName}
+          />
 
-        <AccountInfoRow
-          icon="at-outline"
-          label="Username"
-          value={username}
-          editable
-          onChangeText={setUsername}
-        />
+          <AccountInfoRow
+            icon="at-outline"
+            label="Username"
+            value={username}
+            editable
+            onChangeText={setUsername}
+          />
 
-        <AccountInfoRow
-          icon="mail-outline"
-          label="Email Address"
-          value={email}
-        />
+          <AccountInfoRow
+            icon="mail-outline"
+            label="Email Address"
+            value={email}
+          />
 
-        <AccountInfoRow
-          icon="call-outline"
-          label="Phone Number"
-          value={phone}
-          editable
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
+          <AccountInfoRow
+            icon="call-outline"
+            label="Phone Number"
+            value={phone}
+            editable
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
 
-        <AccountInfoRow
-          icon="calendar-outline"
-          label="Date of Birth"
-          value="Not available"
-        />
+          <AccountInfoRow
+            icon="calendar-outline"
+            label="Date of Birth"
+            value={
+              backendAge !== null && Number.isFinite(backendAge)
+                ? `${backendAge} years old`
+                : "Not available"
+            }
+          />
+        </View>
 
-        {backendAge !== null ? (
-          <View style={styles.ageNote}>
-            <Ionicons
-              name="information-circle-outline"
-              size={18}
-              color="#C5399A"
-            />
-
-            <Text style={styles.ageNoteText}>
-              Your account currently stores your age ({backendAge}), not your
-              date of birth.
-            </Text>
-          </View>
-        ) : null}
-
+        {/* SAVE (Figma: #C34D9C, 362 x 56, padding 16, radius 20,
+            shadow 0 4 10 #0000000D) */}
         <Pressable
           onPress={handleSave}
           disabled={saving}
@@ -413,85 +439,85 @@ export default function AccountInformation() {
             saving && styles.saveButtonDisabled,
             pressed && !saving && styles.pressed,
           ]}>
-          <Text style={styles.saveButtonText}>
-            {saving ? "Saving..." : "Save Changes"}
-          </Text>
+          {saving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
         </Pressable>
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 14,
   },
 
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  headerCenter: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
+  // Pink icon on a soft pink circle.
   headerIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    // Figma: 35 x 36, radius 100, padding 8, background #0000000A
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    backgroundColor: "#0000000A",
   },
 
   headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
   headerSpacer: {
-    width: 36,
+    width: 35,
   },
 
   photoSection: {
     alignItems: "center",
+    gap: 10,
     marginBottom: 22,
   },
 
   photoRing: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    padding: 3,
     borderWidth: 2,
-    borderColor: "#C5399A",
+    borderColor: PINK,
+    backgroundColor: "transparent",
   },
 
   photoInner: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    flex: 1,
+    borderRadius: 40,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EEF5F8",
+    // Figma: see-through - the page's own background shows behind the avatar.
+    backgroundColor: "transparent",
   },
 
   profilePhoto: {
@@ -499,57 +525,45 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  emptyPhoto: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  changePhotoButton: {
-    marginTop: 10,
-  },
-
   changePhotoText: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.semibold,
+    fontSize: 13,
+    color: PINK,
   },
 
+  // Figma: 362 x 317, gap 12
+  list: {
+    gap: 12,
+  },
+
+  // Milky pressed-in card.
   infoCard: {
     minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    marginBottom: 8,
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.48)",
-
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
+    borderColor: "rgba(255,255,255,0.75)",
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
+  // Pink icon on a soft pink circle.
   infoIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   infoContent: {
@@ -557,59 +571,42 @@ const styles = StyleSheet.create({
   },
 
   infoLabel: {
+    fontFamily: FONTS.regular,
     fontSize: 11.5,
-    color: "#85858F",
-    marginBottom: 3,
+    color: "#7A7A84",
+    marginBottom: 1,
   },
 
   infoValue: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: "#202029",
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    color: "#191922",
   },
 
   infoInput: {
     padding: 0,
     margin: 0,
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: "#202029",
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    color: "#191922",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
-  ageNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: 4,
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-
-  ageNoteText: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 11,
-    lineHeight: 16,
-    color: "#85858F",
-  },
-
+  // Figma: #C34D9C, 56 tall, padding 16, radius 20, shadow 0 4 10 #0000000D
   saveButton: {
-    minHeight: 51,
+    minHeight: 56,
+    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
-    marginTop: 6,
+    borderRadius: 20,
+    marginTop: 20,
+    backgroundColor: PINK,
 
-    backgroundColor: "#C5399A",
-
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    elevation: 4,
+    shadowColor: "#000000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   saveButtonDisabled: {
@@ -617,12 +614,12 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
-    fontSize: 13.5,
-    fontWeight: "700",
+    fontFamily: FONTS.semibold,
+    fontSize: 15,
     color: "#FFFFFF",
   },
 
   pressed: {
-    opacity: 0.72,
+    opacity: 0.8,
   },
 });

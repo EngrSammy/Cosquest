@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
 import { CommentAudio } from "./CommentAudio";
 import { ReplyItem } from "./ReplyItem";
 
@@ -49,6 +50,7 @@ function getAvatar(author: any) {
   );
 }
 
+// Figma: short times next to the name - "now", "5m", "3h", "2d", "3w".
 function getTime(createdAt?: string) {
   if (!createdAt) {
     return "";
@@ -63,26 +65,32 @@ function getTime(createdAt?: string) {
   const minutes = Math.floor(Math.max(0, Date.now() - createdTime) / 60000);
 
   if (minutes < 1) {
-    return "just now";
+    return "now";
   }
 
   if (minutes < 60) {
-    return `${minutes} min ago`;
+    return `${minutes}m`;
   }
 
   const hours = Math.floor(minutes / 60);
 
   if (hours < 24) {
-    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    return `${hours}h`;
   }
 
   const days = Math.floor(hours / 24);
 
   if (days < 7) {
-    return `${days} day${days === 1 ? "" : "s"} ago`;
+    return `${days}d`;
   }
 
-  return new Date(createdTime).toLocaleDateString();
+  const weeks = Math.floor(days / 7);
+
+  if (weeks < 52) {
+    return `${weeks}w`;
+  }
+
+  return `${Math.floor(weeks / 52)}y`;
 }
 
 export function CommentItem({
@@ -139,60 +147,50 @@ export function CommentItem({
 
   const hasVoice = Boolean(comment?.media?.url);
 
+  const time = getTime(comment?.createdAt);
+
   return (
     <View style={styles.section}>
       <View style={styles.row}>
-        {/* PROFILE PHOTO */}
-        <Image
-          source={getAvatar(comment?.author || comment)}
-          style={styles.avatar}
-          contentFit="cover"
-        />
+        {/* PROFILE PHOTO (pink ring, Figma) */}
+        <View style={styles.avatarRing}>
+          <Image
+            source={getAvatar(comment?.author || comment)}
+            style={styles.avatar}
+            contentFit="cover"
+          />
+        </View>
 
         <View style={styles.body}>
-          {/* USERNAME */}
+          {/* USERNAME · time · by author */}
           <View style={styles.nameRow}>
             <Text style={styles.username}>{username}</Text>
 
+            {time ? <Text style={styles.time}>{time}</Text> : null}
+
             {isPostAuthor ? (
-              <Text style={styles.authorBadge}>♥ by author</Text>
+              <View style={styles.authorBadge}>
+                <Ionicons name="heart-outline" size={11} color="#C5399A" />
+                <Text style={styles.authorBadgeText}>by author</Text>
+              </View>
             ) : null}
           </View>
-
-          {/* TIME */}
-          <Text style={styles.time}>{getTime(comment?.createdAt)}</Text>
 
           {/* VOICE COMMENT */}
           {hasVoice ? <CommentAudio media={comment.media} /> : null}
 
           {/* COMMENT TEXT — a voice comment may still carry a short
-              typed caption alongside the audio, so this isn't mutually
-              exclusive with the player above. */}
+              typed caption alongside the audio. */}
           {comment?.body ? (
             <Text style={styles.text}>{comment.body}</Text>
           ) : null}
 
-          {/* ACTIONS */}
+          {/* ACTIONS: Reply (pink) + view replies */}
           <View style={styles.actions}>
-            {/* REPLY */}
             <Pressable onPress={onReply} hitSlop={6}>
               <Text style={styles.replyText}>Reply</Text>
             </Pressable>
 
-            {/* LIKE */}
-            <Pressable style={styles.likeAction} onPress={onLike} hitSlop={6}>
-              <Ionicons
-                name={liked ? "heart" : "heart-outline"}
-                size={16}
-                color={liked ? "#C5399A" : "#8B8B93"}
-              />
-
-              <Text style={[styles.likeCount, liked && styles.likedCount]}>
-                {likeCount}
-              </Text>
-            </Pressable>
-
-            {/* VIEW REPLIES */}
             {Number(comment?.replyCount || 0) > 0 ? (
               <Pressable onPress={onToggleReplies} hitSlop={6}>
                 <Text style={styles.viewReplies}>
@@ -204,15 +202,35 @@ export function CommentItem({
                 </Text>
               </Pressable>
             ) : null}
+
+            {/* Delete your own comment */}
+            {isMine ? (
+              <Pressable onPress={onDelete} hitSlop={8}>
+                <Text style={styles.deleteText}>Delete</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
-        {/* DELETE COMMENT */}
-        {isMine ? (
-          <Pressable onPress={onDelete} hitSlop={8}>
-            <Ionicons name="trash-outline" size={17} color="#9999A1" />
-          </Pressable>
-        ) : null}
+        {/* LIKE on the right, with the number under it (Figma) */}
+        <Pressable
+          style={styles.likeColumn}
+          onPress={onLike}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={liked ? "Unlike comment" : "Like comment"}>
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={18}
+            color={liked ? "#C5399A" : "#9C9CAA"}
+          />
+
+          {likeCount > 0 ? (
+            <Text style={[styles.likeCount, liked && styles.likedCount]}>
+              {likeCount}
+            </Text>
+          ) : null}
+        </Pressable>
       </View>
 
       {/* REPLIES */}
@@ -246,19 +264,26 @@ export function CommentItem({
 
 const styles = StyleSheet.create({
   section: {
-    paddingVertical: 9,
+    paddingVertical: 10,
   },
 
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 12,
+  },
+
+  avatarRing: {
+    padding: 2,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(197,57,154,0.45)",
   },
 
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "#E9E9ED",
   },
 
@@ -275,68 +300,83 @@ const styles = StyleSheet.create({
   },
 
   username: {
+    fontFamily: FONTS.semibold,
     fontSize: 13,
-    fontWeight: "700",
     color: "#191922",
   },
 
-  authorBadge: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#C5399A",
-  },
-
   time: {
-    marginTop: 2,
+    fontFamily: FONTS.regular,
     fontSize: 11,
     color: "#9999A1",
   },
 
+  authorBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+
+  authorBadgeText: {
+    fontFamily: FONTS.medium,
+    fontSize: 10.5,
+    color: "#C5399A",
+  },
+
   text: {
-    marginTop: 4,
-    fontSize: 14,
+    marginTop: 3,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
     lineHeight: 19,
-    color: "#424249",
+    color: "#3B3B42",
   },
 
   actions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 18,
-    marginTop: 7,
+    marginTop: 6,
   },
 
   replyText: {
+    fontFamily: FONTS.medium,
     fontSize: 12,
-    fontWeight: "700",
     color: "#C5399A",
   },
 
-  likeAction: {
-    flexDirection: "row",
+  viewReplies: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: "#7C7C85",
+  },
+
+  deleteText: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: "#9999A1",
+  },
+
+  // Like heart + number, on the right.
+  likeColumn: {
+    width: 30,
     alignItems: "center",
-    gap: 4,
+    paddingTop: 2,
   },
 
   likeCount: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#8B8B93",
+    marginTop: 2,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: "#9C9CAA",
   },
 
   likedCount: {
     color: "#C5399A",
   },
 
-  viewReplies: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#7C7C85",
-  },
-
   replies: {
     marginTop: 10,
-    marginLeft: 50,
+    marginLeft: 54,
     paddingLeft: 12,
     borderLeftWidth: 1,
     borderLeftColor: "#E5E5E9",

@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
 
 // Backend errors that need a special button (exact texts from the API doc).
 const INVALID_CODE_ERROR = "That code is invalid or has expired.";
@@ -141,7 +142,7 @@ export default function ResetPassword() {
 
               {codeProblem ? (
                 <>
-                  <Pressable onPress={() => router.back()} hitSlop={8}>
+                  <Pressable onPress={() => safeBack()} hitSlop={8}>
                     <Text style={styles.link}>Back to the code screen</Text>
                   </Pressable>
 

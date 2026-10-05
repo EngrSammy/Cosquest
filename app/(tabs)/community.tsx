@@ -3,6 +3,7 @@ import { Chats } from "@/components/community/Chats";
 import { Feeds } from "@/components/community/Feeds";
 import { Spotlight } from "@/components/community/Spotlight";
 import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { Ionicons } from "@expo/vector-icons";
@@ -62,14 +63,16 @@ export default function Community() {
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            // Figma: the header starts 52 from the top (status bar area).
+            // On the website there's no status bar, so use 52 there too.
+            paddingTop: Math.max(insets.top, 52),
           },
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* Keeps everything a comfortable width on big computer screens,
-            like Facebook on desktop. Full width on phones. */}
+        {/* Keeps everything a comfortable width on big computer screens.
+            Full width on phones. */}
         <View style={styles.column}>
-          {/* HEADER */}
+          {/* HEADER - avatar in a soft pink circle, title, pink bell */}
           <View style={[styles.header, styles.padded]}>
             <Pressable onPress={() => router.push("/profile")} hitSlop={10}>
               <View style={styles.avatarWrap}>
@@ -86,7 +89,7 @@ export default function Community() {
             <Pressable
               onPress={() => router.push("/notifications")}
               hitSlop={10}>
-              <Ionicons name="notifications" size={24} color="#C5399A" />
+              <Ionicons name="notifications" size={28} color="#C5399A" />
             </Pressable>
           </View>
 
@@ -97,7 +100,8 @@ export default function Community() {
             </View>
           ) : null}
 
-          {/* COMMUNITY TABS */}
+          {/* COMMUNITY TABS - the open one is filled pink, the others are
+              raised white pills with a soft shadow (Figma) */}
           <View style={styles.tabs}>
             {TABS.map((key) => {
               const active = tab === key;
@@ -105,21 +109,23 @@ export default function Community() {
               return (
                 <Pressable
                   key={key}
-                  style={styles.tab}
+                  style={[
+                    styles.tab,
+                    active ? styles.tabActive : styles.tabInactive,
+                  ]}
+                  hitSlop={6}
                   onPress={() => setTab(key)}>
                   <Text
                     style={[styles.tabText, active && styles.tabTextActive]}>
                     {key}
                   </Text>
-
-                  {active ? <View style={styles.tabIndicator} /> : null}
                 </Pressable>
               );
             })}
           </View>
 
-          {/* CONTENT — the feed is full width (Facebook style); chats and
-              spotlight keep their side padding. */}
+          {/* CONTENT - the feed is full width; chats and spotlight keep
+              their side padding. */}
           {tab === "Feeds" ? (
             <Feeds />
           ) : tab === "Chats" ? (
@@ -137,6 +143,8 @@ export default function Community() {
   );
 }
 
+const PINK = "#C34D9C";
+
 const styles = StyleSheet.create({
   scroll: {
     paddingBottom: 140,
@@ -149,28 +157,38 @@ const styles = StyleSheet.create({
   },
 
   padded: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    height: 56,
+    marginBottom: 14,
   },
 
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#191922",
+    fontFamily: FONTS.semibold,
+    fontSize: 22,
+    color: "#000000",
   },
 
+  // Figma: a bigger avatar on a soft pink circle.
   avatarWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 30,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     overflow: "hidden",
-    backgroundColor: "rgba(195, 77, 156, 0.2)",
+    backgroundColor: "rgba(195,77,156,0.22)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.9)",
+
+    shadowColor: PINK,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 
   profileImg: {
@@ -183,40 +201,61 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
+  // Three pills spread across the width (Feeds left, Chats middle,
+  // Spotlight right).
   tabs: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 34,
-    height: 40,
-    marginBottom: 8,
+    justifyContent: "space-between",
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 420,
+    paddingHorizontal: 28,
+    marginBottom: 26,
   },
 
   tab: {
-    minWidth: 65,
-    height: 40,
+    minWidth: 82,
+    height: 26,
+    paddingHorizontal: 18,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
+  },
+
+  tabActive: {
+    backgroundColor: PINK,
+
+    shadowColor: PINK,
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+
+  // Raised white pill.
+  tabInactive: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
 
   tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#777780",
+    fontFamily: FONTS.medium,
+    fontSize: 15,
+    color: "#4B4B53",
+    // Poppins sits a little high in its box; this centres it.
+    lineHeight: 20,
   },
 
   tabTextActive: {
-    color: "#191922",
-    fontWeight: "700",
-  },
-
-  tabIndicator: {
-    position: "absolute",
-    bottom: 0,
-    width: 32,
-    height: 3,
-    borderRadius: 3,
-    backgroundColor: "#C5399A",
+    fontFamily: FONTS.semibold,
+    color: "#FFFFFF",
   },
 });

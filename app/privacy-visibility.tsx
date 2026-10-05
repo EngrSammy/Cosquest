@@ -1,54 +1,63 @@
-import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
+import { getBlockedUsernames } from "@/services/publicProfile";
+import { useAppSelector } from "@/store/hooks";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const PINK = "#C34D9C";
+
 type VisibilityOption = "Public" | "Friends" | "Private";
 
-type PrivacyToggleRowProps = {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
+// Figma switch: pink when on, grey when off, white knob. Drawn by hand so it
+// looks the same on phones and the website.
+function PinkSwitch({
+  value,
+  onChange,
+}: {
   value: boolean;
   onChange: (value: boolean) => void;
-  disabled?: boolean;
-};
+}) {
+  return (
+    <Pressable
+      onPress={() => onChange(!value)}
+      hitSlop={8}
+      style={[styles.switchTrack, value && styles.switchTrackOn]}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}>
+      <View style={[styles.switchKnob, value && styles.switchKnobOn]} />
+    </Pressable>
+  );
+}
 
 function PrivacyToggleRow({
-  icon,
   label,
   value,
   onChange,
-  disabled = false,
-}: PrivacyToggleRowProps) {
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
-    <View style={styles.preferenceRow}>
-      <View style={styles.preferenceIcon}>
-        <Ionicons name={icon} size={17} color="#C5399A" />
+    <View style={styles.row}>
+      <View style={styles.rowIcon}>
+        <Ionicons name="person" size={15} color={PINK} />
       </View>
 
-      <Text style={styles.preferenceLabel}>{label}</Text>
+      <Text style={styles.rowLabel}>{label}</Text>
 
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        trackColor={{
-          false: "#D3D3D8",
-          true: "#D88CC0",
-        }}
-        thumbColor={value ? "#C5399A" : "#F4F4F5"}
-        ios_backgroundColor="#D3D3D8"
-      />
+      <PinkSwitch value={value} onChange={onChange} />
     </View>
   );
 }
@@ -89,36 +98,10 @@ function VisibilitySelector({
   );
 }
 
-function BlockedUsersRow({
-  count,
-  onPress,
-}: {
-  count: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.blockedCard, pressed && styles.pressed]}>
-      <View style={styles.preferenceIcon}>
-        <Ionicons name="lock-closed" size={17} color="#C5399A" />
-      </View>
-
-      <View style={styles.blockedTextContainer}>
-        <Text style={styles.blockedTitle}>Blocked Users</Text>
-
-        <Text style={styles.blockedSubtitle}>
-          {count} {count === 1 ? "account" : "accounts"} blocked
-        </Text>
-      </View>
-
-      <Ionicons name="chevron-forward" size={17} color="#9999A3" />
-    </Pressable>
-  );
-}
-
 export default function PrivacyVisibility() {
   const insets = useSafeAreaInsets();
+
+  const token = useAppSelector((state) => state.auth.token);
 
   const [visibility, setVisibility] = useState<VisibilityOption>("Friends");
 
@@ -130,8 +113,32 @@ export default function PrivacyVisibility() {
 
   const [allowDirectMessages, setAllowDirectMessages] = useState(false);
 
-  // Backend does not currently expose blocked-user count.
-  const blockedUsersCount = 0;
+  // Real list of people you've blocked (GET /api/users/me/blocked).
+  const [blockedNames, setBlockedNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getBlockedUsernames(token)
+      .then((names) => {
+        if (!cancelled) {
+          setBlockedNames(Array.from(names));
+        }
+      })
+      .catch(() => {
+        // Keep 0 if it can't be loaded.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const blockedUsersCount = blockedNames.length;
 
   function handleVisibilityChange(value: VisibilityOption) {
     setVisibility(value);
@@ -156,140 +163,197 @@ export default function PrivacyVisibility() {
   }
 
   function handleBlockedUsers() {
+    if (!blockedUsersCount) {
+      Alert.alert("Blocked Users", "You haven't blocked anyone.");
+      return;
+    }
+
     Alert.alert(
-      "Coming Soon",
-      "Blocked users will be available when the backend blocked-users endpoint is added.",
+      "Blocked Users",
+      `${blockedNames.map((name) => `@${name}`).join("\n")}\n\nTo unblock someone, open their profile (or your chat with them) and tap Unblock.`,
     );
   }
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/settings");
+    }
+  };
+
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}>
-        {/* Header */}
+        {/* HEADER: a clear back arrow, then the Figma lock chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={goBack}
+            hitSlop={10}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <View style={styles.headerCenter}>
-            {/* Grey privacy icon container */}
-            <View style={styles.privacyIconContainer}>
-              <Ionicons name="lock-closed-outline" size={16} color="#C5399A" />
+            <View style={styles.headerIcon}>
+              <Ionicons name="lock-closed-outline" size={16} color={PINK} />
             </View>
 
             <Text style={styles.headerTitle}>Privacy & Visibility</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.backButton} />
         </View>
 
         {/* PROFILE VISIBILITY */}
-        <Text style={styles.sectionLabel}>PROFILE VISIBILITY</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PROFILE VISIBILITY</Text>
 
-        <VisibilitySelector
-          value={visibility}
-          onChange={handleVisibilityChange}
-        />
+          <VisibilitySelector
+            value={visibility}
+            onChange={handleVisibilityChange}
+          />
+        </View>
 
         {/* PREFERENCES */}
-        <Text style={[styles.sectionLabel, styles.preferencesLabel]}>
-          PREFERENCES
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PREFERENCES</Text>
 
-        <PrivacyToggleRow
-          icon="lock-closed"
-          label="Show Online Status"
-          value={showOnlineStatus}
-          onChange={(value) =>
-            handlePrivacyToggle(
-              setShowOnlineStatus,
-              value,
-              "Show Online Status",
-            )
-          }
-        />
+          <PrivacyToggleRow
+            label="Show Online Status"
+            value={showOnlineStatus}
+            onChange={(value) =>
+              handlePrivacyToggle(
+                setShowOnlineStatus,
+                value,
+                "Show Online Status",
+              )
+            }
+          />
 
-        <PrivacyToggleRow
-          icon="lock-closed"
-          label="Show Activity Feed"
-          value={showActivityFeed}
-          onChange={(value) =>
-            handlePrivacyToggle(
-              setShowActivityFeed,
-              value,
-              "Show Activity Feed",
-            )
-          }
-        />
+          <PrivacyToggleRow
+            label="Show Activity Feed"
+            value={showActivityFeed}
+            onChange={(value) =>
+              handlePrivacyToggle(
+                setShowActivityFeed,
+                value,
+                "Show Activity Feed",
+              )
+            }
+          />
 
-        <PrivacyToggleRow
-          icon="lock-closed"
-          label="Allow Friend Requests"
-          value={allowFriendRequests}
-          onChange={(value) =>
-            handlePrivacyToggle(
-              setAllowFriendRequests,
-              value,
-              "Allow Friend Requests",
-            )
-          }
-        />
+          <PrivacyToggleRow
+            label="Allow Friend Requests"
+            value={allowFriendRequests}
+            onChange={(value) =>
+              handlePrivacyToggle(
+                setAllowFriendRequests,
+                value,
+                "Allow Friend Requests",
+              )
+            }
+          />
 
-        <PrivacyToggleRow
-          icon="lock-closed"
-          label="Allow Direct Messages"
-          value={allowDirectMessages}
-          onChange={(value) =>
-            handlePrivacyToggle(
-              setAllowDirectMessages,
-              value,
-              "Allow Direct Messages",
-            )
-          }
-        />
+          <PrivacyToggleRow
+            label="Allow Direct Messages"
+            value={allowDirectMessages}
+            onChange={(value) =>
+              handlePrivacyToggle(
+                setAllowDirectMessages,
+                value,
+                "Allow Direct Messages",
+              )
+            }
+          />
+        </View>
 
         {/* BLOCKED LIST */}
-        <Text style={[styles.sectionLabel, styles.blockedSectionLabel]}>
-          BLOCKED LIST
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>BLOCKED LIST</Text>
 
-        <BlockedUsersRow
-          count={blockedUsersCount}
-          onPress={handleBlockedUsers}
-        />
+          <Pressable
+            onPress={handleBlockedUsers}
+            style={({ pressed }) => [
+              styles.row,
+              styles.blockedRow,
+              pressed && styles.pressed,
+            ]}>
+            <View style={styles.rowIcon}>
+              <Ionicons name="person" size={15} color={PINK} />
+            </View>
+
+            <View style={styles.blockedTextContainer}>
+              <Text style={styles.blockedTitle}>Blocked Users</Text>
+
+              <Text style={styles.blockedSubtitle}>
+                {blockedUsersCount}{" "}
+                {blockedUsersCount === 1 ? "account" : "accounts"} blocked
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+          </Pressable>
+        </View>
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 4,
+  },
+
+  headerIcon: {
+    // Figma: 35 x 36, radius 100, padding 8, background #0000000A
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0000000A",
   },
 
   backButton: {
     width: 36,
     height: 36,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
 
@@ -298,147 +362,143 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  /* Grey container from the Figma design */
-  privacyIconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    gap: 10,
   },
 
   headerTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
   headerSpacer: {
-    width: 36,
+    width: 35,
+  },
+
+  section: {
+    paddingTop: 18,
+    gap: 12,
   },
 
   sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8D8D98",
-    letterSpacing: 0.5,
-    marginBottom: 9,
-    marginLeft: 2,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
-  preferencesLabel: {
-    marginTop: 18,
-  },
-
-  blockedSectionLabel: {
-    marginTop: 18,
-  },
-
+  // Milky pressed-in selector, with a pink pill for the chosen option.
   visibilitySelector: {
-    height: 43,
+    height: 46,
     flexDirection: "row",
     alignItems: "center",
-    padding: 3,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.52)",
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
 
   visibilityOption: {
     flex: 1,
-    height: 37,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
+    borderRadius: 10,
   },
 
   visibilityOptionSelected: {
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
   },
 
   visibilityOptionText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6D6D78",
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: "#55555E",
   },
 
   visibilityOptionTextSelected: {
     color: "#FFFFFF",
   },
 
-  preferenceRow: {
-    minHeight: 53,
+  // Milky pressed-in row.
+  row: {
+    minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    marginBottom: 8,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.48)",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
+    borderColor: "rgba(255,255,255,0.75)",
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
-  preferenceIcon: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
+  // Figma: 34 x 34, radius 100, padding 8 - a soft pink chip behind the icon.
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
-  preferenceLabel: {
+  rowLabel: {
     flex: 1,
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: "#5B5B67",
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
+    color: "#3B3B42",
   },
 
-  blockedCard: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.48)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
+  // Pink switch (Figma).
+  switchTrack: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    padding: 2,
+    justifyContent: "center",
+    backgroundColor: "#D3D3D8",
+  },
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+  switchTrackOn: {
+    backgroundColor: PINK,
+  },
 
-    elevation: 3,
+  switchKnob: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FFFFFF",
+    alignSelf: "flex-start",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+
+  switchKnobOn: {
+    alignSelf: "flex-end",
+  },
+
+  blockedRow: {
+    minHeight: 62,
   },
 
   blockedTextContainer: {
@@ -446,19 +506,18 @@ const styles = StyleSheet.create({
   },
 
   blockedTitle: {
+    fontFamily: FONTS.regular,
     fontSize: 11.5,
-    color: "#85858F",
-    marginBottom: 2,
+    color: "#7A7A84",
   },
 
   blockedSubtitle: {
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: "#30303A",
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    color: "#191922",
   },
 
   pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.995 }],
+    opacity: 0.75,
   },
 });

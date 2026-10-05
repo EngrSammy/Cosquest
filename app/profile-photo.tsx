@@ -28,6 +28,7 @@ import {
 } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
 
 export default function ProfilePhoto() {
   const insets = useSafeAreaInsets();
@@ -173,7 +174,7 @@ export default function ProfilePhoto() {
           updateUser({
             avatar: avatarKey,
 
-            photo: null,
+            photo: undefined,
 
             profile: {
               avatarKey,
@@ -198,7 +199,7 @@ export default function ProfilePhoto() {
         [
           {
             text: "OK",
-            onPress: () => router.back(),
+            onPress: () => safeBack(),
           },
         ],
       );
@@ -225,7 +226,7 @@ export default function ProfilePhoto() {
         ]}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={() => safeBack()} hitSlop={10}>
             <Ionicons name="chevron-back" size={26} color="#191922" />
           </Pressable>
 

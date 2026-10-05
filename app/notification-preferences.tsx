@@ -1,31 +1,25 @@
-import { AppBackground } from "@/components/AppBackground";
+import { PinkSwitch } from "@/components/ui/PinkSwitch";
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchNotificationSettings,
   updateNotificationSettingsThunk,
 } from "@/store/thunks/settingsThunks";
+import { safeBack } from "@/utils/safeBack";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type NotificationToggleRowProps = {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-  disabled?: boolean;
-  showIcon?: boolean;
-};
+const PINK = "#C34D9C";
 
 type NotificationSettings = {
   notificationsEnabled?: boolean;
@@ -38,35 +32,34 @@ type NotificationSettings = {
   emailPromotionalEvents?: boolean;
 };
 
+// Figma row: milky card; main rows have a pink bell on a soft pink chip,
+// the push sub-options are indented and have no icon.
 function NotificationToggleRow({
-  icon,
   label,
   value,
   onChange,
   disabled = false,
   showIcon = true,
-}: NotificationToggleRowProps) {
+  indented = false,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  showIcon?: boolean;
+  indented?: boolean;
+}) {
   return (
-    <View style={styles.notificationRow}>
+    <View style={[styles.row, indented && styles.rowIndented]}>
       {showIcon ? (
-        <View style={styles.rowIconContainer}>
-          <Ionicons name={icon} size={17} color="#C5399A" />
+        <View style={styles.rowIcon}>
+          <Ionicons name="notifications" size={15} color={PINK} />
         </View>
       ) : null}
 
       <Text style={styles.rowLabel}>{label}</Text>
 
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        trackColor={{
-          false: "#D4D4D8",
-          true: "#D88CC0",
-        }}
-        thumbColor={value ? "#C5399A" : "#F4F4F5"}
-        ios_backgroundColor="#D4D4D8"
-      />
+      <PinkSwitch value={value} onChange={onChange} disabled={disabled} />
     </View>
   );
 }
@@ -99,10 +92,7 @@ export default function NotificationPreferences() {
 
   const [savingField, setSavingField] = useState<string | null>(null);
 
-  /**
-   * Load the real notification preferences
-   * from the backend when the screen opens.
-   */
+  // Load the real notification preferences when the screen opens.
   useEffect(() => {
     if (!token) {
       return;
@@ -111,10 +101,7 @@ export default function NotificationPreferences() {
     dispatch(fetchNotificationSettings(token));
   }, [dispatch, token]);
 
-  /**
-   * Synchronize local UI state with the
-   * notification settings returned by the backend.
-   */
+  // Keep the switches in sync with what the backend returned.
   useEffect(() => {
     if (!notificationSettings) {
       return;
@@ -153,12 +140,7 @@ export default function NotificationPreferences() {
     }
   }, [notificationSettings]);
 
-  /**
-   * Generic backend update helper.
-   *
-   * The backend accepts partial updates, so changing
-   * one switch only sends that setting.
-   */
+  // Saves one switch (the backend accepts partial updates).
   async function updateNotificationSetting(
     field: keyof NotificationSettings,
     value: boolean,
@@ -187,12 +169,6 @@ export default function NotificationPreferences() {
         }),
       ).unwrap();
 
-      /**
-       * Refresh from the backend after saving.
-       *
-       * This ensures the UI represents what MongoDB
-       * actually accepted.
-       */
       await dispatch(fetchNotificationSettings(token)).unwrap();
     } catch (error) {
       console.error(`Failed to update notification setting ${field}:`, error);
@@ -210,245 +186,185 @@ export default function NotificationPreferences() {
     }
   }
 
-  /**
-   * Allow Push Notifications
-   */
-  async function handleNotificationsEnabled(value: boolean) {
-    const previousValue = notificationsEnabled;
+  // One handler for every switch: update now, roll back if saving fails.
+  function toggle(
+    field: keyof NotificationSettings,
+    current: boolean,
+    setter: (value: boolean) => void,
+  ) {
+    return async (value: boolean) => {
+      setter(value);
 
-    setNotificationsEnabled(value);
-
-    await updateNotificationSetting("notificationsEnabled", value, () =>
-      setNotificationsEnabled(previousValue),
-    );
-  }
-
-  /**
-   * Event Reminders
-   */
-  async function handleEventReminders(value: boolean) {
-    const previousValue = eventReminders;
-
-    setEventReminders(value);
-
-    await updateNotificationSetting("eventReminders", value, () =>
-      setEventReminders(previousValue),
-    );
-  }
-
-  /**
-   * Quest Updates
-   */
-  async function handleQuestUpdates(value: boolean) {
-    const previousValue = questUpdates;
-
-    setQuestUpdates(value);
-
-    await updateNotificationSetting("questUpdates", value, () =>
-      setQuestUpdates(previousValue),
-    );
-  }
-
-  /**
-   * Faction News
-   */
-  async function handleFactionNews(value: boolean) {
-    const previousValue = factionNews;
-
-    setFactionNews(value);
-
-    await updateNotificationSetting("factionNews", value, () =>
-      setFactionNews(previousValue),
-    );
-  }
-
-  /**
-   * Friend Activity
-   */
-  async function handleFriendActivity(value: boolean) {
-    const previousValue = friendActivity;
-
-    setFriendActivity(value);
-
-    await updateNotificationSetting("friendActivity", value, () =>
-      setFriendActivity(previousValue),
-    );
-  }
-
-  /**
-   * Rank Changes
-   */
-  async function handleRankChanges(value: boolean) {
-    const previousValue = rankChanges;
-
-    setRankChanges(value);
-
-    await updateNotificationSetting("rankChanges", value, () =>
-      setRankChanges(previousValue),
-    );
-  }
-
-  /**
-   * Weekly Newsletter
-   */
-  async function handleWeeklyNewsletter(value: boolean) {
-    const previousValue = weeklyNewsletter;
-
-    setWeeklyNewsletter(value);
-
-    await updateNotificationSetting("emailWeeklyNewsletter", value, () =>
-      setWeeklyNewsletter(previousValue),
-    );
-  }
-
-  /**
-   * Promotional Events
-   */
-  async function handlePromotionalEvents(value: boolean) {
-    const previousValue = promotionalEvents;
-
-    setPromotionalEvents(value);
-
-    await updateNotificationSetting("emailPromotionalEvents", value, () =>
-      setPromotionalEvents(previousValue),
-    );
+      await updateNotificationSetting(field, value, () => setter(current));
+    };
   }
 
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}>
-        {/* Header */}
+        {/* HEADER: back arrow, then the Figma bell chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={() => safeBack("/settings")}
+            hitSlop={10}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <View style={styles.headerCenter}>
-            <View style={styles.headerIconContainer}>
-              <Ionicons
-                name="notifications-outline"
-                size={16}
-                color="#C5399A"
-              />
+            <View style={styles.headerIcon}>
+              <Ionicons name="notifications-outline" size={16} color={PINK} />
             </View>
 
             <Text style={styles.headerTitle}>Notifications</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.backButton} />
         </View>
 
         {/* PUSH NOTIFICATIONS */}
-        <Text style={styles.sectionLabel}>PUSH NOTIFICATIONS</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PUSH NOTIFICATIONS</Text>
 
-        <NotificationToggleRow
-          icon="notifications"
-          label="Allow Push Notifications"
-          value={notificationsEnabled}
-          onChange={handleNotificationsEnabled}
-          disabled={savingField === "notificationsEnabled"}
-        />
+          <NotificationToggleRow
+            label="Allow Push Notifications"
+            value={notificationsEnabled}
+            onChange={toggle(
+              "notificationsEnabled",
+              notificationsEnabled,
+              setNotificationsEnabled,
+            )}
+            disabled={savingField === "notificationsEnabled"}
+          />
 
-        <NotificationToggleRow
-          icon="notifications-outline"
-          label="Event Reminders"
-          value={eventReminders}
-          onChange={handleEventReminders}
-          disabled={savingField === "eventReminders"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Event Reminders"
+            value={eventReminders}
+            onChange={toggle(
+              "eventReminders",
+              eventReminders,
+              setEventReminders,
+            )}
+            disabled={savingField === "eventReminders"}
+            showIcon={false}
+            indented
+          />
 
-        <NotificationToggleRow
-          icon="notifications-outline"
-          label="Quest Updates"
-          value={questUpdates}
-          onChange={handleQuestUpdates}
-          disabled={savingField === "questUpdates"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Quest Updates"
+            value={questUpdates}
+            onChange={toggle("questUpdates", questUpdates, setQuestUpdates)}
+            disabled={savingField === "questUpdates"}
+            showIcon={false}
+            indented
+          />
 
-        <NotificationToggleRow
-          icon="notifications-outline"
-          label="Faction News"
-          value={factionNews}
-          onChange={handleFactionNews}
-          disabled={savingField === "factionNews"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Faction News"
+            value={factionNews}
+            onChange={toggle("factionNews", factionNews, setFactionNews)}
+            disabled={savingField === "factionNews"}
+            showIcon={false}
+            indented
+          />
 
-        <NotificationToggleRow
-          icon="notifications-outline"
-          label="Friend Activity"
-          value={friendActivity}
-          onChange={handleFriendActivity}
-          disabled={savingField === "friendActivity"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Friend Activity"
+            value={friendActivity}
+            onChange={toggle(
+              "friendActivity",
+              friendActivity,
+              setFriendActivity,
+            )}
+            disabled={savingField === "friendActivity"}
+            showIcon={false}
+            indented
+          />
 
-        <NotificationToggleRow
-          icon="notifications-outline"
-          label="Rank Changes"
-          value={rankChanges}
-          onChange={handleRankChanges}
-          disabled={savingField === "rankChanges"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Rank Changes"
+            value={rankChanges}
+            onChange={toggle("rankChanges", rankChanges, setRankChanges)}
+            disabled={savingField === "rankChanges"}
+            showIcon={false}
+            indented
+          />
+        </View>
 
         {/* EMAIL NOTIFICATIONS */}
-        <Text style={[styles.sectionLabel, styles.emailSectionLabel]}>
-          EMAIL NOTIFICATIONS
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>EMAIL NOTIFICATIONS</Text>
 
-        <NotificationToggleRow
-          icon="notifications"
-          label="Weekly Newsletter"
-          value={weeklyNewsletter}
-          onChange={handleWeeklyNewsletter}
-          disabled={savingField === "emailWeeklyNewsletter"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Weekly Newsletter"
+            value={weeklyNewsletter}
+            onChange={toggle(
+              "emailWeeklyNewsletter",
+              weeklyNewsletter,
+              setWeeklyNewsletter,
+            )}
+            disabled={savingField === "emailWeeklyNewsletter"}
+          />
 
-        <NotificationToggleRow
-          icon="notifications"
-          label="Promotional Events"
-          value={promotionalEvents}
-          onChange={handlePromotionalEvents}
-          disabled={savingField === "emailPromotionalEvents"}
-          showIcon={false}
-        />
+          <NotificationToggleRow
+            label="Promotional Events"
+            value={promotionalEvents}
+            onChange={toggle(
+              "emailPromotionalEvents",
+              promotionalEvents,
+              setPromotionalEvents,
+            )}
+            disabled={savingField === "emailPromotionalEvents"}
+          />
+        </View>
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 4,
   },
 
   backButton: {
     width: 36,
     height: 36,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
 
@@ -457,80 +373,78 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
 
-  headerIconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  // Figma: 35 x 36, radius 100, padding 8, background #0000000A
+  headerIcon: {
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    backgroundColor: "#0000000A",
   },
 
   headerTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
-  headerSpacer: {
-    width: 36,
+  section: {
+    paddingTop: 18,
+    gap: 12,
   },
 
   sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8D8D98",
-    letterSpacing: 0.5,
-    marginBottom: 9,
-    marginLeft: 2,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
-  emailSectionLabel: {
-    marginTop: 18,
-  },
-
-  notificationRow: {
-    minHeight: 53,
+  // Milky pressed-in row.
+  row: {
+    minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    marginBottom: 8,
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.48)",
-
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
+    borderColor: "rgba(255,255,255,0.75)",
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
-  rowIconContainer: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
+  // Push sub-options sit a little in (Figma).
+  rowIndented: {
+    marginLeft: 16,
+  },
+
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   rowLabel: {
     flex: 1,
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: "#5B5B67",
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
+    color: "#3B3B42",
   },
 });

@@ -55,15 +55,15 @@ export function AppBackground({
         />
       ) : null}
 
-      {/* blueGradient: a clean blue gradient, no map */}
+      {/* blueGradient (Community / Profile / Post screens), from the Figma:
+          linear-gradient(180deg, rgba(255,255,255,0.6) 5.29%,
+                                  rgba(184,232,255,0.6) 77.89%) */}
       {variant === "blueGradient" ? (
         <LinearGradient
-          colors={[
-            "rgba(227,240,255,0.15)",
-            "rgba(90,143,224,0.45)",
-            "rgba(59,130,246,0.35)",
-          ]}
-          locations={[0, 0.55, 1]}
+          colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+          locations={[0.0529, 0.7789]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
       ) : null}

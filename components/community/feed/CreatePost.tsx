@@ -1,4 +1,5 @@
 import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -42,10 +43,6 @@ const HASHTAGS = [
   "#CosplayCommunity",
   "#CosplayLife",
 ];
-
-// The picker must wait until the create-post sheet has finished opening,
-// otherwise iOS can drop it.
-const OPEN_THEN_PICK_DELAY_MS = 350;
 
 function prepareImageForUpload(
   asset: ImagePicker.ImagePickerAsset,
@@ -110,6 +107,9 @@ export function CreatePost() {
   const selectedAvatar = uploadedPhoto
     ? { uri: uploadedPhoto }
     : avatar?.source || require("@/assets/images/dp-avatar.png");
+
+  // The bar shows your AVATAR (like the header), not your uploaded photo.
+  const barAvatar = avatar?.source || require("@/assets/images/dp-avatar.png");
 
   const username =
     user?.profile?.username || authUser?.profile?.username || "You";
@@ -249,15 +249,6 @@ export function CreatePost() {
     }
   };
 
-  // Composer buttons (Photo / Reel / Gallery): open the create-post sheet
-  // and go straight to the picker.
-  const openWith = (pick: () => Promise<void>) => {
-    setVisible(true);
-    setTimeout(() => {
-      pick();
-    }, OPEN_THEN_PICK_DELAY_MS);
-  };
-
   // ==========================================
   // CREATE POST
   // ==========================================
@@ -346,47 +337,29 @@ export function CreatePost() {
   return (
     <>
       {/* ==========================================
-          COMPOSER — full width, Facebook style
+          COMPOSER - the raised pill from the Figma
       ========================================== */}
 
-      <View style={styles.composer}>
-        <Pressable style={styles.composerTop} onPress={() => setVisible(true)}>
-          <Image
-            source={selectedAvatar}
-            style={styles.composerAvatar}
-            contentFit="cover"
-          />
+      <Pressable
+        style={styles.composer}
+        onPress={() => setVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Create a post">
+        <Image
+          source={barAvatar}
+          style={styles.composerAvatar}
+          contentFit="cover"
+        />
 
-          <View style={styles.composerPill}>
-            <Text style={styles.placeholder} numberOfLines={1}>
-              Share your cosplay or a hot take...
-            </Text>
-          </View>
-        </Pressable>
+        <Text style={styles.placeholder} numberOfLines={1}>
+          Share Your Cosplay Or A Hot Take...
+        </Text>
 
-        <View style={styles.composerOptions}>
-          <ComposerOption
-            icon="image"
-            label="Photo"
-            color="#2196F3"
-            onPress={() => openWith(pickPhoto)}
-          />
-
-          <ComposerOption
-            icon="videocam"
-            label="Reel"
-            color="#C5399A"
-            onPress={() => openWith(pickVideo)}
-          />
-
-          <ComposerOption
-            icon="images"
-            label="Gallery"
-            color="#22A679"
-            onPress={() => openWith(pickGallery)}
-          />
+        {/* Figma: 22 x 18, radius 4, #C34D9C29 */}
+        <View style={styles.composerPlus}>
+          <Ionicons name="add" size={16} color="#C5399A" />
         </View>
-      </View>
+      </Pressable>
 
       {/* ==========================================
           CREATE POST MODAL
@@ -542,35 +515,6 @@ export function CreatePost() {
 }
 
 // ==========================================
-// COMPOSER OPTION (under the "Share your cosplay" bar)
-// ==========================================
-
-function ComposerOption({
-  icon,
-  label,
-  color,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  color: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.composerOption,
-        pressed && styles.composerOptionPressed,
-      ]}
-      onPress={onPress}>
-      <Ionicons name={icon} size={20} color={color} />
-
-      <Text style={styles.composerOptionText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// ==========================================
 // POST OPTION (inside the create-post sheet)
 // ==========================================
 
@@ -607,74 +551,53 @@ function PostOption({
 // ==========================================
 
 const styles = StyleSheet.create({
-  // COMPOSER (full width)
-
+  // COMPOSER - the raised pill from the Figma.
+  // (Side margin / height are estimated from the screenshot.)
   composer: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#EDEDF1",
-    marginBottom: 8,
-    paddingTop: 12,
-  },
-
-  composerTop: {
+    alignSelf: "stretch",
+    // Figma: width 329, height 39, left 37 (on a 402 wide screen)
+    height: 39,
+    marginHorizontal: 37,
+    marginBottom: 20,
+    paddingLeft: 18,
+    paddingRight: 20,
+    borderRadius: 20,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 14,
-    paddingBottom: 10,
+    // Figma background #746868, used at 10% so the bar stays light.
+    // If the Figma fill opacity is different, change the last number.
+    backgroundColor: "rgba(116,104,104,0.1)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 
   composerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-
-  composerPill: {
-    flex: 1,
-    minWidth: 0,
-    height: 40,
-    justifyContent: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E1E1E7",
-    paddingHorizontal: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
 
   placeholder: {
-    fontSize: 14,
-    color: "#7A7A82",
-  },
-
-  composerOptions: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: "#EDEDF1",
-    marginHorizontal: 8,
-    paddingVertical: 2,
-  },
-
-  composerOption: {
     flex: 1,
-    flexDirection: "row",
+    minWidth: 0,
+    fontSize: 12,
+    fontFamily: FONTS.medium,
+    color: "#777780",
+  },
+
+  // Figma: width 22, height 18, radius 4, background #C34D9C29
+  composerPlus: {
+    width: 22,
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: "#C34D9C29",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-
-  composerOptionPressed: {
-    backgroundColor: "#F2F2F5",
-  },
-
-  composerOptionText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#65656D",
   },
 
   // CREATE POST SHEET

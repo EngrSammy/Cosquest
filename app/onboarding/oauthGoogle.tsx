@@ -28,6 +28,7 @@ import {
       isPhoneGoogleFlowInProgress,
       readOAuthCode,
 } from "@/utils/googleAuth";
+import { safeBack } from "@/utils/safeBack";
 
 // Lets a popup-style sign-in (if the browser used one) hand the result
 // back to the page that opened it and close itself.
@@ -54,7 +55,7 @@ export default function GoogleOAuthReturn() {
     // Phone: the in-app browser flow is already finishing the sign-in.
     if (isPhoneGoogleFlowInProgress()) {
       if (router.canGoBack()) {
-        router.back();
+        safeBack();
       }
       return;
     }

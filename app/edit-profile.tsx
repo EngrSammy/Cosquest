@@ -1,503 +1,500 @@
-import { AppBackground } from "@/components/AppBackground";
-import { Field } from "@/components/Field";
-import { AVATARS } from "@/constants/avatars";
-
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-
-import { updateAuthUser } from "@/store/slices/authSlice";
-import { updateUser } from "@/store/slices/userSlice";
-
-import { fetchCurrentUser, saveUserProfile } from "@/store/thunks/userThunks";
-
+// ==========================================
+// EDIT PROFILE (Figma)
+// ==========================================
+// Photo (131 x 131 on a pink circle) + "Change Profile Photo", then
+// Display Name / Username / Bio in milky pressed-in fields, then
+// Profile Information: Category (plain row) and Contact options.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-
-import { useEffect, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-function RowSelect({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-      onPress={onPress}>
-      <Text style={styles.rowLabel}>{label}</Text>
+import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
+import { updateProfile } from "@/services/user";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { updateAuthUser } from "@/store/slices/authSlice";
+import { updateUser } from "@/store/slices/userSlice";
+import { safeBack } from "@/utils/safeBack";
 
-      <View style={styles.rowRight}>
-        <Text style={styles.rowValue} numberOfLines={1}>
-          {value}
-        </Text>
+const PINK = "#C34D9C";
 
-        <Ionicons name="chevron-forward" size={16} color="#9C9CAA" />
-      </View>
-    </Pressable>
-  );
+// "digital-creator" -> "Digital creator"
+function humanize(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const text = String(value).replace(/[-_]+/g, " ").trim();
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export default function EditProfile() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
+  const token = useAppSelector((state) => state.auth.token);
   const authUser = useAppSelector((state) => state.auth.user);
+  const user = useAppSelector((state) => state.user.user) as any;
 
-  const user = useAppSelector((state) => state.user.user);
+  const profile = user?.profile || authUser?.profile || {};
+  const email = authUser?.email || user?.email || "";
 
-  const error = useAppSelector((state) => state.user.error);
+  const startName =
+    `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+  const startUsername = profile.username || "";
+  const startBio = profile.bio || "";
 
-  const email = authUser?.email || (user as any)?.email || "";
-
-  useEffect(() => {
-    if (email) {
-      dispatch(fetchCurrentUser(email));
-    }
-  }, [dispatch, email]);
-
-  const backendProfile = (user as any)?.profile || {};
-
-  const backendContact = (user as any)?.contact || {};
-
-  const firstName =
-    backendProfile.firstName ||
-    (user as any)?.firstName ||
-    authUser?.profile?.firstName ||
-    "";
-
-  const lastName =
-    backendProfile.lastName ||
-    (user as any)?.lastName ||
-    authUser?.profile?.lastName ||
-    "";
-
-  const username =
-    backendProfile.username ||
-    (user as any)?.username ||
-    authUser?.profile?.username ||
-    "";
-
-  const age =
-    backendProfile.age ?? (user as any)?.age ?? authUser?.profile?.age ?? null;
-
-  const gender =
-    backendProfile.gender ||
-    (user as any)?.gender ||
-    authUser?.profile?.gender ||
-    "";
-
-  const avatarKey =
-    backendProfile.avatarKey ||
-    (user as any)?.avatar ||
-    authUser?.profile?.avatarKey ||
-    "";
-
-  const photo =
-    backendProfile.avatarPhotoUrl ||
-    (user as any)?.photo ||
-    authUser?.profile?.avatarPhotoUrl ||
-    null;
-
-  const bio = backendProfile.bio || (user as any)?.bio || "";
-
-  const category = backendProfile.category || (user as any)?.category || "";
-
-  const contactEmail =
-    backendContact.email || (user as any)?.contactEmail || email || "";
-
-  const contactPhone = backendContact.phone || (user as any)?.phone || "";
-
-  const businessAddress =
-    backendContact.businessAddress || (user as any)?.businessAddress || "";
-
-  const categoryDisplay = category
-    ? String(category)
-        .replace(/[-_]/g, " ")
-        .replace(/\b\w/g, (letter: string) => letter.toUpperCase())
-    : "Not selected";
-
-  const contactItems: string[] = [];
-
-  if (contactEmail) {
-    contactItems.push("Email");
-  }
-
-  if (contactPhone) {
-    contactItems.push("Phone");
-  }
-
-  if (businessAddress) {
-    contactItems.push("Address");
-  }
-
-  const contactDisplay =
-    contactItems.length > 0 ? contactItems.join(", ") : "Not added";
-
-  const avatarFromList = AVATARS.find((avatar) => avatar.id === avatarKey);
-
-  const selectedAvatar =
-    avatarFromList?.source || require("@/assets/images/dp-avatar.png");
-
-  const avatarSource = photo || selectedAvatar;
-
-  const [form, setForm] = useState({
-    displayName: "",
-    username: "",
-    bio: "",
-  });
-
+  const [displayName, setDisplayName] = useState(startName);
+  const [username, setUsername] = useState(startUsername);
+  const [bio, setBio] = useState(startBio);
   const [saving, setSaving] = useState(false);
 
+  // Fill the fields once the profile arrives (e.g. after a refresh).
+  const loadedKey = `${startName}|${startUsername}|${startBio}`;
+
   useEffect(() => {
-    const fullName = `${firstName} ${lastName}`.trim();
+    setDisplayName(startName);
+    setUsername(startUsername);
+    setBio(startBio);
+    // Only when the saved profile itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedKey]);
 
-    setForm({
-      displayName: fullName,
-      username,
-      bio,
-    });
-  }, [firstName, lastName, username, bio]);
+  const photo = profile.avatarPhotoUrl || null;
 
-  function update(key: keyof typeof form, value: string) {
-    setForm((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
-  }
+  // Figma: your AVATAR character on the pink circle (your photo is shown on
+  // the Profile screen). The photo is only used if no avatar is chosen.
+  const avatarSource = useMemo(() => {
+    const preset = AVATARS.find((avatar) => avatar.id === profile.avatarKey);
 
-  async function handleSave() {
-    if (!email) {
-      Alert.alert("Error", "Your registration email could not be found.");
+    if (preset?.source) {
+      return preset.source;
+    }
+
+    if (photo) {
+      return { uri: photo };
+    }
+
+    return require("@/assets/images/dp-avatar.png");
+  }, [photo, profile.avatarKey]);
+
+  const category = humanize(profile.category);
+
+  const contact = user?.contact || (authUser as any)?.contact || {};
+
+  const contactSummary =
+    [
+      contact.email ? "Email" : "",
+      contact.phone ? "Phone" : "",
+      contact.businessAddress ? "Address" : "",
+    ]
+      .filter(Boolean)
+      .join(", ") || "Add";
+
+  const changed =
+    displayName.trim() !== startName ||
+    username.trim() !== startUsername ||
+    bio.trim() !== startBio;
+
+  const goBack = () => {
+    if (router.canGoBack()) {
+      safeBack();
+    } else {
+      router.replace("/profile");
+    }
+  };
+
+  const save = async () => {
+    if (saving) {
       return;
     }
 
-    const trimmedName = form.displayName.trim();
-
-    const trimmedUsername = form.username.trim();
-
-    const trimmedBio = form.bio.trim();
-
-    if (!trimmedName) {
-      Alert.alert("Missing name", "Please enter your display name.");
+    if (!changed) {
+      goBack();
       return;
     }
 
-    if (!trimmedUsername) {
-      Alert.alert("Missing username", "Please enter your username.");
+    const name = displayName.trim();
+    const handle = username.trim().replace(/^@/, "");
+
+    if (!name) {
+      Alert.alert("Edit Profile", "Please enter your display name.");
       return;
     }
 
-    if (trimmedUsername.length < 3 || trimmedUsername.length > 20) {
-      Alert.alert("Invalid username", "Username must be 3-20 characters.");
+    if (!handle) {
+      Alert.alert("Edit Profile", "Please enter a username.");
       return;
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
-      Alert.alert(
-        "Invalid username",
-        "Username can only contain letters, numbers and underscore.",
-      );
-      return;
-    }
-
-    const nameParts = trimmedName.split(/\s+/);
-
-    const newFirstName = nameParts.shift() || "";
-
-    const newLastName = nameParts.join(" ");
-
-    const currentAge = age ?? 0;
-
-    const currentGender = gender || "";
-
-    if (!currentAge) {
-      Alert.alert("Missing age", "Your account does not have an age saved.");
-      return;
-    }
-
-    if (!currentGender) {
-      Alert.alert(
-        "Missing gender",
-        "Your account does not have a gender saved.",
-      );
-      return;
-    }
+    // "Alex Rivera" -> first "Alex", last "Rivera"
+    const [firstName, ...rest] = name.split(/\s+/);
+    const lastName = rest.join(" ");
 
     try {
       setSaving(true);
 
-      const result = await dispatch(
-        saveUserProfile({
+      await updateProfile(
+        {
           email,
-          firstName: newFirstName,
-          lastName: newLastName,
-          username: trimmedUsername,
-          age: currentAge,
-          gender: currentGender,
-          bio: trimmedBio,
-        }),
-      ).unwrap();
-
-      dispatch(
-        updateUser({
-          email,
-          firstName: newFirstName,
-          lastName: newLastName,
-          username: trimmedUsername,
-          age: currentAge,
-          gender: currentGender,
-          bio: trimmedBio,
-
-          profile: {
-            firstName: newFirstName,
-            lastName: newLastName,
-            username: trimmedUsername,
-            age: currentAge,
-            gender: currentGender,
-            bio: trimmedBio,
-          },
-        }),
+          firstName,
+          lastName,
+          username: handle,
+          age: profile.age,
+          gender: profile.gender,
+          bio: bio.trim(),
+        },
+        token || undefined,
       );
 
-      dispatch(
-        updateAuthUser({
-          profile: {
-            firstName: newFirstName,
-            lastName: newLastName,
-            username: trimmedUsername,
-            age: currentAge,
-            gender: currentGender,
-            bio: trimmedBio,
-          },
-        }),
-      );
+      const changes = {
+        firstName,
+        lastName,
+        username: handle,
+        bio: bio.trim(),
+      };
 
+      dispatch(updateUser({ profile: { ...profile, ...changes } } as any));
+      dispatch(updateAuthUser({ profile: changes }));
+
+      goBack();
+    } catch (error) {
       Alert.alert(
-        "Profile Updated",
-        "Your profile has been updated successfully.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ],
+        "Edit Profile",
+        error instanceof Error ? error.message : "Could not save your profile.",
       );
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to update your profile.";
-
-      Alert.alert("Update Failed", message);
     } finally {
       setSaving(false);
     }
-  }
+  };
 
   return (
-    <AppBackground variant="blueGradient">
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingTop: insets.top + 8,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
-            <Ionicons name="chevron-back" size={26} color="#191922" />
+    <View style={styles.screen}>
+      {/* Figma background:
+          linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
+                                  rgba(184,232,255,0.6) 67.7%) on white */}
+      <LinearGradient
+        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        locations={[0.0459, 0.677]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* HEADER */}
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <Pressable
+            onPress={goBack}
+            hitSlop={10}
+            style={styles.headerSide}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="chevron-back" size={24} color="#191922" />
           </Pressable>
 
           <Text style={styles.headerTitle}>Edit Profile</Text>
 
-          <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
+          <Pressable
+            onPress={save}
+            hitSlop={10}
+            disabled={saving}
+            style={[styles.headerSide, styles.headerRight]}
+            accessibilityRole="button"
+            accessibilityLabel="Save">
             {saving ? (
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={PINK} />
             ) : (
               <Text style={styles.save}>Save</Text>
             )}
           </Pressable>
         </View>
 
-        {error && !saving ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: insets.bottom + 40 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {/* PHOTO (Figma: 209 tall, padding 24 / 24, gap 12) */}
+          <View style={styles.photoSection}>
+            <Pressable
+              style={styles.avatarCircle}
+              onPress={() => router.push("/profile-photo")}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile photo">
+              <Image
+                source={avatarSource}
+                style={styles.avatarImage}
+                contentFit="cover"
+                transition={150}
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/profile-photo")}
+              hitSlop={8}>
+              <Text style={styles.changePhoto}>Change Profile Photo</Text>
+            </Pressable>
           </View>
-        ) : null}
 
-        <View style={styles.avatarWrap}>
-          <Image
-            source={avatarSource}
-            style={styles.avatar}
-            contentFit="cover"
-          />
+          {/* FORM (Figma: 402 wide, padding 20 / 20, gap 20 between every part) */}
+          <View style={styles.form}>
+            <View style={styles.group}>
+              <Text style={styles.label}>Display Name</Text>
+              <TextInput
+                value={displayName}
+                onChangeText={setDisplayName}
+                style={[styles.field, styles.input]}
+                placeholder="Your name"
+                placeholderTextColor="#9C9CAA"
+                autoCapitalize="words"
+              />
+            </View>
 
-          <Pressable onPress={() => router.push("/profile-photo")}>
-            <Text style={styles.changePhoto}>Change Profile Photo</Text>
-          </Pressable>
-        </View>
+            <View style={styles.group}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                style={[styles.field, styles.input]}
+                placeholder="username"
+                placeholderTextColor="#9C9CAA"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
-        <Field
-          label="Display Name"
-          value={form.displayName}
-          onChangeText={(text) => update("displayName", text)}
-          autoCapitalize="words"
-        />
+            <View style={styles.group}>
+              <Text style={styles.label}>Bio</Text>
+              <TextInput
+                value={bio}
+                onChangeText={setBio}
+                style={[styles.field, styles.input, styles.bioInput]}
+                placeholder="Tell people about yourself"
+                placeholderTextColor="#9C9CAA"
+                multiline
+                maxLength={300}
+                textAlignVertical="top"
+              />
+            </View>
 
-        <Field
-          label="Username"
-          value={form.username}
-          onChangeText={(text) =>
-            update("username", text.replace(/[^a-zA-Z0-9_]/g, ""))
-          }
-          autoCapitalize="none"
-        />
+            {/* PROFILE INFORMATION */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Profile Information</Text>
 
-        <Field
-          label="Bio"
-          value={form.bio}
-          onChangeText={(text) => update("bio", text)}
-          multiline
-        />
+              {/* Category: a plain row (no box), like the Figma */}
+              <Pressable
+                style={styles.plainRow}
+                onPress={() => router.push("/category")}
+                accessibilityRole="button">
+                <Text style={styles.rowTitle}>Category</Text>
 
-        <Text style={styles.sectionLabel}>Profile Information</Text>
+                <View style={styles.rowRight}>
+                  <Text style={styles.rowValue} numberOfLines={1}>
+                    {category || "Not selected"}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+                </View>
+              </Pressable>
+            </View>
 
-        <RowSelect
-          label="Category"
-          value={categoryDisplay}
-          onPress={() => router.push("/category")}
-        />
+            {/* Contact options: milky box */}
+            <Pressable
+              style={[styles.field, styles.boxRow]}
+              onPress={() => router.push("/contact-options")}
+              accessibilityRole="button">
+              <Text style={styles.rowTitle}>Contact options</Text>
 
-        <RowSelect
-          label="Contact options"
-          value={contactDisplay}
-          onPress={() => router.push("/contact-options")}
-        />
-
-        {contactEmail || contactPhone || businessAddress ? (
-          <View style={styles.contactPreview}>
-            {contactEmail ? (
-              <View style={styles.contactLine}>
-                <Ionicons name="mail-outline" size={16} color="#8A8A94" />
-
-                <Text style={styles.contactText}>{contactEmail}</Text>
+              <View style={styles.rowRight}>
+                <Text style={styles.rowValue} numberOfLines={1}>
+                  {contactSummary}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
               </View>
-            ) : null}
-
-            {contactPhone ? (
-              <View style={styles.contactLine}>
-                <Ionicons name="call-outline" size={16} color="#8A8A94" />
-
-                <Text style={styles.contactText}>{contactPhone}</Text>
-              </View>
-            ) : null}
-
-            {businessAddress ? (
-              <View style={styles.contactLine}>
-                <Ionicons name="location-outline" size={16} color="#8A8A94" />
-
-                <Text style={styles.contactText}>{businessAddress}</Text>
-              </View>
-            ) : null}
+            </Pressable>
           </View>
-        ) : null}
-      </ScrollView>
-    </AppBackground>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
+// Figma input: 362 x 51, background #0000000D, radius 14, padding 14,
+// box-shadow 0 4 4 #00000017 - plus the milky white rim we use elsewhere.
+const MILKY_FIELD = {
+  minHeight: 51,
+  paddingHorizontal: 14,
+  paddingVertical: 14,
+  borderRadius: 14,
+  backgroundColor: "#0000000D",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.75)",
+
+  shadowColor: "#000000",
+  shadowOpacity: 0.09,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+
 const styles = StyleSheet.create({
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
+  flex: {
+    flex: 1,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  headerSide: {
+    width: 60,
+    height: 36,
+    justifyContent: "center",
+  },
+
+  headerRight: {
+    alignItems: "flex-end",
   },
 
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#191922",
+    flex: 1,
+    textAlign: "center",
+    fontFamily: FONTS.semibold,
+    fontSize: 18,
+    color: "#000000",
   },
 
   save: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.medium,
+    fontSize: 15,
+    color: PINK,
   },
 
-  avatarWrap: {
+  scroll: {
+    // The form below adds the Figma's 20 left / right.
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  // Figma: 402 wide, padding 20 / 20, gap 20 between every part.
+  form: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+
+  // A label with its field.
+  group: {},
+
+  // Figma: 402 x 209, padding 24 / 24, gap 12
+  photoSection: {
+    minHeight: 209,
+    paddingTop: 24,
+    paddingBottom: 24,
+    gap: 12,
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 24,
+    justifyContent: "center",
   },
 
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "rgb(204, 151, 186)",
+  // Figma: 131 x 131 on a pink circle
+  avatarCircle: {
+    width: 131,
+    height: 131,
+    borderRadius: 66,
+    overflow: "hidden",
+    backgroundColor: "#E7A3D2",
+
+    shadowColor: PINK,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
 
   changePhoto: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#C5399A",
-    marginTop: 10,
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    color: PINK,
+  },
+
+  label: {
+    marginBottom: 8,
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: "#7A7A84",
   },
 
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#37373a",
-    marginBottom: 10,
-    marginTop: 15,
+    marginTop: 0,
   },
 
-  row: {
+  field: MILKY_FIELD,
+
+  input: {
+    fontFamily: FONTS.regular,
+    fontSize: 14.5,
+    color: "#191922",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  },
+
+  bioInput: {
+    minHeight: 96,
+    lineHeight: 22,
+  },
+
+  // Category: plain row (no box)
+  plainRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 0.5,
-    borderColor: "rgba(255,255,255,0.25)",
-    borderRadius: 12,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 3,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 12,
+    paddingVertical: 4,
   },
 
-  rowLabel: {
+  boxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  rowTitle: {
+    fontFamily: FONTS.medium,
     fontSize: 15,
-    fontWeight: "600",
     color: "#191922",
   },
 
@@ -505,46 +502,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    maxWidth: "58%",
+    flexShrink: 1,
+    marginLeft: 12,
   },
 
   rowValue: {
-    fontSize: 14,
-    color: "#888891",
-  },
-
-  contactPreview: {
-    marginTop: -4,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-
-  contactLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 4,
-    gap: 8,
-  },
-
-  contactText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#6F6F79",
-  },
-
-  errorBox: {
-    alignItems: "center",
-    marginBottom: 10,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,80,80,0.08)",
-  },
-
-  errorText: {
-    fontSize: 12,
-    color: "#B42318",
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
+    color: "#8A8A93",
+    flexShrink: 1,
   },
 });

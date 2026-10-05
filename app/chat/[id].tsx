@@ -89,6 +89,7 @@ import {
   nextSpeed,
 } from "@/components/chat/VoiceSpeed";
 import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
+import { FONTS } from "@/constants/fonts";
 import type { Wallpaper } from "@/constants/wallpapers";
 import {
   blockUser,
@@ -97,6 +98,7 @@ import {
 } from "@/services/publicProfile";
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
+import { safeBack } from "@/utils/safeBack";
 
 type AttachmentDraft = {
   uri: string;
@@ -748,11 +750,7 @@ function MessageMeta({
   otherParticipant?: Chat["otherParticipant"];
 }) {
   const color =
-    variant === "overlay"
-      ? "#FFFFFF"
-      : mine
-        ? "rgba(255,255,255,0.78)"
-        : "#9C9CAA";
+    variant === "overlay" ? "#FFFFFF" : mine ? "#7A6F7D" : "#9C9CAA";
 
   // No ticks on call entries (like WhatsApp).
   const tickState =
@@ -941,7 +939,7 @@ const Bubble = memo(function Bubble({
               <Ionicons
                 name="arrow-redo-outline"
                 size={12}
-                color={mine ? "rgba(255,255,255,0.85)" : "#8A8A90"}
+                color={mine ? "#6B6B72" : "#8A8A90"}
               />
 
               <Text
@@ -976,7 +974,7 @@ const Bubble = memo(function Bubble({
                     <Ionicons
                       name={replyIcon}
                       size={12}
-                      color={mine ? "rgba(255,255,255,0.8)" : "#777783"}
+                      color={mine ? "#6B6B72" : "#777783"}
                     />
                   ) : null}
 
@@ -1057,11 +1055,7 @@ const Bubble = memo(function Bubble({
               <AudioBubble mediaUrl={mediaUrl} mine={mine} msg={msg} />
             ) : (
               <View style={styles.audioMessage}>
-                <Ionicons
-                  name="mic-outline"
-                  size={18}
-                  color={mine ? "#FFFFFF" : "#C5399A"}
-                />
+                <Ionicons name="mic-outline" size={18} color="#C5399A" />
 
                 <View style={styles.audioLine} />
 
@@ -1494,8 +1488,8 @@ function AudioBubble({
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
 
-  const playedColor = mine ? "#FFFFFF" : "#C5399A";
-  const idleColor = mine ? "rgba(255,255,255,0.45)" : "#D8D8DF";
+  const playedColor = "#C5399A";
+  const idleColor = mine ? "rgba(25,25,34,0.22)" : "#C9C9D2";
 
   const transcript = msg.media?.transcript;
   const transcribing = msg.media?.transcribing;
@@ -1559,15 +1553,20 @@ function AudioBubble({
         <Pressable
           onPress={togglePlayback}
           hitSlop={8}
-          style={[styles.audioPlay, mine && styles.audioPlayMine]}
+          style={[
+            styles.audioPlay,
+            { backgroundColor: mine ? "#FFFFFF" : "#C34D9C" },
+          ]}
           accessibilityRole="button"
           accessibilityLabel={
             status.playing ? "Pause voice message" : "Play voice message"
           }>
           <Ionicons
             name={status.playing ? "pause" : "play"}
-            size={18}
-            color={mine ? "#C5399A" : "#FFFFFF"}
+            size={16}
+            color={mine ? "#C34D9C" : "#FFFFFF"}
+            // Optical centre: a play triangle looks off-centre otherwise.
+            style={status.playing ? undefined : { marginLeft: 2 }}
           />
         </Pressable>
 
@@ -1617,7 +1616,7 @@ function AudioBubble({
             <Ionicons
               name={showTranscript ? "chevron-up" : "text-outline"}
               size={16}
-              color={mine ? "rgba(255,255,255,0.85)" : "#8A8A90"}
+              color={mine ? "#6B6B72" : "#8A8A90"}
             />
           </Pressable>
         ) : null}
@@ -1627,10 +1626,7 @@ function AudioBubble({
         <View style={styles.transcriptBox}>
           {transcribing && !transcript ? (
             <View style={styles.transcriptLoadingRow}>
-              <ActivityIndicator
-                size="small"
-                color={mine ? "#FFFFFF" : "#C5399A"}
-              />
+              <ActivityIndicator size="small" color="#C5399A" />
 
               <Text
                 style={[
@@ -1767,9 +1763,9 @@ function CallLogContent({
           : "Cancelled"
       : "Tap to call back";
 
-  const textColor = mine ? "#FFFFFF" : missedForMe ? "#E5484D" : "#191922";
-  const subColor = mine ? "rgba(255,255,255,0.8)" : "#8A8A90";
-  const arrowColor = missedForMe ? "#E5484D" : mine ? "#FFFFFF" : "#2FB36B";
+  const textColor = missedForMe ? "#E5484D" : "#191922";
+  const subColor = mine ? "#6B6B72" : "#8A8A90";
+  const arrowColor = missedForMe ? "#E5484D" : mine ? "#C5399A" : "#2FB36B";
 
   return (
     <Pressable
@@ -4111,7 +4107,7 @@ export default function ChatScreen() {
           ) : (
             <>
               <Pressable
-                onPress={() => router.back()}
+                onPress={() => safeBack()}
                 hitSlop={10}
                 style={styles.backButton}>
                 <Ionicons name="chevron-back" size={27} color="#191922" />
@@ -4163,13 +4159,14 @@ export default function ChatScreen() {
 
               {canCall ? (
                 <>
+                  {/* Figma: voice call first, then video */}
                   <Pressable
                     hitSlop={10}
-                    onPress={startVideoCall}
+                    onPress={startAudioCall}
                     disabled={callStarting}
                     accessibilityRole="button"
-                    accessibilityLabel="Start video call">
-                    <Ionicons name="videocam" size={24} color="#C5399A" />
+                    accessibilityLabel="Start voice call">
+                    <Ionicons name="call-outline" size={22} color="#C5399A" />
                   </Pressable>
 
                   <Pressable
@@ -4177,23 +4174,27 @@ export default function ChatScreen() {
                     style={{
                       marginLeft: 20,
                     }}
-                    onPress={startAudioCall}
+                    onPress={startVideoCall}
                     disabled={callStarting}
                     accessibilityRole="button"
-                    accessibilityLabel="Start voice call">
-                    <Ionicons name="call" size={21} color="#C5399A" />
+                    accessibilityLabel="Start video call">
+                    <Ionicons
+                      name="videocam-outline"
+                      size={25}
+                      color="#C5399A"
+                    />
                   </Pressable>
                 </>
               ) : null}
 
-              {/* ⋮ → Wallpaper */}
+              {/* Figma's tag icon -> the chat menu (profile, wallpaper, block) */}
               <Pressable
                 hitSlop={10}
-                style={{ marginLeft: 16 }}
+                style={{ marginLeft: 20 }}
                 onPress={() => setShowChatMenu(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Chat options">
-                <Ionicons name="ellipsis-vertical" size={20} color="#4B4B53" />
+                <Ionicons name="pricetag-outline" size={22} color="#C5399A" />
               </Pressable>
             </>
           )}
@@ -4348,7 +4349,7 @@ export default function ChatScreen() {
 
       {showJumpButton && !selectionMode ? (
         <Pressable style={styles.jumpButton} onPress={jumpToLatest}>
-          <Ionicons name="chevron-down" size={24} color="#C5399A" />
+          <Ionicons name="chevron-down" size={20} color="#C34D9C" />
 
           {newMessageCount > 0 ? (
             <View style={styles.newMessageBadge}>
@@ -4469,6 +4470,18 @@ export default function ChatScreen() {
               paddingBottom: keyboardVisible ? 8 : insets.bottom + 8,
             },
           ]}>
+          {/* Figma: pink paperclip circle on the left */}
+          {!recording && !editingMessage ? (
+            <Pressable
+              style={styles.attachCircle}
+              onPress={() => setShowAttachments(true)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Attach">
+              <Ionicons name="attach" size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+
           <View style={styles.inputPill}>
             {recording ? (
               <RecordingIndicator
@@ -4484,22 +4497,13 @@ export default function ChatScreen() {
                   value={draft}
                   onChangeText={handleDraftChange}
                   placeholder={editingMessage ? "Edit message" : "Message"}
-                  placeholderTextColor="#9C9CAA"
+                  placeholderTextColor="#6B6B72"
                   multiline
                   // Browsers make a multi-line box 2 rows tall by default,
                   // which made the input look too tall on the website.
                   numberOfLines={Platform.OS === "web" ? 1 : undefined}
                   maxLength={2000}
                 />
-
-                {!editingMessage ? (
-                  <Pressable
-                    hitSlop={6}
-                    style={styles.pillIcon}
-                    onPress={() => setShowAttachments(true)}>
-                    <Ionicons name="attach" size={24} color="#8A8A90" />
-                  </Pressable>
-                ) : null}
 
                 {!editingMessage && !draft.trim() ? (
                   <Pressable
@@ -4524,8 +4528,8 @@ export default function ChatScreen() {
               }>
               <Ionicons
                 name={editingMessage ? "checkmark" : "send"}
-                size={editingMessage ? 24 : 20}
-                color="#FFFFFF"
+                size={editingMessage ? 22 : 19}
+                color="#C5399A"
               />
             </Pressable>
           ) : (
@@ -4534,7 +4538,7 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
-              <Ionicons name="mic" size={23} color="#FFFFFF" />
+              <Ionicons name="mic-outline" size={22} color="#C34D9C" />
             </View>
           )}
         </View>
@@ -5274,7 +5278,7 @@ function AttachmentButton({
 // ==========================================
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#EAF2FB" },
+  screen: { flex: 1, backgroundColor: "#D4ECF8" },
 
   center: {
     flex: 1,
@@ -5283,14 +5287,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#EAF2FB",
   },
 
-  centerText: { fontSize: 14, color: "#8A8A90" },
+  centerText: { fontFamily: FONTS.regular, fontSize: 14, color: "#8A8A90" },
 
   // HEADER
 
   headerContainer: {
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(150,150,160,0.18)",
+    // Figma: the header sits on the chat background (no white bar).
+    backgroundColor: "rgba(255,255,255,0.35)",
   },
 
   header: {
@@ -5354,7 +5357,7 @@ const styles = StyleSheet.create({
 
   chatMenuText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontFamily: FONTS.semibold,
     color: "#191922",
   },
 
@@ -5369,6 +5372,7 @@ const styles = StyleSheet.create({
   },
 
   blockedText: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: "#6B6B72",
     textAlign: "center",
@@ -5387,7 +5391,7 @@ const styles = StyleSheet.create({
   blockedButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
   },
 
   headerOnlineDot: {
@@ -5404,15 +5408,20 @@ const styles = StyleSheet.create({
 
   headerText: { flex: 1, marginLeft: 10, marginRight: 12 },
 
-  headerName: { fontSize: 16, fontWeight: "800", color: "#191922" },
+  headerName: { fontFamily: FONTS.semibold, fontSize: 15, color: "#000000" },
 
-  headerStatus: { fontSize: 12, color: "#8A8A90", marginTop: 1 },
+  headerStatus: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#7A7A84",
+    marginTop: 0,
+  },
 
   selectionTitle: {
     flex: 1,
     marginLeft: 18,
     fontSize: 19,
-    fontWeight: "800",
+    fontFamily: FONTS.bold,
     color: "#191922",
   },
 
@@ -5421,27 +5430,54 @@ const styles = StyleSheet.create({
   // PINNED BANNER
 
   pinnedBanner: {
+    // Figma: 370 x 52, radius 14, padding 10 / 16, #C34D9C26,
+    // shadow 0 4 4 #00000017 - a floating card under the header.
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
+    minHeight: 52,
+    marginHorizontal: 16,
+    marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(150,150,160,0.18)",
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#C34D9C26",
+    borderLeftWidth: 3,
+    borderLeftColor: "#C34D9C",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
   pinnedBannerText: { flex: 1 },
 
-  pinnedBannerTitle: { fontSize: 11, fontWeight: "800", color: "#C5399A" },
+  pinnedBannerTitle: {
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: "#C34D9C",
+  },
 
-  pinnedBannerBody: { fontSize: 12, color: "#555560", marginTop: 1 },
+  pinnedBannerBody: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#2F2F36",
+    marginTop: 1,
+  },
 
   // LOADING
 
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  loadingText: { marginTop: 10, fontSize: 13, color: "#8A8A90" },
+  loadingText: {
+    marginTop: 10,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: "#8A8A90",
+  },
 
   emptyChat: {
     transform: [{ scaleY: -1 }],
@@ -5449,7 +5485,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
 
-  emptyChatText: { fontSize: 13, color: "#8A8A90" },
+  emptyChatText: { fontFamily: FONTS.regular, fontSize: 13, color: "#8A8A90" },
 
   // LIST
 
@@ -5466,15 +5502,15 @@ const styles = StyleSheet.create({
   },
 
   dateSeparator: {
-    backgroundColor: "rgba(255,255,255,0.92)",
+    backgroundColor: "rgba(255,255,255,0.6)",
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 10,
   },
 
   dateSeparatorText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     color: "#777783",
     letterSpacing: 0.3,
   },
@@ -5543,20 +5579,29 @@ const styles = StyleSheet.create({
   columnTheirs: { alignItems: "flex-start" },
 
   bubble: {
+    // Figma: radius 14, soft shadow 0 4 4 #00000017, and a milky white rim.
     minWidth: 62,
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingTop: 6,
-    paddingBottom: 6,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.65)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
 
-  bubbleTheirs: { backgroundColor: "#FFFFFF" },
+  bubbleTheirs: { backgroundColor: "rgba(11,7,19,0.07)" },
 
-  bubbleMine: { backgroundColor: "#C5399A" },
+  bubbleMine: { backgroundColor: "#C34D9C59" },
 
-  tailTheirs: { borderTopLeftRadius: 2 },
+  tailTheirs: { borderTopLeftRadius: 4 },
 
-  tailMine: { borderTopRightRadius: 2 },
+  tailMine: { borderTopRightRadius: 4 },
 
   mediaBubble: { padding: 3 },
 
@@ -5566,7 +5611,7 @@ const styles = StyleSheet.create({
 
   senderName: {
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: FONTS.bold,
     color: "#C5399A",
     marginBottom: 2,
   },
@@ -5582,7 +5627,7 @@ const styles = StyleSheet.create({
       : null),
   },
 
-  bubbleTextMine: { color: "#FFFFFF" },
+  bubbleTextMine: { color: "#191922" },
 
   metaSpacer: { opacity: 0 },
 
@@ -5598,12 +5643,13 @@ const styles = StyleSheet.create({
   },
 
   forwardedText: {
+    fontFamily: FONTS.regular,
     fontSize: 11,
     fontStyle: "italic",
     color: "#8A8A90",
   },
 
-  forwardedTextMine: { color: "rgba(255,255,255,0.85)" },
+  forwardedTextMine: { color: "#6B6B72" },
 
   // MESSAGE META
 
@@ -5627,9 +5673,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
 
-  bubbleTime: { fontSize: 10.5, color: "#9C9CAA" },
+  bubbleTime: { fontFamily: FONTS.regular, fontSize: 10.5, color: "#9C9CAA" },
 
-  editedText: { fontSize: 10, fontStyle: "italic" },
+  editedText: { fontFamily: FONTS.regular, fontSize: 10, fontStyle: "italic" },
 
   // REPLY
 
@@ -5641,11 +5687,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
 
-  replyPreviewMine: { backgroundColor: "rgba(255,255,255,0.18)" },
+  replyPreviewMine: { backgroundColor: "rgba(255,255,255,0.35)" },
 
   replyBar: { width: 4, backgroundColor: "#C5399A" },
 
-  replyBarMine: { backgroundColor: "#FFFFFF" },
+  replyBarMine: { backgroundColor: "#C34D9C" },
 
   replyBody: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
 
@@ -5656,13 +5702,18 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  replyPreviewTitle: { fontSize: 12, fontWeight: "800", color: "#C5399A" },
+  replyPreviewTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
 
-  replyPreviewTitleMine: { color: "#FFFFFF" },
+  replyPreviewTitleMine: { color: "#C34D9C" },
 
-  replyPreviewText: { flexShrink: 1, fontSize: 12, color: "#777783" },
+  replyPreviewText: {
+    flexShrink: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#777783",
+  },
 
-  replyPreviewTextMine: { color: "rgba(255,255,255,0.85)" },
+  replyPreviewTextMine: { color: "#55555E" },
 
   // MEDIA
 
@@ -5743,10 +5794,9 @@ const styles = StyleSheet.create({
   },
 
   audioPlay: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#C5399A",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -5771,7 +5821,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#D8D8DF",
   },
 
-  audioText: { fontSize: 11, color: "#777783", marginTop: 1 },
+  audioText: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#777783",
+    marginTop: 1,
+  },
 
   audioMetaRow: {
     flexDirection: "row",
@@ -5780,7 +5835,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  audioTextMine: { color: "rgba(255,255,255,0.85)" },
+  audioTextMine: { color: "#6B6B72" },
 
   // Outer wrapper so the transcript block can sit below the play/wave
   // row while still being one visual unit inside the bubble.
@@ -5800,34 +5855,35 @@ const styles = StyleSheet.create({
   },
 
   transcriptText: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     lineHeight: 18,
     color: "#4C4C56",
     fontStyle: "italic",
   },
 
-  transcriptTextMine: { color: "rgba(255,255,255,0.9)" },
+  transcriptTextMine: { color: "#2F2F36" },
 
   transcriptMore: {
     marginTop: 4,
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: FONTS.bold,
     color: "#C5399A",
   },
 
-  transcriptMoreMine: { color: "#FFFFFF" },
+  transcriptMoreMine: { color: "#C34D9C" },
 
   // The word currently being spoken, highlighted against the rest of
   // the (already-italic, muted) transcript text.
   transcriptWordActive: {
     color: "#C5399A",
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     fontStyle: "normal",
   },
 
   transcriptWordActiveMine: {
-    color: "#FFFFFF",
-    fontWeight: "700",
+    color: "#C34D9C",
+    fontFamily: FONTS.bold,
     fontStyle: "normal",
     textDecorationLine: "underline",
   },
@@ -5839,6 +5895,7 @@ const styles = StyleSheet.create({
   },
 
   transcriptLoadingText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#8A8A90",
     fontStyle: "italic",
@@ -5871,7 +5928,7 @@ const styles = StyleSheet.create({
 
   callLogText: { flex: 1, minWidth: 0 },
 
-  callLogTitle: { fontSize: 14.5, fontWeight: "700" },
+  callLogTitle: { fontSize: 14.5, fontFamily: FONTS.bold },
 
   callLogDetailRow: {
     flexDirection: "row",
@@ -5880,7 +5937,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  callLogDetail: { fontSize: 12, fontVariant: ["tabular-nums"] },
+  callLogDetail: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+  },
 
   // DOCUMENT
 
@@ -5893,7 +5954,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.05)",
   },
 
-  documentMessageMine: { backgroundColor: "rgba(255,255,255,0.16)" },
+  documentMessageMine: { backgroundColor: "rgba(255,255,255,0.35)" },
 
   documentIcon: {
     width: 40,
@@ -5906,13 +5967,18 @@ const styles = StyleSheet.create({
 
   documentInfo: { flex: 1, marginLeft: 9 },
 
-  documentName: { fontSize: 13, fontWeight: "700", color: "#191922" },
+  documentName: { fontSize: 13, fontFamily: FONTS.bold, color: "#191922" },
 
-  documentNameMine: { color: "#FFFFFF" },
+  documentNameMine: { color: "#191922" },
 
-  documentLabel: { fontSize: 11, color: "#8A8A90", marginTop: 2 },
+  documentLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#8A8A90",
+    marginTop: 2,
+  },
 
-  documentLabelMine: { color: "rgba(255,255,255,0.75)" },
+  documentLabelMine: { color: "#6B6B72" },
 
   // REACTIONS
 
@@ -5944,30 +6010,32 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(197,57,154,0.1)",
   },
 
-  reactionEmoji: { fontSize: 13 },
+  reactionEmoji: { fontFamily: FONTS.regular, fontSize: 13 },
 
   reactionCount: {
     fontSize: 11,
     color: "#666672",
     marginLeft: 3,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
   },
 
   // JUMP BUTTON
 
   jumpButton: {
     position: "absolute",
-    right: 14,
+    right: 16,
     bottom: 84,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#FFFFFF",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.85)",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
+    elevation: 2,
     shadowColor: "#000",
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
@@ -5984,7 +6052,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  newMessageBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  newMessageBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontFamily: FONTS.bold,
+  },
 
   // VOICE HINT
 
@@ -5997,7 +6069,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  voiceHintText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+  voiceHintText: { color: "#FFFFFF", fontSize: 12, fontFamily: FONTS.semibold },
 
   // EDIT / REPLY BAR
 
@@ -6025,44 +6097,49 @@ const styles = StyleSheet.create({
 
   editingContent: { flex: 1, marginHorizontal: 10, paddingVertical: 8 },
 
-  editingTitle: { fontSize: 12, fontWeight: "800", color: "#C5399A" },
+  editingTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
 
-  editingText: { fontSize: 12, color: "#777783", marginTop: 2 },
+  editingText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#777783",
+    marginTop: 2,
+  },
 
   // COMPOSER
 
   composer: {
+    // Figma: 402 x 64, padding 12, gap 10 (#0B0713, very light).
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingTop: 6,
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    backgroundColor: "rgba(11,7,19,0.05)",
   },
 
   inputPill: {
     flex: 1,
-    minHeight: 46,
+    minHeight: 40,
     flexDirection: "row",
-    alignItems: "flex-end",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    alignItems: "center",
+    backgroundColor: "rgba(11,7,19,0.1)",
+    borderRadius: 20,
     paddingLeft: 6,
     paddingRight: 6,
-    borderWidth: 1,
-    borderColor: "#ECECF0",
   },
 
   input: {
     flex: 1,
-    // Lets the box shrink on narrow (phone-sized) browser windows, so the
-    // attach / camera icons stay inside the pill instead of being pushed out.
+    // Lets the box shrink on narrow (phone-sized) browser windows.
     minWidth: 0,
-    minHeight: 44,
+    minHeight: 40,
     maxHeight: 120,
     paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 10,
-    fontSize: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+    fontFamily: FONTS.regular,
+    fontSize: 14,
     color: "#191922",
     ...(Platform.OS === "web"
       ? ({ outlineStyle: "none", resize: "none" } as object)
@@ -6070,17 +6147,30 @@ const styles = StyleSheet.create({
   },
 
   pillIcon: {
-    height: 44,
+    height: 40,
     paddingHorizontal: 5,
     alignItems: "center",
     justifyContent: "center",
   },
 
   circleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#C5399A",
+    // Figma: milky see-through circle with a pink outline mic.
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Figma: pink paperclip circle at the left of the message bar.
+  attachCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#C34D9C",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -6109,7 +6199,7 @@ const styles = StyleSheet.create({
   recordingTime: {
     width: 38,
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: FONTS.semibold,
     color: "#191922",
   },
 
@@ -6139,7 +6229,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
 
-  slideCancelText: { fontSize: 12, color: "#8A8A90", fontWeight: "600" },
+  slideCancelText: {
+    fontSize: 12,
+    color: "#8A8A90",
+    fontFamily: FONTS.semibold,
+  },
 
   // MENU (long press)
 
@@ -6175,7 +6269,7 @@ const styles = StyleSheet.create({
 
   quickReactionActive: { backgroundColor: "rgba(197,57,154,0.16)" },
 
-  quickReactionText: { fontSize: 25 },
+  quickReactionText: { fontFamily: FONTS.regular, fontSize: 25 },
 
   menuCard: {
     backgroundColor: "#FFFFFF",
@@ -6194,9 +6288,14 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
 
-  menuPreviewText: { flex: 1, fontSize: 12, color: "#8A8A90" },
+  menuPreviewText: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#8A8A90",
+  },
 
-  menuNoticeText: { color: "#1FA855", fontWeight: "700" },
+  menuNoticeText: { color: "#1FA855", fontFamily: FONTS.bold },
 
   menuClose: {
     width: 28,
@@ -6209,6 +6308,7 @@ const styles = StyleSheet.create({
   },
 
   deleteHint: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     lineHeight: 19,
     color: "#6B6B72",
@@ -6226,7 +6326,7 @@ const styles = StyleSheet.create({
 
   deleteOptionText: {
     fontSize: 15.5,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     color: "#D64545",
   },
 
@@ -6238,7 +6338,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 
-  menuItemText: { fontSize: 15, color: "#191922", fontWeight: "600" },
+  menuItemText: { fontSize: 15, color: "#191922", fontFamily: FONTS.semibold },
 
   dangerText: { color: "#D64545" },
 
@@ -6273,7 +6373,7 @@ const styles = StyleSheet.create({
 
   actionTitle: {
     fontSize: 17,
-    fontWeight: "800",
+    fontFamily: FONTS.bold,
     color: "#191922",
     marginBottom: 8,
   },
@@ -6285,7 +6385,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
 
-  actionText: { fontSize: 15, color: "#191922", fontWeight: "600" },
+  actionText: { fontSize: 15, color: "#191922", fontFamily: FONTS.semibold },
 
   cancelButton: {
     marginTop: 8,
@@ -6295,7 +6395,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
 
-  cancelText: { fontSize: 15, fontWeight: "700", color: "#555560" },
+  cancelText: { fontSize: 15, fontFamily: FONTS.bold, color: "#555560" },
 
   // FORWARD
 
@@ -6310,13 +6410,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  forwardPreviewText: { flex: 1, fontSize: 12, color: "#555560" },
+  forwardPreviewText: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#555560",
+  },
 
   forwardSearchInput: {
     minHeight: 44,
     backgroundColor: "#F5F5F7",
     borderRadius: 14,
     paddingHorizontal: 14,
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#191922",
     borderWidth: 1,
@@ -6326,7 +6432,7 @@ const styles = StyleSheet.create({
 
   forwardSectionTitle: {
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: FONTS.bold,
     color: "#777783",
     marginTop: 10,
     marginBottom: 4,
@@ -6355,11 +6461,21 @@ const styles = StyleSheet.create({
 
   forwardUserInfo: { flex: 1 },
 
-  forwardUsername: { fontSize: 11, color: "#8A8A90", marginTop: 2 },
+  forwardUsername: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#8A8A90",
+    marginTop: 2,
+  },
 
   forwardLoading: { paddingVertical: 18, alignItems: "center" },
 
-  noUsersText: { fontSize: 13, color: "#8A8A90", paddingVertical: 12 },
+  noUsersText: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: "#8A8A90",
+    paddingVertical: 12,
+  },
 
   // ATTACHMENTS
 
@@ -6394,7 +6510,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#555560",
     marginTop: 6,
-    fontWeight: "600",
+    fontFamily: FONTS.semibold,
   },
 
   mediaViewerBackdrop: {
@@ -6438,7 +6554,7 @@ const styles = StyleSheet.create({
   attachmentPreviewTitle: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
   },
 
   attachmentPreviewContent: {
@@ -6475,12 +6591,13 @@ const styles = StyleSheet.create({
   documentPreviewName: {
     color: "#191922",
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     textAlign: "center",
   },
 
   documentPreviewHint: {
     color: "#8A8A90",
+    fontFamily: FONTS.regular,
     fontSize: 12,
     marginTop: 6,
   },
@@ -6502,6 +6619,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 11,
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#191922",
   },

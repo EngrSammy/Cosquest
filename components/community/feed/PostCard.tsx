@@ -1,4 +1,5 @@
 import { AVATARS } from "@/constants/avatars";
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   bookmarkPostThunk,
@@ -221,12 +222,12 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   ========================================================= */
 
   const currentUserIds = cleanIds([
-    authUser?.id,
-    authUser?._id,
-    authUser?.userId,
-    user?.id,
-    user?._id,
-    user?.userId,
+    (authUser as any)?.id,
+    (authUser as any)?._id,
+    (authUser as any)?.userId,
+    (user as any)?.id,
+    (user as any)?._id,
+    (user as any)?.userId,
     ...getTokenUserIds(token),
   ]);
 
@@ -236,7 +237,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     user?.profile?.username ||
     authUser?.profile?.username ||
     user?.username ||
-    authUser?.username ||
+    (authUser as any)?.username ||
     "";
 
   /* =========================================================
@@ -524,83 +525,100 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     />
   );
 
-  return (
-    <View style={styles.card}>
-      {/* HEADER — avatar with faction ring, name, faction, place, ⋯ */}
-      <View style={styles.header}>
-        <View
-          style={[styles.ring, { borderColor: factionColor(authorFaction) }]}>
-          <Image
-            source={getAuthorAvatar(post)}
-            style={styles.avatar}
-            contentFit="cover"
-            transition={150}
-          />
-        </View>
+  // Faction · @username (or "Reel" / "shared a post") under the name.
+  const pillMeta = [authorFaction ? capitalize(authorFaction) : "", subtitle]
+    .filter(Boolean)
+    .join(" · ");
 
-        <View style={styles.headerText}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {authorName}
-            </Text>
-
-            {authorFaction ? (
-              <View style={styles.factionChip}>
-                <Text style={styles.factionText}>
-                  {capitalize(authorFaction)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {subtitle ? (
-            <Text style={styles.meta} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* ⋯ only on your own posts (edit / delete) */}
-        {isMine ? (
-          <Pressable
-            style={styles.menuButton}
-            onPress={() => setMenuVisible(true)}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Post options">
-            <Ionicons name="ellipsis-horizontal" size={20} color="#65656D" />
-          </Pressable>
-        ) : null}
+  // The name pill: on the photo (see-through) or on a text card (white).
+  const authorPill = (onPhoto: boolean) => (
+    <View
+      style={[styles.pill, onPhoto ? styles.pillOnPhoto : styles.pillOnCard]}>
+      <View style={[styles.ring, { borderColor: factionColor(authorFaction) }]}>
+        <Image
+          source={getAuthorAvatar(post)}
+          style={styles.avatar}
+          contentFit="cover"
+          transition={150}
+        />
       </View>
 
-      {/* MEDIA with Like · Comment · Share + Save on it */}
-      {hasMedia ? (
-        <View style={styles.mediaWrap}>
-          <PostMedia post={post}>{actions(true)}</PostMedia>
-        </View>
-      ) : null}
-
-      {/* CAPTION + hashtag chips */}
-      {post?.content?.trim() ? (
-        <PostCaption username={postUsername} content={post?.content} />
-      ) : null}
-
-      {/* SHARED POST: the original, in a frame */}
-      {post?.type === "share" ? (
-        <SharedPostEmbed shared={post?.sharedPost} />
-      ) : null}
-
-      {/* Text-only posts: the same buttons as a row */}
-      {!hasMedia ? actions(false) : null}
-
-      {/* COMMENTS LINK */}
-      <Pressable onPress={() => setCommentsVisible(true)} hitSlop={6}>
-        <Text style={styles.footer}>
-          {commentsCount > 0
-            ? `View ${commentsCount === 1 ? "1 comment" : `all ${commentsCount} comments`}`
-            : "Be the first to comment"}
+      <View style={styles.pillText}>
+        <Text style={styles.name} numberOfLines={1}>
+          {authorName}
         </Text>
+
+        {pillMeta ? (
+          <Text style={styles.meta} numberOfLines={1}>
+            {pillMeta}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  // ⋯ only on your own posts (edit / delete).
+  const menuButton = (onPhoto: boolean) =>
+    isMine ? (
+      <Pressable
+        style={[styles.menuButton, onPhoto && styles.menuButtonOnPhoto]}
+        onPress={() => setMenuVisible(true)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Post options">
+        <Ionicons
+          name="ellipsis-horizontal"
+          size={20}
+          color={onPhoto ? "#FFFFFF" : "#65656D"}
+        />
       </Pressable>
+    ) : null;
+
+  return (
+    // Figma: no white box - the PHOTO is the card, the name pill sits on
+    // it, and the caption sits underneath on the page background.
+    <View style={styles.post}>
+      {hasMedia ? (
+        <>
+          <PostMedia post={post}>
+            <View style={styles.overlayTop} pointerEvents="box-none">
+              {authorPill(true)}
+              {menuButton(true)}
+            </View>
+
+            {/* Like · Comment · Share + Save on the photo */}
+            {actions(true)}
+          </PostMedia>
+
+          {/* CAPTION + pink hashtags, under the photo */}
+          {post?.content?.trim() ? (
+            <View style={styles.captionBelow}>
+              <PostCaption username={postUsername} content={post?.content} />
+            </View>
+          ) : null}
+        </>
+      ) : (
+        // Text-only and shared posts: a soft card in the same size/place.
+        <View style={styles.textCard}>
+          <View style={styles.textCardTop}>
+            {authorPill(false)}
+            {menuButton(false)}
+          </View>
+
+          {post?.content?.trim() ? (
+            <View style={styles.textCardCaption}>
+              <PostCaption username={postUsername} content={post?.content} />
+            </View>
+          ) : null}
+
+          {/* SHARED POST: the original, in a frame */}
+          {post?.type === "share" ? (
+            <SharedPostEmbed shared={post?.sharedPost} />
+          ) : null}
+
+          {actions(false)}
+        </View>
+      )}
 
       {/* THREE-DOT MENU */}
       <PostMenu
@@ -711,72 +729,80 @@ export function PostCard({ post, token }: { post: any; token: string }) {
 ========================================================= */
 
 const styles = StyleSheet.create({
-  // Floating rounded card; the photo sits inside it.
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#EDEDF1",
-    padding: 12,
-    paddingBottom: 14,
-    marginBottom: 16,
+  // One post: the photo card (or text card) + the caption under it.
+  post: {
+    marginBottom: 26,
   },
 
-  header: {
+  // Name pill (left) and ⋯ (right) on top of the photo.
+  overlayTop: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    zIndex: 8,
+  },
+
+  pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+    maxWidth: "80%",
+    paddingVertical: 4,
+    paddingLeft: 4,
+    paddingRight: 14,
+    borderRadius: 24,
+  },
+
+  // On a photo: see-through white, like the Figma.
+  pillOnPhoto: {
+    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
+  },
+
+  // On a text card: solid white with a thin rim.
+  pillOnCard: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDEDF1",
   },
 
   // Faction-coloured ring around the avatar.
   ring: {
-    padding: 2,
-    borderRadius: 24,
-    borderWidth: 2,
+    padding: 1.5,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
 
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "#F1E4EE",
   },
 
-  headerText: {
-    flex: 1,
+  pillText: {
+    flexShrink: 1,
     minWidth: 0,
   },
 
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
   name: {
-    flexShrink: 1,
-    fontSize: 14.5,
-    fontWeight: "700",
-    color: "#1C1C22",
-  },
-
-  factionChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: "#EEEDFE",
-  },
-
-  factionText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#3C3489",
+    fontFamily: FONTS.semibold,
+    fontSize: 13.5,
+    lineHeight: 18,
+    color: "#191922",
   },
 
   meta: {
-    marginTop: 2,
-    fontSize: 12,
-    color: "#8A8A93",
+    fontFamily: FONTS.regular,
+    fontSize: 10.5,
+    lineHeight: 14,
+    color: "#4B4B53",
   },
 
   menuButton: {
@@ -787,15 +813,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  mediaWrap: {
-    marginTop: 12,
+  menuButtonOnPhoto: {
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
 
-  footer: {
-    marginTop: 10,
-    paddingHorizontal: 4,
-    fontSize: 12.5,
-    color: "#8A8A93",
+  // Caption under the photo, lined up with the card's edges.
+  captionBelow: {
+    marginTop: 14,
+    paddingHorizontal: 24,
+  },
+
+  // Text-only / shared posts.
+  textCard: {
+    marginHorizontal: 24,
+    padding: 14,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.9)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  textCardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+
+  textCardCaption: {
+    marginTop: 12,
   },
 
   /* EDIT MODAL */

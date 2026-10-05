@@ -1,15 +1,21 @@
-import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { logout as logoutApi } from "@/services/auth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout as logoutLocal } from "@/store/slices/authSlice";
 import { clearUser } from "@/store/slices/userSlice";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+const PINK = "#C34D9C";
+const RED = "#E24D4D";
+
+// Figma row: icon, label, (value), then the ">" right AFTER the text.
 function SettingRow({
   icon,
   label,
@@ -24,14 +30,16 @@ function SettingRow({
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-      onPress={onPress}>
-      <Ionicons name={icon} size={20} color="#C5399A" />
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}>
+      <Ionicons name={icon} size={20} color={PINK} />
 
       <Text style={styles.rowLabel}>{label}</Text>
 
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
 
-      <Ionicons name="chevron-forward" size={16} color="#9C9CAA" />
+      <Ionicons name="chevron-forward" size={16} color="#3B3B42" />
     </Pressable>
   );
 }
@@ -61,13 +69,32 @@ export default function Settings() {
     }
   }
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      safeBack();
+    } else {
+      router.replace("/profile");
+    }
+  };
+
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma background:
+          linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
+                                  rgba(184,232,255,0.6) 67.7%) */}
+      <LinearGradient
+        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        locations={[0.0459, 0.677]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}
@@ -75,168 +102,171 @@ export default function Settings() {
         {/* HEADER */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             hitSlop={10}
-            style={styles.backButton}>
+            style={styles.headerSide}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
             <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <Text style={styles.headerTitle}>Settings</Text>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.headerSide} />
         </View>
 
-        {/* ACCOUNT SETTINGS */}
-        <Text style={styles.sectionLabel}>ACCOUNT SETTINGS</Text>
+        {/* ACCOUNT SETTINGS (Figma: padding 16 top / 20 sides, gap 12) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCOUNT SETTINGS</Text>
 
-        <SettingRow
-          icon="person-outline"
-          label="Account Information"
-          onPress={() => router.push("/account-information")}
-        />
+          <SettingRow
+            icon="person-outline"
+            label="Account Information"
+            onPress={() => router.push("/account-information")}
+          />
 
-        <SettingRow
-          icon="lock-closed-outline"
-          label="Privacy & Visibility"
-          onPress={() => router.push("/privacy-visibility")}
-        />
+          <SettingRow
+            icon="lock-closed-outline"
+            label="Privacy & Visibility"
+            onPress={() => router.push("/privacy-visibility")}
+          />
 
-        <SettingRow
-          icon="notifications-outline"
-          label="Notification Preferences"
-          onPress={() => router.push("/notification-preferences")}
-        />
+          <SettingRow
+            icon="notifications-outline"
+            label="Notification Preferences"
+            onPress={() => router.push("/notification-preferences")}
+          />
+        </View>
 
         {/* APP PREFERENCES */}
-        <Text style={styles.sectionLabel}>APP PREFERENCES</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>APP PREFERENCES</Text>
 
-        <SettingRow
-          icon="eye-outline"
-          label="Appearance"
-          value="Light Mode"
-          onPress={() => router.push("/appearance")}
-        />
+          <SettingRow
+            icon="eye-outline"
+            label="Appearance"
+            value="Light Mode"
+            onPress={() => router.push("/appearance")}
+          />
 
-        <SettingRow
-          icon="cellular-outline"
-          label="Data Usage"
-          onPress={() => router.push("/data-usage")}
-        />
+          {/* Figma: a database icon */}
+          <SettingRow
+            icon="server-outline"
+            label="Data Usage"
+            onPress={() => router.push("/data-usage")}
+          />
 
-        <SettingRow
-          icon="help-circle-outline"
-          label="Help & Support"
-          onPress={() => router.push("/help-support")}
-        />
+          <SettingRow
+            icon="help-circle-outline"
+            label="Help & Support"
+            onPress={() => router.push("/help-support")}
+          />
+        </View>
 
         {/* LOG OUT */}
-        <Pressable
-          style={({ pressed }) => [styles.logoutRow, pressed && styles.pressed]}
-          onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#E24D4D" />
+        <View style={[styles.section, styles.logoutSection]}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Log out">
+            <Ionicons name="log-out-outline" size={21} color={RED} />
 
-          <Text style={styles.logoutLabel}>Log Out</Text>
-        </Pressable>
+            <Text style={styles.logoutLabel}>Log Out</Text>
+          </Pressable>
+        </View>
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
 
-  backButton: {
-    width: 24,
-    alignItems: "center",
+  headerSide: {
+    width: 40,
+    height: 36,
     justifyContent: "center",
   },
 
   headerTitle: {
     flex: 1,
     textAlign: "center",
+    fontFamily: FONTS.semibold,
     fontSize: 20,
-    fontWeight: "700",
-    color: "#191922",
+    color: "#000000",
   },
 
-  headerSpacer: {
-    width: 24,
+  // Figma: 402 wide, padding 16 top / 20 left and right, gap 12.
+  section: {
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    gap: 12,
   },
 
   sectionLabel: {
+    fontFamily: FONTS.medium,
     fontSize: 12,
-    fontWeight: "600",
-    color: "#8A8A90",
-    letterSpacing: 0.5,
-    marginTop: 18,
-    marginBottom: 10,
+    letterSpacing: 0.3,
+    color: "#7A7A84",
   },
 
+  // Milky pressed-in row: #0000000D, radius 14, soft shadow, white rim.
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 0.2,
-    borderColor: "rgba(255,255,255,0.6)",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    elevation: 4,
-    borderRadius: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 15,
-    marginBottom: 10,
+    minHeight: 46,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
   rowLabel: {
-    flex: 1,
+    fontFamily: FONTS.regular,
     fontSize: 15,
-    fontWeight: "600",
     color: "#191922",
   },
 
   rowValue: {
-    fontSize: 13,
-    color: "#9C9CAA",
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: "#7A7A84",
   },
 
-  logoutRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 0.2,
-    borderColor: "rgba(255,255,255,0.6)",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    elevation: 4,
-    borderRadius: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 15,
-    marginTop: 30,
+  logoutSection: {
+    paddingTop: 30,
   },
 
   logoutLabel: {
+    fontFamily: FONTS.medium,
     fontSize: 15,
-    fontWeight: "700",
-    color: "#E24D4D",
+    color: RED,
   },
 
   pressed: {

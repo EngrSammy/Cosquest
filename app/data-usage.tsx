@@ -1,65 +1,84 @@
-import { AppBackground } from "@/components/AppBackground";
+import { PinkSwitch } from "@/components/ui/PinkSwitch";
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-      fetchDataUsageSettings,
-      updateDataUsageSettingsThunk,
+  fetchDataUsageSettings,
+  updateDataUsageSettingsThunk,
 } from "@/store/thunks/settingsThunks";
+import { safeBack } from "@/utils/safeBack";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
-import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Switch,
-      Text,
-      View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const PINK = "#C34D9C";
+
 type ImageQuality = "low" | "medium" | "high" | "auto";
 
-type DownloadRowProps = {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-};
+const QUALITY_OPTIONS: { value: ImageQuality; label: string; hint: string }[] =
+  [
+    { value: "low", label: "Low", hint: "Uses the least data" },
+    { value: "medium", label: "Medium", hint: "A good balance" },
+    { value: "high", label: "High", hint: "Sharpest pictures" },
+    { value: "auto", label: "Auto", hint: "Depends on your connection" },
+  ];
 
-function DownloadRow({ icon, label, value, onChange }: DownloadRowProps) {
+const MILKY = {
+  borderRadius: 14,
+  backgroundColor: "#0000000D",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.75)",
+
+  shadowColor: "#000000",
+  shadowOpacity: 0.09,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+
+function RowIcon({ name }: { name: keyof typeof Ionicons.glyphMap }) {
   return (
-    <View style={styles.row}>
-      <View style={styles.rowIcon}>
-        <Ionicons name={icon} size={17} color="#C5399A" />
-      </View>
-
-      <Text style={styles.rowLabel}>{label}</Text>
-
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{
-          false: "#D4D4D8",
-          true: "#D88CC0",
-        }}
-        thumbColor={value ? "#C5399A" : "#F4F4F5"}
-        ios_backgroundColor="#D4D4D8"
-      />
+    <View style={styles.rowIcon}>
+      <Ionicons name={name} size={15} color={PINK} />
     </View>
   );
 }
 
-/**
- * Convert bytes into a readable storage value.
- *
- * Examples:
- * 1024 -> 1 KB
- * 1048576 -> 1 MB
- * 1073741824 -> 1 GB
- */
+function DownloadRow({
+  icon,
+  label,
+  value,
+  onChange,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.row}>
+      <RowIcon name={icon} />
+
+      <Text style={[styles.rowLabel, styles.rowLabelFlex]}>{label}</Text>
+
+      <PinkSwitch value={value} onChange={onChange} />
+    </View>
+  );
+}
+
+// 1024 -> "1 KB", 1073741824 -> "1 GB"
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return "0 B";
@@ -74,11 +93,7 @@ function formatBytes(bytes: number): string {
 
   const value = bytes / Math.pow(1024, index);
 
-  if (index === 0) {
-    return `${Math.round(value)} ${units[index]}`;
-  }
-
-  if (value >= 100) {
+  if (index === 0 || value >= 100) {
     return `${Math.round(value)} ${units[index]}`;
   }
 
@@ -89,10 +104,7 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(2)} ${units[index]}`;
 }
 
-/**
- * Calculate the actual size of everything inside
- * the application's cache directory.
- */
+// The real size of everything in the app's cache folder.
 async function calculateCacheSize(uri: string): Promise<number> {
   let totalSize = 0;
 
@@ -103,9 +115,7 @@ async function calculateCacheSize(uri: string): Promise<number> {
       const childUri = `${uri}${entry}`;
 
       try {
-        const info = await FileSystem.getInfoAsync(childUri, {
-          size: true,
-        });
+        const info = await FileSystem.getInfoAsync(childUri);
 
         if (!info.exists) {
           continue;
@@ -119,34 +129,27 @@ async function calculateCacheSize(uri: string): Promise<number> {
           totalSize += info.size ?? 0;
         }
       } catch {
-        // Ignore a cache entry that disappears while scanning.
+        // A cache entry disappeared while scanning.
       }
     }
   } catch {
-    // Cache directory may be unavailable or empty.
+    // Cache folder unavailable or empty.
   }
 
   return totalSize;
 }
 
-/**
- * Delete the actual contents of the application's cache.
- *
- * We delete the contents rather than deleting the cache root itself,
- * because the app may need the cache directory to continue existing.
- */
+// Deletes what's inside the cache folder (the folder itself stays).
 async function clearApplicationCache(uri: string): Promise<void> {
   const entries = await FileSystem.readDirectoryAsync(uri);
 
   for (const entry of entries) {
-    const childUri = `${uri}${entry}`;
-
     try {
-      await FileSystem.deleteAsync(childUri, {
+      await FileSystem.deleteAsync(`${uri}${entry}`, {
         idempotent: true,
       });
     } catch {
-      // Continue clearing the remaining cache entries.
+      // Keep clearing the rest.
     }
   }
 }
@@ -161,6 +164,7 @@ export default function DataUsage() {
   const [wifiOnly, setWifiOnly] = useState(true);
   const [autoPlayVideos, setAutoPlayVideos] = useState(true);
   const [imageQuality, setImageQuality] = useState<ImageQuality>("high");
+  const [qualitySheet, setQualitySheet] = useState(false);
 
   const [cacheBytes, setCacheBytes] = useState(0);
   const [totalStorageBytes, setTotalStorageBytes] = useState(0);
@@ -169,9 +173,9 @@ export default function DataUsage() {
   const [storageLoading, setStorageLoading] = useState(true);
   const [cacheClearing, setCacheClearing] = useState(false);
 
-  /**
-   * Load the backend Data Usage settings.
-   */
+  const isWeb = Platform.OS === "web";
+
+  // Load the saved Data Usage settings.
   useEffect(() => {
     if (!token) {
       return;
@@ -180,15 +184,7 @@ export default function DataUsage() {
     dispatch(fetchDataUsageSettings(token));
   }, [dispatch, token]);
 
-  /**
-   * Synchronize the UI with the exact backend fields.
-   *
-   * MongoDB:
-   *
-   * downloadOverWifiOnly
-   * autoPlayVideos
-   * imageQuality
-   */
+  // Show what the backend returned.
   useEffect(() => {
     if (!dataUsage) {
       return;
@@ -212,42 +208,29 @@ export default function DataUsage() {
     }
   }, [dataUsage]);
 
-  /**
-   * Read the actual device storage and actual CosQuest cache.
-   */
+  // The phone's real storage and the app's real cache size.
   const loadDeviceStorage = useCallback(async () => {
     try {
       setStorageLoading(true);
 
-      // Browsers cannot read device storage - only phones can.
-
+      // Browsers can't read device storage - only phones can.
       if (Platform.OS === "web") {
-
         return;
-
       }
-
-      
 
       const [totalDiskCapacity, freeDiskStorage] = await Promise.all([
         FileSystem.getTotalDiskCapacityAsync(),
         FileSystem.getFreeDiskStorageAsync(),
       ]);
 
-      const usedDiskStorage = Math.max(totalDiskCapacity - freeDiskStorage, 0);
-
       setTotalStorageBytes(totalDiskCapacity);
-      setUsedStorageBytes(usedDiskStorage);
+      setUsedStorageBytes(Math.max(totalDiskCapacity - freeDiskStorage, 0));
 
       const cacheDirectory = FileSystem.cacheDirectory;
 
-      if (cacheDirectory) {
-        const actualCacheSize = await calculateCacheSize(cacheDirectory);
-
-        setCacheBytes(actualCacheSize);
-      } else {
-        setCacheBytes(0);
-      }
+      setCacheBytes(
+        cacheDirectory ? await calculateCacheSize(cacheDirectory) : 0,
+      );
     } catch (error) {
       console.error("Failed to load device storage:", error);
     } finally {
@@ -255,221 +238,91 @@ export default function DataUsage() {
     }
   }, []);
 
-  /**
-   * Load real device information when the screen opens.
-   */
   useEffect(() => {
     void loadDeviceStorage();
   }, [loadDeviceStorage]);
 
-  /**
-   * Save Download over Wi-Fi Only.
-   */
-  async function handleWifiOnlyChange(value: boolean) {
-    const previousValue = wifiOnly;
+  // Saves one setting; rolls back (with a message) if it fails.
+  async function saveSetting(
+    data: Record<string, unknown>,
+    rollback: () => void,
+    failMessage: string,
+  ) {
+    if (!token) {
+      rollback();
+      Alert.alert(
+        "Not Signed In",
+        "Please sign in again before changing this setting.",
+      );
+      return;
+    }
 
+    try {
+      await dispatch(updateDataUsageSettingsThunk({ token, data })).unwrap();
+    } catch (error) {
+      console.error("Failed to update data usage setting:", error);
+      rollback();
+      Alert.alert("Update Failed", failMessage);
+    }
+  }
+
+  function handleWifiOnlyChange(value: boolean) {
+    const previous = wifiOnly;
     setWifiOnly(value);
 
-    if (!token) {
-      setWifiOnly(previousValue);
-
-      Alert.alert(
-        "Not Signed In",
-        "Please sign in again before changing this setting.",
-      );
-
-      return;
-    }
-
-    try {
-      await dispatch(
-        updateDataUsageSettingsThunk({
-          token,
-          data: {
-            downloadOverWifiOnly: value,
-          },
-        }),
-      ).unwrap();
-    } catch (error) {
-      console.error("Failed to update Wi-Fi preference:", error);
-
-      setWifiOnly(previousValue);
-
-      Alert.alert(
-        "Update Failed",
-        "We could not save your Wi-Fi download preference. Please try again.",
-      );
-    }
+    void saveSetting(
+      { downloadOverWifiOnly: value },
+      () => setWifiOnly(previous),
+      "We could not save your Wi-Fi download preference. Please try again.",
+    );
   }
 
-  /**
-   * Save Auto-play Videos.
-   */
-  async function handleAutoPlayChange(value: boolean) {
-    const previousValue = autoPlayVideos;
-
+  function handleAutoPlayChange(value: boolean) {
+    const previous = autoPlayVideos;
     setAutoPlayVideos(value);
 
-    if (!token) {
-      setAutoPlayVideos(previousValue);
-
-      Alert.alert(
-        "Not Signed In",
-        "Please sign in again before changing this setting.",
-      );
-
-      return;
-    }
-
-    try {
-      await dispatch(
-        updateDataUsageSettingsThunk({
-          token,
-          data: {
-            autoPlayVideos: value,
-          },
-        }),
-      ).unwrap();
-    } catch (error) {
-      console.error("Failed to update auto-play preference:", error);
-
-      setAutoPlayVideos(previousValue);
-
-      Alert.alert(
-        "Update Failed",
-        "We could not save your auto-play preference. Please try again.",
-      );
-    }
+    void saveSetting(
+      { autoPlayVideos: value },
+      () => setAutoPlayVideos(previous),
+      "We could not save your auto-play preference. Please try again.",
+    );
   }
 
-  /**
-   * Display backend image-quality values nicely.
-   *
-   * Backend:
-   * low
-   * medium
-   * high
-   * auto
-   *
-   * UI:
-   * Low
-   * Medium
-   * High
-   * Auto
-   */
-  function displayImageQuality(value: ImageQuality): string {
-    switch (value) {
-      case "low":
-        return "Low";
+  function chooseImageQuality(value: ImageQuality) {
+    setQualitySheet(false);
 
-      case "medium":
-        return "Medium";
-
-      case "high":
-        return "High";
-
-      case "auto":
-        return "Auto";
-
-      default:
-        return "High";
-    }
-  }
-
-  /**
-   * Save Image Quality.
-   */
-  async function saveImageQuality(value: ImageQuality) {
-    const previousValue = imageQuality;
-
+    const previous = imageQuality;
     setImageQuality(value);
 
-    if (!token) {
-      setImageQuality(previousValue);
-
-      Alert.alert(
-        "Not Signed In",
-        "Please sign in again before changing this setting.",
-      );
-
-      return;
-    }
-
-    try {
-      await dispatch(
-        updateDataUsageSettingsThunk({
-          token,
-          data: {
-            imageQuality: value,
-          },
-        }),
-      ).unwrap();
-    } catch (error) {
-      console.error("Failed to update image quality:", error);
-
-      setImageQuality(previousValue);
-
-      Alert.alert(
-        "Update Failed",
-        "We could not save your image quality preference. Please try again.",
-      );
-    }
+    void saveSetting(
+      { imageQuality: value },
+      () => setImageQuality(previous),
+      "We could not save your image quality preference. Please try again.",
+    );
   }
 
-  /**
-   * Show image quality options.
-   */
-  function handleImageQuality() {
-    Alert.alert("Image Quality", "Choose the image quality to use.", [
-      {
-        text: "Low",
-        onPress: () => {
-          void saveImageQuality("low");
-        },
-      },
-      {
-        text: "Medium",
-        onPress: () => {
-          void saveImageQuality("medium");
-        },
-      },
-      {
-        text: "High",
-        onPress: () => {
-          void saveImageQuality("high");
-        },
-      },
-      {
-        text: "Auto",
-        onPress: () => {
-          void saveImageQuality("auto");
-        },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-    ]);
-  }
+  const qualityLabel =
+    QUALITY_OPTIONS.find((option) => option.value === imageQuality)?.label ||
+    "High";
 
-  /**
-   * Clear the REAL CosQuest application cache.
-   */
   function handleClearCache() {
     if (cacheClearing) {
       return;
     }
 
-    const currentCacheSize = formatBytes(cacheBytes);
+    if (isWeb) {
+      Alert.alert(
+        "Clear Cache",
+        "On the website, your browser keeps CosQuest's temporary files. You can clear them in your browser's settings.",
+      );
+      return;
+    }
 
     Alert.alert(
       "Clear Cache",
-      `This will remove ${currentCacheSize} of temporary CosQuest files from this device. Your account, posts, messages, profile, and other cloud data will not be deleted.`,
+      `This will remove ${formatBytes(cacheBytes)} of temporary CosQuest files from this device. Your account, posts, messages and profile are not deleted.`,
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Clear Cache",
           style: "destructive",
@@ -481,18 +334,14 @@ export default function DataUsage() {
     );
   }
 
-  /**
-   * Actually delete cached files from the device.
-   */
   async function clearCache() {
     const cacheDirectory = FileSystem.cacheDirectory;
 
     if (!cacheDirectory) {
       Alert.alert(
         "Cache Unavailable",
-        "The application cache directory is not available on this device.",
+        "The app's cache folder isn't available on this device.",
       );
-
       return;
     }
 
@@ -501,36 +350,23 @@ export default function DataUsage() {
 
       await clearApplicationCache(cacheDirectory);
 
-      /**
-       * Read the cache again after deletion.
-       * This makes the displayed value reflect the
-       * actual device state instead of assuming 0 MB.
-       */
-      const remainingCacheSize = await calculateCacheSize(cacheDirectory);
+      const remaining = await calculateCacheSize(cacheDirectory);
 
-      setCacheBytes(remainingCacheSize);
+      setCacheBytes(remaining);
 
       Alert.alert(
         "Cache Cleared",
-        remainingCacheSize > 0
-          ? `The cache was cleared. ${formatBytes(
-              remainingCacheSize,
-            )} of cache data remains because some temporary files are currently in use.`
+        remaining > 0
+          ? `The cache was cleared. ${formatBytes(remaining)} remains because some files are in use.`
           : "The CosQuest cache has been cleared.",
       );
     } catch (error) {
       console.error("Failed to clear application cache:", error);
 
-      /**
-       * Even if some files could not be deleted,
-       * recalculate the actual cache size.
-       */
       try {
-        const remainingCacheSize = await calculateCacheSize(cacheDirectory);
-
-        setCacheBytes(remainingCacheSize);
+        setCacheBytes(await calculateCacheSize(cacheDirectory));
       } catch {
-        // Keep the current value if recalculation fails.
+        // Keep the current value.
       }
 
       Alert.alert(
@@ -542,166 +378,217 @@ export default function DataUsage() {
     }
   }
 
-  /**
-   * Storage progress.
-   */
   const storageProgress =
     totalStorageBytes > 0
       ? Math.min(usedStorageBytes / totalStorageBytes, 1)
       : 0;
 
-  const usedStorageText = formatBytes(usedStorageBytes);
-
-  const totalStorageText = formatBytes(totalStorageBytes);
-
   const cacheText = formatBytes(cacheBytes);
 
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}>
-        {/* Header */}
+        {/* HEADER: back arrow, then the Figma database chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={() => safeBack("/settings")}
+            hitSlop={10}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="server-outline" size={16} color="#C5399A" />
+              <Ionicons name="server-outline" size={16} color={PINK} />
             </View>
 
             <Text style={styles.headerTitle}>Data Usage</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.backButton} />
         </View>
 
         {/* STORAGE DETAILS */}
-        <Text style={styles.sectionLabel}>STORAGE DETAILS</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>STORAGE DETAILS</Text>
 
-        <View style={styles.storageCard}>
-          <View style={styles.storageHeader}>
-            <Text style={styles.storageTitle}>Storage Space</Text>
+          <View style={styles.storageCard}>
+            <View style={styles.storageHeader}>
+              <Text style={styles.storageTitle}>Storage Space</Text>
 
-            {storageLoading ? (
-              <ActivityIndicator size="small" color="#C5399A" />
-            ) : (
-              <Text style={styles.storageValue}>
-                {usedStorageText} / {totalStorageText}
+              {isWeb ? (
+                <Text style={styles.storageValue}>On your phone</Text>
+              ) : storageLoading ? (
+                <ActivityIndicator size="small" color={PINK} />
+              ) : (
+                <Text style={styles.storageValue}>
+                  {formatBytes(usedStorageBytes)} /{" "}
+                  {formatBytes(totalStorageBytes)}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.progressBackground}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${storageProgress * 100}%` },
+                ]}
+              />
+            </View>
+
+            <View style={styles.cacheInfo}>
+              <View style={styles.cacheDot} />
+
+              <Text style={styles.cacheText}>
+                {isWeb
+                  ? "App Cache (in your browser)"
+                  : `App Cache (${cacheText})`}
               </Text>
-            )}
-          </View>
-
-          <View style={styles.progressBackground}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${storageProgress * 100}%`,
-                },
-              ]}
-            />
-          </View>
-
-          <View style={styles.cacheInfo}>
-            <View style={styles.cacheDot} />
-
-            <Text style={styles.cacheText}>App Cache ({cacheText})</Text>
+            </View>
           </View>
         </View>
 
         {/* BANDWIDTH & SAVING */}
-        <Text style={[styles.sectionLabel, styles.bandwidthLabel]}>
-          BANDWIDTH & SAVING
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>BANDWIDTH & SAVING</Text>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.row,
-            pressed && styles.pressed,
-            cacheClearing && styles.disabledRow,
-          ]}
-          onPress={handleClearCache}
-          disabled={cacheClearing}>
-          <View style={styles.rowIcon}>
-            <Ionicons name="trash-outline" size={17} color="#C5399A" />
-          </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.row,
+              pressed && styles.pressed,
+              cacheClearing && styles.disabledRow,
+            ]}
+            onPress={handleClearCache}
+            disabled={cacheClearing}>
+            <RowIcon name="trash-outline" />
 
-          <View style={styles.rowTextContainer}>
-            <Text style={styles.rowLabel}>Clear Cache</Text>
+            <View style={styles.rowTextContainer}>
+              <Text style={styles.rowLabel}>Clear Cache</Text>
 
-            <Text style={styles.rowValue}>
-              {cacheClearing ? "Clearing..." : cacheText}
-            </Text>
-          </View>
+              <Text style={styles.rowValue}>
+                {cacheClearing ? "Clearing..." : isWeb ? "Browser" : cacheText}
+              </Text>
+            </View>
 
-          {cacheClearing && <ActivityIndicator size="small" color="#C5399A" />}
-        </Pressable>
+            {cacheClearing ? (
+              <ActivityIndicator size="small" color={PINK} />
+            ) : null}
+          </Pressable>
 
-        <DownloadRow
-          icon="phone-portrait-outline"
-          label="Download over Wi-Fi Only"
-          value={wifiOnly}
-          onChange={handleWifiOnlyChange}
-        />
+          <DownloadRow
+            icon="wifi-outline"
+            label="Download over Wi-Fi Only"
+            value={wifiOnly}
+            onChange={handleWifiOnlyChange}
+          />
 
-        <DownloadRow
-          icon="play-circle-outline"
-          label="Auto-play Videos"
-          value={autoPlayVideos}
-          onChange={handleAutoPlayChange}
-        />
+          <DownloadRow
+            icon="play-circle-outline"
+            label="Auto-play Videos"
+            value={autoPlayVideos}
+            onChange={handleAutoPlayChange}
+          />
 
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-          onPress={handleImageQuality}>
-          <View style={styles.rowIcon}>
-            <Ionicons name="image-outline" size={17} color="#C5399A" />
-          </View>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            onPress={() => setQualitySheet(true)}>
+            <RowIcon name="image-outline" />
 
-          <View style={styles.rowTextContainer}>
-            <Text style={styles.rowLabel}>Image Quality</Text>
+            <View style={styles.rowTextContainer}>
+              <Text style={styles.rowLabel}>Image Quality</Text>
 
-            <Text style={styles.rowValue}>
-              {displayImageQuality(imageQuality)}
-            </Text>
-          </View>
-
-          <Ionicons name="chevron-forward" size={17} color="#9999A3" />
-        </Pressable>
+              <Text style={styles.rowValue}>{qualityLabel}</Text>
+            </View>
+          </Pressable>
+        </View>
       </ScrollView>
-    </AppBackground>
+
+      {/* IMAGE QUALITY SHEET (works on phones and the website) */}
+      <Modal
+        visible={qualitySheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQualitySheet(false)}>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setQualitySheet(false)}>
+          <Pressable
+            style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}
+            onPress={(event) => event.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+
+            <Text style={styles.sheetTitle}>Image Quality</Text>
+
+            {QUALITY_OPTIONS.map((option) => {
+              const selected = option.value === imageQuality;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[styles.sheetOption, selected && styles.sheetOptionOn]}
+                  onPress={() => chooseImageQuality(option.value)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetOptionLabel}>{option.label}</Text>
+                    <Text style={styles.sheetOptionHint}>{option.hint}</Text>
+                  </View>
+
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={22} color={PINK} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 4,
   },
 
   backButton: {
     width: 36,
     height: 36,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
 
@@ -710,60 +597,42 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
 
+  // Figma: 35 x 36, radius 100, padding 8, background #0000000A
   headerIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    backgroundColor: "#0000000A",
   },
 
   headerTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
-  headerSpacer: {
-    width: 36,
+  section: {
+    paddingTop: 18,
+    gap: 12,
   },
 
   sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8D8D98",
-    letterSpacing: 0.5,
-    marginBottom: 9,
-    marginLeft: 2,
-  },
-
-  bandwidthLabel: {
-    marginTop: 18,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
   storageCard: {
-    borderRadius: 12,
-    paddingHorizontal: 13,
-    paddingVertical: 13,
-
-    backgroundColor: "rgba(255,255,255,0.48)",
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
-
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    ...MILKY,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
 
   storageHeader: {
@@ -773,20 +642,21 @@ const styles = StyleSheet.create({
   },
 
   storageTitle: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: "#33333B",
+    fontFamily: FONTS.semibold,
+    fontSize: 13.5,
+    color: "#191922",
   },
 
   storageValue: {
-    fontSize: 11,
-    color: "#7F7F88",
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#6B6B72",
   },
 
   progressBackground: {
     height: 8,
     borderRadius: 5,
-    backgroundColor: "#E0E0E4",
+    backgroundColor: "rgba(0,0,0,0.08)",
     marginTop: 10,
     overflow: "hidden",
   },
@@ -794,7 +664,7 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 5,
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
   },
 
   cacheInfo: {
@@ -807,48 +677,36 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#C5399A",
+    backgroundColor: PINK,
     marginRight: 6,
   },
 
   cacheText: {
-    fontSize: 10.5,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
     color: "#7A7A84",
   },
 
+  // Milky row.
   row: {
-    minHeight: 53,
+    ...MILKY,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    marginBottom: 8,
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.48)",
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
-
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
 
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
   rowIcon: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   rowTextContainer: {
@@ -856,25 +714,86 @@ const styles = StyleSheet.create({
   },
 
   rowLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: "#55555E",
+  },
+
+  rowLabelFlex: {
     flex: 1,
-    fontSize: 12.5,
-    fontWeight: "600",
-    color: "#5B5B67",
   },
 
   rowValue: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: "#292931",
-    marginTop: 2,
+    marginTop: 1,
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    color: "#191922",
   },
 
   pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.995 }],
+    opacity: 0.75,
   },
 
   disabledRow: {
     opacity: 0.75,
+  },
+
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+
+  sheet: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    gap: 10,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+  },
+
+  sheetHandle: {
+    alignSelf: "center",
+    width: 42,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#D5D5DA",
+    marginBottom: 6,
+  },
+
+  sheetTitle: {
+    fontFamily: FONTS.semibold,
+    fontSize: 17,
+    color: "#191922",
+    marginBottom: 4,
+  },
+
+  sheetOption: {
+    ...MILKY,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  sheetOptionOn: {
+    borderColor: PINK,
+  },
+
+  sheetOptionLabel: {
+    fontFamily: FONTS.semibold,
+    fontSize: 14.5,
+    color: "#191922",
+  },
+
+  sheetOptionHint: {
+    marginTop: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#7A7A84",
   },
 });

@@ -231,7 +231,7 @@ export function FactionDescriptionModal({
                 contentContainerStyle={styles.content}>
                 {/* Faction image */}
                 <Image
-                  source={details.image}
+                  source={details.image as any}
                   style={styles.banner}
                   contentFit="cover"
                 />
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
 
   backdropTouch: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 
   /*

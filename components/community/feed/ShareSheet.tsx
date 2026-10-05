@@ -543,7 +543,7 @@ export function ShareSheet({
 
 const styles = StyleSheet.create({
   composerLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "flex-end",
   },
 
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
 
   overlay: {
-    // Was StyleSheet.absoluteFillObject, which no longer exists in this
+    // Was StyleSheet.absoluteFill, which no longer exists in this
     // React Native version — the dark background behind the sheet was
     // silently missing.
     ...StyleSheet.absoluteFill,

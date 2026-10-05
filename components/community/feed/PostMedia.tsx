@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode, useState } from "react";
 import {
   NativeScrollEvent,
@@ -10,22 +9,20 @@ import {
   View,
 } from "react-native";
 
+import { FONTS } from "@/constants/fonts";
+
 import { PostVideo } from "./PostVideo";
 
 // ==========================================
-// SIZE
+// FIGMA CARD
 // ==========================================
-// The photo fills the card's width and its HEIGHT follows the photo's real
-// shape (tall photos are tall, wide ones shorter), limited to the range
-// Facebook/Instagram use: portrait 4:5 up to wide 1.91:1.
-const TALLEST_RATIO = 4 / 5;
-const WIDEST_RATIO = 1.91;
-// Until the photo has loaded, and always for reels: portrait 4:5.
-const DEFAULT_RATIO = 4 / 5;
-
-function clampRatio(ratio: number) {
-  return Math.min(WIDEST_RATIO, Math.max(TALLEST_RATIO, ratio));
-}
+// width 355.42, height 384.19, left 24, no rotation, opacity 1,
+// box-shadow: 0px 4px 4px 0px #00000040
+const CARD_WIDTH = 355.42;
+const CARD_HEIGHT = 384.19;
+const CARD_RATIO = CARD_WIDTH / CARD_HEIGHT;
+const CARD_MARGIN = 24; // "left: 24px" - same gap on the right
+const CARD_RADIUS = 24; // corner radius (adjust if the Figma shows another)
 
 // Every photo/video link on a post, whatever shape the backend sends.
 export function getMediaUrls(post: any): string[] {
@@ -53,9 +50,12 @@ export function getMediaUrls(post: any): string[] {
   return urls;
 }
 
-// The rounded photo / reel / gallery inside the post card.
-// `children` are drawn ON TOP of it (the like / comment / share panel and
-// the save button — see PostActions).
+// The rounded photo / reel / gallery card.
+// `children` are drawn ON TOP of it (the name pill and ⋯ at the top, the
+// dark swoosh with like / comment / share and the save button at the
+// bottom - see PostCard / PostActions).
+//
+// Every card is the same Figma size; photos are cropped to fill it.
 export function PostMedia({
   post,
   children,
@@ -66,25 +66,12 @@ export function PostMedia({
   const urls = getMediaUrls(post);
   const isReel = post?.type === "reel";
 
-  const [ratio, setRatio] = useState(DEFAULT_RATIO);
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
 
   if (!urls.length) {
     return null;
   }
-
-  const aspectRatio = isReel ? DEFAULT_RATIO : ratio;
-
-  const handleImageLoad = (event: {
-    source: { width: number; height: number };
-  }) => {
-    const { width: imageWidth, height: imageHeight } = event.source || {};
-
-    if (imageWidth > 0 && imageHeight > 0) {
-      setRatio(clampRatio(imageWidth / imageHeight));
-    }
-  };
 
   const handleGalleryScroll = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
@@ -112,11 +99,10 @@ export function PostMedia({
         contentFit="cover"
         cachePolicy="memory-disk"
         transition={150}
-        onLoad={handleImageLoad}
       />
     );
   } else {
-    // GALLERY — swipe sideways; the first photo sets the height.
+    // GALLERY - swipe sideways.
     media =
       width > 0 ? (
         <ScrollView
@@ -134,7 +120,6 @@ export function PostMedia({
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={150}
-              onLoad={itemIndex === 0 ? handleImageLoad : undefined}
             />
           ))}
         </ScrollView>
@@ -142,53 +127,51 @@ export function PostMedia({
   }
 
   return (
-    <View
-      style={[styles.frame, { aspectRatio }]}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      {media}
+    // Outer view carries the shadow (it can't sit on a view that clips).
+    <View style={styles.shadow}>
+      <View
+        style={styles.frame}
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        {media}
 
-      {/* Soft shade at the bottom so the white icons are always readable */}
-      <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.35)"]}
-        style={styles.shade}
-        pointerEvents="none"
-      />
+        {/* (Reels: "Reel" is shown in the name pill, so no extra label
+            here - it would sit under the pill.) */}
 
-      {isReel ? (
-        <View style={[styles.label, styles.reelLabel]} pointerEvents="none">
-          <Text style={styles.labelText}>Reel</Text>
-        </View>
-      ) : null}
+        {urls.length > 1 ? (
+          <View style={[styles.label, styles.counter]} pointerEvents="none">
+            <Text style={styles.labelText}>
+              {index + 1}/{urls.length}
+            </Text>
+          </View>
+        ) : null}
 
-      {urls.length > 1 ? (
-        <View style={[styles.label, styles.counter]} pointerEvents="none">
-          <Text style={styles.labelText}>
-            {index + 1}/{urls.length}
-          </Text>
-        </View>
-      ) : null}
-
-      {children}
+        {children}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // box-shadow: 0px 4px 4px 0px #00000040
+  shadow: {
+    marginHorizontal: CARD_MARGIN,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: "#2C2C2A",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.25, // 0x40 = 25%
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+
   frame: {
     width: "100%",
-    maxHeight: 640,
-    borderRadius: 18,
+    aspectRatio: CARD_RATIO,
+    borderRadius: CARD_RADIUS,
     overflow: "hidden",
     backgroundColor: "#2C2C2A",
     position: "relative",
-  },
-
-  shade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "35%",
   },
 
   label: {
@@ -200,18 +183,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
 
-  reelLabel: {
-    left: 10,
-    backgroundColor: "#C5399A",
-  },
-
+  // Below the ⋯ menu button (top-right) on your own posts.
   counter: {
-    right: 10,
+    top: 56,
+    right: 12,
   },
 
   labelText: {
     color: "#FFFFFF",
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: FONTS.semibold,
   },
 });

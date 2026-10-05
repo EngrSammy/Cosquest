@@ -1,38 +1,39 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-      AudioModule,
-      RecordingPresets,
-      setAudioModeAsync,
-      useAudioRecorder,
-      useAudioRecorderState,
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
 } from "expo-audio";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      Animated,
-      Easing,
-      KeyboardAvoidingView,
-      Modal,
-      PanResponder,
-      Platform,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
+import { FONTS } from "@/constants/fonts";
 import { useAppDispatch } from "@/store/hooks";
 
 import {
-      createComment,
-      fetchComments,
-      likeCommentThunk,
-      removeComment,
-      unlikeCommentThunk,
+  createComment,
+  fetchComments,
+  likeCommentThunk,
+  removeComment,
+  unlikeCommentThunk,
 } from "@/store/thunks/postThunks";
 
 import { CommentItem } from "./CommentItem";
@@ -58,30 +59,20 @@ type CreateCommentResponse = {
 const MIN_VOICE_MILLIS = 800;
 const VOICE_CANCEL_THRESHOLD = -80;
 
-// How often to re-check for a finished transcript while this modal is
-// open. Comments have no realtime/socket delivery and no existing poll
-// loop at all — without this, a voice comment's transcript would only
-// ever show up if the person closed and reopened the modal.
-// This used to be the only way a finished transcript ever arrived.
-// Now that comment:edited delivers it live (see the socket wiring
-// below), this is just a safety net for a missed event — same change
-// already made to chat's polling.
+// Safety net for a missed comment:edited event (transcripts arrive live).
 const TRANSCRIPT_POLL_INTERVAL_MS = 20000;
 
-// Deliberately a module-level function, not one defined inside the
-// component body — same reasoning as chat's generateVoiceFileName:
-// Date.now() inside a component is flagged by the React Compiler
-// purity lint rule even though this only ever runs from an event
-// handler, never during render.
+// Figma: the quick emojis above the comment field.
+const QUICK_EMOJIS = ["❤️", "🙌", "🔥", "👏", "😂", "😢", "😮", "😍"];
+
+// Deliberately a module-level function (React Compiler purity rule).
 function generateVoiceFileName() {
   return `comment-voice-${Date.now()}.m4a`;
 }
 
 /* =========================================================
    RECORDING INDICATOR
-   Same component/behavior as chat's — blinking dot, live timer, a
-   metering-reactive mini waveform, and a slide-to-cancel hint that
-   arms once you've dragged far enough left.
+   Same component/behavior as chat's.
 ========================================================= */
 
 function RecordingIndicator({
@@ -221,9 +212,6 @@ export function CommentsModal({
 
   /* =========================================================
      VOICE COMMENT RECORDING
-     Same press-and-hold, slide-left-to-cancel gesture as chat's mic
-     button — isMeteringEnabled:true so the indicator's mini waveform
-     actually reacts to your voice, matching chat exactly.
   ========================================================= */
 
   const audioRecorder = useAudioRecorder({
@@ -258,22 +246,14 @@ export function CommentsModal({
   };
 
   /* =========================================================
-     COMMENT LIKE STATE
-     
-     This stores the current server-backed state for:
-     
-     - Main comments
-     - Replies
+     COMMENT LIKE STATE (main comments and replies)
   ========================================================= */
 
   const [commentLikes, setCommentLikes] = useState<Record<string, LikeState>>(
     {},
   );
 
-  /*
-   * Prevent multiple like requests for the
-   * same comment/reply at the same time.
-   */
+  // Prevent multiple like requests for the same comment at the same time.
   const [likingComments, setLikingComments] = useState<Record<string, boolean>>(
     {},
   );
@@ -293,21 +273,12 @@ export function CommentsModal({
   );
 
   /* =========================================================
-     GET LIKE STATE
-     
-     The backend may return:
-     
-     liked
-     likeCount
-     
-     or:
-     
-     likes
+     GET LIKE STATE (liked + likeCount, or likes)
   ========================================================= */
 
   const getCommentLikeState = useCallback((comment: any): LikeState => {
     return {
-      liked: !!comment?.liked,
+      liked: !!(comment?.liked ?? comment?.likedByMe),
       count: Number(comment?.likeCount ?? comment?.likes ?? 0),
     };
   }, []);
@@ -333,13 +304,7 @@ export function CommentsModal({
 
       setComments(loadedComments);
 
-      /*
-       * Initialize like states from backend.
-       *
-       * We preserve an existing state if the user
-       * has just liked/unliked something and the
-       * server response is still being processed.
-       */
+      // Keep a just-tapped like while the server catches up.
       setCommentLikes((current) => {
         const updated = {
           ...current,
@@ -402,17 +367,11 @@ export function CommentsModal({
 
         const loadedReplies = result?.comments ?? [];
 
-        /*
-         * Save replies
-         */
         setRepliesByComment((current) => ({
           ...current,
           [commentId]: loadedReplies,
         }));
 
-        /*
-         * Initialize like state for replies
-         */
         setCommentLikes((current) => {
           const updated = {
             ...current,
@@ -427,9 +386,6 @@ export function CommentsModal({
           return updated;
         });
 
-        /*
-         * Open replies
-         */
         setRepliesOpen((current) => ({
           ...current,
           [commentId]: true,
@@ -445,14 +401,7 @@ export function CommentsModal({
   );
 
   /* =========================================================
-     TRANSCRIPT POLLING
-
-     Comments have no realtime delivery and, unlike chat, no poll loop
-     existed here at all before this. A voice comment's transcript
-     finishes on the backend a few seconds after upload — without this,
-     the only way to ever see it would be closing and reopening the
-     modal. This re-checks only while something is actually still
-     transcribing, and stops otherwise.
+     TRANSCRIPT POLLING (only while something is still transcribing)
   ========================================================= */
 
   useEffect(() => {
@@ -505,15 +454,6 @@ export function CommentsModal({
 
   /* =========================================================
      SOCKET — LIVE COMMENTS
-
-     Joins this post's room while the modal is open and applies each
-     event straight into the same comments/repliesByComment/
-     commentLikes state the REST calls already manage — a comment:new
-     for a reply only gets applied to repliesByComment if that thread
-     is already loaded (matching the existing lazy-load-on-tap
-     behavior for replies); otherwise nothing needs to happen locally
-     since the parent's replyCount is refreshed the next time that
-     thread is opened via loadReplies.
   ========================================================= */
 
   useEffect(() => {
@@ -524,9 +464,6 @@ export function CommentsModal({
     const socket = getSocket();
 
     if (!socket) {
-      // Not connected yet — the transcript safety poll above and a
-      // manual reopen of the modal both still work; this just means
-      // live delivery doesn't start until a connection exists.
       return;
     }
 
@@ -542,9 +479,7 @@ export function CommentsModal({
 
     doJoin();
 
-    // Same reasoning as chat's reconnect handling — room membership
-    // doesn't survive a dropped connection, so a reconnect needs to
-    // re-join explicitly or live updates silently stop.
+    // Room membership doesn't survive a dropped connection.
     socket.on("connect", doJoin);
 
     const handleCommentNew = (payload: { postId: string; comment: any }) => {
@@ -573,11 +508,7 @@ export function CommentsModal({
         return;
       }
 
-      // A reply — only apply it if that thread is already loaded
-      // (the user has tapped "View replies" at some point this
-      // session). If it isn't loaded, there's nothing to update
-      // locally; the real replyCount shows correctly the next time
-      // loadReplies actually runs for that thread.
+      // A reply — only applied if that thread is already loaded.
       setRepliesByComment((current) => {
         const existing = current[comment.parentComment];
 
@@ -600,9 +531,7 @@ export function CommentsModal({
         [comment.id]: getCommentLikeState(comment),
       }));
 
-      // Bump the parent's displayed reply count even if the thread
-      // itself isn't open, so "View 3 replies" stays accurate without
-      // needing to reopen it.
+      // Keep "View 3 replies" accurate.
       setComments((current) =>
         current.map((item) =>
           item.id === comment.parentComment
@@ -654,7 +583,6 @@ export function CommentsModal({
       const removedIds = new Set(payload.commentIds);
 
       if (!payload.parentComment) {
-        // A top-level comment (and its replies, cascaded) was removed.
         setComments((current) =>
           current.filter((item) => !removedIds.has(item.id)),
         );
@@ -669,8 +597,6 @@ export function CommentsModal({
           return updated;
         });
       } else {
-        // A single reply was removed — decrement its parent's count
-        // and drop it from that thread if it's currently loaded.
         setComments((current) =>
           current.map((item) =>
             item.id === payload.parentComment
@@ -722,11 +648,6 @@ export function CommentsModal({
         return;
       }
 
-      // Only the count is broadcast (deliberately no per-viewer "mine"
-      // flag — see the backend's own reasoning on this), so this
-      // updates the count while leaving whatever "liked" state is
-      // already here untouched. Your own like/unlike already updates
-      // both via the direct REST response in toggleCommentLike.
       setCommentLikes((current) => {
         const existing = current[payload.commentId];
 
@@ -783,19 +704,7 @@ export function CommentsModal({
   );
 
   /* =========================================================
-     LIKE / UNLIKE COMMENT OR REPLY
-     
-     IMPORTANT:
-     
-     A reply is also a comment in the backend.
-     
-     Therefore both use:
-     
-     POST
-     /api/posts/:postId/comments/:commentId/likes
-     
-     DELETE
-     /api/posts/:postId/comments/:commentId/likes
+     LIKE / UNLIKE COMMENT OR REPLY (a reply is also a comment)
   ========================================================= */
 
   const toggleCommentLike = useCallback(
@@ -806,9 +715,6 @@ export function CommentsModal({
         return;
       }
 
-      /*
-       * Prevent duplicate requests.
-       */
       if (likingComments[commentId]) {
         return;
       }
@@ -821,10 +727,6 @@ export function CommentsModal({
           ...current,
           [commentId]: true,
         }));
-
-        /* =====================================================
-           UNLIKE
-        ===================================================== */
 
         if (currentLikeState.liked) {
           const rawResult = await dispatch(
@@ -840,11 +742,6 @@ export function CommentsModal({
               ? (rawResult as any)
               : {};
 
-          /*
-           * Use backend count if available.
-           *
-           * Otherwise calculate it locally.
-           */
           const serverCount =
             typeof result.likeCount === "number"
               ? result.likeCount
@@ -862,10 +759,6 @@ export function CommentsModal({
             },
           }));
         } else {
-          /* ===================================================
-             LIKE
-          =================================================== */
-
           const rawResult = await dispatch(
             likeCommentThunk({
               postId,
@@ -879,11 +772,6 @@ export function CommentsModal({
               ? (rawResult as any)
               : {};
 
-          /*
-           * Use backend count if available.
-           *
-           * Otherwise calculate it locally.
-           */
           const serverCount =
             typeof result.likeCount === "number"
               ? result.likeCount
@@ -931,65 +819,7 @@ export function CommentsModal({
   );
 
   /* =========================================================
-     SEND COMMENT / REPLY (TEXT)
-  ========================================================= */
-
-  const sendComment = async () => {
-    const text = commentText.trim();
-
-    if (!text) {
-      return;
-    }
-
-    try {
-      setSending(true);
-
-      const data: {
-        body: string;
-        parentComment?: string;
-      } = {
-        body: text,
-      };
-
-      /*
-       * If replying to a comment or reply,
-       * use that item's ID as parentComment.
-       */
-      if (replyingTo) {
-        data.parentComment = replyingTo.id;
-      }
-
-      const rawResult = await dispatch(
-        createComment({
-          postId,
-          token,
-          data,
-        }),
-      ).unwrap();
-
-      const result = rawResult as CreateCommentResponse;
-
-      applyNewComment(result);
-
-      setCommentText("");
-      setReplyingTo(null);
-    } catch (error) {
-      Alert.alert(
-        "Comment",
-        error instanceof Error ? error.message : "Unable to add comment.",
-      );
-    } finally {
-      setSending(false);
-    }
-  };
-
-  /* =========================================================
      APPLY A NEWLY CREATED COMMENT/REPLY TO LOCAL STATE
-
-     Shared by the text send path and the voice send path below —
-     both end up with the same server response shape and need the
-     same local bookkeeping (insert into the right list, seed its
-     like state, keep replies open, bump the count).
   ========================================================= */
 
   const applyNewComment = useCallback(
@@ -1037,11 +867,57 @@ export function CommentsModal({
   );
 
   /* =========================================================
-     VOICE COMMENT — RECORD / SEND / CANCEL
+     SEND COMMENT / REPLY (TEXT)
+  ========================================================= */
 
-     Same gesture as chat's mic button: press and hold to record,
-     release to stop and send, drag left past the threshold and
-     release to cancel instead.
+  const sendComment = async () => {
+    const text = commentText.trim();
+
+    if (!text) {
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      const data: {
+        body: string;
+        parentComment?: string;
+      } = {
+        body: text,
+      };
+
+      if (replyingTo) {
+        data.parentComment = replyingTo.id;
+      }
+
+      const rawResult = await dispatch(
+        createComment({
+          postId,
+          token,
+          data,
+        }),
+      ).unwrap();
+
+      const result = rawResult as CreateCommentResponse;
+
+      applyNewComment(result);
+
+      setCommentText("");
+      setReplyingTo(null);
+    } catch (error) {
+      Alert.alert(
+        "Comment",
+        error instanceof Error ? error.message : "Unable to add comment.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /* =========================================================
+     VOICE COMMENT — RECORD / SEND / CANCEL
+     Press and hold to record, release to send, drag left to cancel.
   ========================================================= */
 
   const startVoiceRecording = async () => {
@@ -1130,8 +1006,7 @@ export function CommentsModal({
           type: string;
         };
       } = {
-        // Any text already typed rides along as an optional caption —
-        // this isn't cleared until the send actually succeeds below.
+        // Any typed text rides along as an optional caption.
         body: commentText.trim() || undefined,
         file: {
           uri,
@@ -1194,9 +1069,7 @@ export function CommentsModal({
 
     await startVoiceRecording();
 
-    // The finger was lifted while the permission prompt / native
-    // recorder was still starting, so finish as soon as recording is
-    // running.
+    // Finger lifted while the recorder was still starting.
     if (!recordingPressActive.current && audioRecorder.isRecording) {
       await finishVoiceRecording(releasedCancelled.current);
     }
@@ -1253,8 +1126,7 @@ export function CommentsModal({
       onPanResponderRelease: (_, gesture) => {
         voiceHandlers.current.release(gesture.dx);
       },
-      // Interrupted (e.g. by the permission dialog): discard the
-      // recording.
+      // Interrupted (e.g. by the permission dialog): discard it.
       onPanResponderTerminate: () => {
         voiceHandlers.current.release(-9999);
       },
@@ -1289,29 +1161,15 @@ export function CommentsModal({
                 }),
               ).unwrap();
 
-              /*
-               * removeComment returns:
-               *
-               * {
-               *   postId,
-               *   commentId,
-               *   result
-               * }
-               */
+              // removeComment returns { postId, commentId, result }
               const wrappedResult = rawResult as any;
 
               const result = wrappedResult?.result ?? wrappedResult ?? {};
 
-              /* =================================================
-                 REPLY
-              ================================================= */
-
               if (comment.parentComment) {
+                // REPLY
                 await loadReplies(comment.parentComment);
 
-                /*
-                 * Remove deleted reply's like state.
-                 */
                 setCommentLikes((current) => {
                   const updated = {
                     ...current,
@@ -1322,9 +1180,6 @@ export function CommentsModal({
                   return updated;
                 });
 
-                /*
-                 * Remove loading state if it exists.
-                 */
                 setLikingComments((current) => {
                   const updated = {
                     ...current,
@@ -1335,17 +1190,11 @@ export function CommentsModal({
                   return updated;
                 });
               } else {
-                /* =================================================
-                   REMOVE MAIN COMMENT
-                ================================================= */
-
+                // MAIN COMMENT (and its replies)
                 setComments((current) =>
                   current.filter((item) => item.id !== comment.id),
                 );
 
-                /*
-                 * Remove replies.
-                 */
                 setRepliesByComment((current) => {
                   const updated = {
                     ...current,
@@ -1356,9 +1205,6 @@ export function CommentsModal({
                   return updated;
                 });
 
-                /*
-                 * Remove open state.
-                 */
                 setRepliesOpen((current) => {
                   const updated = {
                     ...current,
@@ -1369,9 +1215,6 @@ export function CommentsModal({
                   return updated;
                 });
 
-                /*
-                 * Remove like state.
-                 */
                 setCommentLikes((current) => {
                   const updated = {
                     ...current,
@@ -1382,9 +1225,6 @@ export function CommentsModal({
                   return updated;
                 });
 
-                /*
-                 * Remove loading state.
-                 */
                 setLikingComments((current) => {
                   const updated = {
                     ...current,
@@ -1434,9 +1274,7 @@ export function CommentsModal({
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
-          {/* ===================================================
-              HEADER
-          =================================================== */}
+          {/* HEADER */}
 
           <View style={styles.header}>
             <View>
@@ -1452,9 +1290,7 @@ export function CommentsModal({
             </Pressable>
           </View>
 
-          {/* ===================================================
-              COMMENTS
-          =================================================== */}
+          {/* COMMENTS */}
 
           {loading ? (
             <View style={styles.loading}>
@@ -1538,9 +1374,7 @@ export function CommentsModal({
             </ScrollView>
           )}
 
-          {/* ===================================================
-              FOOTER
-          =================================================== */}
+          {/* FOOTER */}
 
           <View style={styles.footer}>
             {replyingTo ? (
@@ -1561,25 +1395,22 @@ export function CommentsModal({
               </View>
             ) : null}
 
-            {/* STICKERS — hidden while recording, same as chat swaps
-                its input for the RecordingIndicator. */}
+            {/* QUICK EMOJIS (Figma: plain, spread across the width) -
+                hidden while recording. */}
             {!isRecording ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.reactions}
-                contentContainerStyle={styles.reactionsContent}>
-                {["✨", "👏", "🔥", "🤣", "👍", "😘", "😍"].map((emoji) => (
+              <View style={styles.reactions}>
+                {QUICK_EMOJIS.map((emoji) => (
                   <Pressable
                     key={emoji}
                     style={styles.reaction}
+                    hitSlop={6}
                     onPress={() =>
                       setCommentText((current) => current + emoji)
                     }>
                     <Text style={styles.reactionText}>{emoji}</Text>
                   </Pressable>
                 ))}
-              </ScrollView>
+              </View>
             ) : null}
 
             {/* INPUT */}
@@ -1607,7 +1438,7 @@ export function CommentsModal({
                         ? `Reply to @${replyingTo?.author?.username || "user"}...`
                         : `Add comment for ${postUsername || "this post"}...`
                     }
-                    placeholderTextColor="#9C9CAA"
+                    placeholderTextColor="#A58FA0"
                     style={styles.input}
                     multiline
                     maxLength={500}
@@ -1616,10 +1447,8 @@ export function CommentsModal({
                 )}
               </View>
 
-              {/* MIC — press and hold to record, release to send, drag
-                  left past the threshold to cancel instead. Same
-                  gesture as chat's mic button. Hidden once there's
-                  typed text, since Send covers that case. */}
+              {/* MIC — hold to record, release to send, drag left to
+                  cancel. Send replaces it once there's typed text. */}
               {!commentText.trim() ? (
                 <View
                   style={[styles.mic, isRecording && styles.micRecording]}
@@ -1627,9 +1456,9 @@ export function CommentsModal({
                   accessibilityLabel="Hold to record voice comment"
                   {...micPanResponder.panHandlers}>
                   {sendingVoice ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color="#C34D9C" />
                   ) : (
-                    <Ionicons name="mic" size={18} color="#FFFFFF" />
+                    <Ionicons name="mic-outline" size={19} color="#C34D9C" />
                   )}
                 </View>
               ) : (
@@ -1643,7 +1472,7 @@ export function CommentsModal({
                   {sending ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Ionicons name="send" size={18} color="#FFFFFF" />
+                    <Ionicons name="send" size={17} color="#FFFFFF" />
                   )}
                 </Pressable>
               )}
@@ -1697,13 +1526,14 @@ const styles = StyleSheet.create({
   },
 
   title: {
+    fontFamily: FONTS.semibold,
     fontSize: 18,
-    fontWeight: "700",
     color: "#191922",
   },
 
   count: {
-    marginTop: 2,
+    marginTop: 1,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#92929A",
   },
@@ -1735,6 +1565,7 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 10,
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: "#8B8B93",
   },
@@ -1747,8 +1578,8 @@ const styles = StyleSheet.create({
 
   emptyTitle: {
     marginTop: 12,
+    fontFamily: FONTS.semibold,
     fontSize: 15,
-    fontWeight: "700",
     color: "#44444B",
   },
 
@@ -1759,7 +1590,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: "#EEEEF1",
-    paddingTop: 8,
+    paddingTop: 10,
     backgroundColor: "#FFFFFF",
   },
 
@@ -1776,33 +1607,29 @@ const styles = StyleSheet.create({
 
   replyBannerText: {
     color: "#C5399A",
+    fontFamily: FONTS.semibold,
     fontSize: 12,
-    fontWeight: "700",
   },
 
+  // Figma: plain emojis spread across the width (no circles).
   reactions: {
-    marginBottom: 8,
-  },
-
-  reactionsContent: {
-    gap: 9,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    marginBottom: 12,
   },
 
   reaction: {
-    minWidth: 38,
-    height: 34,
-    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F4F4F6",
+    paddingVertical: 2,
   },
 
   reactionText: {
-    fontSize: 18,
+    fontSize: 22,
   },
 
-  // Same "hold to record, release to send" hint chat shows for a
-  // too-short recording.
   voiceHint: {
     alignSelf: "center",
     backgroundColor: "rgba(25,25,34,0.82)",
@@ -1814,43 +1641,57 @@ const styles = StyleSheet.create({
 
   voiceHintText: {
     color: "#FFFFFF",
+    fontFamily: FONTS.medium,
     fontSize: 12,
-    fontWeight: "600",
   },
 
   inputRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
+    alignItems: "center",
+    gap: 10,
   },
 
   inputAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
 
+  // Figma: light pink pill with a soft shadow.
   inputPill: {
     flex: 1,
-    minHeight: 42,
-    borderRadius: 22,
-    backgroundColor: "#F4F4F6",
+    minHeight: 40,
+    borderRadius: 20,
+    backgroundColor: "#C34D9C1F",
+    borderWidth: 1,
+    borderColor: "rgba(195,77,156,0.12)",
     justifyContent: "center",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
 
   input: {
-    minHeight: 42,
+    minHeight: 40,
     maxHeight: 95,
     paddingHorizontal: 15,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingTop: 10,
+    paddingBottom: 8,
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
     color: "#191922",
+    ...(Platform.OS === "web"
+      ? ({ outlineStyle: "none", resize: "none" } as object)
+      : null),
   },
 
   send: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#C5399A",
@@ -1860,13 +1701,16 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 
+  // Matches the comment field: light pink circle, pink outline mic.
   mic: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: "#C34D9C1F",
+    borderWidth: 1,
+    borderColor: "rgba(195,77,156,0.12)",
   },
 
   micRecording: {
@@ -1876,7 +1720,7 @@ const styles = StyleSheet.create({
   // RECORDING INDICATOR — same layout/values as chat's.
 
   recordingIndicator: {
-    height: 42,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
@@ -1893,8 +1737,8 @@ const styles = StyleSheet.create({
 
   recordingTime: {
     width: 38,
+    fontFamily: FONTS.semibold,
     fontSize: 14,
-    fontWeight: "600",
     color: "#191922",
   },
 
@@ -1925,9 +1769,9 @@ const styles = StyleSheet.create({
   },
 
   slideCancelText: {
+    fontFamily: FONTS.medium,
     fontSize: 12,
     color: "#8A8A90",
-    fontWeight: "600",
   },
 
   dangerText: {

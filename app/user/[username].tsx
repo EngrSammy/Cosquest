@@ -40,6 +40,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchFollowing } from "@/store/thunks/followThunks";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
+import { safeBack } from "@/utils/safeBack";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
@@ -184,7 +185,7 @@ export default function UserProfileScreen() {
 
   const goBack = () => {
     if (router.canGoBack()) {
-      router.back();
+      safeBack();
     } else {
       router.replace("/home");
     }

@@ -1,30 +1,40 @@
-import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
+import { safeBack } from "@/utils/safeBack";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import {
-      Alert,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type SupportRowProps = {
+const PINK = "#C34D9C";
+
+// Figma row: milky card, pink icon on a soft pink chip, a small grey title
+// and (for the support rows) a bold line underneath.
+function SupportRow({
+  icon,
+  title,
+  description,
+  onPress,
+}: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   description?: string;
   onPress: () => void;
-};
-
-function SupportRow({ icon, title, description, onPress }: SupportRowProps) {
+}) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.supportRow, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={title}>
       <View style={styles.rowIcon}>
-        <Ionicons name={icon} size={17} color="#C5399A" />
+        <Ionicons name={icon} size={15} color={PINK} />
       </View>
 
       <View style={styles.rowText}>
@@ -38,10 +48,6 @@ function SupportRow({ icon, title, description, onPress }: SupportRowProps) {
   );
 }
 
-function SectionLabel({ children }: { children: string }) {
-  return <Text style={styles.sectionLabel}>{children}</Text>;
-}
-
 export default function HelpSupport() {
   const insets = useSafeAreaInsets();
 
@@ -53,103 +59,125 @@ export default function HelpSupport() {
   }
 
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: insets.top + 10,
             paddingBottom: insets.bottom + 40,
           },
         ]}>
-        {/* Header */}
+        {/* HEADER: back arrow, then the Figma question chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backButton}>
-            <Ionicons name="arrow-back" size={23} color="#191922" />
+            onPress={() => safeBack("/settings")}
+            hitSlop={10}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={24} color="#191922" />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="help-circle-outline" size={16} color="#C5399A" />
+              <Ionicons name="help-circle-outline" size={17} color={PINK} />
             </View>
 
             <Text style={styles.headerTitle}>Help & Support</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.backButton} />
         </View>
 
         {/* SUPPORT CENTER */}
-        <SectionLabel>SUPPORT CENTER</SectionLabel>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>SUPPORT CENTER</Text>
 
-        <SupportRow
-          icon="help-circle"
-          title="FAQ / Knowledge Base"
-          description="Read guides & helpful answers"
-          onPress={() => handleComingSoon("FAQ / Knowledge Base")}
-        />
+          <SupportRow
+            icon="book-outline"
+            title="FAQ / Knowledge Base"
+            description="Read guides & helpful answers"
+            onPress={() => handleComingSoon("FAQ / Knowledge Base")}
+          />
 
-        <SupportRow
-          icon="chatbubble-ellipses"
-          title="Contact Support"
-          description="Chat with our customer team"
-          onPress={() => handleComingSoon("Contact Support")}
-        />
+          <SupportRow
+            icon="chatbubble-ellipses-outline"
+            title="Contact Support"
+            description="Chat with our customer team"
+            onPress={() => handleComingSoon("Contact Support")}
+          />
 
-        <SupportRow
-          icon="bug-outline"
-          title="Report a Bug"
-          description="Help us improve your experience"
-          onPress={() => handleComingSoon("Report a Bug")}
-        />
+          <SupportRow
+            icon="bug-outline"
+            title="Report a Bug"
+            description="Help us improve your experience"
+            onPress={() => handleComingSoon("Report a Bug")}
+          />
+        </View>
 
         {/* LEGAL */}
-        <SectionLabel>LEGAL</SectionLabel>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>LEGAL</Text>
 
-        <SupportRow
-          icon="document-text-outline"
-          title="Terms of Service"
-          onPress={() => handleComingSoon("Terms of Service")}
-        />
+          <SupportRow
+            icon="document-text-outline"
+            title="Terms of Service"
+            onPress={() => handleComingSoon("Terms of Service")}
+          />
 
-        <SupportRow
-          icon="shield-checkmark-outline"
-          title="Privacy Policy"
-          onPress={() => handleComingSoon("Privacy Policy")}
-        />
+          <SupportRow
+            icon="shield-checkmark-outline"
+            title="Privacy Policy"
+            onPress={() => handleComingSoon("Privacy Policy")}
+          />
+        </View>
 
         {/* APP VERSION */}
         <View style={styles.versionContainer}>
-          <Text style={styles.appName}>CosQuest App</Text>
+          <Text style={styles.appName}>Cosquest App</Text>
 
           <Text style={styles.versionText}>v2.4.0 (Build 512)</Text>
         </View>
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
   scroll: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     height: 50,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 4,
   },
 
   backButton: {
     width: 36,
     height: 36,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
 
@@ -158,71 +186,67 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
 
+  // Figma: 35 x 36, radius 100, padding 8, background #0000000A
   headerIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0F0F2",
-    marginRight: 8,
+    backgroundColor: "#0000000A",
   },
 
   headerTitle: {
+    fontFamily: FONTS.semibold,
     fontSize: 17,
-    fontWeight: "700",
     color: "#191922",
   },
 
-  headerSpacer: {
-    width: 36,
+  section: {
+    paddingTop: 18,
+    gap: 12,
   },
 
   sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8D8D98",
-    letterSpacing: 0.5,
-    marginBottom: 9,
-    marginTop: 14,
-    marginLeft: 2,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
-  supportRow: {
-    minHeight: 61,
+  // Milky pressed-in row.
+  row: {
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    marginBottom: 8,
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.48)",
-
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)",
+    borderColor: "rgba(255,255,255,0.75)",
 
-    shadowColor: "#8EB4C8",
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
   rowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 11,
-    backgroundColor: "#FBEAF5",
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   rowText: {
@@ -230,16 +254,17 @@ const styles = StyleSheet.create({
   },
 
   rowTitle: {
-    fontSize: 12,
-    color: "#777780",
-    marginBottom: 3,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: "#55555E",
   },
 
   rowDescription: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: "#202029",
-    lineHeight: 18,
+    marginTop: 2,
+    fontFamily: FONTS.semibold,
+    fontSize: 14.5,
+    lineHeight: 20,
+    color: "#191922",
   },
 
   versionContainer: {
@@ -248,19 +273,19 @@ const styles = StyleSheet.create({
   },
 
   appName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#202029",
+    fontFamily: FONTS.semibold,
+    fontSize: 13.5,
+    color: "#191922",
   },
 
   versionText: {
-    fontSize: 10.5,
-    color: "#9696A0",
-    marginTop: 4,
+    marginTop: 3,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#8A8A93",
   },
 
   pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.995 }],
+    opacity: 0.75,
   },
 });

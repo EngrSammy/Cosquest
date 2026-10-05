@@ -6,13 +6,14 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 
 import { setCallMinimized } from "@/components/calls/callUi";
+import { safeBack } from "@/utils/safeBack";
 
 export default function CallRoute() {
   useEffect(() => {
     setCallMinimized(false);
 
     if (router.canGoBack()) {
-      router.back();
+      safeBack();
     } else {
       router.replace("/");
     }

@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,8 @@ import {
 } from "react-native";
 
 import { AVATARS } from "@/constants/avatars";
+import { FACTIONS } from "@/constants/factions";
+import { FONTS } from "@/constants/fonts";
 import { apiRequest } from "@/services/api";
 import { FollowUser } from "@/services/follow";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -24,55 +27,71 @@ import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
 // ==========================================
 // DESIGN TOKENS
 // ==========================================
-// One accent (brand pink) reserved for attention-states and the single
-// primary action per screen — everything else runs on ink/graphite/
-// hairline neutrals so the screen reads as one considered surface rather
-// than "pink decorating everything." Radii are pulled back from "pill"
-// toward "rounded rectangle" throughout — the softer, less bubbly
-// language reads more like a considered product than a consumer feed.
 const COLORS = {
   ink: "#171922",
   graphite: "#5D5F6B",
   graphiteSoft: "#8A8A93",
   hairline: "rgba(23,25,34,0.12)",
   hairlineSoft: "rgba(23,25,34,0.07)",
-  surface: "rgba(255,255,255,0.70)",
-  surfaceSoft: "rgba(255,255,255,0.42)",
   brand: "#C5399A",
   brandSoft: "rgba(197,57,154,0.10)",
-  brandBorder: "rgba(197,57,154,0.35)",
-  navy: "#171922",
   danger: "#B42318",
   dangerSoft: "rgba(255,80,80,0.08)",
   // Green "online" dot, same as the chat screen header.
   online: "#25D366",
 };
 
-// Real per-faction accent colors — same ones already established in the
-// faction description modal (onboarding). A faction chat's icon uses its
-// own faction's actual color instead of a flat, generic tone, so the
-// list ties directly into CosQuest's own identity system rather than
-// decorating it with an unrelated color. Community chats (not tied to a
-// specific faction) fall back to the ink/navy tone.
-const FACTION_ACCENTS: Record<string, string> = {
-  ascendants: "#C5499D",
-  icons: "#C5499D",
-  controllers: "#C5499D",
-  blockbusters: "#E48600",
-  everborn: "#08A878",
-  celestials: "#16A7E0",
+// ==========================================
+// FIGMA VALUES (frame is 402 wide)
+// ==========================================
+// "Your Space" card (Community and ICONS are identical):
+//   art 99 x 99 at left 20 / top 205
+//   grey card 302 x 78 at left 77 / top 224, radius 19, #0000000D
+//   count badge 13.9 x 16 at left 361 / top 258
+const ART_SIZE = 99;
+const CARD_LEFT = 57; // 77 - 20 : the card starts this far right of the art
+const CARD_TOP = 19; // 224 - 205
+const CARD_HEIGHT = 78;
+const CARD_RADIUS = 19;
+const CARD_BG = "#0000000D";
+const CARD_GAP = 24; // space between the two cards
+const TEXT_LEFT = 130; // where the title starts (150 - 20)
+
+const BADGE_WIDTH = 14;
+const BADGE_HEIGHT = 16;
+const BADGE_TOP = CARD_TOP + 34; // 258 - 224
+const BADGE_RIGHT = 4; // 379 - (361 + 14)
+
+// Count badge colours (estimated from the Figma - send me the fills if off):
+const BADGE_COMMUNITY = "#C34D9C";
+const BADGE_FACTION = "#8E91F2";
+
+// "(Comic Book Faction)" etc. under each faction's wordmark.
+const FACTION_TAGLINE: Record<string, string> = {
+  ascendants: "Anime Faction",
+  icons: "Comic Book Faction",
+  controllers: "Gaming Faction",
+  blockbusters: "Movie Faction",
+  everborn: "Fantasy Faction",
+  celestials: "Sci-Fi Faction",
 };
 
-function getGroupIconColor(chat: {
-  type?: "community" | "faction" | "dm";
-  factionKey?: string;
-}): string {
-  if (chat.type === "faction" && chat.factionKey) {
-    return FACTION_ACCENTS[chat.factionKey] || COLORS.navy;
-  }
+// The Community group picture (exported from the Figma).
+const COMMUNITY_ART: any = require("@/assets/images/factions/community.png");
 
-  return COLORS.navy;
-}
+// Direct Message circles (Figma: 53 x 54, background #C34D9C33)
+const DM_CIRCLE_W = 53;
+const DM_CIRCLE_H = 54;
+const DM_CIRCLE_BG = "#C34D9C33";
+const DM_GAP = 19;
+
+// The "+" is a bold plus, 23 x 23, colour #9A9AA3
+const PLUS_SIZE = 23;
+const PLUS_COLOR = "#9A9AA3";
+
+// Figma: the search bar and the "+" circle are see-through white
+// (#FFFFFF1A = white 10%) with a soft shadow (0 2 4 #0000001A).
+const GLASS_BG = "rgba(255,255,255,0.1)";
 
 type ChatItem = {
   id: string;
@@ -130,66 +149,13 @@ function isPersonOnline(person: FollowUser): boolean {
   return Boolean((person as any).isOnline);
 }
 
-// Short relative label for a DM's last message — "2m", "5h", "Yesterday",
-// or a short date once it's more than a week old. Deliberately terse:
-// this sits in a list row, not a detail view.
-function formatShortRelativeTime(value?: string): string {
-  if (!value) {
-    return "";
-  }
-
-  const timestamp = new Date(value).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return "";
-  }
-
-  const diffMs = Date.now() - timestamp;
-
-  const minutes = Math.floor(diffMs / 60000);
-
-  if (minutes < 1) {
-    return "now";
-  }
-
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours}h`;
-  }
-
-  const days = Math.floor(hours / 24);
-
-  if (days === 1) {
-    return "Yesterday";
-  }
-
-  if (days < 7) {
-    return `${days}d`;
-  }
-
-  return new Date(value).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 // ==========================================
 // ERROR MESSAGE HELPER
 // ==========================================
 // RTK thunks that use rejectWithValue(someString) throw that raw string
 // directly when you call .unwrap() on a rejected result — NOT an Error
-// instance. Every catch block in this file that did
-// `error instanceof Error ? error.message : "generic fallback"` was
-// therefore always hitting the fallback branch for thunk failures,
-// silently discarding whatever real message the backend sent (e.g. "This
-// user is not accepting direct messages.") and showing a useless generic
-// string instead. This handles both shapes so the real backend message
-// actually reaches the person using the app.
+// instance. This handles both shapes so the real backend message actually
+// reaches the person using the app.
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -251,6 +217,42 @@ async function searchUsers(
   );
 }
 
+// The Community group picture. (If it ever fails to load, a small cluster
+// of avatars is drawn instead.)
+function CommunityCluster() {
+  if (COMMUNITY_ART) {
+    return (
+      <Image
+        source={COMMUNITY_ART}
+        style={styles.spaceArtImage}
+        contentFit="contain"
+      />
+    );
+  }
+
+  const picks = AVATARS.slice(0, 4);
+
+  const spots = [
+    { left: 0, top: 20 },
+    { left: 38, top: 0 },
+    { left: 44, top: 44 },
+    { left: 6, top: 52 },
+  ];
+
+  return (
+    <View style={styles.cluster}>
+      {picks.map((avatar, index) => (
+        <Image
+          key={avatar.id}
+          source={avatar.source}
+          style={[styles.clusterAvatar, spots[index]]}
+          contentFit="cover"
+        />
+      ))}
+    </View>
+  );
+}
+
 export function Chats() {
   const dispatch = useAppDispatch();
 
@@ -270,14 +272,10 @@ export function Chats() {
 
   const following = useAppSelector((state) => state.follow.following);
 
-  // Global typing state (see useSocketConnection.ts) — lets a
-  // conversation you haven't opened yet still show "typing..." in the
-  // list, the same way WhatsApp's chat list does.
-  const typingByConversation = useAppSelector(
-    (state) => state.chat.typingByConversation,
-  );
-
   const [peopleVisible, setPeopleVisible] = useState(false);
+
+  // the "Search direct messages" box
+  const [dmSearch, setDmSearch] = useState("");
 
   const [search, setSearch] = useState("");
 
@@ -333,10 +331,7 @@ export function Chats() {
     (chat) => chat.type === "community" || chat.type === "faction",
   );
 
-  // Real DM threads — this is what "Direct Message" should actually show
-  // first: conversations that exist, most recent activity on top. Not
-  // everyone you follow with identical rows regardless of whether you've
-  // ever messaged them.
+  // Real DM threads, most recent activity first.
   const dmConversations = useMemo(() => {
     return conversations
       .filter((chat) => chat.type === "dm")
@@ -354,7 +349,7 @@ export function Chats() {
       });
   }, [conversations]);
 
-  // So a DM row can show the real avatar even though the conversation
+  // So a DM circle can show the real avatar even though the conversation
   // payload's otherParticipant may not include one — cross-referenced by
   // username against the people you follow, who do carry avatar data.
   const followingByUsername = useMemo(() => {
@@ -381,8 +376,8 @@ export function Chats() {
     return set;
   }, [dmConversations]);
 
-  // People you follow but haven't actually started a conversation with —
-  // a lighter, secondary "start chatting" list underneath real threads.
+  // People you follow but haven't actually started a conversation with -
+  // they get a circle too, after the real conversations.
   const notYetMessaged = following.filter(
     (person) => !messagedUsernames.has(person.username.toLowerCase()),
   );
@@ -391,7 +386,7 @@ export function Chats() {
    * Open an existing DM with this person if one is already loaded, otherwise
    * create one via POST /api/chats/dm (through the createChat thunk), then
    * navigate into it. Shared by the "Message" icon in Find People and by
-   * tapping an avatar in the Direct Message row.
+   * tapping a circle in the Direct Message row.
    */
   async function openOrCreateChat(person: FollowUser) {
     if (!token) {
@@ -432,12 +427,6 @@ export function Chats() {
       }
 
       if (!chatId) {
-        // This specific fallback used to be the ONLY message anyone ever
-        // saw here, because the catch below couldn't tell a real backend
-        // rejection from this local "id came back empty" case. If you
-        // still hit this exact message after the getErrorMessage fix
-        // below, it means createChat actually resolved successfully but
-        // the response had no usable id — see the note further down.
         throw new Error(
           "Unable to start this conversation. The server didn't return a conversation id.",
         );
@@ -469,17 +458,12 @@ export function Chats() {
     });
   };
 
-  const getGroupIcon = (type: ChatItem["type"]) => {
-    if (type === "faction") {
-      return "shield-outline" as const;
-    }
-
-    return "globe-outline" as const;
-  };
-
+  // Figma: "Community — General".
   const getGroupName = (chat: ChatItem) => {
     if (chat.type === "community") {
-      return chat.title || "Community";
+      const name = chat.title || "Community";
+
+      return /general/i.test(name) ? name : `${name} — General`;
     }
 
     return chat.title || chat.factionKey || "Faction";
@@ -620,17 +604,33 @@ export function Chats() {
     return null;
   }
 
+  const hasDmCircles = dmConversations.length > 0 || notYetMessaged.length > 0;
+
+  // "Search direct messages" filters the circles by name / username.
+  const dmQuery = dmSearch.trim().toLowerCase();
+
+  const matchesDm = (name?: string, username?: string) =>
+    !dmQuery ||
+    `${name || ""} ${username || ""}`.toLowerCase().includes(dmQuery);
+
+  const visibleDmConversations = dmConversations.filter((chat) => {
+    const username = chat.otherParticipant?.username || "";
+    const followed = followingByUsername.get(username.toLowerCase());
+
+    return matchesDm(followed?.name, username);
+  });
+
+  const visibleNotYetMessaged = notYetMessaged.filter((person) =>
+    matchesDm(person.name, person.username),
+  );
+
   return (
     <View style={styles.wrap}>
       {/* =========================
           YOUR SPACE
       ========================== */}
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.section}>Your Space</Text>
-      </View>
-
-      <View style={styles.sectionRule} />
+      <Text style={styles.section}>Your Space</Text>
 
       {loading ? (
         <View style={styles.loading}>
@@ -649,241 +649,224 @@ export function Chats() {
           </Pressable>
         </View>
       ) : groupChats.length === 0 ? (
-        <View style={styles.emptyCard}>
+        <View style={styles.spaceEmpty}>
           <Ionicons
             name="chatbubbles-outline"
-            size={26}
+            size={24}
             color={COLORS.graphiteSoft}
           />
 
           <Text style={styles.emptyText}>No group chats yet</Text>
         </View>
       ) : (
-        <View style={styles.rosterCard}>
-          {groupChats.map((chat, index) => (
-            <Pressable
-              key={chat.id}
-              style={[styles.rosterRow, index > 0 && styles.rosterDivider]}
-              onPress={() => openChat(chat.id)}>
-              <View
-                style={[
-                  styles.groupIcon,
-                  { backgroundColor: getGroupIconColor(chat) },
-                ]}>
-                <Ionicons
-                  name={getGroupIcon(chat.type)}
-                  size={19}
-                  color="#FFFFFF"
-                />
-              </View>
+        <View style={styles.spaceList}>
+          {groupChats.map((chat) => {
+            const faction =
+              chat.type === "faction"
+                ? FACTIONS.find((item) => item.id === chat.factionKey)
+                : undefined;
 
-              <View style={styles.rosterText}>
-                <Text style={styles.rosterName} numberOfLines={1}>
-                  {getGroupName(chat)}
-                </Text>
+            const tagline = faction
+              ? FACTION_TAGLINE[chat.factionKey || ""]
+              : "";
 
-                <Text style={styles.rosterMeta} numberOfLines={1}>
-                  {getLastMessage(chat)}
-                </Text>
-              </View>
+            const unread = chat.unreadCount || 0;
 
-              <View style={styles.rosterRight}>
-                <Text style={styles.memberCountText}>
-                  {chat.memberCount || 0} members
-                </Text>
+            return (
+              <Pressable
+                key={chat.id}
+                style={styles.spaceItem}
+                onPress={() => openChat(chat.id)}>
+                {/* the grey card, starts under the art */}
+                <View style={styles.spaceBg} />
 
-                {chat.unreadCount && chat.unreadCount > 0 ? (
-                  <View style={styles.unread}>
-                    <Text style={styles.unreadText}>{chat.unreadCount}</Text>
+                {/* the art: faction picture, or the Community picture */}
+                <View style={styles.spaceArt} pointerEvents="none">
+                  {faction?.image ? (
+                    <Image
+                      source={faction.image}
+                      style={styles.spaceArtImage}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <CommunityCluster />
+                  )}
+                </View>
+
+                {/* title / (faction type) / last message */}
+                <View style={styles.spaceText} pointerEvents="none">
+                  {faction?.label ? (
+                    <Image
+                      source={faction.label}
+                      style={styles.spaceWordmark}
+                      contentFit="contain"
+                      contentPosition="left"
+                    />
+                  ) : (
+                    <Text style={styles.spaceName} numberOfLines={1}>
+                      {getGroupName(chat)}
+                    </Text>
+                  )}
+
+                  {tagline ? (
+                    <Text style={styles.spaceName} numberOfLines={1}>
+                      ({tagline})
+                    </Text>
+                  ) : null}
+
+                  <Text style={styles.spaceMeta} numberOfLines={1}>
+                    {getLastMessage(chat)}
+                  </Text>
+                </View>
+
+                {/* count circle + members */}
+                {unread > 0 ? (
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: faction
+                          ? BADGE_FACTION
+                          : BADGE_COMMUNITY,
+                      },
+                    ]}>
+                    <Text style={styles.badgeText}>
+                      {unread > 99 ? "99+" : unread}
+                    </Text>
                   </View>
                 ) : null}
-              </View>
-            </Pressable>
-          ))}
+
+                <Text style={styles.members}>
+                  {chat.memberCount || 0} Members
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       )}
 
       {/* =========================
           DIRECT MESSAGE
-          Real conversation threads first — sorted by recency, with an
-          actual last-message preview and timestamp — the same pattern a
-          considered messaging product (Slack, iMessage) uses. People you
-          follow but haven't messaged yet sit in a lighter, secondary list
-          underneath rather than being mixed in as identical rows.
+          A row of round avatars (name under each) and a "+" button at the
+          end that opens Find People - like the Figma.
       ========================== */}
 
-      <View style={styles.dmSectionHeader}>
-        <Text style={styles.section}>Direct Message</Text>
+      <View style={styles.dmSearch}>
+        <Ionicons name="search" size={18} color={COLORS.graphiteSoft} />
 
-        <Pressable style={styles.findPeopleGhost} onPress={openPeople}>
-          <Ionicons name="person-add-outline" size={14} color={COLORS.brand} />
-
-          <Text style={styles.findPeopleGhostText}>Find People</Text>
-        </Pressable>
+        <TextInput
+          value={dmSearch}
+          onChangeText={setDmSearch}
+          style={styles.dmSearchInput}
+          placeholder="Search direct messages"
+          placeholderTextColor={COLORS.graphiteSoft}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
       </View>
 
-      <View style={styles.sectionRule} />
+      <Text style={[styles.section, styles.dmSection]}>Direct Message</Text>
 
-      {dmConversations.length === 0 && following.length === 0 ? (
-        <View style={styles.emptyDmCard}>
-          <View style={styles.peopleIconCircle}>
-            <Ionicons name="people-outline" size={28} color={COLORS.brand} />
-          </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.dmRow}>
+        {visibleDmConversations.map((chat) => {
+          const otherUsername = chat.otherParticipant?.username || "";
 
-          <Text style={styles.emptyDmTitle}>Find your people</Text>
+          const followedPerson = followingByUsername.get(
+            otherUsername.toLowerCase(),
+          );
 
-          <Text style={styles.emptyDmDescription}>
-            Discover CosQuest users, follow them and start chatting.
-          </Text>
+          const avatarSource = followedPerson
+            ? getAvatarSource(followedPerson)
+            : chat.otherParticipant?.avatarPhotoUrl
+              ? { uri: chat.otherParticipant.avatarPhotoUrl }
+              : require("@/assets/images/dp-avatar.png");
 
-          <Pressable style={styles.findPeopleLarge} onPress={openPeople}>
-            <Text style={styles.findPeopleLargeText}>Find People</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          {dmConversations.length > 0 ? (
-            <View style={styles.rosterCard}>
-              {dmConversations.map((chat, index) => {
-                const otherUsername = chat.otherParticipant?.username || "";
+          const displayName =
+            followedPerson?.name || otherUsername || "Someone";
 
-                const followedPerson = followingByUsername.get(
-                  otherUsername.toLowerCase(),
-                );
+          return (
+            <Pressable
+              key={chat.id}
+              style={styles.dmItem}
+              onPress={() => openChat(chat.id)}>
+              <View style={styles.dmCircle}>
+                <Image
+                  source={avatarSource}
+                  style={styles.dmCircleImage}
+                  contentFit="cover"
+                />
 
-                const avatarSource = followedPerson
-                  ? getAvatarSource(followedPerson)
-                  : chat.otherParticipant?.avatarPhotoUrl
-                    ? { uri: chat.otherParticipant.avatarPhotoUrl }
-                    : require("@/assets/images/dp-avatar.png");
+                {chat.otherParticipant?.isOnline ? (
+                  <View style={styles.onlineDot} />
+                ) : null}
 
-                const displayName =
-                  followedPerson?.name || otherUsername || "Someone";
-
-                const isTyping = !!typingByConversation[chat.id];
-
-                const previewText = isTyping
-                  ? "typing..."
-                  : chat.lastMessage
-                    ? `${
-                        chat.lastMessage.senderName
-                          ? `${chat.lastMessage.senderName}: `
-                          : ""
-                      }${chat.lastMessage.preview || "Message"}`
-                    : "No messages yet";
-
-                return (
-                  <Pressable
-                    key={chat.id}
-                    style={[
-                      styles.rosterRow,
-                      index > 0 && styles.rosterDivider,
-                    ]}
-                    onPress={() => openChat(chat.id)}>
-                    <View style={styles.dmAvatarWrap}>
-                      <Image
-                        source={avatarSource}
-                        style={styles.dmAvatarImage}
-                        contentFit="cover"
-                      />
-
-                      {chat.otherParticipant?.isOnline ? (
-                        <View style={styles.onlineRing} />
-                      ) : null}
-                    </View>
-
-                    <View style={styles.rosterText}>
-                      <Text style={styles.rosterName} numberOfLines={1}>
-                        {displayName}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.rosterMeta,
-                          isTyping && styles.rosterMetaTyping,
-                        ]}
-                        numberOfLines={1}>
-                        {previewText}
-                      </Text>
-                    </View>
-
-                    <View style={styles.rosterRight}>
-                      {chat.lastMessage?.createdAt ? (
-                        <Text style={styles.dmTimeText}>
-                          {formatShortRelativeTime(chat.lastMessage.createdAt)}
-                        </Text>
-                      ) : null}
-
-                      {chat.unreadCount && chat.unreadCount > 0 ? (
-                        <View style={styles.unread}>
-                          <Text style={styles.unreadText}>
-                            {chat.unreadCount}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-
-          {notYetMessaged.length > 0 ? (
-            <>
-              <Text style={styles.subSection}>
-                {dmConversations.length > 0
-                  ? "People you follow"
-                  : "Message someone you follow"}
-              </Text>
-
-              <View style={styles.rosterCardQuiet}>
-                {notYetMessaged.map((person, index) => {
-                  const busy = startingChatWith === person.username;
-
-                  return (
-                    <Pressable
-                      key={person.id || person.username}
-                      style={[
-                        styles.rosterRow,
-                        index > 0 && styles.rosterDivider,
-                      ]}
-                      disabled={busy}
-                      onPress={() => openOrCreateChat(person)}>
-                      <View style={styles.dmAvatarWrapSmall}>
-                        <Image
-                          source={getAvatarSource(person)}
-                          style={styles.dmAvatarImageSmall}
-                          contentFit="cover"
-                        />
-
-                        {isPersonOnline(person) ? (
-                          <View style={styles.onlineRingSmall} />
-                        ) : null}
-                      </View>
-
-                      <View style={styles.rosterText}>
-                        <Text style={styles.rosterNameQuiet} numberOfLines={1}>
-                          {person.name || person.username}
-                        </Text>
-                      </View>
-
-                      {busy ? (
-                        <ActivityIndicator size="small" color={COLORS.brand} />
-                      ) : (
-                        <Ionicons
-                          name="chatbubble-outline"
-                          size={16}
-                          color={COLORS.graphiteSoft}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })}
+                {chat.unreadCount && chat.unreadCount > 0 ? (
+                  <View style={styles.dmUnread}>
+                    <Text style={styles.unreadText}>{chat.unreadCount}</Text>
+                  </View>
+                ) : null}
               </View>
-            </>
-          ) : null}
-        </>
-      )}
+
+              <Text style={styles.dmName} numberOfLines={1}>
+                {displayName}
+              </Text>
+            </Pressable>
+          );
+        })}
+
+        {visibleNotYetMessaged.map((person) => {
+          const busy = startingChatWith === person.username;
+
+          return (
+            <Pressable
+              key={person.id || person.username}
+              style={styles.dmItem}
+              disabled={busy}
+              onPress={() => openOrCreateChat(person)}>
+              <View style={styles.dmCircle}>
+                <Image
+                  source={getAvatarSource(person)}
+                  style={styles.dmCircleImage}
+                  contentFit="cover"
+                />
+
+                {isPersonOnline(person) ? (
+                  <View style={styles.onlineDot} />
+                ) : null}
+
+                {busy ? (
+                  <View style={styles.dmBusy}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </View>
+                ) : null}
+              </View>
+
+              <Text style={styles.dmName} numberOfLines={1}>
+                {person.name || person.username}
+              </Text>
+            </Pressable>
+          );
+        })}
+
+        {/* "+" : Find People */}
+        <Pressable
+          style={styles.dmItem}
+          onPress={openPeople}
+          accessibilityRole="button"
+          accessibilityLabel="Find people">
+          <View style={styles.plusCircle}>
+            <View style={styles.plusH} />
+            <View style={styles.plusV} />
+          </View>
+        </Pressable>
+
+        {!hasDmCircles ? (
+          <Text style={styles.dmHint}>Tap + to find people to chat with.</Text>
+        ) : null}
+      </ScrollView>
 
       {/* =========================
           FIND PEOPLE MODAL
@@ -1141,33 +1124,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  dmSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-
+  // Plain headings, no divider lines (Figma).
   section: {
+    fontFamily: FONTS.medium,
     fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.ink,
-    marginTop: 14,
-    marginBottom: 6,
+    color: "#55555F",
+    paddingLeft: 8,
+    marginTop: 4,
+    marginBottom: 10,
   },
 
-  // A real structural device, not decoration — separates each section
-  // from its content with a deliberate line rather than empty space.
-  sectionRule: {
-    height: 1,
-    backgroundColor: COLORS.hairline,
-    marginBottom: 10,
+  dmSection: {
+    marginTop: 18,
   },
 
   loading: {
@@ -1179,6 +1147,7 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.graphiteSoft,
   },
@@ -1192,6 +1161,7 @@ const styles = StyleSheet.create({
   },
 
   errorText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.danger,
     textAlign: "center",
@@ -1206,195 +1176,216 @@ const styles = StyleSheet.create({
   },
 
   retryText: {
+    fontFamily: FONTS.bold,
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "700",
   },
 
-  emptyCard: {
+  emptyText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.graphiteSoft,
+  },
+
+  /* YOUR SPACE - one card per chat (Figma specs above) */
+
+  spaceList: {
+    gap: CARD_GAP,
+  },
+
+  spaceEmpty: {
     minHeight: 84,
-    borderRadius: 14,
-    backgroundColor: COLORS.surfaceSoft,
-    borderWidth: 1,
-    borderColor: COLORS.hairlineSoft,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: CARD_BG,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
 
-  emptyText: {
-    fontSize: 12,
-    color: COLORS.graphiteSoft,
-  },
-
-  // ROSTER — the one shared list pattern used for both group chats and
-  // direct messages, instead of two different visual metaphors.
-  rosterCard: {
-    backgroundColor: COLORS.surfaceSoft,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.hairlineSoft,
-    paddingHorizontal: 14,
-  },
-
-  rosterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 13,
-  },
-
-  rosterDivider: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.hairlineSoft,
-  },
-
-  rosterText: {
-    flex: 1,
-  },
-
-  rosterName: {
-    fontSize: 14.5,
-    fontWeight: "600",
-    color: COLORS.ink,
-  },
-
-  rosterMeta: {
-    fontSize: 12,
-    color: COLORS.graphiteSoft,
-    marginTop: 2,
-  },
-
-  rosterMetaTyping: {
-    color: COLORS.brand,
-    fontWeight: "600",
-  },
-
-  rosterRight: {
-    alignItems: "flex-end",
-    gap: 4,
-  },
-
-  groupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
-    backgroundColor: COLORS.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  memberCountText: {
-    fontSize: 10.5,
-    color: COLORS.graphiteSoft,
-    fontWeight: "500",
-  },
-
-  unread: {
-    minWidth: 19,
-    height: 19,
-    borderRadius: 10,
-    backgroundColor: COLORS.brand,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-
-  unreadText: {
-    fontSize: 10,
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-
-  findPeopleGhost: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: COLORS.brandBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9,
-  },
-
-  findPeopleGhostText: {
-    color: COLORS.brand,
-    fontSize: 11.5,
-    fontWeight: "600",
-  },
-
-  emptyDmCard: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 26,
-    paddingHorizontal: 25,
-    borderRadius: 16,
-    backgroundColor: COLORS.surfaceSoft,
-    borderWidth: 1,
-    borderColor: COLORS.hairlineSoft,
-  },
-
-  peopleIconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: COLORS.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyDmTitle: {
-    marginTop: 13,
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.ink,
-  },
-
-  emptyDmDescription: {
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 18,
-    color: COLORS.graphiteSoft,
-    textAlign: "center",
-    maxWidth: 260,
-  },
-
-  // The one deliberately bold moment on this screen — a genuine first-use
-  // empty-state CTA, so it earns the solid fill the rest of the screen
-  // avoids.
-  findPeopleLarge: {
-    marginTop: 16,
-    backgroundColor: COLORS.brand,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
-    borderRadius: 11,
-  },
-
-  findPeopleLargeText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  dmAvatarWrap: {
-    width: 44,
-    height: 44,
+  spaceItem: {
+    height: ART_SIZE,
     position: "relative",
   },
 
-  dmAvatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.brandSoft,
+  spaceBg: {
+    position: "absolute",
+    left: CARD_LEFT,
+    right: 0,
+    top: CARD_TOP,
+    height: CARD_HEIGHT,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: CARD_BG,
   },
 
-  // Green "online" dot on the bottom-right of the avatar, WhatsApp-style.
-  // (Kept the old style names so the JSX above didn't need to change.)
-  onlineRing: {
+  spaceArt: {
     position: "absolute",
-    right: 0,
-    bottom: 0,
+    left: 0,
+    top: 0,
+    width: ART_SIZE,
+    height: ART_SIZE,
+  },
+
+  spaceArtImage: {
+    width: ART_SIZE,
+    height: ART_SIZE,
+  },
+
+  cluster: {
+    width: ART_SIZE,
+    height: ART_SIZE,
+  },
+
+  clusterAvatar: {
+    position: "absolute",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    backgroundColor: "#F1E4EE",
+  },
+
+  spaceText: {
+    position: "absolute",
+    left: TEXT_LEFT,
+    right: 44,
+    top: CARD_TOP,
+    height: CARD_HEIGHT,
+    justifyContent: "center",
+    gap: 2,
+  },
+
+  spaceWordmark: {
+    width: 64,
+    height: 18,
+  },
+
+  spaceName: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: COLORS.ink,
+  },
+
+  spaceMeta: {
+    fontFamily: FONTS.regular,
+    fontSize: 10,
+    color: COLORS.graphiteSoft,
+  },
+
+  badge: {
+    position: "absolute",
+    right: BADGE_RIGHT,
+    top: BADGE_TOP,
+    minWidth: BADGE_WIDTH,
+    height: BADGE_HEIGHT,
+    borderRadius: BADGE_HEIGHT / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+
+  badgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9,
+    color: "#FFFFFF",
+  },
+
+  members: {
+    position: "absolute",
+    right: 10,
+    bottom: 8,
+    fontFamily: FONTS.medium,
+    fontSize: 7,
+    color: COLORS.graphiteSoft,
+  },
+
+  unreadText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    color: "#FFFFFF",
+  },
+
+  /* SEARCH DIRECT MESSAGES
+     Figma: 355 x 44, radius 22, padding 12 / 14, gap 10,
+     background #FFFFFF1A (white 10%), shadow 0 2 4 #0000001A */
+
+  dmSearch: {
+    height: 44,
+    marginTop: 24,
+    borderRadius: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: GLASS_BG,
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  dmSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: COLORS.ink,
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  },
+
+  /* DIRECT MESSAGE - round avatars, 53 x 54, 72 apart */
+
+  dmRow: {
+    alignItems: "flex-start",
+    gap: DM_GAP,
+    paddingLeft: 10,
+    paddingRight: 10,
+    paddingBottom: 6,
+  },
+
+  dmItem: {
+    width: DM_CIRCLE_W,
+    alignItems: "center",
+  },
+
+  dmCircle: {
+    width: DM_CIRCLE_W,
+    height: DM_CIRCLE_H,
+    borderRadius: DM_CIRCLE_H / 2,
+    backgroundColor: DM_CIRCLE_BG,
+    position: "relative",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+
+  dmCircleImage: {
+    width: DM_CIRCLE_W,
+    height: DM_CIRCLE_H,
+    borderRadius: DM_CIRCLE_H / 2,
+  },
+
+  dmName: {
+    marginTop: 6,
+    maxWidth: 64,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: "#777780",
+    textAlign: "center",
+  },
+
+  // Green "online" dot, bottom-right of the circle.
+  onlineDot: {
+    position: "absolute",
+    right: 1,
+    bottom: 1,
     width: 13,
     height: 13,
     borderRadius: 7,
@@ -1403,60 +1394,72 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
   },
 
-  dmTimeText: {
-    fontSize: 11,
-    color: COLORS.graphiteSoft,
-  },
-
-  // Secondary heading for the "people you follow but haven't messaged"
-  // list — deliberately quieter than the main section labels so it reads
-  // as a lesser, discovery-oriented list rather than competing with real
-  // conversations above it.
-  subSection: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.graphiteSoft,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  rosterCardQuiet: {
-    backgroundColor: "transparent",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.hairlineSoft,
-    paddingHorizontal: 14,
-  },
-
-  dmAvatarWrapSmall: {
-    width: 34,
-    height: 34,
-    position: "relative",
-  },
-
-  dmAvatarImageSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: COLORS.brandSoft,
-  },
-
-  onlineRingSmall: {
+  dmUnread: {
     position: "absolute",
-    right: -1,
-    bottom: -1,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: COLORS.online,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.brand,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
   },
 
-  rosterNameQuiet: {
-    fontSize: 13.5,
-    fontWeight: "500",
-    color: COLORS.graphite,
+  dmBusy: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: DM_CIRCLE_H / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+
+  // Figma: 53 x 54 at left 323 - the same see-through look as the search
+  // bar (white 10%, shadow 0 2 4 #0000001A).
+  plusCircle: {
+    width: DM_CIRCLE_W,
+    height: DM_CIRCLE_H,
+    borderRadius: DM_CIRCLE_H / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: GLASS_BG,
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  // bold plus drawn with two bars: 23 x 23, #9A9AA3
+  plusH: {
+    position: "absolute",
+    left: (DM_CIRCLE_W - PLUS_SIZE) / 2,
+    top: (DM_CIRCLE_H - 6) / 2,
+    width: PLUS_SIZE,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: PLUS_COLOR,
+  },
+
+  plusV: {
+    position: "absolute",
+    left: (DM_CIRCLE_W - 6) / 2,
+    top: (DM_CIRCLE_H - PLUS_SIZE) / 2,
+    width: 6,
+    height: PLUS_SIZE,
+    borderRadius: 2,
+    backgroundColor: PLUS_COLOR,
+  },
+
+  dmHint: {
+    alignSelf: "center",
+    maxWidth: 150,
+    fontFamily: FONTS.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: COLORS.graphiteSoft,
   },
 
   /* =========================
@@ -1488,13 +1491,14 @@ const styles = StyleSheet.create({
   },
 
   modalTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 19,
-    fontWeight: "700",
     color: COLORS.ink,
   },
 
   modalSubtitle: {
     marginTop: 3,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.graphiteSoft,
   },
@@ -1522,6 +1526,7 @@ const styles = StyleSheet.create({
 
   searchInput: {
     flex: 1,
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: COLORS.ink,
     padding: 0,
@@ -1536,8 +1541,8 @@ const styles = StyleSheet.create({
   },
 
   peopleTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 13,
-    fontWeight: "700",
     color: COLORS.graphite,
   },
 
@@ -1547,8 +1552,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: COLORS.hairlineSoft,
     color: COLORS.graphite,
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: "700",
     textAlign: "center",
     paddingTop: 4,
   },
@@ -1569,13 +1574,14 @@ const styles = StyleSheet.create({
 
   modalErrorTitle: {
     marginTop: 9,
+    fontFamily: FONTS.bold,
     fontSize: 15,
-    fontWeight: "700",
     color: COLORS.ink,
   },
 
   modalErrorText: {
     marginTop: 5,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     lineHeight: 18,
     color: COLORS.graphiteSoft,
@@ -1591,9 +1597,9 @@ const styles = StyleSheet.create({
   },
 
   retryPeopleText: {
+    fontFamily: FONTS.bold,
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "700",
   },
 
   peopleList: {
@@ -1640,22 +1646,23 @@ const styles = StyleSheet.create({
   },
 
   personName: {
+    fontFamily: FONTS.semibold,
     fontSize: 14,
-    fontWeight: "600",
     color: COLORS.ink,
   },
 
   personUsername: {
     marginTop: 2,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.graphiteSoft,
   },
 
   personFaction: {
     marginTop: 2,
+    fontFamily: FONTS.semibold,
     fontSize: 10,
     color: COLORS.brand,
-    fontWeight: "600",
   },
 
   personActions: {
@@ -1686,14 +1693,14 @@ const styles = StyleSheet.create({
   },
 
   followButtonText: {
+    fontFamily: FONTS.bold,
     fontSize: 12.5,
-    fontWeight: "700",
     color: "#FFFFFF",
   },
 
   followingButtonText: {
+    fontFamily: FONTS.semibold,
     fontSize: 12.5,
-    fontWeight: "600",
     color: COLORS.graphite,
   },
 
@@ -1720,13 +1727,14 @@ const styles = StyleSheet.create({
 
   noPeopleTitle: {
     marginTop: 10,
+    fontFamily: FONTS.bold,
     fontSize: 15,
-    fontWeight: "700",
     color: COLORS.ink,
   },
 
   noPeopleText: {
     marginTop: 5,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.graphiteSoft,
     textAlign: "center",

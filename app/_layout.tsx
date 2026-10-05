@@ -6,6 +6,13 @@ import SessionGate from "@/components/SessionGate";
 import { UserProvider } from "@/context/UserContext";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { store } from "@/store/store";
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from "@expo-google-fonts/poppins";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 // LiveKit setup for phones (does nothing on web — see the file itself).
@@ -34,10 +41,15 @@ function SocketConnectionGate() {
 }
 
 export default function RootLayout() {
-  // Preload the icon fonts so they resolve correctly on web
+  // Icon fonts (so they resolve on web) + Poppins, the app font (Figma).
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
     ...MaterialIcons.font,
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
   });
 
   if (!fontsLoaded) return null;

@@ -1,9 +1,16 @@
+import { FONTS } from "@/constants/fonts";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 // Long captions fold with "See more".
 const LONG_CAPTION_CHARS = 200;
 const COLLAPSED_LINES = 3;
+
+// Figma: Poppins ~14, black text, bold username, pink hashtags.
+const CAPTION_SIZE = 14; // Updated from 13.5
+const CAPTION_LINE_HEIGHT = 22; // Updated from 21
+const CAPTION_COLOR = "#191922";
+const HASHTAG_COLOR = "#C5399A";
 
 function extractHashtags(text?: string) {
   if (!text) {
@@ -24,7 +31,8 @@ function removeHashtags(text?: string) {
     .trim();
 }
 
-// Bold username + caption, then the hashtags as pink chips.
+// Bold username + caption, then the hashtags as plain pink text (like the
+// Figma). No side padding of its own: the card decides the edges.
 export function PostCaption({
   username,
   content,
@@ -45,7 +53,7 @@ export function PostCaption({
   const collapsed = isLong && !expanded;
 
   return (
-    <View style={styles.wrap}>
+    <View>
       {caption ? (
         <Text
           style={styles.caption}
@@ -62,59 +70,35 @@ export function PostCaption({
       ) : null}
 
       {hashtags.length > 0 ? (
-        <View style={styles.chips}>
-          {hashtags.map((tag) => (
-            <View key={tag} style={styles.chip}>
-              <Text style={styles.chipText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
+        <Text style={[styles.caption, styles.hashtags]}>
+          {hashtags.join(" ")}
+        </Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-
   caption: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#29292F",
+    fontFamily: FONTS.regular,
+    fontSize: CAPTION_SIZE,
+    lineHeight: CAPTION_LINE_HEIGHT,
+    color: CAPTION_COLOR,
   },
 
   username: {
-    fontWeight: "800",
-    color: "#191922",
+    fontFamily: FONTS.semibold,
+    color: "#000000",
+  },
+
+  hashtags: {
+    color: HASHTAG_COLOR,
   },
 
   more: {
     marginTop: 3,
+    fontFamily: FONTS.semibold,
     fontSize: 12.5,
-    fontWeight: "700",
     color: "#8A8A93",
-  },
-
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
-  },
-
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#FBEAF0",
-  },
-
-  chipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#993556",
   },
 });

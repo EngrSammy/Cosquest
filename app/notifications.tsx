@@ -23,6 +23,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
 
 function getAvatarSource(actor: AppNotificationItem["actor"]) {
   if (actor?.avatarPhotoUrl) {
@@ -196,7 +197,7 @@ export default function Notifications() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => safeBack()} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color="#191922" />
         </Pressable>
 

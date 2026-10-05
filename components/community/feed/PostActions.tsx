@@ -1,6 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { useId, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FONTS } from "@/constants/fonts";
+import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
+
+// ==========================================
+// FIGMA MEASUREMENTS (card = 355.42 x 384.19)
+// ==========================================
+// Read off the Figma at 203% zoom, converted back to design units.
+const PANEL_HEIGHT = 64; // dark shape is ~64 tall on the left
+
+// Shape, as fractions of the card width. The dark box is flat over the
+// buttons, then it quickly slims down and FADES OUT before the right edge.
+const FLAT_UNTIL = 0.46; // the box stays full height until here
+const TAIL_END = 0.84; // the slim tail is gone (and invisible) by here
+const CURVE_C1 = 0.56; // curve handles
+const CURVE_C2 = 0.68;
+
+// Positions inside the panel (design units):
+const STATS_LEFT = 24; // heart / comment / share start (centres at 44, 84, 123)
+const STATS_TOP = 9; // icons start 9 below the top of the panel
+const SAVE_RIGHT = 20; // bookmark sits ~32 from the right edge (centre)
+const SAVE_BOTTOM = 7;
 
 function getRelativeTime(createdAt?: string) {
   if (!createdAt) {
@@ -44,18 +65,20 @@ function Stat({
   color,
   onPress,
   label,
+  wide,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   count: number;
   color: string;
   onPress: () => void;
   label: string;
+  wide: boolean;
 }) {
   return (
     <Pressable
-      style={styles.stat}
+      style={[styles.stat, wide ? styles.statWide : styles.statNarrow]}
       onPress={onPress}
-      hitSlop={8}
+      hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={label}>
       <Ionicons name={icon} size={22} color={color} />
@@ -64,9 +87,69 @@ function Stat({
   );
 }
 
-// Like · Comment · Share in a glass panel anchored to the BOTTOM-LEFT corner
-// of the photo/video (only its top-right corner rounded), with the time
-// under the counts. Save stands alone at the bottom right — no background.
+// The dark shape behind the buttons: a box over like / comment / share, then
+// the top edge curves down so the rest gets slimmer, and it fades to nothing.
+function PanelShape({ width }: { width: number }) {
+  const h = PANEL_HEIGHT;
+  const id = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  const flatEnd = width * FLAT_UNTIL;
+  const tailEnd = width * TAIL_END;
+
+  // Closed shape = the dark fill.
+  const fill =
+    `M0 0 L${flatEnd} 0 ` +
+    `C${width * CURVE_C1} 0 ${width * CURVE_C2} ${h} ${tailEnd} ${h} ` +
+    `L0 ${h} Z`;
+
+  // Open line = just the white rim along the top + curve.
+  const edge =
+    `M0 0.5 L${flatEnd} 0.5 ` +
+    `C${width * CURVE_C1} 0.5 ${width * CURVE_C2} ${h - 0.5} ${tailEnd} ${h - 0.5}`;
+
+  return (
+    <Svg
+      width={width}
+      height={h}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none">
+      <Defs>
+        {/* dark fill: solid over the buttons, fading to nothing */}
+        <LinearGradient
+          id={`fill${id}`}
+          gradientUnits="userSpaceOnUse"
+          x1={0}
+          y1={0}
+          x2={tailEnd}
+          y2={0}>
+          <Stop offset="0" stopColor="#000000" stopOpacity={0.3} />
+          <Stop offset="0.5" stopColor="#000000" stopOpacity={0.25} />
+          <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+        </LinearGradient>
+
+        {/* white rim: also fades out */}
+        <LinearGradient
+          id={`edge${id}`}
+          gradientUnits="userSpaceOnUse"
+          x1={0}
+          y1={0}
+          x2={tailEnd}
+          y2={0}>
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
+          <Stop offset="0.6" stopColor="#FFFFFF" stopOpacity={0.85} />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+
+      <Path d={fill} fill={`url(#fill${id})`} />
+      <Path d={edge} fill="none" stroke={`url(#edge${id})`} strokeWidth={1} />
+    </Svg>
+  );
+}
+
+// Like · Comment · Share on the dark swoosh at the BOTTOM of the photo, with
+// the time under the counts. Save (with its count) floats on its own at the
+// bottom right.
 //
 // `overlay` = drawn on top of media (default). For text-only posts there's
 // no media, so the same buttons are shown as a plain row instead.
@@ -74,6 +157,7 @@ export function PostActions({
   likes,
   comments,
   shares,
+  saves,
   liked,
   bookmarked,
   createdAt,
@@ -96,8 +180,10 @@ export function PostActions({
   onBookmark: () => void;
   overlay?: boolean;
 }) {
+  const [panelWidth, setPanelWidth] = useState(0);
+
   const baseColor = overlay ? "#FFFFFF" : "#3B3B42";
-  const likeColor = liked ? "#FF4D67" : baseColor;
+  const likeColor = liked ? "#FF3B30" : baseColor;
   const saveColor = bookmarked ? "#C5399A" : baseColor;
   const time = getRelativeTime(createdAt);
 
@@ -110,6 +196,7 @@ export function PostActions({
           color={likeColor}
           onPress={onLike}
           label={liked ? "Unlike" : "Like"}
+          wide={overlay}
         />
 
         <Stat
@@ -118,6 +205,7 @@ export function PostActions({
           color={baseColor}
           onPress={onComment}
           label="Comments"
+          wide={overlay}
         />
 
         <Stat
@@ -126,6 +214,7 @@ export function PostActions({
           color={baseColor}
           onPress={onShare}
           label="Share"
+          wide={overlay}
         />
       </View>
 
@@ -139,14 +228,20 @@ export function PostActions({
     <Pressable
       onPress={onBookmark}
       hitSlop={10}
+      style={styles.saveButton}
       accessibilityRole="button"
       accessibilityLabel={bookmarked ? "Remove from saved" : "Save"}>
       <Ionicons
         name={bookmarked ? "bookmark" : "bookmark-outline"}
-        size={25}
+        size={22}
         color={saveColor}
-        style={overlay ? styles.iconShadow : undefined}
       />
+
+      {typeof saves === "number" ? (
+        <Text style={[styles.count, { color: saveColor }]}>
+          {formatCount(saves)}
+        </Text>
+      ) : null}
     </Pressable>
   );
 
@@ -161,9 +256,14 @@ export function PostActions({
 
   return (
     <>
-      <BlurView intensity={25} tint="dark" style={styles.panel}>
-        {stats}
-      </BlurView>
+      <View
+        style={styles.panel}
+        pointerEvents="box-none"
+        onLayout={(event) => setPanelWidth(event.nativeEvent.layout.width)}>
+        {panelWidth > 0 ? <PanelShape width={panelWidth} /> : null}
+
+        <View style={styles.panelContent}>{stats}</View>
+      </View>
 
       <View style={styles.save}>{saveButton}</View>
     </>
@@ -171,63 +271,73 @@ export function PostActions({
 }
 
 const styles = StyleSheet.create({
-  // Glass panel: touches the left and bottom edges, top-right corner round.
+  // Full width of the photo, anchored to the bottom. The empty right side
+  // lets touches through to the photo.
   panel: {
     position: "absolute",
     left: 0,
+    right: 0,
     bottom: 0,
-    paddingLeft: 16,
-    paddingRight: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderTopRightRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "rgba(20,20,26,0.45)",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.35)",
+    height: PANEL_HEIGHT,
     zIndex: 6,
+  },
+
+  panelContent: {
+    position: "absolute",
+    left: STATS_LEFT,
+    top: STATS_TOP,
   },
 
   statsRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 22,
   },
 
   stat: {
     alignItems: "center",
+  },
+
+  // Over the photo: icon centres are 40 apart, like the Figma.
+  statWide: {
+    width: 40,
+  },
+
+  // Text-only posts (plain row).
+  statNarrow: {
     minWidth: 30,
+    marginRight: 22,
   },
 
   count: {
-    marginTop: 2,
-    fontSize: 11.5,
-    fontWeight: "600",
+    marginTop: 1,
+    fontSize: 10.5,
+    fontFamily: FONTS.medium,
+    color: "#FFFFFF",
   },
 
   time: {
-    marginTop: 5,
-    fontSize: 11,
-    color: "rgba(255,255,255,0.9)",
+    marginTop: 3,
+    marginLeft: 8,
+    fontSize: 10,
+    fontFamily: FONTS.regular,
+    color: "#FFFFFF",
   },
 
   timeInline: {
+    marginLeft: 0,
     color: "#8A8A93",
   },
 
-  // Save on its own at the bottom right — just the icon.
+  // Save (and its count) on its own at the bottom right.
   save: {
     position: "absolute",
-    right: 14,
-    bottom: 18,
-    zIndex: 6,
+    right: SAVE_RIGHT,
+    bottom: SAVE_BOTTOM,
+    zIndex: 7,
   },
 
-  iconShadow: {
-    textShadowColor: "rgba(0,0,0,0.45)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  saveButton: {
+    alignItems: "center",
   },
 
   // Text-only posts: the same buttons as a plain row.

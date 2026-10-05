@@ -13,12 +13,20 @@ export type WallpaperPreset = {
   // A faint pattern drawn over the colour.
   image?: number;
   imageOpacity?: number;
+  locations?: [number, number, ...number[]];
+  vertical?: boolean;
 };
 
 export const DEFAULT_WALLPAPER: Wallpaper = { kind: "preset", id: "default" };
 
 export const WALLPAPER_PRESETS: WallpaperPreset[] = [
-  { id: "default", label: "Default", color: "#EAF2FB" },
+  // Figma chat background: soft sky blue.
+  {
+    id: "default",
+    label: "Default",
+    color: "#D4ECF8",
+    gradient: ["#E2F2FB", "#C8E4F4"],
+  },
   {
     id: "map",
     label: "CosQuest map",

@@ -124,10 +124,10 @@ export function SharedPostEmbed({ shared }: { shared?: SharedPost | null }) {
 }
 
 const styles = StyleSheet.create({
+  // Sits inside the post's text card (which has its own padding).
   frame: {
-    marginHorizontal: 14,
-    marginTop: 4,
-    marginBottom: 10,
+    marginTop: 12,
+    marginBottom: 4,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E8E8EE",

@@ -1,6 +1,7 @@
 import { AppBackground } from "@/components/AppBackground";
 import { AVATARS } from "@/constants/avatars";
 import { FACTIONS } from "@/constants/factions";
+import { FONTS } from "@/constants/fonts";
 import type { FactionMemberPreview } from "@/services/faction";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import type { Post } from "@/store/slices/postSlice";
@@ -32,47 +33,55 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
-const INTEREST_LABELS: Record<string, string> = {
-  anime: "Anime",
-  comic: "Comics",
-  movie: "Movies",
-  game: "Games",
-  toon: "Toons",
-  scifi: "Sci-Fi",
-  fantasy: "Fantasy",
-  horror: "Horror",
-  cosplay: "Cosplay",
-  sports: "Sports",
-  music: "Music",
-  news: "News",
-};
+// Figma colours
+const PINK = "#C34D9C";
+const PURPLE = "#7E2167";
 
-// How many faction member avatars to actually show in the card's row —
-// the rest are folded into the "+N" pill. Matches the thunk's own
-// `limit` for this fetch (see the useEffect below) so the two numbers
-// stay in sync.
+// How many faction member avatars to show before the "+N" pill.
 const FACTION_MEMBER_PREVIEW_LIMIT = 4;
 
-// Confirmed against the backend (User model / factionController.js):
-// there is no rank field and no faction-specific XP field anywhere on
-// User — only a global pointsBalance, unrelated to factions. "Lieutenant"
-// and the XP bar below are still mock values for exactly that reason;
-// member count and the avatar row ARE real now (see fetchFactionMembers).
-// Once a real rank/XP endpoint exists, only this object needs to change.
+// There's no rank / faction-XP field on the backend yet, so these stay
+// placeholder values until a real endpoint exists.
 const FACTION_RANK_PREVIEW = {
   rank: "Lieutenant",
   xp: 7840,
   nextRankXp: 10000,
 };
 
+// 12400 -> "12.4k", 1200000 -> "1.2m"
+function compactNumber(value: number) {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}m`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 1).replace(/\.0$/, "")}k`;
+  }
+
+  return String(value);
+}
+
+// "cosplay-creator" -> "Cosplay creator"
+function humanize(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const text = String(value).replace(/[-_]+/g, " ").trim();
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function Stat({
   value,
   label,
   onPress,
+  align = "center",
 }: {
   value: string | number;
   label: string;
   onPress?: () => void;
+  align?: "flex-start" | "center" | "flex-end";
 }) {
   const content = (
     <>
@@ -84,14 +93,27 @@ function Stat({
   if (onPress) {
     return (
       <Pressable
-        style={({ pressed }) => [styles.stat, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [
+          styles.stat,
+          { alignItems: align },
+          pressed && { opacity: 0.6 },
+        ]}
         onPress={onPress}>
         {content}
       </Pressable>
     );
   }
 
-  return <View style={styles.stat}>{content}</View>;
+  return <View style={[styles.stat, { alignItems: align }]}>{content}</View>;
+}
+
+function GameStat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.gameStat}>
+      <Text style={styles.gameStatValue}>{value}</Text>
+      <Text style={styles.gameStatLabel}>{label}</Text>
+    </View>
+  );
 }
 
 function ActionButton({
@@ -110,10 +132,7 @@ function ActionButton({
   );
 }
 
-// Same avatar-resolution pattern already used for the signed-in user's
-// own avatar further down this file (avatarFromList / selectedAvatar) —
-// a real uploaded photo wins, otherwise fall back to the matching
-// preset from AVATARS, otherwise the default placeholder.
+// A real uploaded photo wins, then the preset avatar, then the default.
 function getMemberAvatarSource(member: FactionMemberPreview) {
   if (member.avatarPhotoUrl) {
     return { uri: member.avatarPhotoUrl };
@@ -124,6 +143,8 @@ function getMemberAvatarSource(member: FactionMemberPreview) {
   return preset?.source || require("@/assets/images/dp-avatar.png");
 }
 
+// Figma: 371 x 136, radius 18, padding 12, border 1px #C34D9C33,
+// background linear-gradient(90deg, rgba(255,255,255,0.16), rgba(255,240,250,0.2)).
 function FactionProfileCard({
   faction,
   memberCount,
@@ -131,12 +152,8 @@ function FactionProfileCard({
   previewMembers,
 }: {
   faction: (typeof FACTIONS)[number];
-  // Real total from GET /api/factions/:key/members' pagination.total —
-  // undefined while the fetch hasn't resolved yet.
   memberCount: number | undefined;
   memberCountLoading: boolean;
-  // Real avatar-row preview (up to FACTION_MEMBER_PREVIEW_LIMIT), from
-  // that same endpoint's `users` array.
   previewMembers: FactionMemberPreview[];
 }) {
   const progress =
@@ -148,31 +165,33 @@ function FactionProfileCard({
 
   const memberCountLabel = memberCountLoading
     ? "…"
-    : `${(memberCount ?? 0).toLocaleString()} members`;
+    : `${compactNumber(memberCount ?? 0)} members`;
 
   return (
     <View style={styles.factionCard}>
       <LinearGradient
-        colors={[
-          "rgba(235,247,253,0.72)",
-          "rgba(245,250,253,0.52)",
-          "rgba(255,255,255,0.34)",
-        ]}
+        colors={["rgba(255,255,255,0.16)", "rgba(255,240,250,0.2)"]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 1, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
 
       <View style={styles.factionTopRow}>
-        <View style={styles.factionShield}>
-          <Ionicons name="shield-outline" size={31} color="#FFFFFF" />
-        </View>
+        {/* Shield on the pink -> purple gradient */}
+        <LinearGradient
+          colors={[PINK, PURPLE]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.factionShield}>
+          <Ionicons name="shield-outline" size={20} color="#FFFFFF" />
+        </LinearGradient>
 
         <View style={styles.factionIdentity}>
           <Image
             source={faction.label}
             style={styles.factionWordmark}
             contentFit="contain"
+            contentPosition="left"
           />
 
           <Text style={styles.factionRank}>{FACTION_RANK_PREVIEW.rank}</Text>
@@ -184,7 +203,7 @@ function FactionProfileCard({
       </View>
 
       <View style={styles.membersRow}>
-        <Text style={styles.membersLabel}>Members</Text>
+        <Text style={styles.factionSmallLabel}>Members</Text>
 
         <View style={styles.memberAvatars}>
           {previewMembers.map((member, index) => (
@@ -192,9 +211,7 @@ function FactionProfileCard({
               key={member.id}
               style={[
                 styles.memberAvatarWrap,
-                {
-                  marginLeft: index === 0 ? 0 : -7,
-                },
+                { marginLeft: index === 0 ? 0 : 4 },
               ]}>
               <Image
                 source={getMemberAvatarSource(member)}
@@ -205,70 +222,32 @@ function FactionProfileCard({
           ))}
 
           {extraMembers > 0 ? (
-            <View
-              style={[
-                styles.extraMembers,
-                {
-                  marginLeft: previewMembers.length > 0 ? -3 : 0,
-                },
-              ]}>
-              <Text style={styles.extraMembersText}>+{extraMembers}</Text>
-            </View>
+            <Text style={styles.extraMembersText}>+{extraMembers}</Text>
           ) : null}
         </View>
       </View>
 
       <View style={styles.xpHeader}>
-        <Text style={styles.xpLabel}>User XP</Text>
+        <Text style={styles.factionSmallLabel}>User XP</Text>
 
-        <View style={styles.xpRight}>
-          <Text style={styles.xpValue}>
-            {FACTION_RANK_PREVIEW.xp.toLocaleString()} /{" "}
-            {FACTION_RANK_PREVIEW.nextRankXp.toLocaleString()}
-          </Text>
-        </View>
+        <Text style={styles.xpValue}>
+          {FACTION_RANK_PREVIEW.xp.toLocaleString()} /{" "}
+          {FACTION_RANK_PREVIEW.nextRankXp.toLocaleString()}
+        </Text>
       </View>
 
-      <View style={styles.xpBarWrap}>
-        <View style={styles.xpTrack}>
-          <LinearGradient
-            colors={["#E4B8DA", "#D887C2", "#C5399A"]}
-            locations={[0, 0.45, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[
-              styles.xpProgress,
-              {
-                width: `${progress * 100}%`,
-              },
-            ]}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.xpMarker,
-            {
-              left: `${progress * 100}%`,
-            },
-          ]}>
-          <View style={styles.xpMarkerInner}>
-            <Ionicons name="diamond" size={8} color="#FFFFFF" />
-          </View>
-        </View>
+      <View style={styles.xpTrack}>
+        <LinearGradient
+          colors={[PINK, PURPLE]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.xpProgress, { width: `${progress * 100}%` }]}
+        />
       </View>
     </View>
   );
 }
 
-/**
- * Reel item.
- *
- * The URL comes directly from the normalized backend post:
- * post.image
- *
- * expo-video is already installed in this project.
- */
 function ReelItem({ post }: { post: Post }) {
   const videoUrl = post.image;
 
@@ -341,10 +320,6 @@ export default function Profile() {
 
   const postsError = useAppSelector((state) => state.post.error);
 
-  // Real followers/following counts — same source the dedicated
-  // Followers/Following screens already use (services/follow.ts via
-  // fetchFollowers/fetchFollowing), rather than guessing at fields like
-  // user.followersCount that don't actually exist on the user object.
   const followersTotal = useAppSelector((state) => state.follow.followersTotal);
 
   const followingTotal = useAppSelector((state) => state.follow.followingTotal);
@@ -357,9 +332,6 @@ export default function Profile() {
     }
   }, [dispatch, email]);
 
-  /**
-   * Load the actual posts from the backend.
-   */
   useEffect(() => {
     if (!token) {
       return;
@@ -392,10 +364,6 @@ export default function Profile() {
     authUser?.profile?.username ||
     "username";
 
-  // Load real followers/following counts for the logged-in user — this
-  // was previously never dispatched on this screen at all, which is why
-  // the numbers shown were always 0/fabricated regardless of how many
-  // followers you actually had.
   useEffect(() => {
     if (!username || username === "username" || !token) {
       return;
@@ -409,7 +377,6 @@ export default function Profile() {
 
   const selectedFaction = FACTIONS.find((item) => item.id === factionKey);
 
-  // Real faction card data — GET /api/factions/:key/members.
   const factionMembersState = useAppSelector((state) =>
     factionKey ? state.faction.membersByFaction[factionKey] : undefined,
   );
@@ -431,17 +398,33 @@ export default function Profile() {
     );
   }, [dispatch, factionKey]);
 
-  const interests =
-    user?.interests && user.interests.length > 0
-      ? user.interests
-      : authUser?.interests || [];
+  // "@username • Category" under the name (Figma). The category shows only
+  // if you chose one and allowed it on your profile (Edit Profile).
+  const category =
+    (user as any)?.profile?.showCategoryOnProfile === false
+      ? ""
+      : humanize(
+          (user as any)?.profile?.category ||
+            (authUser as any)?.profile?.category,
+        );
 
-  /**
-   * Determine the current user's ID.
-   *
-   * The backend post normalizer stores the author's
-   * ID in post.userId.
-   */
+  // Figma: "@alexrivera • Cosplay creator • Building in public" -
+  // here: @username • your category • your faction's tagline (e.g.
+  // "Sci-Fi Fans"). Set a category in Edit Profile for the middle part.
+  const factionTagline =
+    FACTIONS.find((item) => item.id === (user?.faction || authUser?.faction))
+      ?.caption || "";
+
+  void factionTagline;
+
+  // Figma: "@username • Cosplay creator • Building in public". Your own
+  // category (Edit Profile) replaces "Cosplay creator" once you set one.
+  const subtitle = [
+    `@${username}`,
+    category || "Cosplay creator",
+    "Building in public",
+  ].join(" • ");
+
   const currentUserId = useMemo(() => {
     const possibleIds = [
       (user as any)?.id,
@@ -460,15 +443,7 @@ export default function Profile() {
     return found !== undefined ? String(found) : null;
   }, [user, authUser]);
 
-  /**
-   * Match posts belonging to the logged-in user.
-   *
-   * We primarily use userId because the normalized
-   * Post object provides it.
-   *
-   * If the backend doesn't return userId for a post,
-   * username/handle is used as a fallback.
-   */
+  // Posts belonging to you (by id, or by username as a fallback).
   const myPosts = useMemo(() => {
     if (!posts.length) {
       return [];
@@ -497,26 +472,17 @@ export default function Profile() {
     });
   }, [posts, currentUserId, username]);
 
-  /**
-   * Image posts.
-   */
   const imagePosts = useMemo(
     () =>
       myPosts.filter((post) => post.type === "image" && Boolean(post.image)),
     [myPosts],
   );
 
-  /**
-   * Video/reel posts.
-   */
   const reelPosts = useMemo(
     () => myPosts.filter((post) => post.type === "reel" && Boolean(post.image)),
     [myPosts],
   );
 
-  /**
-   * Text-only thought posts.
-   */
   const thoughtPosts = useMemo(
     () =>
       myPosts.filter(
@@ -525,12 +491,6 @@ export default function Profile() {
     [myPosts],
   );
 
-  /**
-   * Number displayed under Posts.
-   *
-   * This is the actual number of posts returned
-   * for this user, not a hardcoded value.
-   */
   const postCount = myPosts.length;
 
   const quests = 0;
@@ -582,19 +542,28 @@ export default function Profile() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
+        {/* HEADER (Figma: "+" left, pink menu right, no title) */}
         <View style={styles.header}>
-          <Ionicons name="person-outline" size={24} color="#191922" />
+          <Pressable
+            onPress={() => router.push("/community")}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Create a post">
+            <Ionicons name="add" size={28} color="#191922" />
+          </Pressable>
 
-          <Text style={styles.headerTitle}>Profile</Text>
-
-          <Pressable onPress={() => router.push("/settings")} hitSlop={10}>
-            <Ionicons name="menu" size={26} color="#C5399A" />
+          <Pressable
+            onPress={() => router.push("/settings")}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Settings">
+            <Ionicons name="menu" size={26} color={PINK} />
           </Pressable>
         </View>
 
         {profileLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="small" color="#C5399A" />
+            <ActivityIndicator size="small" color={PINK} />
 
             <Text style={styles.loadingText}>Loading profile...</Text>
           </View>
@@ -619,93 +588,93 @@ export default function Profile() {
           </View>
         ) : null}
 
-        <View style={styles.avatarWrap}>
-          <View style={styles.bannerContainer}>
+        {/* PHOTO (Figma): a square photo, with a big pink CIRCLE fading in
+            at the bottom, and the avatar sitting in that circle. */}
+        <View style={styles.heroWrap}>
+          <View style={styles.hero}>
             {cloudinaryPhoto ? (
               <Image
-                source={{
-                  uri: cloudinaryPhoto,
-                }}
-                style={styles.banner}
+                source={{ uri: cloudinaryPhoto }}
+                style={StyleSheet.absoluteFill}
                 contentFit="cover"
               />
             ) : (
-              <View style={styles.emptyBanner}>
+              <View style={styles.heroEmpty}>
                 <Ionicons
                   name="person-outline"
-                  size={52}
-                  color="rgba(255,255,255,0.55)"
+                  size={56}
+                  color="rgba(255,255,255,0.7)"
                 />
               </View>
             )}
 
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.74)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.tint}
-            />
+            <View style={styles.heroCircle} pointerEvents="none">
+              {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 47.87%, #C34D9C 100%) */}
+              <LinearGradient
+                colors={["rgba(0,0,0,0)", PINK]}
+                locations={[0.4787, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
           </View>
 
-          <View style={styles.profile}>
-            <Image
-              source={selectedAvatar}
-              style={styles.profileImg}
-              contentFit="cover"
-            />
+          {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
+              shadow, so it looks like it's coming out of the photo. It sits
+              outside the photo's clipping, so the shadow isn't cut off. */}
+          <View style={styles.avatarShadow} pointerEvents="none">
+            <LinearGradient
+              colors={["#E28BC8", PINK]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.avatarRing}>
+              <Image
+                source={selectedAvatar}
+                style={styles.avatarImg}
+                contentFit="cover"
+              />
+            </LinearGradient>
           </View>
         </View>
 
+        {/* NAME + "@username • Category" */}
         <Text style={styles.name}>{displayName}</Text>
 
-        <Text style={styles.username}>@{username}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
 
+        {/* Followers (left) · Following (middle) · Posts (right) */}
         <View style={styles.statsRow}>
           <Stat
-            value={followersTotal}
+            value={compactNumber(followersTotal || 0)}
             label="Followers"
+            align="flex-start"
             onPress={() => router.push("/followers")}
           />
 
           <Stat
-            value={followingTotal}
+            value={compactNumber(followingTotal || 0)}
             label="Following"
             onPress={() => router.push("/following")}
           />
 
-          <Stat value={postCount} label="Posts" />
+          <Stat
+            value={compactNumber(postCount)}
+            label="Posts"
+            align="flex-end"
+          />
         </View>
 
-        <View style={styles.gameStatsWrap}>
-          <View style={styles.gameStats}>
-            <Stat value={quests} label="Quests" />
-          </View>
-
-          <View style={styles.gameStats}>
-            <Stat value={wins} label="Wins" />
-          </View>
-
-          <View style={styles.gameStats}>
-            <Stat value={points} label="Points" />
-          </View>
+        {/* Slim pink pills */}
+        <View style={styles.gameStatsRow}>
+          <GameStat value={quests} label="Quest" />
+          <GameStat value={wins} label="Wins" />
+          <GameStat value={points} label="Points" />
         </View>
 
-        {interests.length > 0 ? (
-          <>
-            <Text style={styles.sectionLabel}>Interests</Text>
-
-            <View style={styles.interests}>
-              {interests.map((interest) => (
-                <View key={interest} style={styles.interestChip}>
-                  <Text style={styles.interestText}>
-                    {INTEREST_LABELS[interest] || interest}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
-        ) : null}
-
+        {/* ABOUT */}
         {about.trim() ? (
           <>
             <Text style={styles.sectionLabel}>About</Text>
@@ -714,6 +683,7 @@ export default function Profile() {
           </>
         ) : null}
 
+        {/* FACTION */}
         {selectedFaction ? (
           <View style={styles.factionSection}>
             <Text style={styles.sectionLabel}>Faction</Text>
@@ -727,10 +697,11 @@ export default function Profile() {
           </View>
         ) : null}
 
+        {/* NEW / FACTION highlights */}
         <View style={styles.highlights}>
           <View style={styles.highlight}>
             <View style={styles.highlightNew}>
-              <Ionicons name="add" size={28} color="#9899A4" />
+              <Ionicons name="add" size={24} color="#9899A4" />
             </View>
 
             <Text style={styles.highlightLabel}>New</Text>
@@ -751,6 +722,7 @@ export default function Profile() {
           ) : null}
         </View>
 
+        {/* Slim Edit / Share pills */}
         <View style={styles.actions}>
           <View style={{ flex: 1 }}>
             <ActionButton
@@ -764,6 +736,7 @@ export default function Profile() {
           </View>
         </View>
 
+        {/* TABS (the open one is dark and bold) */}
         <View style={styles.tabs}>
           {(["Posts", "Reels", "Thoughts"] as Tab[]).map((key) => {
             const active = tab === key;
@@ -779,10 +752,10 @@ export default function Profile() {
                       ? "grid-outline"
                       : key === "Reels"
                         ? "play-circle-outline"
-                        : "chatbubble-ellipses-outline"
+                        : "person-outline"
                   }
                   size={18}
-                  color={active ? "#C5399A" : "#9C9CAA"}
+                  color={active ? "#191922" : "#9C9CAA"}
                 />
 
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>
@@ -793,10 +766,7 @@ export default function Profile() {
           })}
         </View>
 
-        {/* =====================================================
-            POSTS
-        ====================================================== */}
-
+        {/* POSTS */}
         {tab === "Posts" ? (
           imagePosts.length > 0 ? (
             <View style={styles.grid}>
@@ -824,7 +794,7 @@ export default function Profile() {
             </View>
           ) : (
             <View style={styles.emptyContent}>
-              <Ionicons name="images-outline" size={38} color="#9C9CAA" />
+              <Ionicons name="images-outline" size={36} color="#9C9CAA" />
 
               <Text style={styles.emptyTitle}>No posts yet</Text>
 
@@ -835,10 +805,7 @@ export default function Profile() {
           )
         ) : null}
 
-        {/* =====================================================
-            REELS
-        ====================================================== */}
-
+        {/* REELS */}
         {tab === "Reels" ? (
           reelPosts.length > 0 ? (
             <View style={styles.reelsList}>
@@ -848,7 +815,7 @@ export default function Profile() {
             </View>
           ) : (
             <View style={styles.emptyContent}>
-              <Ionicons name="videocam-outline" size={38} color="#9C9CAA" />
+              <Ionicons name="videocam-outline" size={36} color="#9C9CAA" />
 
               <Text style={styles.emptyTitle}>No reels yet</Text>
 
@@ -859,10 +826,7 @@ export default function Profile() {
           )
         ) : null}
 
-        {/* =====================================================
-            THOUGHTS
-        ====================================================== */}
-
+        {/* THOUGHTS */}
         {tab === "Thoughts" ? (
           thoughtPosts.length > 0 ? (
             <View style={styles.thoughtsList}>
@@ -874,7 +838,7 @@ export default function Profile() {
             <View style={styles.emptyContent}>
               <Ionicons
                 name="chatbubble-ellipses-outline"
-                size={38}
+                size={36}
                 color="#9C9CAA"
               />
 
@@ -892,27 +856,44 @@ export default function Profile() {
 }
 
 const GAP = 1;
-const H_PAD = 20;
+const H_PAD = 16;
 
-const COL = (Dimensions.get("window").width - GAP * 2) / 3;
+const SCREEN_W = Math.min(Dimensions.get("window").width, 640);
+
+// Figma photo: a 316 x 316 square on a 402 wide screen.
+const HERO_SIZE = Math.min(316, SCREEN_W - 2 * 30);
+// The pink circle is a little wider than the photo, and sits at its bottom.
+const HERO_CIRCLE = Math.round(HERO_SIZE * 1.06);
+// Figma avatar: 89.21 x 89.21 on the 316 photo.
+const AVATAR_SIZE = Math.round(HERO_SIZE * (89.21 / 316));
+
+// The "milky", pressed-in glass look (same as the chat bubbles): see-through
+// white with a bright white rim and a soft shadow.
+const MILKY = {
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.85)",
+  shadowColor: "#000000",
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+} as const;
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: H_PAD,
     paddingBottom: 140,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: 6,
     marginBottom: 12,
-  },
-
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#191922",
   },
 
   loading: {
@@ -924,8 +905,9 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#79797e",
+    color: "#79797E",
   },
 
   errorBox: {
@@ -937,6 +919,7 @@ const styles = StyleSheet.create({
   },
 
   errorText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#B42318",
     textAlign: "center",
@@ -944,204 +927,188 @@ const styles = StyleSheet.create({
 
   retryText: {
     marginTop: 5,
+    fontFamily: FONTS.bold,
     fontSize: 13,
-    fontWeight: "700",
-    color: "#C5399A",
+    color: PINK,
   },
 
-  avatarWrap: {
-    alignSelf: "center",
-    marginTop: 20,
-    marginBottom: 10,
-    width: 150,
-  },
-
-  bannerContainer: {
+  // Straight top edge, round bottom.
+  hero: {
+    width: HERO_SIZE,
+    height: HERO_SIZE,
+    borderRadius: 6,
     overflow: "hidden",
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    left: -80,
     backgroundColor: "rgba(178,204,239,0.72)",
   },
 
-  banner: {
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-  },
-
-  emptyBanner: {
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+  heroEmpty: {
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(178,204,239,0.72)",
   },
 
-  tint: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "50%",
-    width: 300,
-  },
-
-  profile: {
-    position: "absolute",
-    bottom: -20,
-    left: 45,
-    width: 65,
-    height: 65,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+  avatarRing: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     overflow: "hidden",
-    backgroundColor: "#C5399A",
-
-    shadowColor: "#191922",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-
-    elevation: 4,
   },
 
-  profileImg: {
+  // Holds the photo + the avatar (not clipped, so the avatar's shadow shows).
+  heroWrap: {
+    alignSelf: "center",
+    width: HERO_SIZE,
+    height: HERO_SIZE,
+  },
+
+  // Deep shadow under the avatar circle: it "pops out" of the photo.
+  avatarShadow: {
+    position: "absolute",
+    left: (HERO_SIZE - AVATAR_SIZE) / 2,
+    bottom: 6,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: PINK,
+
+    shadowColor: "#4A0F3B",
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+
+  // The big pink circle at the bottom of the photo.
+  heroCircle: {
+    position: "absolute",
+    width: HERO_CIRCLE,
+    height: HERO_CIRCLE,
+    borderRadius: HERO_CIRCLE / 2,
+    left: (HERO_SIZE - HERO_CIRCLE) / 2,
+    bottom: -4,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+
+  // Pink behind the avatar (Figma).
+  avatarFill: {
+    flex: 1,
+    borderRadius: 29,
+    overflow: "hidden",
+    backgroundColor: "#E7A3D2",
+  },
+
+  avatarImg: {
     width: "100%",
     height: "100%",
   },
 
   name: {
-    fontSize: 22,
-    fontWeight: "800",
+    marginTop: 14,
+    fontFamily: FONTS.bold,
+    fontSize: 20,
     color: "#191922",
     textAlign: "center",
-    marginTop: 20,
   },
 
-  username: {
-    fontSize: 12.5,
-    color: "#86868b",
-    textAlign: "center",
+  subtitle: {
     marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 10.5,
+    color: "#8A8A93",
+    textAlign: "center",
   },
 
   statsRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 20,
+    justifyContent: "space-between",
+    marginTop: 18,
+    paddingHorizontal: 8,
   },
 
   stat: {
-    alignItems: "center",
     minWidth: 70,
   },
 
   statValue: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontFamily: FONTS.semibold,
+    fontSize: 15,
     color: "#191922",
   },
 
   statLabel: {
-    fontSize: 13,
-    color: "#79797e",
-    marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 10,
+    color: "#79797E",
   },
 
-  gameStatsWrap: {
+  // Slim pink pills.
+  gameStatsRow: {
     flexDirection: "row",
-    justifyContent: "center",
     gap: 10,
-    marginTop: 20,
+    marginTop: 10,
   },
 
-  gameStats: {
-    paddingVertical: 5,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(193,76,154,0.23)",
+  gameStat: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(195,77,156,0.2)",
+    ...MILKY,
+  },
 
-    shadowColor: "#7E6E7A",
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+  gameStatValue: {
+    fontFamily: FONTS.semibold,
+    fontSize: 13,
+    lineHeight: 17,
+    color: "#191922",
+  },
 
-    elevation: 4,
+  gameStatLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 8,
+    lineHeight: 11,
+    color: "#8A7F88",
   },
 
   sectionLabel: {
-    fontSize: 15,
-    fontWeight: "800",
+    marginTop: 18,
+    fontFamily: FONTS.semibold,
+    fontSize: 11,
     color: "#191922",
-    marginTop: 20,
-  },
-
-  interests: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 8,
-  },
-
-  interestChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "rgba(193,76,154,0.12)",
-  },
-
-  interestText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#C5399A",
   },
 
   about: {
-    fontSize: 13.5,
-    color: "#4c4c56",
-    marginTop: 6,
-    lineHeight: 20,
+    marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#4C4C56",
   },
 
   factionSection: {
-    marginTop: 4,
+    marginTop: 12,
   },
 
   factionCard: {
-    position: "relative",
-    marginTop: 10,
+    marginTop: 8,
     width: "100%",
-    minHeight: 190,
-    borderRadius: 22,
-
-    borderWidth: 1.2,
-    borderColor: "rgba(239,198,222,0.95)",
-
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 17,
-
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#C34D9C33",
+    padding: 12,
+    gap: 10,
     overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.35)",
 
     shadowColor: "#7E9CB0",
-    shadowOpacity: 0.2,
-    shadowRadius: 11,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-
-    elevation: 5,
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   factionTopRow: {
@@ -1150,68 +1117,52 @@ const styles = StyleSheet.create({
   },
 
   factionShield: {
-    width: 63,
-    height: 63,
-    borderRadius: 17,
-
-    backgroundColor: "rgba(197,57,154,0.68)",
-
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-
-    shadowColor: "#C5399A",
-    shadowOpacity: 0.18,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-
-    elevation: 3,
   },
 
   factionIdentity: {
     flex: 1,
-    marginLeft: 14,
-    justifyContent: "center",
+    marginLeft: 10,
   },
 
   factionWordmark: {
-    width: 110,
-    height: 28,
+    width: 64,
+    height: 16,
   },
 
   factionRank: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginTop: 0,
-    color: "#C5399A",
+    marginTop: 1,
+    fontFamily: FONTS.medium,
+    fontSize: 10,
+    color: PINK,
   },
 
   memberCountPill: {
-    backgroundColor: "rgba(230,224,247,0.78)",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "rgba(195,77,156,0.12)",
   },
 
   memberCountText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.medium,
+    fontSize: 9.5,
+    color: PINK,
   },
 
   membersRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 17,
   },
 
-  membersLabel: {
-    fontSize: 16,
-    fontWeight: "500",
+  factionSmallLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 9.5,
     color: "#6F7480",
   },
 
@@ -1221,13 +1172,11 @@ const styles = StyleSheet.create({
   },
 
   memberAvatarWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    backgroundColor: "#D8D8E0",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     overflow: "hidden",
+    backgroundColor: "#D8D8E0",
   },
 
   memberAvatar: {
@@ -1235,252 +1184,156 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  extraMembers: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(230,224,247,0.86)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   extraMembersText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#C5399A",
+    marginLeft: 6,
+    fontFamily: FONTS.medium,
+    fontSize: 9,
+    color: PINK,
   },
 
   xpHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 13,
-  },
-
-  xpLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#6F7480",
-  },
-
-  xpRight: {
-    flexDirection: "row",
-    alignItems: "center",
   },
 
   xpValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.medium,
+    fontSize: 9.5,
+    color: PINK,
   },
 
-  xpBarWrap: {
-    position: "relative",
-    width: "100%",
-    marginTop: 9,
-    paddingTop: 0,
-  },
-
+  // Thin bar.
   xpTrack: {
     width: "100%",
-    height: 12,
-    borderRadius: 8,
-    backgroundColor: "#D8E5EC",
+    height: 5,
+    marginTop: -4,
+    borderRadius: 3,
+    backgroundColor: "rgba(195,77,156,0.15)",
     overflow: "hidden",
   },
 
   xpProgress: {
     height: "100%",
-    borderRadius: 8,
-  },
-
-  xpMarker: {
-    position: "absolute",
-    top: -6,
-    marginLeft: -8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "rgba(197,57,154,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-
-    shadowColor: "#C5399A",
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-
-    elevation: 2,
-  },
-
-  xpMarkerInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#C5399A",
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 3,
   },
 
   highlights: {
     flexDirection: "row",
-    gap: 22,
-    marginTop: 24,
+    gap: 18,
+    marginTop: 16,
   },
 
   highlight: {
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
 
   highlightNew: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    ...MILKY,
+  },
 
-    borderWidth: 1.2,
-    borderColor: "#D9D9DE",
-    borderStyle: "dashed",
-
-    backgroundColor: "rgba(248,248,249,0.92)",
-
+  // Dark circle with a soft glowing ring.
+  highlightRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: "rgba(195,77,156,0.55)",
+    backgroundColor: "#1E1B22",
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#8F8F98",
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
-  },
-
-  highlightRing: {
-    padding: 3,
-    borderRadius: 37,
-
-    borderWidth: 1.5,
-    borderColor: "#C5399A",
-
-    backgroundColor: "rgba(248,248,249,0.72)",
-
-    shadowColor: "#C5399A",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
+    shadowColor: PINK,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 4,
   },
 
   highlightImg: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
 
   highlightLabel: {
-    fontSize: 12.5,
+    fontFamily: FONTS.regular,
+    fontSize: 10,
     color: "#7F8290",
-    fontWeight: "400",
   },
 
+  // Slim pink pills.
   actions: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
+    gap: 14,
+    marginTop: 16,
   },
 
   action: {
+    paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 11,
-    borderRadius: 25,
-
-    backgroundColor: "rgba(205,135,191,0.34)",
-
-    borderWidth: 0.5,
-    borderColor: "rgba(255,255,255,0.65)",
-
-    shadowColor: "#7E6E7A",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    elevation: 4,
+    borderRadius: 14,
+    backgroundColor: "rgba(195,77,156,0.22)",
+    ...MILKY,
   },
 
   actionLabel: {
-    fontSize: 13,
-    fontWeight: "400",
-    color: "#777985",
+    fontFamily: FONTS.regular,
+    fontSize: 10.5,
+    color: "#7A6F7D",
   },
 
   tabs: {
     flexDirection: "row",
     justifyContent: "space-around",
-
-    marginTop: 16,
-
-    backgroundColor: "rgba(255,255,255,0.18)",
-
-    borderWidth: 0.5,
-    borderColor: "rgba(255,255,255,0.65)",
-
-    borderRadius: 30,
+    marginTop: 14,
     paddingVertical: 10,
-
-    shadowColor: "#8194A4",
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    elevation: 4,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.35)",
+    ...MILKY,
   },
 
   tab: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingVertical: 2,
   },
 
   tabText: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
-    fontWeight: "600",
     color: "#9C9CAA",
   },
 
   tabTextActive: {
-    color: "#C5399A",
-    fontWeight: "800",
+    fontFamily: FONTS.semibold,
+    color: "#191922",
   },
 
+  // Edge to edge, 3 columns.
   grid: {
+    // Edge to edge, 3 per row. Each photo is a third of THIS width (not the
+    // browser window's), so it's always 3 across - phone, website or desktop.
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: GAP,
-    marginTop: 8,
+    marginTop: 10,
     marginHorizontal: -H_PAD,
   },
 
   postThumbWrap: {
-    width: COL,
-    height: COL,
+    width: "33.3333%",
+    aspectRatio: 1,
+    // Thin gaps between photos.
+    padding: GAP / 2,
   },
 
   thumb: {
@@ -1493,26 +1346,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 30,
-    marginTop: 40,
+    marginTop: 36,
   },
 
   emptyTitle: {
     marginTop: 10,
-    fontSize: 15,
-    fontWeight: "700",
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
     color: "#5F606B",
   },
 
   empty: {
     textAlign: "center",
     color: "#9C9CAA",
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 18,
+    marginTop: 4,
+    fontFamily: FONTS.regular,
+    fontSize: 11.5,
+    lineHeight: 17,
   },
 
   reelsList: {
-    marginTop: 8,
+    marginTop: 10,
     gap: 12,
   },
 
@@ -1542,6 +1396,7 @@ const styles = StyleSheet.create({
 
   reelCaptionText: {
     color: "#FFFFFF",
+    fontFamily: FONTS.regular,
     fontSize: 12,
     lineHeight: 17,
   },
@@ -1557,43 +1412,36 @@ const styles = StyleSheet.create({
 
   reelUnavailableText: {
     marginTop: 8,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#9C9CAA",
   },
 
   thoughtsList: {
-    marginTop: 8,
+    marginTop: 10,
     gap: 10,
   },
 
   thoughtCard: {
     width: "100%",
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.48)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.55)",
-
-    shadowColor: "#7E9CB0",
-    shadowOpacity: 0.12,
-    shadowRadius: 7,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
   },
 
   thoughtText: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: "#4C4C56",
   },
 
   thoughtTime: {
     marginTop: 8,
+    fontFamily: FONTS.regular,
     fontSize: 10.5,
     color: "#9C9CAA",
   },

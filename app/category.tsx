@@ -29,6 +29,7 @@ import {
 } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { safeBack } from "@/utils/safeBack";
 
 export default function Category() {
   const insets = useSafeAreaInsets();
@@ -162,7 +163,7 @@ export default function Category() {
         }),
       );
 
-      router.back();
+      safeBack();
     } catch (error) {
       Alert.alert(
         "Category update failed",
@@ -182,7 +183,7 @@ export default function Category() {
         ]}
         keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={() => safeBack()} hitSlop={10}>
             <Ionicons name="chevron-back" size={26} color="#191922" />
           </Pressable>
 

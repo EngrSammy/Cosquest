@@ -24,6 +24,7 @@ import { AppBackground } from "@/components/AppBackground";
 import { PostCard } from "@/components/community/feed/PostCard";
 import { getPost } from "@/services/posts";
 import { useAppSelector } from "@/store/hooks";
+import { safeBack } from "@/utils/safeBack";
 
 // The backend's single-post answer may be { post: {...} } or the post
 // itself, and may use slightly different names than the feed list
@@ -50,7 +51,7 @@ function normalizePost(raw: any) {
 
 function goBack() {
   if (router.canGoBack()) {
-    router.back();
+    safeBack();
   } else {
     router.replace("/(tabs)/community");
   }
