@@ -14,6 +14,7 @@ import {
   pinMessage,
   reactToMessage,
   removeMessageReaction,
+  rollbackChatMessage,
   searchChatUsers,
   sendMessage,
   unpinMessage,
@@ -167,6 +168,9 @@ export const createMessage = createAsyncThunk(
         kind?: string;
         media?: ChatMedia | null;
         file?: ChatMessageFile | null;
+        // @ mentions (user ids) and/or everyone.
+        mentions?: string[];
+        mentionsEveryone?: boolean;
       };
     },
     { rejectWithValue },
@@ -632,6 +636,39 @@ export const readConversation = createAsyncThunk(
         error instanceof Error
           ? error.message
           : "Failed to mark conversation as read",
+      );
+    }
+  },
+);
+
+// ==========================================
+// UNDO EDIT (author only)
+// ==========================================
+
+export const rollbackMessageThunk = createAsyncThunk(
+  "chat/rollbackMessage",
+  async (
+    {
+      conversationId,
+      messageId,
+      token,
+    }: {
+      conversationId: string;
+      messageId: string;
+      token: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const message = await rollbackChatMessage(conversationId, messageId, token);
+
+      return {
+        ...message,
+        conversationId: message.conversationId || conversationId,
+      };
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Couldn't undo the edit",
       );
     }
   },

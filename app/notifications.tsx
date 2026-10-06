@@ -78,7 +78,10 @@ function NotificationRow({
   following,
   followBusy,
   onToggleFollow,
+  onOpen,
 }: {
+  // Mention notifications: opens the chat.
+  onOpen?: () => void;
   item: AppNotificationItem;
   following: boolean;
   followBusy: boolean;
@@ -87,7 +90,10 @@ function NotificationRow({
   const isFollowNotification = item.type === "follow" && !!item.actor;
 
   return (
-    <View style={[styles.row, !item.read && styles.rowUnread]}>
+    <Pressable
+      onPress={onOpen}
+      disabled={!onOpen}
+      style={[styles.row, !item.read && styles.rowUnread]}>
       <Image
         source={getAvatarSource(item.actor)}
         style={styles.avatar}
@@ -96,7 +102,7 @@ function NotificationRow({
 
       <View style={styles.rowText}>
         <Text style={styles.body}>
-          {item.actor?.username ? (
+          {item.actor?.username && item.type !== "mention" ? (
             <Text style={styles.handle}>@{item.actor.username} </Text>
           ) : null}
           {item.message || ""}
@@ -123,7 +129,7 @@ function NotificationRow({
           )}
         </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -247,6 +253,15 @@ export default function Notifications() {
               !!item.actor?.username && !!busyUsernames[item.actor.username]
             }
             onToggleFollow={() => handleToggleFollow(item.actor?.username)}
+            onOpen={
+              item.conversationId
+                ? () =>
+                    router.push({
+                      pathname: "/chat/[id]",
+                      params: { id: item.conversationId! },
+                    })
+                : undefined
+            }
           />
         )}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 10 }}

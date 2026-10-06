@@ -18,6 +18,9 @@ export type AppNotificationItem = {
   read?: boolean;
   createdAt?: string;
   actor?: NotificationActor | null;
+  // @ mention notifications: the chat (and message) to open.
+  conversationId?: string | null;
+  messageId?: string | null;
 };
 
 function normalizeActor(raw: any): NotificationActor | null {
@@ -48,6 +51,8 @@ function normalizeNotification(item: any): AppNotificationItem {
     read: !!item?.read,
     createdAt: item?.createdAt,
     actor: normalizeActor(item?.actor),
+    conversationId: item?.conversationId ?? null,
+    messageId: item?.messageId ?? null,
   };
 }
 

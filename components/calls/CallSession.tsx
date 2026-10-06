@@ -28,6 +28,7 @@ import GroupCallMembers, {
   groupCallTitle,
 } from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
+import VideoGridTile from "@/components/calls/VideoGridTile";
 import type { Call } from "@/services/calls";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -346,6 +347,21 @@ function CallStage({
 
   const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
 
+  // One entry per person in the room (a placeholder when their camera is
+  // off) - for the group video grid.
+  const cameraSlots = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+
+  // How many OTHER people have their camera on right now.
+  const remoteVideoCount = tracks.filter(
+    (ref) =>
+      isTrackReference(ref) &&
+      !ref.participant.isLocal &&
+      !ref.publication.isMuted,
+  ).length;
+
   const localTrack = tracks.find(
     (ref): ref is TrackReference =>
       isTrackReference(ref) && ref.participant.isLocal,
@@ -510,6 +526,24 @@ function CallStage({
     try {
       await track.restartTrack({ facingMode: next });
       setFacing(next);
+      return;
+    } catch {
+      // Some Android phones ignore that - use the phone's own switch below.
+    }
+
+    try {
+      const mediaTrack = track.mediaStreamTrack as unknown as {
+        _switchCamera?: () => void;
+        applyConstraints?: (constraints: object) => Promise<void>;
+      };
+
+      if (typeof mediaTrack._switchCamera === "function") {
+        mediaTrack._switchCamera();
+        setFacing(next);
+      } else if (typeof mediaTrack.applyConstraints === "function") {
+        await mediaTrack.applyConstraints({ facingMode: next });
+        setFacing(next);
+      }
     } catch {
       // Only one camera on this device.
     }
@@ -543,6 +577,133 @@ function CallStage({
   // ==========================================
   // VIDEO LAYOUT (Figma: video-call-screen)
   // ==========================================
+
+  // Flip · Mute · Camera · Speaker · Add · End
+  const videoBar = (
+    <View style={[styles.videoBar, { bottom: insets.bottom + 18 }]}>
+      <CallControl
+        variant="solid"
+        icon="camera-reverse-outline"
+        label="Flip"
+        onPress={flipCamera}
+        disabled={!myCameraOn}
+      />
+      <CallControl
+        variant="solid"
+        icon={isMicrophoneEnabled ? "mic-outline" : "mic-off-outline"}
+        label="Mute"
+        active={!isMicrophoneEnabled}
+        onPress={toggleMic}
+      />
+      <CallControl
+        variant="solid"
+        icon={isCameraEnabled ? "videocam-outline" : "videocam-off-outline"}
+        label="Camera"
+        active={isCameraEnabled}
+        onPress={toggleCamera}
+      />
+      <CallControl
+        variant="solid"
+        icon="volume-high-outline"
+        label="Speaker"
+        active={speakerOn}
+        onPress={() => setSpeakerOn((current) => !current)}
+      />
+      <CallControl
+        variant="solid"
+        icon="person-add-outline"
+        label="Add"
+        onPress={openAddPeople}
+        disabled={!!endMessage}
+      />
+
+      <View style={styles.endItem}>
+        <Pressable
+          style={styles.endRound}
+          onPress={hangUp}
+          disabled={!!endMessage}
+          accessibilityRole="button"
+          accessibilityLabel="End call">
+          <MaterialIcons name="call-end" size={26} color="#FFFFFF" />
+        </Pressable>
+        <Text style={styles.endLabel}>End</Text>
+      </View>
+    </View>
+  );
+
+  // ==========================================
+  // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)
+  // ==========================================
+
+  if (videoLayout && (isGroup || remoteVideoCount > 1)) {
+    const slots = [...cameraSlots].sort((a, b) =>
+      a.participant.isLocal ? -1 : b.participant.isLocal ? 1 : 0,
+    );
+
+    return (
+      <View style={styles.videoRoot}>
+        <View
+          style={[
+            styles.grid,
+            { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 108 },
+          ]}>
+          {slots.map((slot) => {
+            const participant = slot.participant;
+            const isMe = participant.isLocal;
+            const member = call.members.find(
+              (m) => m.user.id === participant.identity,
+            );
+            const person = member?.user || {
+              id: participant.identity,
+              name: participant.name || null,
+            };
+
+            const hasVideo =
+              isTrackReference(slot) && !slot.publication.isMuted;
+
+            return (
+              <VideoGridTile
+                key={participant.identity}
+                person={person}
+                isMe={isMe}
+                count={slots.length}
+                speaking={speakingIds.includes(
+                  isMe && myUserId ? myUserId : participant.identity,
+                )}
+                micOff={!participant.isMicrophoneEnabled}>
+                {hasVideo ? (
+                  <VideoTrack
+                    trackRef={slot as TrackReference}
+                    style={StyleSheet.absoluteFill}
+                    objectFit="cover"
+                    mirror={isMe && facing === "user"}
+                  />
+                ) : null}
+              </VideoGridTile>
+            );
+          })}
+        </View>
+
+        {/* Name + timer pill */}
+        <View style={[styles.topPillRow, { top: insets.top + 12 }]}>
+          <View style={styles.topPill}>
+            <Text style={styles.topPillName} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <View style={styles.topPillStatusRow}>
+              {answered && !endMessage ? <View style={styles.liveDot} /> : null}
+              <Text style={styles.topPillStatus}>{statusText}</Text>
+              {waiting ? <AnimatedDots /> : null}
+            </View>
+          </View>
+        </View>
+
+        {videoBar}
+
+        {addPeopleSheet}
+      </View>
+    );
+  }
 
   if (videoLayout) {
     const localFullScreen = myCameraOn && !remoteTrack;
@@ -604,56 +765,7 @@ function CallStage({
           </View>
         ) : null}
 
-        {/* Flip · Mute · Camera · Speaker · End */}
-        <View style={[styles.videoBar, { bottom: insets.bottom + 18 }]}>
-          <CallControl
-            variant="solid"
-            icon="camera-reverse-outline"
-            label="Flip"
-            onPress={flipCamera}
-            disabled={!myCameraOn}
-          />
-          <CallControl
-            variant="solid"
-            icon={isMicrophoneEnabled ? "mic-outline" : "mic-off-outline"}
-            label="Mute"
-            active={!isMicrophoneEnabled}
-            onPress={toggleMic}
-          />
-          <CallControl
-            variant="solid"
-            icon={isCameraEnabled ? "videocam-outline" : "videocam-off-outline"}
-            label="Camera"
-            active={isCameraEnabled}
-            onPress={toggleCamera}
-          />
-          <CallControl
-            variant="solid"
-            icon="volume-high-outline"
-            label="Speaker"
-            active={speakerOn}
-            onPress={() => setSpeakerOn((current) => !current)}
-          />
-          <CallControl
-            variant="solid"
-            icon="person-add-outline"
-            label="Add"
-            onPress={openAddPeople}
-            disabled={!!endMessage}
-          />
-
-          <View style={styles.endItem}>
-            <Pressable
-              style={styles.endRound}
-              onPress={hangUp}
-              disabled={!!endMessage}
-              accessibilityRole="button"
-              accessibilityLabel="End call">
-              <MaterialIcons name="call-end" size={26} color="#FFFFFF" />
-            </Pressable>
-            <Text style={styles.endLabel}>End</Text>
-          </View>
-        </View>
+        {videoBar}
 
         {addPeopleSheet}
       </View>
@@ -817,6 +929,14 @@ const styles = StyleSheet.create({
   videoRoot: { flex: 1, backgroundColor: "#0D0D12" },
 
   topPillRow: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+
+  grid: {
+    ...StyleSheet.absoluteFill,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignContent: "stretch",
+    paddingHorizontal: 6,
+  },
 
   groupStrip: {
     position: "absolute",

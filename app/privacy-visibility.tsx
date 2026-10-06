@@ -1,11 +1,19 @@
+import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { FONTS } from "@/constants/fonts";
+import {
+  DEFAULT_PRIVACY,
+  getPrivacy,
+  updatePrivacy,
+  type PrivacySettings,
+} from "@/services/privacy";
 import { getBlockedUsernames } from "@/services/publicProfile";
 import { useAppSelector } from "@/store/hooks";
+import { safeBack } from "@/utils/safeBack";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -17,37 +25,39 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PINK = "#C34D9C";
 
-type VisibilityOption = "Public" | "Friends" | "Private";
+type Visibility = PrivacySettings["profileVisibility"];
+type ToggleKey = Exclude<keyof PrivacySettings, "profileVisibility">;
 
-// Figma switch: pink when on, grey when off, white knob. Drawn by hand so it
-// looks the same on phones and the website.
-function PinkSwitch({
-  value,
-  onChange,
-}: {
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <Pressable
-      onPress={() => onChange(!value)}
-      hitSlop={8}
-      style={[styles.switchTrack, value && styles.switchTrackOn]}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}>
-      <View style={[styles.switchKnob, value && styles.switchKnobOn]} />
-    </Pressable>
-  );
-}
+const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
+  { value: "public", label: "Public" },
+  { value: "friends", label: "Friends" },
+  { value: "private", label: "Private" },
+];
+
+const TOGGLES: { key: ToggleKey; label: string; hint?: string }[] = [
+  { key: "showOnlineStatus", label: "Show Online Status" },
+  { key: "showActivityFeed", label: "Show Activity Feed" },
+  { key: "allowFriendRequests", label: "Allow Friend Requests" },
+  { key: "allowDirectMessages", label: "Allow Direct Messages" },
+  {
+    key: "readReceipts",
+    label: "Read Receipts",
+    hint: "Off: people won't see when you've read their messages, and you won't see theirs.",
+  },
+];
 
 function PrivacyToggleRow({
   label,
+  hint,
   value,
   onChange,
+  disabled,
 }: {
   label: string;
+  hint?: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <View style={styles.row}>
@@ -55,45 +65,12 @@ function PrivacyToggleRow({
         <Ionicons name="person" size={15} color={PINK} />
       </View>
 
-      <Text style={styles.rowLabel}>{label}</Text>
+      <View style={styles.rowTextWrap}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+      </View>
 
-      <PinkSwitch value={value} onChange={onChange} />
-    </View>
-  );
-}
-
-function VisibilitySelector({
-  value,
-  onChange,
-}: {
-  value: VisibilityOption;
-  onChange: (value: VisibilityOption) => void;
-}) {
-  const options: VisibilityOption[] = ["Public", "Friends", "Private"];
-
-  return (
-    <View style={styles.visibilitySelector}>
-      {options.map((option) => {
-        const selected = value === option;
-
-        return (
-          <Pressable
-            key={option}
-            onPress={() => onChange(option)}
-            style={[
-              styles.visibilityOption,
-              selected && styles.visibilityOptionSelected,
-            ]}>
-            <Text
-              style={[
-                styles.visibilityOptionText,
-                selected && styles.visibilityOptionTextSelected,
-              ]}>
-              {option}
-            </Text>
-          </Pressable>
-        );
-      })}
+      <PinkSwitch value={value} onChange={onChange} disabled={disabled} />
     </View>
   );
 }
@@ -103,67 +80,74 @@ export default function PrivacyVisibility() {
 
   const token = useAppSelector((state) => state.auth.token);
 
-  const [visibility, setVisibility] = useState<VisibilityOption>("Friends");
-
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
-
-  const [showActivityFeed, setShowActivityFeed] = useState(true);
-
-  const [allowFriendRequests, setAllowFriendRequests] = useState(true);
-
-  const [allowDirectMessages, setAllowDirectMessages] = useState(false);
-
-  // Real list of people you've blocked (GET /api/users/me/blocked).
+  const [privacy, setPrivacy] = useState<PrivacySettings>(DEFAULT_PRIVACY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
   const [blockedNames, setBlockedNames] = useState<string[]>([]);
 
+  // Load the real settings and blocked list.
   useEffect(() => {
     if (!token) {
+      setLoading(false);
       return;
     }
 
     let cancelled = false;
 
-    getBlockedUsernames(token)
-      .then((names) => {
-        if (!cancelled) {
-          setBlockedNames(Array.from(names));
-        }
+    getPrivacy(token)
+      .then((settings) => {
+        if (!cancelled) setPrivacy(settings);
       })
       .catch(() => {
-        // Keep 0 if it can't be loaded.
+        // Keep the defaults shown.
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
+
+    getBlockedUsernames(token)
+      .then((names) => {
+        if (!cancelled) setBlockedNames(Array.from(names));
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
     };
   }, [token]);
 
-  const blockedUsersCount = blockedNames.length;
-
-  function handleVisibilityChange(value: VisibilityOption) {
-    setVisibility(value);
-
-    Alert.alert(
-      "Coming Soon",
-      "Profile visibility will be connected when the backend privacy endpoint is available.",
-    );
-  }
-
-  function handlePrivacyToggle(
-    setter: (value: boolean) => void,
-    value: boolean,
-    feature: string,
+  // Saves one change straight away; puts it back if saving fails.
+  async function save<K extends keyof PrivacySettings>(
+    key: K,
+    value: PrivacySettings[K],
   ) {
-    setter(value);
+    if (!token) {
+      return;
+    }
 
-    Alert.alert(
-      "Coming Soon",
-      `${feature} will be connected when the backend privacy endpoint is available.`,
-    );
+    const previous = privacy[key];
+    setPrivacy((current) => ({ ...current, [key]: value }));
+    setSaving(key);
+
+    try {
+      const saved = await updatePrivacy(
+        { [key]: value } as Partial<PrivacySettings>,
+        token,
+      );
+      setPrivacy(saved);
+    } catch (error) {
+      setPrivacy((current) => ({ ...current, [key]: previous }));
+      Alert.alert(
+        "Couldn't save",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setSaving(null);
+    }
   }
 
   function handleBlockedUsers() {
-    if (!blockedUsersCount) {
+    if (!blockedNames.length) {
       Alert.alert("Blocked Users", "You haven't blocked anyone.");
       return;
     }
@@ -174,17 +158,8 @@ export default function PrivacyVisibility() {
     );
   }
 
-  const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/settings");
-    }
-  };
-
   return (
     <View style={styles.screen}>
-      {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
       <LinearGradient
         colors={["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
@@ -197,15 +172,12 @@ export default function PrivacyVisibility() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
-          {
-            paddingTop: insets.top + 10,
-            paddingBottom: insets.bottom + 40,
-          },
+          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 40 },
         ]}>
-        {/* HEADER: a clear back arrow, then the Figma lock chip + title */}
+        {/* HEADER: back arrow, then the Figma lock chip + title */}
         <View style={styles.header}>
           <Pressable
-            onPress={goBack}
+            onPress={() => safeBack("/settings")}
             hitSlop={10}
             style={styles.backButton}
             accessibilityRole="button"
@@ -221,70 +193,55 @@ export default function PrivacyVisibility() {
             <Text style={styles.headerTitle}>Privacy & Visibility</Text>
           </View>
 
-          <View style={styles.backButton} />
+          <View style={styles.backButton}>
+            {loading ? <ActivityIndicator size="small" color={PINK} /> : null}
+          </View>
         </View>
 
         {/* PROFILE VISIBILITY */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>PROFILE VISIBILITY</Text>
 
-          <VisibilitySelector
-            value={visibility}
-            onChange={handleVisibilityChange}
-          />
+          <View style={styles.visibilitySelector}>
+            {VISIBILITY_OPTIONS.map((option) => {
+              const selected = privacy.profileVisibility === option.value;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  disabled={loading || !!saving}
+                  onPress={() => save("profileVisibility", option.value)}
+                  style={[
+                    styles.visibilityOption,
+                    selected && styles.visibilityOptionSelected,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.visibilityOptionText,
+                      selected && styles.visibilityOptionTextSelected,
+                    ]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {/* PREFERENCES */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>PREFERENCES</Text>
 
-          <PrivacyToggleRow
-            label="Show Online Status"
-            value={showOnlineStatus}
-            onChange={(value) =>
-              handlePrivacyToggle(
-                setShowOnlineStatus,
-                value,
-                "Show Online Status",
-              )
-            }
-          />
-
-          <PrivacyToggleRow
-            label="Show Activity Feed"
-            value={showActivityFeed}
-            onChange={(value) =>
-              handlePrivacyToggle(
-                setShowActivityFeed,
-                value,
-                "Show Activity Feed",
-              )
-            }
-          />
-
-          <PrivacyToggleRow
-            label="Allow Friend Requests"
-            value={allowFriendRequests}
-            onChange={(value) =>
-              handlePrivacyToggle(
-                setAllowFriendRequests,
-                value,
-                "Allow Friend Requests",
-              )
-            }
-          />
-
-          <PrivacyToggleRow
-            label="Allow Direct Messages"
-            value={allowDirectMessages}
-            onChange={(value) =>
-              handlePrivacyToggle(
-                setAllowDirectMessages,
-                value,
-                "Allow Direct Messages",
-              )
-            }
-          />
+          {TOGGLES.map((toggle) => (
+            <PrivacyToggleRow
+              key={toggle.key}
+              label={toggle.label}
+              hint={toggle.hint}
+              value={privacy[toggle.key]}
+              disabled={loading || saving === toggle.key}
+              onChange={(value) => save(toggle.key, value)}
+            />
+          ))}
         </View>
 
         {/* BLOCKED LIST */}
@@ -302,12 +259,12 @@ export default function PrivacyVisibility() {
               <Ionicons name="person" size={15} color={PINK} />
             </View>
 
-            <View style={styles.blockedTextContainer}>
+            <View style={styles.rowTextWrap}>
               <Text style={styles.blockedTitle}>Blocked Users</Text>
 
               <Text style={styles.blockedSubtitle}>
-                {blockedUsersCount}{" "}
-                {blockedUsersCount === 1 ? "account" : "accounts"} blocked
+                {blockedNames.length}{" "}
+                {blockedNames.length === 1 ? "account" : "accounts"} blocked
               </Text>
             </View>
 
@@ -319,11 +276,20 @@ export default function PrivacyVisibility() {
   );
 }
 
+const MILKY = {
+  borderRadius: 14,
+  backgroundColor: "#0000000D",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.75)",
+  shadowColor: "#000000",
+  shadowOpacity: 0.09,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
+  screen: { flex: 1, backgroundColor: "#FFFFFF" },
 
   scroll: {
     paddingHorizontal: 20,
@@ -337,17 +303,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 4,
-  },
-
-  headerIcon: {
-    // Figma: 35 x 36, radius 100, padding 8, background #0000000A
-    width: 35,
-    height: 36,
-    borderRadius: 100,
-    padding: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#0000000A",
   },
 
   backButton: {
@@ -365,20 +320,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  headerTitle: {
-    fontFamily: FONTS.semibold,
-    fontSize: 17,
-    color: "#191922",
-  },
-
-  headerSpacer: {
+  // Figma: 35 x 36, radius 100, padding 8, background #0000000A
+  headerIcon: {
     width: 35,
+    height: 36,
+    borderRadius: 100,
+    padding: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0000000A",
   },
 
-  section: {
-    paddingTop: 18,
-    gap: 12,
-  },
+  headerTitle: { fontFamily: FONTS.semibold, fontSize: 17, color: "#191922" },
+
+  section: { paddingTop: 18, gap: 12 },
 
   sectionLabel: {
     fontFamily: FONTS.medium,
@@ -387,22 +342,12 @@ const styles = StyleSheet.create({
     color: "#7A7A84",
   },
 
-  // Milky pressed-in selector, with a pink pill for the chosen option.
   visibilitySelector: {
+    ...MILKY,
     height: 46,
     flexDirection: "row",
     alignItems: "center",
     padding: 4,
-    borderRadius: 14,
-    backgroundColor: "#0000000D",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.75)",
-
-    shadowColor: "#000000",
-    shadowOpacity: 0.09,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
 
   visibilityOption: {
@@ -413,9 +358,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  visibilityOptionSelected: {
-    backgroundColor: PINK,
-  },
+  visibilityOptionSelected: { backgroundColor: PINK },
 
   visibilityOptionText: {
     fontFamily: FONTS.medium,
@@ -423,31 +366,19 @@ const styles = StyleSheet.create({
     color: "#55555E",
   },
 
-  visibilityOptionTextSelected: {
-    color: "#FFFFFF",
-  },
+  visibilityOptionTextSelected: { color: "#FFFFFF" },
 
-  // Milky pressed-in row.
   row: {
+    ...MILKY,
     minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "#0000000D",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.75)",
-
-    shadowColor: "#000000",
-    shadowOpacity: 0.09,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
 
-  // Figma: 34 x 34, radius 100, padding 8 - a soft pink chip behind the icon.
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
   rowIcon: {
     width: 34,
     height: 34,
@@ -458,58 +389,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(195,77,156,0.12)",
   },
 
-  rowLabel: {
-    flex: 1,
+  rowTextWrap: { flex: 1, minWidth: 0 },
+
+  rowLabel: { fontFamily: FONTS.regular, fontSize: 13.5, color: "#3B3B42" },
+
+  rowHint: {
+    marginTop: 2,
     fontFamily: FONTS.regular,
-    fontSize: 13.5,
-    color: "#3B3B42",
+    fontSize: 11,
+    lineHeight: 15,
+    color: "#8A8A93",
   },
 
-  // Pink switch (Figma).
-  switchTrack: {
-    width: 40,
-    height: 22,
-    borderRadius: 11,
-    padding: 2,
-    justifyContent: "center",
-    backgroundColor: "#D3D3D8",
-  },
+  blockedRow: { minHeight: 62 },
 
-  switchTrackOn: {
-    backgroundColor: PINK,
-  },
-
-  switchKnob: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#FFFFFF",
-    alignSelf: "flex-start",
-
-    shadowColor: "#000000",
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-
-  switchKnobOn: {
-    alignSelf: "flex-end",
-  },
-
-  blockedRow: {
-    minHeight: 62,
-  },
-
-  blockedTextContainer: {
-    flex: 1,
-  },
-
-  blockedTitle: {
-    fontFamily: FONTS.regular,
-    fontSize: 11.5,
-    color: "#7A7A84",
-  },
+  blockedTitle: { fontFamily: FONTS.regular, fontSize: 11.5, color: "#7A7A84" },
 
   blockedSubtitle: {
     fontFamily: FONTS.semibold,
@@ -517,7 +411,5 @@ const styles = StyleSheet.create({
     color: "#191922",
   },
 
-  pressed: {
-    opacity: 0.75,
-  },
+  pressed: { opacity: 0.75 },
 });

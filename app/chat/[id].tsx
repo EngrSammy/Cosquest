@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -55,6 +55,7 @@ import {
   readConversation,
   removeMessage,
   removeReactionThunk,
+  rollbackMessageThunk,
   searchUsers,
   unpinMessageThunk,
 } from "@/store/thunks/chatThunks";
@@ -79,7 +80,10 @@ import {
 } from "@/services/socket";
 
 import { ChatWallpaperBackground } from "@/components/chat/ChatWallpaperBackground";
-import { LinkText } from "@/components/chat/LinkText";
+import MentionPicker, {
+  type MentionPerson,
+} from "@/components/chat/MentionPicker";
+import { MentionText } from "@/components/chat/MentionText";
 import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
 import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
 import {
@@ -178,6 +182,13 @@ type Message = {
   // `read` field in chatController.js).
   read?: boolean;
 
+  // @ mentions: who was tagged (user ids), or everyone.
+  mentions?: string[];
+  mentionsEveryone?: boolean;
+
+  // Only on YOUR messages: true when an edit can be undone.
+  canRollback?: boolean;
+
   // Call entries (kind "call"): saved by the backend when a call finishes.
   // The sender is always the CALLER.
   callLog?: {
@@ -266,6 +277,17 @@ const IMAGE_PICKER_QUALITY = 0.6;
 // as here — they're only ever invoked from event handlers (send,
 // finishVoiceRecording, etc.), never during render itself. Living outside
 // the component sidesteps that false positive entirely.
+// True while a PHOTO is the chat wallpaper: bubbles become solid so the
+// picture doesn't show through them and the text stays easy to read.
+const PhotoWallpaperContext = createContext(false);
+
+// My own user id, so a bubble can tell when it mentions me.
+const MyUserIdContext = createContext("");
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function generateLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -733,7 +755,22 @@ function getTickState(
     }
   }
 
-  return otherParticipant?.isOnline ? "delivered" : "sent";
+  if (otherParticipant?.isOnline) {
+    return "delivered";
+  }
+
+  // Delivered (two grey ticks): they have been active since it was sent,
+  // so it reached them - even if they are offline now (like WhatsApp).
+  if (otherParticipant?.lastActiveAt && msg.createdAt) {
+    const activeSince = new Date(otherParticipant.lastActiveAt).getTime();
+    const msgTime = new Date(msg.createdAt).getTime();
+
+    if (!Number.isNaN(activeSince) && !Number.isNaN(msgTime) && activeSince >= msgTime) {
+      return "delivered";
+    }
+  }
+
+  return "sent";
 }
 
 function MessageMeta({
@@ -850,6 +887,15 @@ const Bubble = memo(function Bubble({
 
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  const onPhoto = useContext(PhotoWallpaperContext);
+
+  // Someone mentioned me (or everyone): the bubble gets a pink edge.
+  const myId = useContext(MyUserIdContext);
+  const mentionsMe =
+    !mine &&
+    !msg.deleted &&
+    (!!msg.mentionsEveryone || (!!myId && (msg.mentions || []).includes(myId)));
+
   const senderName = msg.sender?.username || "User";
 
   const avatar = getAvatar(msg.sender);
@@ -924,6 +970,8 @@ const Bubble = memo(function Bubble({
           style={[
             styles.bubble,
             mine ? styles.bubbleMine : styles.bubbleTheirs,
+            onPhoto && (mine ? styles.bubbleMineOnPhoto : styles.bubbleTheirsOnPhoto),
+            mentionsMe && styles.bubbleMentionsMe,
             firstInGroup && (mine ? styles.tailMine : styles.tailTheirs),
             hasMedia && styles.mediaBubble,
           ]}>
@@ -1124,7 +1172,7 @@ const Bubble = memo(function Bubble({
                 ]}>
                 {/* Links in the message are clickable (post links open
                     inside the app, other links in the browser). */}
-                {msg.deleted ? text : <LinkText text={text} mine={mine} />}
+                {msg.deleted ? text : <MentionText text={text} mine={mine} />}
                 <Text style={styles.metaSpacer}>{spacer}</Text>
               </Text>
             </View>
@@ -1903,6 +1951,14 @@ export default function ChatScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [draft, setDraft] = useState("");
+
+  // @ MENTIONS: the people picked with the checkbox picker (and/or
+  // everyone), and whether the picker is open.
+  const [mentionPicks, setMentionPicks] = useState<MentionPerson[]>([]);
+  const [mentionEveryone, setMentionEveryone] = useState(false);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  // True when the picker was opened by typing "@" (that "@" is replaced).
+  const typedAtRef = useRef(false);
   const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
 
   // Optimistic delete: deleteForMe/deleteForEveryone/deleteSelectedFor add
@@ -2915,6 +2971,12 @@ export default function ChatScreen() {
   const handleDraftChange = (text: string) => {
     setDraft(text);
 
+    // Typing "@" opens the checkbox picker (Community / faction chats).
+    if (groupChat && !editingMessage && text === draft + "@") {
+      typedAtRef.current = true;
+      setShowMentionPicker(true);
+    }
+
     if (!conversationId) {
       return;
     }
@@ -2947,6 +3009,52 @@ export default function ChatScreen() {
   };
 
   // ========================================
+  // @ MENTIONS
+  // ========================================
+
+  const closeMentionPicker = () => {
+    setShowMentionPicker(false);
+    typedAtRef.current = false;
+  };
+
+  const insertMentions = (people: MentionPerson[], everyone: boolean) => {
+    setShowMentionPicker(false);
+
+    const tags = [
+      ...(everyone ? ["@everyone"] : []),
+      ...people.map((person) => `@${person.username}`),
+    ];
+
+    if (!tags.length) {
+      typedAtRef.current = false;
+      return;
+    }
+
+    const replaceTypedAt = typedAtRef.current;
+    typedAtRef.current = false;
+
+    setDraft((current) => {
+      const base =
+        replaceTypedAt && current.endsWith("@") ? current.slice(0, -1) : current;
+      const spacer = base && !/\s$/.test(base) ? " " : "";
+
+      return `${base}${spacer}${tags.join(" ")} `;
+    });
+
+    setMentionPicks((current) => {
+      const byId = new Map(current.map((person) => [person.id, person]));
+      people.forEach((person) => byId.set(person.id, person));
+      return Array.from(byId.values());
+    });
+
+    if (everyone) {
+      setMentionEveryone(true);
+    }
+
+    setTimeout(() => inputRef.current?.focus(), 150);
+  };
+
+  // ========================================
   // SEND
   // ========================================
 
@@ -2960,6 +3068,17 @@ export default function ChatScreen() {
     // Capture what we need before clearing state — setReplyingTo/setDraft
     // below won't affect these local variables within this call.
     const replyToId = replyingTo?.id;
+
+    // Only people whose @name is still in the text are mentioned.
+    const mentionIds = mentionPicks
+      .filter((person) =>
+        new RegExp(`(^|\\s)@${escapeRegExp(person.username)}(\\b|$)`, "i").test(text),
+      )
+      .map((person) => person.id);
+    const mentionsAll = mentionEveryone && /(^|\s)@everyone\b/i.test(text);
+
+    setMentionPicks([]);
+    setMentionEveryone(false);
 
     // Clear the composer right away, WhatsApp-style: the pending bubble
     // below already shows the message in the list, so there's no reason
@@ -2997,6 +3116,8 @@ export default function ChatScreen() {
           data: {
             content: text,
             replyTo: replyToId,
+            mentions: mentionIds.length ? mentionIds : undefined,
+            mentionsEveryone: mentionsAll || undefined,
           },
         }),
       ).unwrap();
@@ -3078,6 +3199,33 @@ export default function ChatScreen() {
       Alert.alert(
         "Edit message",
         error instanceof Error ? error.message : "Unable to edit message.",
+      );
+    }
+  };
+
+  // ========================================
+  // UNDO EDIT (only you know a message was edited)
+  // ========================================
+
+  const undoEdit = async (message: Message) => {
+    if (!token || !conversationId) {
+      return;
+    }
+
+    closeMenu();
+
+    try {
+      await dispatch(
+        rollbackMessageThunk({
+          conversationId,
+          messageId: message.id,
+          token,
+        }),
+      ).unwrap();
+    } catch (error) {
+      Alert.alert(
+        "Undo edit",
+        typeof error === "string" ? error : "Couldn't undo the edit.",
       );
     }
   };
@@ -4046,6 +4194,8 @@ export default function ChatScreen() {
       // lives inside this same KeyboardAvoidingView, adding insets.top here
       // double-counted space and contributed to the oversized keyboard gap.
       keyboardVerticalOffset={0}>
+      <PhotoWallpaperContext.Provider value={shownWallpaper.kind === "photo"}>
+      <MyUserIdContext.Provider value={String(currentUserId)}>
       {/* Chat wallpaper behind everything */}
       <ChatWallpaperBackground
         key={
@@ -4505,6 +4655,21 @@ export default function ChatScreen() {
                   maxLength={2000}
                 />
 
+                {/* @ - mention people (checkbox picker) */}
+                {groupChat && !editingMessage ? (
+                  <Pressable
+                    hitSlop={6}
+                    style={styles.pillIcon}
+                    onPress={() => {
+                      typedAtRef.current = false;
+                      setShowMentionPicker(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mention people">
+                    <Ionicons name="at" size={22} color="#8A8A90" />
+                  </Pressable>
+                ) : null}
+
                 {!editingMessage && !draft.trim() ? (
                   <Pressable
                     hitSlop={6}
@@ -4769,6 +4934,16 @@ export default function ChatScreen() {
                   label="Edit"
                   onPress={menuTap(
                     () => selectedMessage && startEditing(selectedMessage),
+                  )}
+                />
+              ) : null}
+
+              {selectedMessageIsMine && selectedMessage?.canRollback ? (
+                <MenuItem
+                  icon="arrow-undo-circle-outline"
+                  label="Undo edit"
+                  onPress={menuTap(
+                    () => selectedMessage && undoEdit(selectedMessage),
                   )}
                 />
               ) : null}
@@ -5235,6 +5410,15 @@ export default function ChatScreen() {
         </Pressable>
       </Modal>
 
+      {/* @ MENTION PICKER */}
+      <MentionPicker
+        visible={showMentionPicker}
+        conversationId={conversationId}
+        token={token}
+        onClose={closeMentionPicker}
+        onDone={insertMentions}
+      />
+
       {/* CHAT WALLPAPER PICKER */}
       <WallpaperPicker
         visible={showWallpaperPicker}
@@ -5243,6 +5427,8 @@ export default function ChatScreen() {
         onPreview={setWallpaperPreview}
         onClose={() => setShowWallpaperPicker(false)}
       />
+      </MyUserIdContext.Provider>
+      </PhotoWallpaperContext.Provider>
     </KeyboardAvoidingView>
   );
 }
@@ -5598,6 +5784,17 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: "rgba(11,7,19,0.07)" },
 
   bubbleMine: { backgroundColor: "#C34D9C59" },
+
+
+  // On a photo wallpaper: solid, so the picture doesn't show through.
+
+  bubbleTheirsOnPhoto: { backgroundColor: "rgba(255,255,255,0.94)" },
+
+
+  bubbleMineOnPhoto: { backgroundColor: "#F2C6E3" },
+
+  // Someone mentioned you (or everyone): pink edge.
+  bubbleMentionsMe: { borderColor: "#C34D9C", borderWidth: 1.5 },
 
   tailTheirs: { borderTopLeftRadius: 4 },
 

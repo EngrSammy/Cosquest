@@ -1,100 +1,78 @@
-import { AppBackground } from "@/components/AppBackground";
-
+import { PinkSwitch } from "@/components/ui/PinkSwitch";
+import { FONTS } from "@/constants/fonts";
+import { getProfileCategories, type ProfileCategory } from "@/services/user";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-
-import {
-  fetchProfileCategories,
-  saveUserCategory,
-} from "@/store/thunks/userThunks";
-
 import { updateAuthUser } from "@/store/slices/authSlice";
-
 import { updateUser } from "@/store/slices/userSlice";
+import { saveUserCategory } from "@/store/thunks/userThunks";
+import { safeBack } from "@/utils/safeBack";
 
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { safeBack } from "@/utils/safeBack";
+
+const PINK = "#C34D9C";
 
 export default function Category() {
   const insets = useSafeAreaInsets();
-
   const dispatch = useAppDispatch();
 
   const authUser = useAppSelector((state) => state.auth.user);
-
   const user = useAppSelector((state) => state.user.user);
-
-  const loading = useAppSelector((state) => state.user.loading);
+  const token = useAppSelector((state) => state.auth.token);
+  const saving = useAppSelector((state) => state.user.loading);
 
   const email = authUser?.email || (user as any)?.email || "";
 
   const profile = (user as any)?.profile || {};
+  const currentCategory: string = profile.category || "";
+  const currentDisplay: boolean = profile.showCategoryOnProfile ?? true;
 
-  const currentCategory = profile.category || "";
-
-  const currentDisplay = profile.showCategoryOnProfile ?? true;
-
-  const [categories, setCategories] = useState<
-    {
-      key: string;
-      name: string;
-    }[]
-  >([]);
-
+  const [categories, setCategories] = useState<ProfileCategory[]>([]);
   const [selected, setSelected] = useState(currentCategory);
-
   const [displayOnProfile, setDisplayOnProfile] = useState(currentDisplay);
-
   const [query, setQuery] = useState("");
-
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setSelected(currentCategory);
-
     setDisplayOnProfile(currentDisplay);
   }, [currentCategory, currentDisplay]);
 
-  useEffect(() => {
-    async function loadCategories() {
-      try {
-        setLoadingCategories(true);
+  // GET /api/meta/profile-categories (was a thunk that didn't exist).
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      setLoadError(null);
 
-        const result = await dispatch(fetchProfileCategories()).unwrap();
+      const result = await getProfileCategories();
 
-        console.log("PROFILE CATEGORIES:", result);
-
-        setCategories(result.categories || []);
-      } catch (error) {
-        Alert.alert(
-          "Unable to load categories",
-          error instanceof Error
-            ? error.message
-            : "Could not load profile categories.",
-        );
-      } finally {
-        setLoadingCategories(false);
-      }
+      setCategories(result?.categories || []);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Could not load categories.",
+      );
+    } finally {
+      setLoadingCategories(false);
     }
+  };
 
-    loadCategories();
-  }, [dispatch]);
+  useEffect(() => {
+    void loadCategories();
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,14 +88,12 @@ export default function Category() {
 
   async function handleDone() {
     if (!email) {
-      Alert.alert("Error", "Your registration email could not be found.");
-
+      Alert.alert("Error", "Your account email could not be found.");
       return;
     }
 
     if (!selected) {
       Alert.alert("Select a category", "Please select a category.");
-
       return;
     }
 
@@ -127,17 +103,14 @@ export default function Category() {
           email,
           category: selected,
           showCategoryOnProfile: displayOnProfile,
+          token: token || undefined,
         }),
       ).unwrap();
 
-      console.log("CATEGORY RESULT:", result);
-
       const returnedUser = (result as any)?.user || result;
-
       const returnedProfile = returnedUser?.profile || {};
 
       const savedKey = returnedProfile.category || selected;
-
       const savedDisplay =
         returnedProfile.showCategoryOnProfile ?? displayOnProfile;
 
@@ -147,9 +120,7 @@ export default function Category() {
             category: savedKey,
             showCategoryOnProfile: savedDisplay,
           },
-
           category: savedKey,
-
           showCategoryOnProfile: savedDisplay,
         }),
       );
@@ -163,42 +134,67 @@ export default function Category() {
         }),
       );
 
-      safeBack();
+      safeBack("/edit-profile");
     } catch (error) {
       Alert.alert(
         "Category update failed",
-        error instanceof Error ? error.message : "Unable to save category.",
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Unable to save category.",
       );
     }
   }
 
+  const busy = saving || loadingCategories;
+
   return (
-    <AppBackground variant="blueGradient">
+    <View style={styles.screen}>
+      {/* Same background as the Figma screens */}
+      <LinearGradient
+        colors={["#FFFFFF", "#E1F3FF"]}
+        locations={[0, 0.6442]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* HEADER: back, title, Done */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <Pressable
+          onPress={() => safeBack("/edit-profile")}
+          hitSlop={10}
+          style={styles.headerSide}
+          accessibilityRole="button"
+          accessibilityLabel="Back">
+          <Ionicons name="arrow-back" size={24} color="#191922" />
+        </Pressable>
+
+        <Text style={styles.headerTitle}>Category</Text>
+
+        <Pressable
+          onPress={handleDone}
+          hitSlop={10}
+          disabled={busy}
+          style={[styles.headerSide, styles.headerRight]}
+          accessibilityRole="button"
+          accessibilityLabel="Done">
+          {saving ? (
+            <ActivityIndicator size="small" color={PINK} />
+          ) : (
+            <Text style={[styles.done, busy && styles.doneOff]}>Done</Text>
+          )}
+        </Pressable>
+      </View>
+
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          {
-            paddingTop: insets.top + 8,
-          },
+          { paddingBottom: insets.bottom + 40 },
         ]}
-        keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Pressable onPress={() => safeBack()} hitSlop={10}>
-            <Ionicons name="chevron-back" size={26} color="#191922" />
-          </Pressable>
-
-          <Pressable
-            onPress={handleDone}
-            hitSlop={10}
-            disabled={loading || loadingCategories}>
-            {loading || loadingCategories ? (
-              <ActivityIndicator size="small" color="#C5399A" />
-            ) : (
-              <Text style={styles.done}>Done</Text>
-            )}
-          </Pressable>
-        </View>
-
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>What best describes you?</Text>
 
         <Text style={styles.subtitle}>
@@ -206,166 +202,267 @@ export default function Category() {
           at any time.
         </Text>
 
-        <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Display on profile</Text>
+        {/* Display on profile */}
+        <View style={styles.row}>
+          <View style={styles.rowIcon}>
+            <Ionicons name="eye-outline" size={15} color={PINK} />
+          </View>
 
-          <Switch
-            value={displayOnProfile}
-            onValueChange={setDisplayOnProfile}
-            trackColor={{
-              true: "#C5399A",
-              false: "#ffffff26",
-            }}
-            thumbColor="#ffffff"
-          />
+          <Text style={[styles.rowLabel, styles.flex]}>Display on profile</Text>
+
+          <PinkSwitch value={displayOnProfile} onChange={setDisplayOnProfile} />
         </View>
 
-        <View style={styles.searchRow}>
-          <Ionicons name="search" size={18} color="#C5399A" />
+        {/* Search */}
+        <View style={[styles.row, styles.searchRow]}>
+          <Ionicons name="search" size={18} color={PINK} />
 
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search categories"
-            placeholderTextColor="#87878f"
+            placeholderTextColor="#9C9CAA"
             autoCapitalize="none"
+            autoCorrect={false}
           />
+
+          {query ? (
+            <Pressable onPress={() => setQuery("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color="#9C9CAA" />
+            </Pressable>
+          ) : null}
         </View>
 
-        <Text style={styles.sectionLabel}>Suggested</Text>
+        <Text style={styles.sectionLabel}>SUGGESTED</Text>
 
         {loadingCategories ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color="#C5399A" />
+          <View style={styles.stateBox}>
+            <ActivityIndicator color={PINK} />
+            <Text style={styles.stateText}>Loading categories...</Text>
+          </View>
+        ) : loadError ? (
+          <View style={styles.stateBox}>
+            <Ionicons name="cloud-offline-outline" size={30} color="#9C9CAA" />
+            <Text style={styles.stateText}>{loadError}</Text>
 
-            <Text style={styles.loadingText}>Loading categories...</Text>
+            <Pressable style={styles.retry} onPress={loadCategories}>
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>
+              {query.trim()
+                ? "No categories match your search."
+                : "No categories yet."}
+            </Text>
           </View>
         ) : (
-          filtered.map((category) => {
-            const active = category.key === selected;
+          <View style={styles.list}>
+            {filtered.map((category) => {
+              const active = category.key === selected;
 
-            return (
-              <Pressable
-                key={category.key}
-                style={({ pressed }) => [
-                  styles.row,
-                  pressed && {
-                    opacity: 0.7,
-                  },
-                ]}
-                onPress={() => setSelected(category.key)}>
-                <Text style={styles.rowLabel}>{category.name}</Text>
+              return (
+                <Pressable
+                  key={category.key}
+                  style={({ pressed }) => [
+                    styles.row,
+                    active && styles.rowActive,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => setSelected(category.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}>
+                  <Text style={[styles.rowLabel, styles.flex]}>
+                    {category.name}
+                  </Text>
 
-                <Ionicons
-                  name={active ? "radio-button-on" : "radio-button-off"}
-                  size={22}
-                  color={active ? "#C5399A" : "#89898f"}
-                />
-              </Pressable>
-            );
-          })
+                  <Ionicons
+                    name={active ? "radio-button-on" : "radio-button-off"}
+                    size={22}
+                    color={active ? PINK : "#9C9CAA"}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
-    </AppBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
+  flex: {
+    flex: 1,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+  },
+
+  headerSide: {
+    width: 60,
+    height: 36,
+    justifyContent: "center",
+  },
+
+  headerRight: {
+    alignItems: "flex-end",
+  },
+
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: FONTS.semibold,
+    fontSize: 18,
+    color: "#000000",
   },
 
   done: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#C5399A",
+    fontFamily: FONTS.medium,
+    fontSize: 15,
+    color: PINK,
+  },
+
+  doneOff: {
+    opacity: 0.5,
+  },
+
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
   },
 
   title: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
+    fontSize: 22,
     color: "#191922",
-    marginTop: 10,
   },
 
   subtitle: {
-    fontSize: 14,
+    marginTop: 6,
+    marginBottom: 20,
+    fontFamily: FONTS.regular,
+    fontSize: 13.5,
     lineHeight: 20,
     color: "#6F6F79",
-    marginTop: 8,
-    marginBottom: 20,
   },
 
-  toggleRow: {
+  // Milky pressed-in row.
+  row: {
+    minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 18,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#0000000D",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
+
+    shadowColor: "#000000",
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: "600",
+  rowActive: {
+    borderColor: PINK,
+    backgroundColor: "rgba(195,77,156,0.08)",
+  },
+
+  // Figma: 34 x 34, radius 100, padding 8, soft pink.
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 100,
+    padding: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(195,77,156,0.12)",
+  },
+
+  rowLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 14.5,
     color: "#191922",
   },
 
   searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    marginBottom: 18,
+    marginTop: 12,
+    gap: 10,
+    paddingVertical: 0,
   },
 
   searchInput: {
     flex: 1,
-    height: 46,
-    marginLeft: 8,
+    minWidth: 0,
+    height: 50,
+    fontFamily: FONTS.regular,
+    fontSize: 14.5,
     color: "#191922",
-    fontSize: 14,
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#37373a",
-    marginBottom: 10,
+    marginTop: 22,
+    marginBottom: 12,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: "#7A7A84",
   },
 
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 15,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  list: {
+    gap: 12,
   },
 
-  rowLabel: {
-    fontSize: 15,
-    color: "#191922",
-  },
-
-  loadingBox: {
+  stateBox: {
     alignItems: "center",
     paddingVertical: 30,
+    gap: 8,
   },
 
-  loadingText: {
-    marginTop: 8,
+  stateText: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: "#6F6F79",
+    textAlign: "center",
+  },
+
+  retry: {
+    marginTop: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: PINK,
+  },
+
+  retryText: {
+    fontFamily: FONTS.semibold,
+    fontSize: 13,
+    color: "#FFFFFF",
+  },
+
+  pressed: {
+    opacity: 0.75,
   },
 });

@@ -22,7 +22,7 @@ import {
   VideoTrack,
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
@@ -38,6 +38,7 @@ import GroupCallMembers, {
   groupCallTitle,
 } from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
+import VideoGridTile from "@/components/calls/VideoGridTile";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
@@ -154,6 +155,17 @@ export default function CallSession() {
   const [cameraOn, setCameraOn] = useState(false);
   const [localVideo, setLocalVideo] = useState<LocalVideoTrack | null>(null);
   const [remoteVideo, setRemoteVideo] = useState<VideoTrack | null>(null);
+  // Everyone else in the room, with their video when their camera is on.
+  const [remotePeople, setRemotePeople] = useState<
+    {
+      identity: string;
+      name: string;
+      video: VideoTrack | null;
+      micOn: boolean;
+    }[]
+  >([]);
+  // Front ("user") or back ("environment") camera.
+  const [facing, setFacing] = useState<"user" | "environment">("user");
   // Some browsers (especially Safari on iPhone) block sound until the
   // user taps something on the page.
   const [needsAudioTap, setNeedsAudioTap] = useState(false);
@@ -235,8 +247,43 @@ export default function CallSession() {
 
     roomRef.current = room;
 
+    // Rebuilds the list of people (and their videos) from the room.
+    const refreshRemotes = () => {
+      const people: {
+        identity: string;
+        name: string;
+        video: VideoTrack | null;
+        micOn: boolean;
+      }[] = [];
+
+      room.remoteParticipants.forEach((participant) => {
+        let video: VideoTrack | null = null;
+
+        participant.videoTrackPublications.forEach((publication) => {
+          if (
+            publication.track &&
+            !publication.isMuted &&
+            publication.source === Track.Source.Camera
+          ) {
+            video = publication.track as VideoTrack;
+          }
+        });
+
+        people.push({
+          identity: participant.identity,
+          name: participant.name || "",
+          video,
+          micOn: participant.isMicrophoneEnabled,
+        });
+      });
+
+      setRemotePeople(people);
+      setRemoteVideo(people.find((person) => person.video)?.video || null);
+    };
+
     const updateRemoteCount = () => {
       setRemoteCount(room.remoteParticipants.size);
+      refreshRemotes();
     };
 
     const handleTrackSubscribed = (track: RemoteTrack) => {
@@ -247,7 +294,7 @@ export default function CallSession() {
         document.body.appendChild(element);
         audioElementsRef.current.push(element);
       } else if (track.kind === Track.Kind.Video) {
-        setRemoteVideo(track as VideoTrack);
+        refreshRemotes();
       }
     };
 
@@ -255,27 +302,13 @@ export default function CallSession() {
       track.detach().forEach((element) => element.remove());
 
       if (track.kind === Track.Kind.Video) {
-        setRemoteVideo((current) => (current === track ? null : current));
+        refreshRemotes();
       }
     };
 
     const handleRemoteMuteChange = () => {
-      // Hide the other person's video while their camera is off.
-      let found: VideoTrack | null = null;
-
-      room.remoteParticipants.forEach((participant) => {
-        participant.videoTrackPublications.forEach((publication) => {
-          if (
-            publication.track &&
-            !publication.isMuted &&
-            publication.source === Track.Source.Camera
-          ) {
-            found = publication.track as VideoTrack;
-          }
-        });
-      });
-
-      setRemoteVideo(found);
+      // Camera or mic turned on/off: show video or avatar, mic icon.
+      refreshRemotes();
     };
 
     const handleLocalTrackPublished = () => {
@@ -481,6 +514,31 @@ export default function CallSession() {
     }
   };
 
+  const flipCamera = async () => {
+    const room = roomRef.current;
+    const publication = room?.localParticipant.getTrackPublication(
+      Track.Source.Camera,
+    );
+    const track = publication?.track as LocalVideoTrack | undefined;
+
+    if (!track) {
+      return;
+    }
+
+    const next = facing === "user" ? "environment" : "user";
+
+    try {
+      await track.restartTrack({ facingMode: next });
+      setFacing(next);
+      setLocalVideo(track);
+    } catch {
+      Alert.alert(
+        "Flip camera",
+        "This device has only one camera. On a phone, open CosQuest in the app (or your phone's browser) to use the back camera.",
+      );
+    }
+  };
+
   const enableAudio = async () => {
     try {
       await roomRef.current?.startAudio();
@@ -538,6 +596,121 @@ export default function CallSession() {
     </Pressable>
   ) : null;
 
+  // Flip · Mute · Camera · Add · End
+  const videoBar = (
+    <View style={[styles.videoBar, { bottom: insets.bottom + 18 }]}>
+      <CallControl
+        variant="solid"
+        icon="camera-reverse-outline"
+        label="Flip"
+        onPress={flipCamera}
+        disabled={!cameraOn}
+      />
+      <CallControl
+        variant="solid"
+        icon={micOn ? "mic-outline" : "mic-off-outline"}
+        label="Mute"
+        active={!micOn}
+        onPress={toggleMic}
+      />
+      <CallControl
+        variant="solid"
+        icon={cameraOn ? "videocam-outline" : "videocam-off-outline"}
+        label="Camera"
+        active={cameraOn}
+        onPress={toggleCamera}
+      />
+      <CallControl
+        variant="solid"
+        icon="person-add-outline"
+        label="Add"
+        onPress={() => setAddPeopleOpen(true)}
+        disabled={!!endMessage}
+      />
+
+      <View style={styles.endItem}>
+        <Pressable
+          style={styles.endRound}
+          onPress={hangUp}
+          disabled={!!endMessage}
+          accessibilityRole="button"
+          accessibilityLabel="End call">
+          <MaterialIcons name="call-end" size={26} color="#FFFFFF" />
+        </Pressable>
+        <Text style={styles.endLabel}>End</Text>
+      </View>
+    </View>
+  );
+
+  // ==========================================
+  // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)
+  // ==========================================
+
+  const remoteVideoCount = remotePeople.filter((person) => person.video).length;
+
+  if (videoLayout && (isGroup || remoteVideoCount > 1)) {
+    const count = remotePeople.length + 1;
+    const memberFor = (identity: string) =>
+      active.call.members.find((member) => member.user.id === identity)?.user;
+
+    return (
+      <View style={styles.videoRoot}>
+        <View
+          style={[
+            styles.grid,
+            { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 108 },
+          ]}>
+          {/* You */}
+          <VideoGridTile
+            person={memberFor(myUserId || "")}
+            isMe
+            count={count}
+            speaking={!!myUserId && speakingIds.includes(myUserId)}
+            micOff={!micOn}>
+            {localVideo ? (
+              <WebVideo track={localVideo} mirror={facing === "user"} />
+            ) : null}
+          </VideoGridTile>
+
+          {/* Everyone else */}
+          {remotePeople.map((person) => (
+            <VideoGridTile
+              key={person.identity}
+              person={
+                memberFor(person.identity) || {
+                  id: person.identity,
+                  name: person.name || null,
+                }
+              }
+              count={count}
+              speaking={speakingIds.includes(person.identity)}
+              micOff={!person.micOn}>
+              {person.video ? <WebVideo track={person.video} /> : null}
+            </VideoGridTile>
+          ))}
+        </View>
+
+        <View style={[styles.topPillRow, { top: insets.top + 12 }]}>
+          <View style={styles.topPill}>
+            <Text style={styles.topPillName} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <View style={styles.topPillStatusRow}>
+              {answered && !endMessage ? <View style={styles.liveDot} /> : null}
+              <Text style={styles.topPillStatus}>{statusText}</Text>
+              {waiting ? <AnimatedDots /> : null}
+            </View>
+          </View>
+          {audioTapButton}
+        </View>
+
+        {videoBar}
+
+        {addPeopleSheet}
+      </View>
+    );
+  }
+
   if (videoLayout) {
     return (
       <View style={styles.videoRoot}>
@@ -545,7 +718,7 @@ export default function CallSession() {
           {remoteVideo ? (
             <WebVideo track={remoteVideo} />
           ) : localVideo ? (
-            <WebVideo track={localVideo} mirror />
+            <WebVideo track={localVideo} mirror={facing === "user"} />
           ) : null}
         </View>
 
@@ -576,46 +749,12 @@ export default function CallSession() {
 
         {localVideo && remoteVideo ? (
           <View style={[styles.selfPreview, { top: insets.top + 84 }]}>
-            <WebVideo track={localVideo} mirror />
+            <WebVideo track={localVideo} mirror={facing === "user"} />
             <Text style={styles.selfLabel}>You</Text>
           </View>
         ) : null}
 
-        <View style={[styles.videoBar, { bottom: insets.bottom + 18 }]}>
-          <CallControl
-            variant="solid"
-            icon={micOn ? "mic-outline" : "mic-off-outline"}
-            label="Mute"
-            active={!micOn}
-            onPress={toggleMic}
-          />
-          <CallControl
-            variant="solid"
-            icon={cameraOn ? "videocam-outline" : "videocam-off-outline"}
-            label="Camera"
-            active={cameraOn}
-            onPress={toggleCamera}
-          />
-          <CallControl
-            variant="solid"
-            icon="person-add-outline"
-            label="Add"
-            onPress={() => setAddPeopleOpen(true)}
-            disabled={!!endMessage}
-          />
-
-          <View style={styles.endItem}>
-            <Pressable
-              style={styles.endRound}
-              onPress={hangUp}
-              disabled={!!endMessage}
-              accessibilityRole="button"
-              accessibilityLabel="End call">
-              <MaterialIcons name="call-end" size={26} color="#FFFFFF" />
-            </Pressable>
-            <Text style={styles.endLabel}>End</Text>
-          </View>
-        </View>
+        {videoBar}
 
         {addPeopleSheet}
       </View>
@@ -780,6 +919,14 @@ const styles = StyleSheet.create({
   endPillText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
 
   videoRoot: { flex: 1, backgroundColor: "#0D0D12" },
+
+  grid: {
+    ...StyleSheet.absoluteFill,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignContent: "stretch",
+    paddingHorizontal: 6,
+  },
 
   groupStrip: {
     position: "absolute",

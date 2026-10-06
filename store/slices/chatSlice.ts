@@ -15,6 +15,7 @@ import {
   readConversation,
   removeMessage,
   removeReactionThunk,
+  rollbackMessageThunk,
   searchUsers,
   unpinMessageThunk,
 } from "../thunks/chatThunks";
@@ -365,6 +366,12 @@ const chatSlice = createSlice({
         ...messages[index],
 
         ...message,
+
+        // Live edits never say a message was edited (only its author
+        // knows, and their own copy came from the REST response) - keep
+        // what this device already knew.
+        editedAt: messages[index].editedAt,
+        canRollback: messages[index].canRollback,
 
         conversationId,
       };
@@ -823,6 +830,41 @@ const chatSlice = createSlice({
 
           ...message,
 
+          conversationId,
+        };
+
+        updateConversationPreview(state, conversationId);
+      })
+
+      // ======================================
+      // UNDO EDIT (same as an edit)
+      // ======================================
+
+      .addCase(rollbackMessageThunk.fulfilled, (state, action) => {
+        const message = action.payload;
+
+        if (!message) {
+          return;
+        }
+
+        const conversationId =
+          message.conversationId || action.meta.arg.conversationId;
+
+        const messages = state.messages[conversationId];
+
+        if (!messages) {
+          return;
+        }
+
+        const index = messages.findIndex((item) => item.id === message.id);
+
+        if (index < 0) {
+          return;
+        }
+
+        messages[index] = {
+          ...messages[index],
+          ...message,
           conversationId,
         };
 

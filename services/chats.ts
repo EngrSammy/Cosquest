@@ -77,6 +77,13 @@ export type ChatMessage = {
   updatedAt?: string;
 
   forwarded?: boolean;
+
+  // @ mentions: the user ids tagged, or everyone in the chat.
+  mentions?: string[];
+  mentionsEveryone?: boolean;
+
+  // Only on YOUR messages: true when an edit can be undone.
+  canRollback?: boolean;
 };
 
 export type ChatLastMessage = {
@@ -333,6 +340,9 @@ export async function sendMessage(
     media?: ChatMedia | null;
     replyTo?: string;
     parentMessage?: string;
+    // @ mentions (user ids) and/or everyone.
+    mentions?: string[];
+    mentionsEveryone?: boolean;
     file?: ChatMessageFile | null;
   },
   token: string,
@@ -358,6 +368,15 @@ export async function sendMessage(
 
     if (data.parentMessage) {
       formData.append("parentMessage", data.parentMessage);
+    }
+
+    // @ mentions travel as JSON in the form.
+    if (data.mentions?.length) {
+      formData.append("mentions", JSON.stringify(data.mentions));
+    }
+
+    if (data.mentionsEveryone) {
+      formData.append("mentionsEveryone", "true");
     }
 
     await appendFileToFormData(formData, "media", data.file);
@@ -660,4 +679,76 @@ export async function markConversationRead(
       token,
     },
   );
+}
+
+/* =========================================================
+   CHAT MEMBERS (for the @ mention picker)
+   GET /api/chats/:conversationId/members?search=&page=&limit=
+========================================================= */
+
+export type ChatMember = {
+  id: string;
+  username: string;
+  name?: string | null;
+  avatarKey?: string | null;
+  avatarPhotoUrl?: string | null;
+};
+
+export async function getChatMembers(
+  conversationId: string,
+  options: { search?: string; page?: number; limit?: number },
+  token: string,
+): Promise<{ members: ChatMember[]; total: number; hasMore: boolean }> {
+  const params = new URLSearchParams();
+
+  if (options.search) params.set("search", options.search);
+  if (options.page) params.set("page", String(options.page));
+  if (options.limit) params.set("limit", String(options.limit));
+
+  const query = params.toString();
+
+  const response = await apiRequest<any>(
+    `/api/chats/${encodeURIComponent(conversationId)}/members${query ? `?${query}` : ""}`,
+    {
+      method: "GET",
+      token,
+    },
+  );
+
+  const list: any[] = Array.isArray(response?.members) ? response.members : [];
+
+  return {
+    members: list
+      .map((member) => ({
+        id: String(member?.id ?? member?._id ?? ""),
+        username: member?.username || "",
+        name: member?.name || null,
+        avatarKey: member?.avatarKey ?? null,
+        avatarPhotoUrl: member?.avatarPhotoUrl ?? null,
+      }))
+      .filter((member) => member.id && member.username),
+    total: response?.pagination?.total ?? list.length,
+    hasMore: !!response?.pagination?.hasMore,
+  };
+}
+
+/* =========================================================
+   UNDO EDIT (author only)
+   POST /api/chats/:conversationId/messages/:messageId/rollback
+========================================================= */
+
+export async function rollbackChatMessage(
+  conversationId: string,
+  messageId: string,
+  token: string,
+): Promise<ChatMessage> {
+  const response = await apiRequest<any>(
+    `/api/chats/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/rollback`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+
+  return normalizeMessage(response?.message ?? response?.data ?? response);
 }
