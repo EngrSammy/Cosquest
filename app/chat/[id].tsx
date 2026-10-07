@@ -45,6 +45,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   createMessage,
   editMessage,
+  fetchChats,
   fetchConversation,
   fetchMessageSeen,
   fetchMessageShare,
@@ -143,6 +144,9 @@ type Message = {
 
   deleted?: boolean;
 
+  // A group admin deleted it.
+  deletedByAdmin?: boolean;
+
   editedAt?: string | null;
 
   createdAt?: string;
@@ -203,7 +207,19 @@ type Message = {
 type Chat = {
   id: string;
 
-  type?: "community" | "faction" | "dm";
+  type?: "community" | "faction" | "dm" | "group";
+
+  // User-created groups.
+  group?: {
+    kind?: "faction" | "open" | "private";
+    photoUrl?: string | null;
+    myRole?: string;
+    muted?: boolean;
+    // Phase 3: muted by an admin (can read, not send), and slow mode.
+    mutedByAdminUntil?: string | null;
+    slowModeSeconds?: number;
+    nextSendAt?: string | null;
+  };
 
   title?: string;
 
@@ -286,6 +302,29 @@ const MyUserIdContext = createContext("");
 
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The clock, read outside the component (see generateLocalId below).
+function currentTime() {
+  return Date.now();
+}
+
+// "until 18:00", or "until an admin unmutes you" for a mute with no end.
+function adminMuteText(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  if (date.getFullYear() - new Date().getFullYear() > 5) return "until an admin unmutes you";
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return date.toDateString() === new Date().toDateString()
+    ? `until ${time}`
+    : `until ${date.toLocaleDateString([], { day: "numeric", month: "short" })} ${time}`;
+}
+
+function isInFuture(value?: string | null) {
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return !Number.isNaN(time) && time > Date.now();
 }
 
 function generateLocalId(prefix: string) {
@@ -900,7 +939,11 @@ const Bubble = memo(function Bubble({
 
   const avatar = getAvatar(msg.sender);
 
-  const text = msg.deleted ? "🚫 This message was deleted." : msg.content || "";
+  const text = msg.deleted
+    ? msg.deletedByAdmin
+      ? "🚫 This message was deleted by an admin."
+      : "🚫 This message was deleted."
+    : msg.content || "";
 
   const mediaUrl = getMediaUrl(msg.media);
 
@@ -1959,6 +2002,39 @@ export default function ChatScreen() {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   // True when the picker was opened by typing "@" (that "@" is replaced).
   const typedAtRef = useRef(false);
+
+  // SLOW MODE: when I can send my next message (ms), and a ticking clock
+  // for the countdown.
+  const [slowUntil, setSlowUntil] = useState(0);
+  const [slowNow, setSlowNow] = useState(0);
+  const nextSendAt = conversation?.group?.nextSendAt;
+
+  useEffect(() => {
+    if (nextSendAt) {
+      setSlowUntil(new Date(nextSendAt).getTime());
+    }
+  }, [nextSendAt]);
+
+  useEffect(() => {
+    if (!slowUntil) {
+      return;
+    }
+
+    const tick = () => {
+      const now = currentTime();
+      setSlowNow(now);
+      if (now >= slowUntil) {
+        setSlowUntil(0);
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [slowUntil]);
+
+  const slowWait =
+    slowUntil && slowNow ? Math.max(0, Math.ceil((slowUntil - slowNow) / 1000)) : 0;
   const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
 
   // Optimistic delete: deleteForMe/deleteForEveryone/deleteSelectedFor add
@@ -2080,6 +2156,13 @@ export default function ChatScreen() {
   }, [token, otherUsername]);
 
   const openTheirProfile = () => {
+    // Groups: the photo / name opens Group info.
+    if (conversation?.type === "group") {
+      setShowChatMenu(false);
+      router.push({ pathname: "/group/[id]", params: { id: conversationId } });
+      return;
+    }
+
     if (!otherUsername) {
       return;
     }
@@ -2199,7 +2282,23 @@ export default function ChatScreen() {
   const previousMessageCount = useRef(messages.length);
 
   const groupChat =
-    conversation?.type === "community" || conversation?.type === "faction";
+    conversation?.type === "community" ||
+    conversation?.type === "faction" ||
+    conversation?.type === "group";
+
+  // GROUP ADMINS (owner / admin): delete anyone's message, pin.
+  const isGroupAdmin =
+    conversation?.type === "group" &&
+    (conversation.group?.myRole === "owner" ||
+      conversation.group?.myRole === "admin");
+
+  // In groups only admins can pin.
+  const canPin = conversation?.type !== "group" || isGroupAdmin;
+
+  // An admin muted me: I can read but not send.
+  const mutedByAdmin =
+    conversation?.type === "group" &&
+    isInFuture(conversation.group?.mutedByAdminUntil);
 
   // Calls are DM-only (the backend rejects calls in community/faction).
   const canCall = conversation?.type === "dm";
@@ -2324,7 +2423,9 @@ export default function ChatScreen() {
   const headerAvatar =
     conversation?.type === "dm"
       ? getAvatar(conversation.otherParticipant)
-      : null;
+      : conversation?.type === "group"
+        ? conversation.group?.photoUrl || null
+        : null;
 
   // ========================================
   // PINNED
@@ -2643,6 +2744,37 @@ export default function ChatScreen() {
       dispatch(socketChatRead({ ...payload, currentUserId }));
     };
 
+    // Groups: I was removed or banned -> close it. Something changed
+    // (my role, a mute, slow mode) -> refresh this chat's details.
+    const handleGroupRemoved = (payload: {
+      conversationId: string;
+      reason?: string;
+    }) => {
+      if (payload.conversationId !== conversationId || !token) {
+        return;
+      }
+
+      dispatch(fetchChats(token));
+      Alert.alert(
+        "Group",
+        payload.reason === "banned"
+          ? "You were removed from this group and can't rejoin."
+          : "You were removed from this group.",
+      );
+      router.replace("/home");
+    };
+
+    const handleGroupUpdated = (payload: { conversationId: string }) => {
+      if (payload.conversationId !== conversationId || !token) {
+        return;
+      }
+
+      dispatch(fetchConversation({ conversationId, token }));
+    };
+
+    socket.on("group:removed", handleGroupRemoved);
+    socket.on("group:updated", handleGroupUpdated);
+
     socket.on("message:new", handleMessageNew);
     socket.on("message:edited", handleMessageEdited);
     socket.on("message:deleted", handleMessageDeleted);
@@ -2664,6 +2796,8 @@ export default function ChatScreen() {
       socket.off("message:reaction", handleMessageReaction);
       socket.off("chat:pinned", handleChatPinned);
       socket.off("chat:read", handleChatRead);
+      socket.off("group:removed", handleGroupRemoved);
+      socket.off("group:updated", handleGroupUpdated);
 
       leaveConversation(conversationId);
     };
@@ -3009,6 +3143,26 @@ export default function ChatScreen() {
   };
 
   // ========================================
+  // SLOW MODE (groups)
+  // ========================================
+
+  const startSlowTimer = () => {
+    const seconds = conversation?.group?.slowModeSeconds || 0;
+    if (conversation?.type === "group" && seconds > 0 && !isGroupAdmin) {
+      setSlowUntil(currentTime() + seconds * 1000);
+    }
+  };
+
+  // "Slow mode is on. You can send again in 25s." -> wait 25s.
+  const noteSlowModeError = (error: unknown) => {
+    const text = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+    const match = text.match(/again in (\d+)s/i);
+    if (match) {
+      setSlowUntil(currentTime() + Number(match[1]) * 1000);
+    }
+  };
+
+  // ========================================
   // @ MENTIONS
   // ========================================
 
@@ -3062,6 +3216,11 @@ export default function ChatScreen() {
     const text = draft.trim();
 
     if (!text || !token || !conversationId) {
+      return;
+    }
+
+    if (slowWait > 0) {
+      showVoiceHint(`Slow mode: you can send again in ${slowWait}s`);
       return;
     }
 
@@ -3124,12 +3283,16 @@ export default function ChatScreen() {
 
       removePendingMessage(pendingId);
 
+      startSlowTimer();
+
       scrollToLatestIfNeeded();
     } catch (error) {
       removePendingMessage(pendingId);
 
       // Give the text back so nothing is lost on failure.
       setDraft(text);
+
+      noteSlowModeError(error);
 
       Alert.alert(
         "Message",
@@ -3276,7 +3439,7 @@ export default function ChatScreen() {
       return;
     }
 
-    if (!isMyMessage(message)) {
+    if (!isMyMessage(message) && !isGroupAdmin) {
       Alert.alert(
         "Delete message",
         "You can only delete your own message for everyone.",
@@ -4267,7 +4430,7 @@ export default function ChatScreen() {
               <Pressable
                 style={styles.headerProfileTap}
                 onPress={openTheirProfile}
-                disabled={!otherUsername}
+                disabled={!otherUsername && conversation?.type !== "group"}
                 accessibilityRole="button"
                 accessibilityLabel="View profile">
                 <View style={styles.headerAvatarWrap}>
@@ -4583,6 +4746,29 @@ export default function ChatScreen() {
       {/* COMPOSER */}
       {/* ================================== */}
 
+      {/* Muted by an admin: no message box, a note instead */}
+      {!selectionMode && mutedByAdmin ? (
+        <View
+          style={[
+            styles.blockedBar,
+            { paddingBottom: (keyboardVisible ? 0 : insets.bottom) + 12 },
+          ]}>
+          <Text style={styles.blockedText}>
+            An admin muted you {adminMuteText(conversation?.group?.mutedByAdminUntil)}.
+            You can read messages but not send them.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Slow mode countdown */}
+      {!selectionMode && !mutedByAdmin && slowWait > 0 ? (
+        <View style={styles.slowModeBar}>
+          <Text style={styles.slowModeText}>
+            Slow mode · you can send again in {slowWait}s
+          </Text>
+        </View>
+      ) : null}
+
       {/* Blocked: no message box, an Unblock button instead */}
       {!selectionMode && iBlockedThem ? (
         <View
@@ -4607,7 +4793,7 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      {!selectionMode && !iBlockedThem ? (
+      {!selectionMode && !iBlockedThem && !mutedByAdmin ? (
         <View
           style={[
             styles.composer,
@@ -4912,21 +5098,23 @@ export default function ChatScreen() {
                 )}
               />
 
-              <MenuItem
-                icon={
-                  selectedMessage && pinnedIds.includes(selectedMessage.id)
-                    ? "pin"
-                    : "pin-outline"
-                }
-                label={
-                  selectedMessage && pinnedIds.includes(selectedMessage.id)
-                    ? "Unpin"
-                    : "Pin"
-                }
-                onPress={menuTap(
-                  () => selectedMessage && pinMessage(selectedMessage),
-                )}
-              />
+              {canPin ? (
+                <MenuItem
+                  icon={
+                    selectedMessage && pinnedIds.includes(selectedMessage.id)
+                      ? "pin"
+                      : "pin-outline"
+                  }
+                  label={
+                    selectedMessage && pinnedIds.includes(selectedMessage.id)
+                      ? "Unpin"
+                      : "Pin"
+                  }
+                  onPress={menuTap(
+                    () => selectedMessage && pinMessage(selectedMessage),
+                  )}
+                />
+              ) : null}
 
               {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
                 <MenuItem
@@ -5014,7 +5202,9 @@ export default function ChatScreen() {
                       Date.now() - new Date(item.createdAt || 0).getTime() <
                       DELETE_FOR_EVERYONE_WINDOW_MS,
                   );
-                  const canEveryone = allMine && recent;
+                  // Group admins can delete members' messages any time.
+                  const adminDelete = isGroupAdmin && !allMine;
+                  const canEveryone = (allMine && recent) || adminDelete;
 
                   const closeSheet = () => setDeleteSheet(null);
 
@@ -5047,7 +5237,9 @@ export default function ChatScreen() {
                       </Text>
 
                       <Text style={styles.deleteHint}>
-                        {canEveryone
+                        {adminDelete
+                          ? "As an admin, you can delete members' messages for everyone."
+                          : canEveryone
                           ? "Delete for everyone removes it for both of you."
                           : allMine
                             ? "Delete for everyone is only possible within 5 minutes of sending. You can still delete it for yourself."
@@ -5366,6 +5558,17 @@ export default function ChatScreen() {
           style={styles.chatMenuBackdrop}
           onPress={() => setShowChatMenu(false)}>
           <View style={[styles.chatMenu, { top: insets.top + 52 }]}>
+            {conversation?.type === "group" ? (
+              <Pressable style={styles.chatMenuItem} onPress={openTheirProfile}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color="#191922"
+                />
+                <Text style={styles.chatMenuText}>Group info</Text>
+              </Pressable>
+            ) : null}
+
             {otherUsername ? (
               <Pressable style={styles.chatMenuItem} onPress={openTheirProfile}>
                 <Ionicons
@@ -5555,6 +5758,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.96)",
     borderTopWidth: 1,
     borderTopColor: "rgba(150,150,160,0.18)",
+  },
+
+  slowModeBar: {
+    alignSelf: "center",
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(195,77,156,0.14)",
+  },
+
+  slowModeText: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: "#C34D9C",
   },
 
   blockedText: {

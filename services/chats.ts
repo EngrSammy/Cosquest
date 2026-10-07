@@ -2,7 +2,7 @@ import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
 
-export type ChatType = "community" | "faction" | "dm";
+export type ChatType = "community" | "faction" | "dm" | "group";
 
 export type ChatParticipant = {
   id?: string;
@@ -78,6 +78,9 @@ export type ChatMessage = {
 
   forwarded?: boolean;
 
+  // A group admin deleted it.
+  deletedByAdmin?: boolean;
+
   // @ mentions: the user ids tagged, or everyone in the chat.
   mentions?: string[];
   mentionsEveryone?: boolean;
@@ -113,6 +116,20 @@ export type Chat = {
   pinnedMessage?: (Partial<ChatMessage> & { id: string }) | null;
 
   otherParticipant?: ChatParticipant | null;
+
+  // User-created groups (type "group").
+  group?: {
+    kind?: "faction" | "open" | "private";
+    description?: string;
+    photoUrl?: string | null;
+    myRole?: "owner" | "admin" | "member";
+    muted?: boolean;
+    mutedUntil?: string | null;
+    // Phase 3: muted by an admin (can read, not send), and slow mode.
+    mutedByAdminUntil?: string | null;
+    slowModeSeconds?: number;
+    nextSendAt?: string | null;
+  };
 
   participants?: ChatParticipant[];
 

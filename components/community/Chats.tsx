@@ -18,10 +18,12 @@ import {
 import { AVATARS } from "@/constants/avatars";
 import { FACTIONS } from "@/constants/factions";
 import { FONTS } from "@/constants/fonts";
+import { GroupAvatar } from "@/components/groups/GroupUi";
 import { apiRequest } from "@/services/api";
 import { FollowUser } from "@/services/follow";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
+import { getSocket } from "@/services/socket";
 import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
 
 // ==========================================
@@ -95,7 +97,14 @@ const GLASS_BG = "rgba(255,255,255,0.1)";
 
 type ChatItem = {
   id: string;
-  type: "community" | "faction" | "dm";
+  type: "community" | "faction" | "dm" | "group";
+  // User-created groups.
+  group?: {
+    kind?: "faction" | "open" | "private";
+    photoUrl?: string | null;
+    muted?: boolean;
+    myRole?: string;
+  };
   title?: string;
   factionKey?: string;
   memberCount?: number;
@@ -311,6 +320,27 @@ export function Chats() {
     dispatch(fetchChats(token));
   }, [token, dispatch]);
 
+  // Groups: removed / banned, or a group changed -> refresh the list.
+  useEffect(() => {
+    const socket = getSocket();
+
+    if (!socket || !token) {
+      return;
+    }
+
+    const refresh = () => {
+      dispatch(fetchChats(token));
+    };
+
+    socket.on("group:removed", refresh);
+    socket.on("group:updated", refresh);
+
+    return () => {
+      socket.off("group:removed", refresh);
+      socket.off("group:updated", refresh);
+    };
+  }, [token, dispatch]);
+
   // Keep the "people you follow" list fresh so the Direct Message row has
   // something to show as soon as this screen mounts, not just right after
   // tapping Follow.
@@ -330,6 +360,24 @@ export function Chats() {
   const groupChats = conversations.filter(
     (chat) => chat.type === "community" || chat.type === "faction",
   );
+
+  // User-created groups, most recent activity first.
+  const myGroups = useMemo(() => {
+    return conversations
+      .filter((chat) => chat.type === "group")
+      .slice()
+      .sort((a, b) => {
+        const aTime = a.lastMessage?.createdAt
+          ? new Date(a.lastMessage.createdAt).getTime()
+          : 0;
+
+        const bTime = b.lastMessage?.createdAt
+          ? new Date(b.lastMessage.createdAt).getTime()
+          : 0;
+
+        return bTime - aTime;
+      });
+  }, [conversations]);
 
   // Real DM threads, most recent activity first.
   const dmConversations = useMemo(() => {
@@ -739,6 +787,95 @@ export function Chats() {
                 <Text style={styles.members}>
                   {chat.memberCount || 0} Members
                 </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {/* =========================
+          GROUPS (user-created)
+      ========================== */}
+
+      <View style={styles.groupsHeader}>
+        <Text style={[styles.section, styles.groupsTitle]}>Groups</Text>
+
+        <View style={styles.groupsActions}>
+          <Pressable
+            onPress={() => router.push("/group/discover")}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Discover groups">
+            <Text style={styles.discoverText}>Discover</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.newGroupPill}
+            onPress={() => router.push("/group/new")}
+            accessibilityRole="button"
+            accessibilityLabel="New group">
+            <Ionicons name="add" size={15} color="#FFFFFF" />
+            <Text style={styles.newGroupText}>New</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {myGroups.length === 0 ? (
+        <Pressable
+          style={styles.groupsEmpty}
+          onPress={() => router.push("/group/new")}>
+          <Ionicons name="people-outline" size={22} color={COLORS.brand} />
+          <Text style={styles.groupsEmptyText}>
+            Create a group for your friends, team or local faction meetup.
+          </Text>
+        </Pressable>
+      ) : (
+        <View style={styles.groupList}>
+          {myGroups.map((chat) => {
+            const unread = chat.unreadCount || 0;
+
+            return (
+              <Pressable
+                key={chat.id}
+                style={styles.groupRow}
+                onPress={() => openChat(chat.id)}>
+                <GroupAvatar
+                  name={chat.title}
+                  photoUrl={chat.group?.photoUrl}
+                  size={48}
+                />
+
+                <View style={styles.groupText}>
+                  <View style={styles.groupNameRow}>
+                    <Text style={styles.groupName} numberOfLines={1}>
+                      {chat.title || "Group"}
+                    </Text>
+
+                    {chat.group?.muted ? (
+                      <Ionicons
+                        name="notifications-off-outline"
+                        size={13}
+                        color={COLORS.graphiteSoft}
+                      />
+                    ) : null}
+                  </View>
+
+                  <Text style={styles.groupLast} numberOfLines={1}>
+                    {getLastMessage(chat)}
+                  </Text>
+                </View>
+
+                {unread > 0 ? (
+                  <View
+                    style={[
+                      styles.groupUnread,
+                      chat.group?.muted && styles.groupUnreadMuted,
+                    ]}>
+                    <Text style={styles.unreadText}>
+                      {unread > 99 ? "99+" : unread}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
             );
           })}
@@ -1303,6 +1440,121 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 10,
     color: "#FFFFFF",
+  },
+
+  /* GROUPS (user-created) */
+
+  groupsHeader: {
+    marginTop: 26,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  groupsTitle: {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+
+  groupsActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  discoverText: {
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: COLORS.brand,
+  },
+
+  newGroupPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#C34D9C",
+  },
+
+  newGroupText: {
+    fontFamily: FONTS.semibold,
+    fontSize: 12.5,
+    color: "#FFFFFF",
+  },
+
+  groupsEmpty: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: CARD_BG,
+  },
+
+  groupsEmptyText: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.graphite,
+  },
+
+  groupList: {
+    marginTop: 10,
+    gap: 10,
+  },
+
+  groupRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: CARD_BG,
+  },
+
+  groupText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  groupNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  groupName: {
+    flexShrink: 1,
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    color: COLORS.ink,
+  },
+
+  groupLast: {
+    marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.graphiteSoft,
+  },
+
+  groupUnread: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.brand,
+  },
+
+  groupUnreadMuted: {
+    backgroundColor: "#A9A9B2",
   },
 
   /* SEARCH DIRECT MESSAGES

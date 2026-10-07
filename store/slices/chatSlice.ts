@@ -392,9 +392,10 @@ const chatSlice = createSlice({
       action: PayloadAction<{
         conversationId: string;
         messageId: string;
+        byAdmin?: boolean;
       }>,
     ) {
-      const { conversationId, messageId } = action.payload;
+      const { conversationId, messageId, byAdmin } = action.payload;
 
       const messages = state.messages[conversationId];
 
@@ -410,7 +411,11 @@ const chatSlice = createSlice({
 
           deleted: true,
 
-          content: "This message was deleted.",
+          deletedByAdmin: !!byAdmin,
+
+          content: byAdmin
+            ? "This message was deleted by an admin."
+            : "This message was deleted.",
 
           media: null,
 
