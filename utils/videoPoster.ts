@@ -1,4 +1,4 @@
-﻿// Cloudinary can give the first frame of any video as a picture, just by
+// Cloudinary can give the first frame of any video as a picture, just by
 // changing its link:
 //   .../video/upload/v123/cosquest/clip.mp4
 //   .../video/upload/so_0,w_720,c_limit/v123/cosquest/clip.jpg

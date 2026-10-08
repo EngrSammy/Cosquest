@@ -28,7 +28,7 @@ export function Feeds() {
   const token = useAppSelector((state) => state.auth.token);
 
   // Re-render every 30s so "2m" / "1h" times stay current.
-  const [clock, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(() => Date.now());
 
   useEffect(() => {
     const timer = setInterval(() => {

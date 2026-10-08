@@ -1088,7 +1088,7 @@ export default function GroupInfo() {
                 return (
                   <View style={styles.rows}>
                     <Text style={styles.sheetHint}>
-                      They can still read, but can't send messages for:
+                      They can still read, but can&apos;t send messages for:
                     </Text>
                     <GroupRow
                       icon="time-outline"

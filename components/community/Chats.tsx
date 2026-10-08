@@ -1093,7 +1093,7 @@ export function Chats() {
                   color={COLORS.danger}
                 />
 
-                <Text style={styles.modalErrorTitle}>Couldn't load people</Text>
+                <Text style={styles.modalErrorTitle}>Couldn&apos;t load people</Text>
 
                 <Text style={styles.modalErrorText}>{peopleError}</Text>
 

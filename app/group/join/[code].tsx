@@ -154,7 +154,7 @@ export default function GroupInvite() {
               photoUrl={preview.photoUrl}
               size={120}
             />
-            <Text style={styles.invited}>You're invited to join</Text>
+            <Text style={styles.invited}>You&apos;re invited to join</Text>
             <Text style={styles.name}>{preview.name}</Text>
             <Text style={styles.meta}>
               {KIND_LABEL[preview.kind]} · {preview.memberCount}{" "}

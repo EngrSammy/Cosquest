@@ -1,4 +1,4 @@
-﻿// WEB ONLY - stand-in for react-native-maps, which doesn't work in a
+// WEB ONLY - stand-in for react-native-maps, which doesn't work in a
 // browser. metro.config.js swaps this in for the website; phones keep the
 // real map. Shows a small note where the map would be, so the rest of the
 // screen (e.g. Contact Options) still works.

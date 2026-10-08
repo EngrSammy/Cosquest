@@ -87,7 +87,7 @@ export default function GoogleOAuthReturn() {
       <View style={styles.center}>
         {error ? (
           <>
-            <Text style={styles.title}>Google sign-in didn't work</Text>
+            <Text style={styles.title}>Google sign-in didn&apos;t work</Text>
 
             <Text style={styles.text}>{error}</Text>
 

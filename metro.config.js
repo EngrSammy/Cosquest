@@ -1,4 +1,4 @@
-﻿// Metro = the tool that bundles the app's code.
+// Metro = the tool that bundles the app's code.
 //
 // WEB STUBS: some packages only work on phones (they crash a browser).
 // When bundling for the WEBSITE, Metro swaps them for a simple stand-in

@@ -1,4 +1,4 @@
-﻿// Shows a video's FIRST FRAME as a still picture (instead of a black box).
+// Shows a video's FIRST FRAME as a still picture (instead of a black box).
 //   1. Cloudinary video      -> Cloudinary's first-frame picture
 //   2. Website, local video  -> the browser draws the first frame
 //   3. Phone, local video    -> expo-video-thumbnails makes the frame
