@@ -1,6 +1,9 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
+import type { PollSummary } from "./polls";
+import type { Rank } from "./ranks";
+import type { MessageSparkTag } from "./sparks";
 
 export type ChatType = "community" | "faction" | "dm" | "group";
 
@@ -19,6 +22,8 @@ export type ChatParticipant = {
   // chat:read socket event — used to color a sent message's checkmark
   // pink once its createdAt falls at or before this timestamp.
   lastReadAt?: string | null;
+  // Faction rank (badge beside the name).
+  rank?: Rank | null;
 };
 
 export type MessageReaction = {
@@ -80,6 +85,15 @@ export type ChatMessage = {
 
   // A group admin deleted it.
   deletedByAdmin?: boolean;
+
+  // kind "poll": the question, options and results.
+  poll?: PollSummary | null;
+
+  // Groups: "owner" / "admin" badge for the sender (null otherwise).
+  senderGroupRole?: "owner" | "admin" | null;
+
+  // Sparks: the sub-conversation this message is part of.
+  spark?: MessageSparkTag | null;
 
   // @ mentions: the user ids tagged, or everyone in the chat.
   mentions?: string[];

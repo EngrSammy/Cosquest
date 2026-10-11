@@ -14,64 +14,65 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      Modal,
-      Pressable,
-      ScrollView,
-      Share,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { RankBadge } from "@/components/chat/RankBadge";
 import {
-      GroupAvatar,
-      GroupRow,
-      GroupScreen,
-      INK,
-      MILKY,
-      MUTED,
-      OptionSelector,
-      PINK,
-      SectionLabel,
-      groupStyles,
+  GroupAvatar,
+  GroupRow,
+  GroupScreen,
+  INK,
+  MILKY,
+  MUTED,
+  OptionSelector,
+  PINK,
+  SectionLabel,
+  groupStyles,
 } from "@/components/groups/GroupUi";
 import PeoplePicker, { personKey } from "@/components/groups/PeoplePicker";
 import { FONTS } from "@/constants/fonts";
 import { userIdFromToken } from "@/services/calls";
 import {
-      SKIP_REASON_TEXT,
-      SLOW_MODE_OPTIONS,
-      addGroupMembers,
-      answerJoinRequest,
-      banMember,
-      canActOn,
-      getBans,
-      getGroup,
-      getGroupMembers,
-      getJoinRequests,
-      inviteLinkFor,
-      joinGroup,
-      leaveGroup,
-      muteGroup,
-      muteMember,
-      mutedUntilText,
-      removeMember,
-      resetInviteLink,
-      setMemberRole,
-      unbanMember,
-      unmuteMember,
-      updateGroup,
-      type Group,
-      type GroupBanEntry,
-      type GroupMember,
-      type GroupPerson,
-      type GroupPreview,
-      type JoinRequest,
-      type MemberMuteDuration,
+  SKIP_REASON_TEXT,
+  SLOW_MODE_OPTIONS,
+  addGroupMembers,
+  answerJoinRequest,
+  banMember,
+  canActOn,
+  getBans,
+  getGroup,
+  getGroupMembers,
+  getJoinRequests,
+  inviteLinkFor,
+  joinGroup,
+  leaveGroup,
+  muteGroup,
+  muteMember,
+  mutedUntilText,
+  removeMember,
+  resetInviteLink,
+  setMemberRole,
+  unbanMember,
+  unmuteMember,
+  updateGroup,
+  type Group,
+  type GroupBanEntry,
+  type GroupMember,
+  type GroupPerson,
+  type GroupPreview,
+  type JoinRequest,
+  type MemberMuteDuration,
 } from "@/services/groups";
 import { getSocket } from "@/services/socket";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -777,11 +778,16 @@ export default function GroupInfo() {
                   contentFit="cover"
                 />
                 <View style={styles.memberText}>
-                  <Text style={styles.memberName} numberOfLines={1}>
-                    {member.id === myUserId
-                      ? "You"
-                      : member.name || member.username}
-                  </Text>
+                  <View style={styles.memberNameRow}>
+                    <Text
+                      style={[styles.memberName, styles.memberNameShrink]}
+                      numberOfLines={1}>
+                      {member.id === myUserId
+                        ? "You"
+                        : member.name || member.username}
+                    </Text>
+                    <RankBadge rank={member.rank} />
+                  </View>
                   <Text style={styles.memberUsername} numberOfLines={1}>
                     @{member.username}
                     {member.mutedUntil
@@ -1460,6 +1466,10 @@ const styles = StyleSheet.create({
   memberText: { flex: 1, minWidth: 0 },
 
   memberName: { fontFamily: FONTS.semibold, fontSize: 14.5, color: INK },
+
+  memberNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  memberNameShrink: { flexShrink: 1 },
 
   memberUsername: {
     marginTop: 1,

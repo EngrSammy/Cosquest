@@ -9,6 +9,8 @@ import { fetchFactionMembers } from "@/store/thunks/factionThunks";
 import { fetchFollowers, fetchFollowing } from "@/store/thunks/followThunks";
 import { fetchPosts } from "@/store/thunks/postThunks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
+import { RankBadge } from "@/components/chat/RankBadge";
+import { nextRankFor, useRanks, type Rank } from "@/services/ranks";
 
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -40,12 +42,13 @@ const PURPLE = "#7E2167";
 // How many faction member avatars to show before the "+N" pill.
 const FACTION_MEMBER_PREVIEW_LIMIT = 4;
 
-// There's no rank / faction-XP field on the backend yet, so these stay
-// placeholder values until a real endpoint exists.
-const FACTION_RANK_PREVIEW = {
-  rank: "Lieutenant",
-  xp: 7840,
-  nextRankXp: 10000,
+// Faction rank on the card: the real rank (from points, or set by hand),
+// and progress to the next one (GET /api/ranks has the point levels).
+type FactionRankInfo = {
+  rank: Rank | null;
+  points: number;
+  nextName: string | null;
+  nextPoints: number | null;
 };
 
 // 12400 -> "12.4k", 1200000 -> "1.2m"
@@ -150,16 +153,18 @@ function FactionProfileCard({
   memberCount,
   memberCountLoading,
   previewMembers,
+  rankInfo,
 }: {
   faction: (typeof FACTIONS)[number];
   memberCount: number | undefined;
   memberCountLoading: boolean;
   previewMembers: FactionMemberPreview[];
+  rankInfo: FactionRankInfo;
 }) {
-  const progress =
-    FACTION_RANK_PREVIEW.nextRankXp > 0
-      ? Math.min(FACTION_RANK_PREVIEW.xp / FACTION_RANK_PREVIEW.nextRankXp, 1)
-      : 0;
+  // Full bar at the top rank (or a rank set by hand).
+  const progress = rankInfo.nextPoints
+    ? Math.min(rankInfo.points / rankInfo.nextPoints, 1)
+    : 1;
 
   const extraMembers = Math.max(0, (memberCount ?? 0) - previewMembers.length);
 
@@ -194,7 +199,13 @@ function FactionProfileCard({
             contentPosition="left"
           />
 
-          <Text style={styles.factionRank}>{FACTION_RANK_PREVIEW.rank}</Text>
+          {rankInfo.rank ? (
+            <View style={{ marginTop: 4, alignSelf: "flex-start" }}>
+              <RankBadge rank={rankInfo.rank} size="md" showName />
+            </View>
+          ) : (
+            <Text style={styles.factionRank}>Private</Text>
+          )}
         </View>
 
         <View style={styles.memberCountPill}>
@@ -228,11 +239,14 @@ function FactionProfileCard({
       </View>
 
       <View style={styles.xpHeader}>
-        <Text style={styles.factionSmallLabel}>User XP</Text>
+        <Text style={styles.factionSmallLabel}>
+          {rankInfo.nextName ? `Points to ${rankInfo.nextName}` : "Points"}
+        </Text>
 
         <Text style={styles.xpValue}>
-          {FACTION_RANK_PREVIEW.xp.toLocaleString()} /{" "}
-          {FACTION_RANK_PREVIEW.nextRankXp.toLocaleString()}
+          {rankInfo.nextPoints
+            ? `${rankInfo.points.toLocaleString()} / ${rankInfo.nextPoints.toLocaleString()}`
+            : `${rankInfo.points.toLocaleString()} · ${rankInfo.rank?.overridden ? "Set by an orchestrator" : "Top rank"}`}
         </Text>
       </View>
 
@@ -495,7 +509,18 @@ export default function Profile() {
 
   const quests = 0;
   const wins = 0;
-  const points = 0;
+  // Real points and faction rank (from GET /api/users/me).
+  const points =
+    Number((user as any)?.pointsBalance ?? (authUser as any)?.pointsBalance ?? 0) || 0;
+  const ranks = useRanks();
+  const myRank: Rank | null = (user as any)?.rank || (authUser as any)?.rank || null;
+  const nextRank = nextRankFor(myRank, ranks);
+  const factionRankInfo: FactionRankInfo = {
+    rank: myRank,
+    points,
+    nextName: nextRank?.name || null,
+    nextPoints: nextRank?.minPoints ?? null,
+  };
 
   async function handleShareProfile() {
     try {
@@ -693,6 +718,7 @@ export default function Profile() {
               memberCount={factionMembersState?.pagination.total}
               memberCountLoading={factionMembersLoading && !factionMembersState}
               previewMembers={factionMembersState?.users || []}
+              rankInfo={factionRankInfo}
             />
           </View>
         ) : null}

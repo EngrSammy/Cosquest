@@ -130,6 +130,10 @@ function getPreview(message: ChatMessage): string {
     return "📎 Document";
   }
 
+  if (message.kind === "poll") {
+    return `📊 ${message.content || "Poll"}`;
+  }
+
   // Call entry. A moment later the backend's chat:preview refresh replaces
   // this with the exact wording for this person ("Missed voice call", etc.).
   if (message.kind === "call") {
@@ -460,6 +464,71 @@ const chatSlice = createSlice({
       }
 
       message.reactions = reactions || [];
+    },
+
+    // ======================================
+    // SOCKET — POLL RESULTS (someone voted / the poll closed)
+    // Live updates leave out myVotes (each app keeps its own picks).
+    // ======================================
+
+    socketPollUpdated(
+      state,
+      action: PayloadAction<{
+        conversationId: string;
+        messageId: string;
+        poll: NonNullable<ChatMessage["poll"]>;
+      }>,
+    ) {
+      const { conversationId, messageId, poll } = action.payload;
+
+      const message = state.messages[conversationId]?.find(
+        (item) => item.id === messageId,
+      );
+
+      if (!message || !poll) {
+        return;
+      }
+
+      const previous = message.poll;
+
+      message.poll = {
+        ...previous,
+        ...poll,
+        myVotes: poll.myVotes ?? previous?.myVotes ?? [],
+      };
+    },
+
+    // ======================================
+    // SOCKET — SPARK TAGS
+    // messageIds given: tag them into the Spark. No messageIds: the Spark
+    // was deleted, so untag every message that was in it.
+    // ======================================
+
+    socketSparkMessages(
+      state,
+      action: PayloadAction<{
+        conversationId: string;
+        sparkId: string;
+        era?: number;
+        messageIds?: string[];
+      }>,
+    ) {
+      const { conversationId, sparkId, era, messageIds } = action.payload;
+      const messages = state.messages[conversationId];
+
+      if (!messages) {
+        return;
+      }
+
+      for (const message of messages) {
+        if (messageIds) {
+          if (messageIds.includes(message.id)) {
+            message.spark = { ...(message.spark || {}), id: sparkId, era: era ?? 0 };
+          }
+        } else if (message.spark?.id === sparkId) {
+          message.spark = null;
+        }
+      }
     },
 
     // ======================================
@@ -1083,6 +1152,8 @@ export const {
   socketMessageReaction,
   socketChatPinned,
   socketChatRead,
+  socketPollUpdated,
+  socketSparkMessages,
   socketPresenceChanged,
   socketTypingStarted,
   socketTypingStopped,

@@ -1,6 +1,7 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
+import type { Rank } from "./ranks";
 
 // ==========================================
 // GROUPS (user-created group chats)
@@ -20,6 +21,8 @@ export type GroupPerson = {
   avatarKey?: string | null;
   avatarPhotoUrl?: string | null;
   faction?: string | null;
+  // Faction rank (badge beside the name).
+  rank?: Rank | null;
 };
 
 // mutedUntil: muted by an admin until then (shown to admins).

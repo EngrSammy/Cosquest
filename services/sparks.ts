@@ -1,0 +1,141 @@
+﻿import { apiRequest } from "./api";
+
+// ==========================================
+// SPARKS (sub-conversations surfaced from a group chat)
+// ==========================================
+
+export type Spark = {
+  id: string;
+  conversationId: string;
+  subject: string;
+  summary: string;
+  summarizedByAi: boolean;
+  keywords: string[];
+  // Pulsing circle while active; quiet card otherwise. Pinned never fades.
+  active: boolean;
+  pinned: boolean;
+  // Has a past (revived): pulses in a different colour.
+  revived: boolean;
+  eras: { index: number; startedAt: string }[];
+  messageCount: number;
+  participantCount: number;
+  createdBy: string | null;
+  startedByBot: boolean;
+  lastActivityAt: string;
+  createdAt: string;
+};
+
+export type SparkSeam = { beforeMessageId: string; label: string };
+
+// Tag on a chat message.
+export type MessageSparkTag = { id: string; era: number; postedInSpark?: boolean };
+
+// ---------- colours ----------
+// Past -> present on a gradient (spec: "Colors run on a gradient, not two
+// tones"). Era 0 of a revived Spark is the oldest colour; the newest era is
+// pink. New (never revived) Sparks are pink; revived ones pulse purple.
+const PAST = [142, 145, 242]; // #8E91F2
+const PRESENT = [195, 77, 156]; // #C34D9C
+
+export function eraColor(era: number, totalEras: number) {
+  if (totalEras <= 1) return "#C34D9C";
+  const t = Math.min(1, Math.max(0, era / (totalEras - 1)));
+  const mix = PAST.map((from, i) => Math.round(from + (PRESENT[i] - from) * t));
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+}
+
+export function sparkColor(spark: Pick<Spark, "revived">) {
+  return spark.revived ? "#8E91F2" : "#C34D9C";
+}
+
+// ---------- requests ----------
+
+function base(conversationId: string) {
+  return `/api/chats/${encodeURIComponent(conversationId)}/sparks`;
+}
+
+export async function listSparks(conversationId: string, token: string) {
+  const response = await apiRequest<any>(base(conversationId), { token });
+  return { sparks: (response?.sparks || []) as Spark[], canManage: !!response?.canManage };
+}
+
+export async function getSpark(conversationId: string, sparkId: string, token: string) {
+  const response = await apiRequest<any>(`${base(conversationId)}/${encodeURIComponent(sparkId)}`, { token });
+  return {
+    spark: response?.spark as Spark,
+    messages: (response?.messages || []).map((m: any) => ({ ...m, id: String(m?.id ?? m?._id ?? ""), conversationId })),
+    seams: (response?.seams || []) as SparkSeam[],
+    canManage: !!response?.canManage,
+  };
+}
+
+export type StartSparkResult =
+  | { ok: true; spark: Spark }
+  | { ok: false; code: "similar_sparks"; matches: Spark[]; error: string }
+  | { ok: false; code: "already_in_spark"; spark?: Spark; error: string };
+
+// Uses fetch directly so the "similar Sparks" answer (409) keeps its list.
+export async function startSpark(
+  conversationId: string,
+  data: { messageId: string; subject: string; force?: boolean },
+  token: string,
+): Promise<StartSparkResult> {
+  const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+  const response = await fetch(`${BASE_URL}${base(conversationId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  const body = await response.json().catch(() => null);
+
+  if (response.ok) return { ok: true, spark: body?.spark };
+  if (response.status === 409 && body?.code === "similar_sparks") {
+    return { ok: false, code: "similar_sparks", matches: body.matches || [], error: body.error };
+  }
+  if (response.status === 409 && body?.code === "already_in_spark") {
+    return { ok: false, code: "already_in_spark", spark: body.spark, error: body.error };
+  }
+  throw new Error(body?.error || "Couldn't start the Spark.");
+}
+
+export async function addToSpark(conversationId: string, sparkId: string, messageId: string, token: string) {
+  const response = await apiRequest<any>(`${base(conversationId)}/${encodeURIComponent(sparkId)}/messages`, {
+    method: "POST",
+    body: { messageId },
+    token,
+  });
+  return response?.spark as Spark;
+}
+
+export async function pinSpark(conversationId: string, sparkId: string, pinned: boolean, token: string) {
+  const response = await apiRequest<any>(`${base(conversationId)}/${encodeURIComponent(sparkId)}/pin`, {
+    method: "PATCH",
+    body: { pinned },
+    token,
+  });
+  return response?.spark as Spark;
+}
+
+export async function deleteSpark(conversationId: string, sparkId: string, token: string) {
+  return apiRequest(`${base(conversationId)}/${encodeURIComponent(sparkId)}`, { method: "DELETE", token });
+}
+
+export async function mergeSpark(conversationId: string, sparkId: string, intoSparkId: string, token: string) {
+  const response = await apiRequest<any>(`${base(conversationId)}/${encodeURIComponent(sparkId)}/merge`, {
+    method: "POST",
+    body: { intoSparkId },
+    token,
+  });
+  return response?.spark as Spark;
+}
+
+// A reply posted inside a Spark (it also shows in the main chat).
+export async function replyInSpark(conversationId: string, sparkId: string, content: string, token: string) {
+  const response = await apiRequest<any>(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
+    method: "POST",
+    body: { content, sparkId },
+    token,
+  });
+  const message = response?.message ?? response;
+  return { ...message, id: String(message?.id ?? message?._id ?? ""), conversationId };
+}
