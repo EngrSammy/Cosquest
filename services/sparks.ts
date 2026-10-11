@@ -31,21 +31,29 @@ export type SparkSeam = { beforeMessageId: string; label: string };
 export type MessageSparkTag = { id: string; era: number; postedInSpark?: boolean };
 
 // ---------- colours ----------
-// Past -> present on a gradient (spec: "Colors run on a gradient, not two
-// tones"). Era 0 of a revived Spark is the oldest colour; the newest era is
-// pink. New (never revived) Sparks are pink; revived ones pulse purple.
-const PAST = [142, 145, 242]; // #8E91F2
-const PRESENT = [195, 77, 156]; // #C34D9C
+// Figma M07/M09: new Sparks are pink. A revived Spark's history runs on a
+// gradient from purple (past) to teal (today) - "a gradient, not two tones",
+// so a Spark revived many times keeps extending the same scale.
+const PINK = "#B63D91";
+const PAST = [158, 111, 207]; // #9E6FCF
+const TODAY = [42, 138, 146]; // #2A8A92
 
 export function eraColor(era: number, totalEras: number) {
-  if (totalEras <= 1) return "#C34D9C";
+  if (totalEras <= 1) return PINK;
   const t = Math.min(1, Math.max(0, era / (totalEras - 1)));
-  const mix = PAST.map((from, i) => Math.round(from + (PRESENT[i] - from) * t));
+  const mix = PAST.map((from, i) => Math.round(from + (TODAY[i] - from) * t));
   return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 
 export function sparkColor(spark: Pick<Spark, "revived">) {
-  return spark.revived ? "#8E91F2" : "#C34D9C";
+  return spark.revived ? "#2A8A92" : PINK;
+}
+
+// "Nov 2025"
+export function monthYear(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString([], { month: "short", year: "numeric" });
 }
 
 // ---------- requests ----------

@@ -130,6 +130,11 @@ function getPreview(message: ChatMessage): string {
     return "📎 Document";
   }
 
+  if (message.kind === "album") {
+    const count = Array.isArray((message as any).album) ? (message as any).album.length : 0;
+    return count > 1 ? `📷 ${count} photos` : "📷 Photo";
+  }
+
   if (message.kind === "poll") {
     return `📊 ${message.content || "Poll"}`;
   }

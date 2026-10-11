@@ -1,35 +1,40 @@
 ﻿// ==========================================
-// SPARKS RAIL (layout option A: "side rail")
+// SPARKS RAIL (Figma M03 · Option A: side rail) + DORMANT CARD (M08)
 // ==========================================
-// Circles down the right side of the chat: one per active (pulsing) or
-// pinned Spark, with its subject. Revived Sparks pulse in a different
-// colour. "All" opens every Spark, including quiet ones (static cards).
-// (Options B-D - top orbit strip, inline cards, dark mode - would replace
-// only this file; the panel and logic stay the same.)
+// Circles down the right side of the chat for active (pulsing) and pinned
+// Sparks, each with its subject and "3 people"; quiet Sparks as small cards
+// ("Route ideas · Quiet · Open ->"). Revived Sparks are teal with a clock.
+// DormantSparkCard is the card shown in the main chat under a quiet Spark's
+// last message. Built from the screenshots for testing.
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
-import { sparkColor, type Spark } from "@/services/sparks";
+import { type Spark } from "@/services/sparks";
 
-const MAX_CIRCLES = 4;
+const PINK = "#B63D91";
+const TEAL = "#2A8A92";
+const INK = "#24283C";
+const MUTED = "#66738A";
+const LILAC = "#F0EDF9";
 
-function timeAgo(value: string) {
-  const ms = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(1, Math.round(ms / 60000));
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 30) return `${days} d ago`;
-  return new Date(value).toLocaleDateString();
+const MAX_CIRCLES = 3;
+const MAX_QUIET = 2;
+
+function timeOf(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return sameDay
+    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) {
   const pulse = useRef(new Animated.Value(0)).current;
-  const color = sparkColor(spark);
+  const color = spark.revived ? TEAL : PINK;
 
   useEffect(() => {
     if (!spark.active) {
@@ -38,20 +43,13 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 1200, easing: Easing.out(Easing.ease), useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [spark.active, pulse]);
-
-  const initials =
-    spark.subject
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((word) => word[0]?.toUpperCase() || "")
-      .join("") || "⚡";
 
   return (
     <Pressable onPress={onPress} style={styles.circleItem} accessibilityLabel={`Spark: ${spark.subject}`}>
@@ -63,29 +61,39 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
               styles.pulse,
               {
                 borderColor: color,
-                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
-                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }],
+                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
               },
             ]}
           />
         ) : null}
-        <View style={[styles.circle, { backgroundColor: color }, !spark.active && styles.circleQuiet]}>
-          <Text style={styles.circleText}>{initials}</Text>
+        <View style={[styles.circle, spark.revived && styles.circleRevived]}>
+          <Ionicons name={spark.revived ? "time-outline" : "sparkles-outline"} size={24} color={color} />
         </View>
         {spark.pinned ? (
           <View style={styles.pinBadge}>
             <Ionicons name="pin" size={9} color="#FFFFFF" />
           </View>
         ) : null}
-        {spark.revived ? (
-          <View style={[styles.pinBadge, styles.revivedBadge]}>
-            <Ionicons name="time" size={9} color="#FFFFFF" />
-          </View>
-        ) : null}
       </View>
       <Text style={styles.circleLabel} numberOfLines={2}>
         {spark.subject}
       </Text>
+      <Text style={[styles.circlePeople, { color }]}>
+        {spark.participantCount} {spark.participantCount === 1 ? "person" : "people"}
+      </Text>
+    </Pressable>
+  );
+}
+
+function QuietCard({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.quietCard} accessibilityLabel={`Quiet Spark: ${spark.subject}`}>
+      <Text style={styles.quietTitle} numberOfLines={2}>
+        {spark.subject}
+      </Text>
+      <Text style={styles.quietState}>Quiet</Text>
+      <Text style={styles.quietOpen}>Open →</Text>
     </Pressable>
   );
 }
@@ -102,27 +110,61 @@ export default function SparksRail({
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
 }) {
-  const shown = sparks.filter((spark) => spark.active || spark.pinned).slice(0, MAX_CIRCLES);
-
   if (!sparks.length) {
     return null;
   }
 
+  const circles = sparks.filter((spark) => spark.active || spark.pinned).slice(0, MAX_CIRCLES);
+  const quiet = sparks.filter((spark) => !spark.active && !spark.pinned).slice(0, MAX_QUIET);
+  const hidden = sparks.length - circles.length - quiet.length;
+
   return (
     <View style={[styles.rail, { top }]} pointerEvents="box-none">
-      {shown.map((spark) => (
+      {circles.map((spark) => (
         <SparkCircle key={spark.id} spark={spark} onPress={() => onOpen(spark)} />
       ))}
 
-      <Pressable onPress={onShowAll} style={styles.allButton} accessibilityLabel="All Sparks">
-        <Ionicons name="flash" size={13} color="#C34D9C" />
-        <Text style={styles.allText}>{sparks.length}</Text>
+      {quiet.map((spark) => (
+        <QuietCard key={spark.id} spark={spark} onPress={() => onOpen(spark)} />
+      ))}
+
+      {hidden > 0 ? (
+        <Pressable onPress={onShowAll} style={styles.allButton} accessibilityLabel="All Sparks">
+          <Text style={styles.allText}>All · {sparks.length}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+// Figma M08: a quiet Spark's card in the main chat, under its last message.
+export function DormantSparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spark: Spark) => void }) {
+  return (
+    <View style={styles.dormant}>
+      <View style={styles.dormantHead}>
+        <Ionicons name="time-outline" size={22} color={MUTED} />
+        <Text style={styles.dormantTitle} numberOfLines={2}>
+          {spark.subject}
+        </Text>
+        {spark.pinned ? <Ionicons name="pin" size={14} color={PINK} /> : null}
+      </View>
+      <Text style={styles.dormantMeta}>
+        Quiet · last reply {timeOf(spark.lastActivityAt)} · {spark.messageCount}{" "}
+        {spark.messageCount === 1 ? "message" : "messages"}
+      </Text>
+      {spark.summary ? (
+        <Text style={styles.dormantSummary} numberOfLines={3}>
+          {spark.summary}
+        </Text>
+      ) : null}
+      <Pressable style={({ pressed }) => [styles.dormantButton, pressed && styles.pressed]} onPress={() => onOpen(spark)}>
+        <Text style={styles.dormantButtonText}>Open conversation</Text>
       </Pressable>
     </View>
   );
 }
 
-// Every Spark: active (pulsing), pinned, and quiet ones as static cards.
+// Every Spark: active, pinned, and quiet ones.
 export function SparksListSheet({
   visible,
   sparks,
@@ -142,32 +184,40 @@ export function SparksListSheet({
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 14 }]}>
         <View style={styles.handle} />
         <View style={styles.sheetHeader}>
-          <Ionicons name="flash" size={18} color="#C34D9C" />
-          <Text style={styles.sheetTitle}>Sparks</Text>
+          <Text style={styles.sheetTitle}>Sparks in this chat</Text>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+            <Ionicons name="close" size={22} color={INK} />
+          </Pressable>
         </View>
-        <Text style={styles.sheetHint}>Sub-conversations the Sparks bot found in this chat (or members started).</Text>
+        <Text style={styles.sheetHint}>Sparks appear when the conversation needs them. Start one from any message.</Text>
 
         <ScrollView style={styles.list}>
           {sparks.length === 0 ? <Text style={styles.empty}>No Sparks yet.</Text> : null}
           {sparks.map((spark) => (
             <Pressable key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
-              <View style={[styles.cardDot, { backgroundColor: sparkColor(spark) }, spark.active && styles.cardDotActive]} />
+              <View style={[styles.cardIcon, spark.revived && styles.circleRevived]}>
+                <Ionicons
+                  name={spark.active ? "sparkles-outline" : "time-outline"}
+                  size={18}
+                  color={spark.revived ? TEAL : PINK}
+                />
+              </View>
               <View style={styles.cardText}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {spark.subject}
                   </Text>
-                  {spark.pinned ? <Ionicons name="pin" size={12} color="#C34D9C" /> : null}
+                  {spark.pinned ? <Ionicons name="pin" size={12} color={PINK} /> : null}
                 </View>
+                <Text style={styles.cardMeta}>
+                  {spark.active ? `Active · ${spark.participantCount} people` : `Quiet · ${timeOf(spark.lastActivityAt)}`} ·{" "}
+                  {spark.messageCount} messages{spark.revived ? " · revived" : ""}
+                </Text>
                 {spark.summary ? (
                   <Text style={styles.cardSummary} numberOfLines={2}>
                     {spark.summary}
                   </Text>
                 ) : null}
-                <Text style={styles.cardMeta}>
-                  {spark.active ? "Active now" : `Quiet · ${timeAgo(spark.lastActivityAt)}`} · {spark.messageCount} messages
-                  {spark.revived ? " · revived" : ""}
-                </Text>
               </View>
             </Pressable>
           ))}
@@ -178,85 +228,105 @@ export function SparksListSheet({
 }
 
 const styles = StyleSheet.create({
-  rail: { position: "absolute", right: 8, alignItems: "center", gap: 10, zIndex: 5 },
+  pressed: { opacity: 0.75 },
 
-  circleItem: { width: 62, alignItems: "center" },
+  // RAIL
+  rail: { position: "absolute", right: 8, width: 82, alignItems: "center", gap: 14, zIndex: 5 },
 
-  circleWrap: { width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  circleItem: { width: 82, alignItems: "center" },
 
-  pulse: { position: "absolute", width: 46, height: 46, borderRadius: 23, borderWidth: 3 },
+  circleWrap: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+
+  pulse: { position: "absolute", width: 56, height: 56, borderRadius: 28, borderWidth: 3 },
 
   circle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    shadowColor: "#000000",
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    backgroundColor: "#F3DDED",
+    borderWidth: 3,
+    borderColor: "rgba(182,61,145,0.16)",
   },
 
-  circleQuiet: { opacity: 0.75 },
-
-  circleText: { fontFamily: FONTS.bold, fontSize: 14, color: "#FFFFFF" },
+  circleRevived: { backgroundColor: "#DDEFF2", borderColor: "rgba(42,138,146,0.18)" },
 
   pinBadge: {
     position: "absolute",
-    top: -2,
-    right: -2,
-    width: 17,
-    height: 17,
+    top: 0,
+    right: 2,
+    width: 18,
+    height: 18,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#191922",
+    backgroundColor: INK,
     borderWidth: 1.5,
     borderColor: "#FFFFFF",
   },
 
-  revivedBadge: { top: undefined, bottom: -2, backgroundColor: "#8E91F2" },
-
   circleLabel: {
-    marginTop: 3,
-    maxWidth: 62,
+    marginTop: 6,
     textAlign: "center",
-    fontFamily: FONTS.medium,
-    fontSize: 9.5,
-    lineHeight: 12,
-    color: "#3B3B42",
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 6,
-    paddingHorizontal: 3,
-    overflow: "hidden",
+    fontFamily: FONTS.semibold,
+    fontSize: 12,
+    lineHeight: 16,
+    color: INK,
   },
 
-  allButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 9,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.85)",
+  circlePeople: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 11, lineHeight: 14 },
+
+  quietCard: { width: 76, padding: 10, borderRadius: 14, backgroundColor: LILAC },
+
+  quietTitle: { fontFamily: FONTS.semibold, fontSize: 12, lineHeight: 16, color: INK },
+
+  quietState: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 11, color: MUTED },
+
+  quietOpen: { marginTop: 6, fontFamily: FONTS.medium, fontSize: 12, color: PINK },
+
+  allButton: { paddingHorizontal: 10, height: 26, borderRadius: 13, justifyContent: "center", backgroundColor: LILAC },
+
+  allText: { fontFamily: FONTS.medium, fontSize: 11.5, color: PINK },
+
+  // DORMANT CARD (M08)
+  dormant: {
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "rgba(195,77,156,0.35)",
+    borderColor: "rgba(182,61,145,0.18)",
   },
 
-  allText: { fontFamily: FONTS.semibold, fontSize: 11.5, color: "#C34D9C" },
+  dormantHead: { flexDirection: "row", alignItems: "center", gap: 10 },
 
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
+  dormantTitle: { flex: 1, fontFamily: FONTS.semibold, fontSize: 17, lineHeight: 22, color: INK },
+
+  dormantMeta: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: MUTED },
+
+  dormantSummary: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: INK },
+
+  dormantButton: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: LILAC,
+  },
+
+  dormantButtonText: { fontFamily: FONTS.semibold, fontSize: 15, color: PINK },
+
+  // LIST SHEET
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
 
   sheet: {
     maxHeight: "80%",
     width: "100%",
     maxWidth: 640,
     alignSelf: "center",
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingTop: 10,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -265,38 +335,43 @@ const styles = StyleSheet.create({
 
   handle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "#D5D5DA", marginBottom: 10 },
 
-  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 
-  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 18, color: "#191922" },
+  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 20, color: INK },
 
-  sheetHint: { marginTop: 2, marginBottom: 10, fontFamily: FONTS.regular, fontSize: 12, color: "#7A7A84" },
+  sheetHint: { marginTop: 4, marginBottom: 12, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: MUTED },
 
   list: { maxHeight: 520 },
 
-  empty: { paddingVertical: 24, textAlign: "center", fontFamily: FONTS.regular, fontSize: 13, color: "#7A7A84" },
+  empty: { paddingVertical: 24, textAlign: "center", fontFamily: FONTS.regular, fontSize: 13, color: MUTED },
 
   card: {
     flexDirection: "row",
     gap: 12,
-    padding: 12,
+    padding: 14,
     marginBottom: 10,
-    borderRadius: 14,
-    backgroundColor: "#0000000D",
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.75)",
+    borderColor: "rgba(36,40,60,0.08)",
   },
 
-  cardDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4, opacity: 0.6 },
-
-  cardDotActive: { opacity: 1 },
+  cardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3DDED",
+  },
 
   cardText: { flex: 1, minWidth: 0 },
 
   cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  cardTitle: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 14.5, color: "#191922" },
+  cardTitle: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 15, color: INK },
 
-  cardSummary: { marginTop: 3, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 17, color: "#4A4A52" },
+  cardMeta: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
 
-  cardMeta: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 11, color: "#7A7A84" },
+  cardSummary: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 13, lineHeight: 18, color: INK },
 });

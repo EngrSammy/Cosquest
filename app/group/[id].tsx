@@ -96,7 +96,7 @@ function errorText(error: unknown, fallback: string) {
 export default function GroupInfo() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, manage } = useLocalSearchParams<{ id: string; manage?: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
 
   const token = useAppSelector((state) => state.auth.token);
@@ -637,11 +637,19 @@ export default function GroupInfo() {
       title="Group info"
       onBack={() => safeBack()}
       right={
-        g.canEdit ? (
-          <Pressable onPress={openEdit} hitSlop={10}>
-            <Text style={styles.editText}>Edit</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          {g.canEdit ? (
+            <Pressable onPress={openEdit} hitSlop={10}>
+              <Text style={styles.editText}>Edit</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => router.push({ pathname: "/group/settings/[id]", params: { id: g.id } })}
+            hitSlop={10}
+            accessibilityLabel="Group settings">
+            <Ionicons name="settings-outline" size={22} color={PINK} />
           </Pressable>
-        ) : null
+        </View>
       }>
       <ScrollView
         contentContainerStyle={[

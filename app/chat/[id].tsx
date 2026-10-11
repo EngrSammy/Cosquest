@@ -92,8 +92,10 @@ import PollCreator from "@/components/chat/PollCreator";
 import { RankBadge, RankLine, RoleBadge } from "@/components/chat/RankBadge";
 import type { Rank } from "@/services/ranks";
 import SparkPanel from "@/components/chat/SparkPanel";
-import SparksRail, { SparksListSheet } from "@/components/chat/SparksRail";
+import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
+import AlbumGrid from "@/components/chat/AlbumGrid";
+import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
 import {
   eraColor,
   listSparks,
@@ -173,6 +175,10 @@ type Message = {
 
   // Sparks: the sub-conversation this message is part of.
   spark?: MessageSparkTag | null;
+
+  // Albums (M17) and the wording "Undo" restores (M15).
+  album?: { kind: "image" | "video"; url?: string; thumbnailUrl?: string | null; duration?: number | null }[] | null;
+  previousContent?: string | null;
 
   editedAt?: string | null;
 
@@ -374,6 +380,13 @@ function avatarTint(name?: string) {
   let hash = 0;
   for (const char of String(name || "")) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return AVATAR_TINTS[hash % AVATAR_TINTS.length];
+}
+
+// Figma M15: show the "Your message" card for 10 minutes after an edit.
+function editedRecently(value?: string | null) {
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return !Number.isNaN(time) && Date.now() - time < 10 * 60 * 1000;
 }
 
 function generateLocalId(prefix: string) {
@@ -1281,6 +1294,9 @@ const Bubble = memo(function Bubble({
             </View>
           ) : null}
 
+          {/* ALBUM (several photos/videos) */}
+          {!msg.deleted && msg.kind === "album" && msg.album?.length ? <AlbumGrid items={msg.album} /> : null}
+
           {/* POLL */}
           {!msg.deleted && msg.kind === "poll" && msg.poll ? (
             <PollBubble
@@ -2021,7 +2037,7 @@ function MenuItem({
         {label}
       </Text>
 
-      <Ionicons name={icon} size={20} color={danger ? "#D64545" : "#C5399A"} />
+      <Ionicons name={icon} size={22} color={danger ? "#C0394B" : "#66738A"} />
     </Pressable>
   );
 }
@@ -2181,6 +2197,7 @@ export default function ChatScreen() {
 
   const [showAttachments, setShowAttachments] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showShareMedia, setShowShareMedia] = useState(false);
 
   // SPARKS (Community, faction rooms, groups)
   const [sparks, setSparks] = useState<Spark[]>([]);
@@ -2484,6 +2501,27 @@ export default function ChatScreen() {
   // re-render every visible Bubble. Memoizing it, together with wrapping
   // Bubble in memo() above, means a bubble only re-renders when something
   // it actually depends on changes.
+  // Figma M08: a quiet Spark shows a card under its latest message.
+  const quietSparkCardAfter = useMemo(() => {
+    const map = new Map<string, Spark>();
+    const seen = new Set<string>();
+
+    // visibleMessages is newest first, so the first hit is the latest.
+    for (const message of visibleMessages) {
+      const sparkId = message.spark?.id;
+      if (!sparkId || seen.has(sparkId)) {
+        continue;
+      }
+      seen.add(sparkId);
+      const spark = sparks.find((item) => item.id === sparkId);
+      if (spark && !spark.active) {
+        map.set(message.id, spark);
+      }
+    }
+
+    return map;
+  }, [visibleMessages, sparks]);
+
   const listExtraData = useMemo(
     () => ({
       selectedIds,
@@ -4722,7 +4760,15 @@ export default function ChatScreen() {
                 onPress={() => setShowChatMenu(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Chat options">
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+                <Pressable
+                  hitSlop={8}
+                  accessibilityLabel="Search in chat"
+                  onPress={() => router.push({ pathname: "/chat/search/[id]", params: { id: conversationId } })}>
+                  <Ionicons name="search-outline" size={22} color="#24283C" />
+                </Pressable>
                 <Ionicons name="ellipsis-horizontal" size={24} color="#24283C" />
+              </View>
               </Pressable>
             </>
           )}
@@ -4776,7 +4822,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            extraData={listExtraData}
+            extraData={[listExtraData, quietSparkCardAfter]}
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -4871,6 +4917,44 @@ export default function ChatScreen() {
                       otherParticipant={conversation?.otherParticipant}
                     />
                   </SwipeToReply>
+
+                  {quietSparkCardAfter.get(item.id) ? (
+                    <DormantSparkCard
+                      spark={quietSparkCardAfter.get(item.id)!}
+                      onOpen={(spark) => setOpenSparkId(spark.id)}
+                    />
+                  ) : null}
+
+                  {/* Figma M15: your edited message - edit again or undo */}
+                  {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
+                    <View style={styles.editCard}>
+                      <Text style={styles.editSection}>YOUR MESSAGE</Text>
+                      <View style={styles.editBox}>
+                        <Text style={styles.editLabel}>Saved text</Text>
+                        <View style={styles.editSaved}>
+                          <Text style={styles.editSavedText}>{item.content}</Text>
+                        </View>
+                        <View style={styles.editNote}>
+                          <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
+                          <Text style={styles.editNoteText}>Your message has been updated.</Text>
+                        </View>
+                        <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
+                          <Text style={styles.editButtonText}>Edit again</Text>
+                        </Pressable>
+                      </View>
+
+                      <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
+                      <View style={styles.editBox}>
+                        <Text style={styles.editHint}>Before your change</Text>
+                        {item.previousContent ? (
+                          <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
+                        ) : null}
+                        <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
+                          <Text style={styles.editButtonText}>Undo · restore previous message</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               );
             }}
@@ -4980,6 +5064,20 @@ export default function ChatScreen() {
       {/* ================================== */}
       {/* COMPOSER */}
       {/* ================================== */}
+
+      {/* Figma M14: who your @ mentions will notify */}
+      {!selectionMode && (mentionPicks.length > 0 || mentionEveryone) ? (
+        <View style={styles.notifyRow}>
+          <Ionicons name="checkmark" size={14} color="#B63D91" />
+          <Text style={styles.notifyText} numberOfLines={1}>
+            {mentionEveryone
+              ? "Everyone in this chat will be notified"
+              : `${mentionPicks
+                  .map((person) => person.name || person.username)
+                  .join(mentionPicks.length === 2 ? " and " : ", ")} will be notified`}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Muted by an admin: no message box, a note instead */}
       {!selectionMode && mutedByAdmin ? (
@@ -5260,8 +5358,15 @@ export default function ChatScreen() {
           <Pressable
             style={styles.menuColumn}
             onPress={(event) => event.stopPropagation()}>
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>Message actions</Text>
+              <Pressable onPress={closeMenu} hitSlop={10} accessibilityLabel="Close">
+                <Ionicons name="close" size={24} color="#66738A" />
+              </Pressable>
+            </View>
+
             {/* QUICK REACTIONS */}
-            <View style={styles.quickReactions}>
+            <View style={[styles.quickReactions, styles.sheetReactions]}>
               {REACTION_EMOJIS.map((emoji) => (
                 <Pressable
                   key={emoji}
@@ -5282,7 +5387,7 @@ export default function ChatScreen() {
             </View>
 
             {/* ACTIONS */}
-            <View style={styles.menuCard}>
+            <View style={[styles.menuCard, styles.sheetCard]}>
               {selectedMessage ? (
                 <View style={styles.menuPreview}>
                   <Text
@@ -5311,7 +5416,7 @@ export default function ChatScreen() {
 
               <MenuItem
                 icon="arrow-undo-outline"
-                label="Reply"
+                label="Reply to quote"
                 onPress={menuTap(
                   () => selectedMessage && startReply(selectedMessage),
                 )}
@@ -5358,8 +5463,8 @@ export default function ChatScreen() {
 
               {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
                 <MenuItem
-                  icon="create-outline"
-                  label="Edit"
+                  icon="pencil-outline"
+                  label="Edit your message"
                   onPress={menuTap(
                     () => selectedMessage && startEditing(selectedMessage),
                   )}
@@ -5389,7 +5494,7 @@ export default function ChatScreen() {
               {groupChat && selectedMessage && !selectedMessage.deleted ? (
                 selectedMessage.spark ? (
                   <MenuItem
-                    icon="flash"
+                    icon="sparkles"
                     label="Open Spark"
                     onPress={menuTap(() => {
                       const sparkId = selectedMessage?.spark?.id;
@@ -5401,7 +5506,7 @@ export default function ChatScreen() {
                   />
                 ) : (
                   <MenuItem
-                    icon="flash-outline"
+                    icon="sparkles-outline"
                     label="Start a Spark"
                     onPress={menuTap(() => {
                       const seed = selectedMessage;
@@ -5432,7 +5537,7 @@ export default function ChatScreen() {
 
               <MenuItem
                 icon="trash-outline"
-                label="Delete"
+                label={selectedMessageIsMine ? "Delete your message" : "Delete"}
                 danger
                 onPress={menuTap(
                   () => selectedMessage && deletePrompt(selectedMessage),
@@ -5818,6 +5923,16 @@ export default function ChatScreen() {
                 label="Poll"
                 onPress={openPollCreator}
               />
+
+              <AttachmentButton
+                icon="images-outline"
+                label="Album"
+                onPress={async () => {
+                  setShowAttachments(false);
+                  await new Promise((resolve) => setTimeout(resolve, 450));
+                  setShowShareMedia(true);
+                }}
+              />
             </View>
           </View>
         </Pressable>
@@ -5916,12 +6031,38 @@ export default function ChatScreen() {
         visible={!!sparkSeed}
         conversationId={conversationId}
         token={token}
-        message={sparkSeed ? { id: sparkSeed.id, content: sparkSeed.content } : null}
+        conversationTitle={(conversation as any)?.title}
+        message={
+          sparkSeed
+            ? {
+                id: sparkSeed.id,
+                content: sparkSeed.content,
+                senderName: (sparkSeed.sender as any)?.name || sparkSeed.sender?.username,
+                rank: sparkSeed.sender?.rank,
+                createdAt: sparkSeed.createdAt,
+              }
+            : null
+        }
         onClose={() => setSparkSeed(null)}
         onDone={(spark) => {
           setSparks((current) => [spark, ...current.filter((item) => item.id !== spark.id)]);
           setTimeout(() => setOpenSparkId(spark.id), 350);
         }}
+      />
+
+      {/* SHARE WITH YOUR GROUP (M17) */}
+      <ShareMediaSheet
+        visible={showShareMedia}
+        conversationId={conversationId}
+        token={token}
+        replyTo={replyingTo?.id || null}
+        onClose={() => setShowShareMedia(false)}
+        onSent={(message) => {
+          dispatch(socketMessageReceived({ conversationId, message }));
+          startSlowTimer();
+          scrollToLatestIfNeeded();
+        }}
+        onVoiceNote={() => showVoiceHint("Hold the mic button to record a voice note")}
       />
 
       {/* POLL CREATOR */}
@@ -6283,7 +6424,7 @@ const styles = StyleSheet.create({
 
   rowGroupContinue: { marginTop: 6 },
 
-  rowWithReactions: { marginBottom: 12 },
+  rowWithReactions: { marginBottom: 0 /* M14 */ },
 
   rowMine: { justifyContent: "flex-end" },
 
@@ -6352,6 +6493,111 @@ const styles = StyleSheet.create({
   mediaPad: { paddingHorizontal: 6 },
 
   captionWrap: { paddingHorizontal: 6, paddingTop: 4, paddingBottom: 2 },
+
+  // Figma M14: "✓ Maya Chen and Diego Ruiz will be notified".
+  notifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    backgroundColor: "#FFFFFF",
+  },
+
+  notifyText: { flexShrink: 1, fontFamily: FONTS.medium, fontSize: 12.5, color: "#B63D91" },
+
+  // Figma M15: "Your message" / "Restore previous wording" card.
+  editCard: { marginTop: 14 },
+
+  editSection: {
+    marginTop: 6,
+    marginBottom: 8,
+    fontFamily: FONTS.semibold,
+    fontSize: 12,
+    letterSpacing: 0.4,
+    color: "#66738A",
+  },
+
+  editBox: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(36,40,60,0.08)",
+  },
+
+  editLabel: { marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 13, color: "#24283C" },
+
+  editSaved: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(102,115,138,0.25)",
+  },
+
+  editSavedText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+
+  editNote: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "#F0EDF9" },
+
+  editNoteTitle: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" },
+
+  editNoteText: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 13, color: "#66738A" },
+
+  editHint: { fontFamily: FONTS.regular, fontSize: 14, color: "#66738A" },
+
+  editPrevious: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+
+  editButton: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0EDF9",
+  },
+
+  editButtonText: { fontFamily: FONTS.semibold, fontSize: 15, color: "#B63D91" },
+
+  // Figma M10: "Message actions" as a white bottom sheet.
+  sheetBackdrop: {
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+    backgroundColor: "rgba(36,40,60,0.35)",
+  },
+
+  sheetColumn: {
+    maxWidth: 640,
+    alignSelf: "center",
+    alignItems: "stretch",
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: "#FFFFFF",
+  },
+
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 22, lineHeight: 28, color: "#24283C" },
+
+  sheetReactions: {
+    alignSelf: "stretch",
+    justifyContent: "space-between",
+    backgroundColor: "#F0EDF9",
+    borderRadius: 28,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+
+  sheetCard: { backgroundColor: "transparent", borderRadius: 0, paddingVertical: 0 },
 
   // Figma M02: name + Owner/Admin, rank line under it (gap 3), then the bubble.
   msgHeader: { gap: 3, marginBottom: 6 },
@@ -6461,18 +6707,21 @@ const styles = StyleSheet.create({
   // REPLY
 
   replyPreview: {
+    // Figma M14: quote inside the bubble, a pink line on the left.
     flexDirection: "row",
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "rgba(197,57,154,0.08)",
-    marginBottom: 5,
+    marginBottom: 8,
+    paddingLeft: 10,
+    paddingVertical: 2,
+    borderLeftWidth: 2,
+    borderLeftColor: "#B63D91",
+    backgroundColor: "transparent",
   },
 
-  replyPreviewMine: { backgroundColor: "rgba(255,255,255,0.35)" },
+  replyPreviewMine: { backgroundColor: "transparent" /* M14 */ },
 
-  replyBar: { width: 4, backgroundColor: "#C5399A" },
+  replyBar: { width: 0 /* M14: the pink line is the border now */ },
 
-  replyBarMine: { backgroundColor: "#C34D9C" },
+  replyBarMine: { width: 0 /* M14 */ },
 
   replyBody: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
 
@@ -6483,18 +6732,13 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  replyPreviewTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
+  replyPreviewTitle: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
 
-  replyPreviewTitleMine: { color: "#C34D9C" },
+  replyPreviewTitleMine: { color: "#66738A" /* M14 */ },
 
-  replyPreviewText: {
-    flexShrink: 1,
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: "#777783",
-  },
+  replyPreviewText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
 
-  replyPreviewTextMine: { color: "#55555E" },
+  replyPreviewTextMine: { color: "#66738A" /* M14 */ },
 
   // MEDIA
 
@@ -6764,41 +7008,34 @@ const styles = StyleSheet.create({
   // REACTIONS
 
   reactions: {
+    // Figma M14: reactions sit under the bubble, "🙌 3".
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
-    marginTop: -9,
+    gap: 10,
+    marginTop: 6,
+    marginLeft: 2,
   },
 
-  reactionsMine: { justifyContent: "flex-end", marginRight: 6 },
+  reactionsMine: { justifyContent: "flex-start" /* M14 */ },
 
-  reactionsTheirs: { justifyContent: "flex-start", marginLeft: 6 },
+  reactionsTheirs: { justifyContent: "flex-start" /* M14 */ },
 
   reactionBadge: {
+    // M14
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 6,
+    gap: 3,
+    paddingHorizontal: 2,
     paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: "rgba(150,150,160,0.25)",
-    elevation: 1,
+    backgroundColor: "transparent",
+    borderWidth: 0,
   },
 
-  reactionBadgeActive: {
-    borderColor: "#C5399A",
-    backgroundColor: "rgba(197,57,154,0.1)",
-  },
+  reactionBadgeActive: { backgroundColor: "transparent" /* M14 */ },
 
-  reactionEmoji: { fontFamily: FONTS.regular, fontSize: 13 },
+  reactionEmoji: { fontSize: 15 /* M14 */ },
 
-  reactionCount: {
-    fontSize: 11,
-    color: "#666672",
-    marginLeft: 3,
-    fontFamily: FONTS.bold,
-  },
+  reactionCount: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" /* M14 */ },
 
   // JUMP BUTTON
 
@@ -6854,38 +7091,25 @@ const styles = StyleSheet.create({
 
   // EDIT / REPLY BAR
 
-  editingBar: {
-    paddingHorizontal: 8,
-    paddingTop: 6,
-  },
+  editingBar: { paddingHorizontal: 14, paddingTop: 10, backgroundColor: "#FFFFFF" /* M14 */ },
 
   editingCard: {
+    // Figma M14: lilac "Replying to …" card.
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    paddingRight: 10,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#ECECF0",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#F0EDF9",
   },
 
-  editingAccent: {
-    alignSelf: "stretch",
-    width: 4,
-    backgroundColor: "#C5399A",
-  },
+  editingAccent: { width: 0 /* M14 */ },
 
   editingContent: { flex: 1, marginHorizontal: 10, paddingVertical: 8 },
 
-  editingTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
+  editingTitle: { fontFamily: FONTS.semibold, fontSize: 12.5, color: "#B63D91" /* M14 */ },
 
-  editingText: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: "#777783",
-    marginTop: 2,
-  },
+  editingText: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 14, color: "#24283C" /* M14 */ },
 
   // COMPOSER
 

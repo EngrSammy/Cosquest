@@ -1,12 +1,13 @@
 ﻿// ==========================================
-// SPARK PANEL (side panel over the chat)
+// SPARK PANEL (Figma M07 active · M09 revived)
 // ==========================================
-// Spec: "Tapping a circle opens a side panel over the main feed, not a
-// full-screen takeover, so the main chat stays alive underneath. The panel
-// shows a running summary, the messages, and a reply box."
-// Each message has a colour marker for where it sits in time (past ->
-// present gradient); long silences show a seam ("11 months later").
-// Admins: pin, merge into another Spark, delete.
+// A rounded panel over the chat from the right (the main chat stays visible
+// on the left). Header: subject + "Active · 3 people" (pink) or "Revived ·
+// since Nov 2025" (teal). A "Sparks bot · Running summary" card. Each message
+// with its date-time dot, avatar, name, Owner/Admin, rank line and bubble.
+// Revived Sparks add a legend, a coloured timeline line (purple past ->
+// teal today) and seam cards ("11 months later"). Reply box at the bottom.
+// Admins: the ⋯ menu (pin, merge, delete). Built from the screenshots.
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -24,22 +25,41 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { RankLine } from "@/components/chat/RankBadge";
 import { FONTS } from "@/constants/fonts";
 import {
   deleteSpark,
   eraColor,
   getSpark,
   mergeSpark,
+  monthYear,
   pinSpark,
   replyInSpark,
   sparkColor,
   type Spark,
   type SparkSeam,
 } from "@/services/sparks";
+import { useAppSelector } from "@/store/hooks";
 
-const PINK = "#C34D9C";
-const INK = "#191922";
-const MUTED = "#7A7A84";
+const PINK = "#B63D91";
+const TEAL = "#2A8A92";
+const INK = "#24283C";
+const MUTED = "#66738A";
+const LILAC = "#F0EDF9";
+
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+
+function avatarTint(name?: string) {
+  let hash = 0;
+  for (const char of String(name || "")) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
+}
+
+function initialsOf(name?: string) {
+  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : (parts[0] || "?").slice(0, 2);
+  return letters.toUpperCase();
+}
 
 function messageText(message: any) {
   if (message.deleted) return "This message was deleted.";
@@ -50,11 +70,17 @@ function messageText(message: any) {
   return message.content || "Message";
 }
 
-function timeLabel(value: string) {
+function timeOf(value?: string) {
+  return value ? new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+}
+
+// "Oct 8 · 9:30 AM" (with the year when it isn't this year).
+function stampOf(value?: string) {
+  if (!value) return "";
   const date = new Date(value);
-  const sameDay = date.toDateString() === new Date().toDateString();
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return sameDay ? time : `${date.toLocaleDateString([], { day: "numeric", month: "short" })} ${time}`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const day = date.toLocaleDateString([], { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+  return `${day} · ${timeOf(value)}`;
 }
 
 export default function SparkPanel({
@@ -84,6 +110,7 @@ export default function SparkPanel({
 }) {
   const insets = useSafeAreaInsets();
   const listRef = useRef<ScrollView>(null);
+  const myUserId = useAppSelector((state) => String((state.auth.user as any)?.id || (state.call as any)?.myUserId || ""));
 
   const [spark, setSpark] = useState<Spark | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -163,10 +190,10 @@ export default function SparkPanel({
   const confirmDelete = () => {
     if (!spark) return;
     setShowMenu(false);
-    Alert.alert("Delete this Spark?", "Its messages stay in the main chat.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(`Delete the "${spark.subject}" Spark?`, "This is an admin-only action. Its messages stay in the main chat.", [
+      { text: "Keep Spark", style: "cancel" },
       {
-        text: "Delete",
+        text: "Delete Spark",
         style: "destructive",
         onPress: async () => {
           try {
@@ -181,63 +208,90 @@ export default function SparkPanel({
     ]);
   };
 
-  const mergeInto = async (target: Spark) => {
+  const mergeInto = (target: Spark) => {
     if (!spark) return;
-    try {
-      await mergeSpark(conversationId, spark.id, target.id, token);
-      onRemoved(spark.id);
-      onClose();
-    } catch (error) {
-      Alert.alert("Spark", error instanceof Error ? error.message : "Couldn't merge.");
-    }
+    Alert.alert(
+      `Merge into ${target.subject}?`,
+      `Combine the ${spark.subject} and ${target.subject} conversation histories. No automatic merge: this needs your confirmation.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm merge",
+          onPress: async () => {
+            try {
+              await mergeSpark(conversationId, spark.id, target.id, token);
+              onRemoved(spark.id);
+              onClose();
+            } catch (error) {
+              Alert.alert("Spark", error instanceof Error ? error.message : "Couldn't merge.");
+            }
+          },
+        },
+      ],
+    );
   };
 
   const totalEras = spark?.eras?.length || 1;
+  const revived = !!spark?.revived;
+  const accent = spark ? sparkColor(spark) : PINK;
   const seamBefore = new Map(seams.map((seam) => [seam.beforeMessageId, seam.label]));
   const mergeTargets = otherSparks.filter((item) => item.id !== spark?.id);
+  const firstEra = spark?.eras?.[0]?.startedAt || spark?.createdAt;
+  const lastEra = spark?.eras?.[totalEras - 1]?.startedAt || spark?.lastActivityAt;
+
+  const status = !spark
+    ? ""
+    : revived
+      ? `Revived · since ${monthYear(firstEra)}`
+      : spark.active
+        ? `Active · ${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`
+        : `Quiet · last reply ${timeOf(spark.lastActivityAt)}`;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        {/* Tap the dimmed chat to close: the main chat stays visible. */}
+        {/* The main chat stays visible on the left; tap it to close. */}
         <Pressable style={styles.dim} onPress={onClose} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={[styles.panel, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
+          style={[styles.panel, { marginTop: insets.top + 64, marginBottom: insets.bottom + 12 }]}>
           {/* HEADER */}
           <View style={styles.header}>
-            <View style={[styles.headerDot, { backgroundColor: spark ? sparkColor(spark) : PINK }]}>
-              <Ionicons name="flash" size={14} color="#FFFFFF" />
-            </View>
+            <Ionicons name={revived ? "time-outline" : "sparkles-outline"} size={24} color={accent} />
             <View style={styles.headerText}>
               <Text style={styles.subject} numberOfLines={2}>
                 {spark?.subject || "Spark"}
               </Text>
               {spark ? (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {spark.active ? "Active" : "Quiet"} · {spark.messageCount} messages · {spark.participantCount}{" "}
-                  {spark.participantCount === 1 ? "person" : "people"}
-                  {spark.pinned ? " · pinned" : ""}
-                </Text>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: accent }]} />
+                  <Text style={[styles.status, { color: accent }]} numberOfLines={1}>
+                    {status}
+                    {spark.pinned ? " · pinned" : ""}
+                  </Text>
+                </View>
               ) : null}
             </View>
             {canManage ? (
-              <Pressable onPress={() => setShowMenu((current) => !current)} hitSlop={8} accessibilityLabel="Spark options">
-                <Ionicons name="ellipsis-vertical" size={20} color={INK} />
+              <Pressable onPress={() => setShowMenu((current) => !current)} hitSlop={8} accessibilityLabel="Manage Spark">
+                <Ionicons name="ellipsis-horizontal" size={22} color={MUTED} />
               </Pressable>
             ) : null}
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-              <Ionicons name="close" size={24} color={INK} />
+              <Ionicons name="close" size={24} color={MUTED} />
             </Pressable>
           </View>
 
-          {/* ADMIN MENU */}
+          {/* ADMIN MENU (M31 powers) */}
           {showMenu ? (
             <View style={styles.menu}>
               <Pressable style={styles.menuItem} onPress={togglePin}>
-                <Ionicons name={spark?.pinned ? "pin" : "pin-outline"} size={17} color={PINK} />
-                <Text style={styles.menuText}>{spark?.pinned ? "Unpin (can fade when quiet)" : "Pin (never fades)"}</Text>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>{spark?.pinned ? "Unpin Spark" : "Pin Spark"}</Text>
+                  <Text style={styles.menuHint}>Keep visible through quiet periods</Text>
+                </View>
+                <Ionicons name={spark?.pinned ? "pin" : "pin-outline"} size={20} color={MUTED} />
               </Pressable>
               <Pressable
                 style={styles.menuItem}
@@ -245,12 +299,12 @@ export default function SparkPanel({
                   setShowMenu(false);
                   setShowMerge(true);
                 }}>
-                <Ionicons name="git-merge-outline" size={17} color={PINK} />
-                <Text style={styles.menuText}>Merge into another Spark…</Text>
+                <Text style={[styles.menuLabel, styles.menuText]}>Merge into another Spark…</Text>
+                <Ionicons name="git-merge-outline" size={20} color={MUTED} />
               </Pressable>
-              <Pressable style={styles.menuItem} onPress={confirmDelete}>
-                <Ionicons name="trash-outline" size={17} color="#D64545" />
-                <Text style={[styles.menuText, styles.danger]}>Delete Spark</Text>
+              <Pressable style={[styles.menuItem, styles.menuLast]} onPress={confirmDelete}>
+                <Text style={[styles.menuLabel, styles.menuText, styles.danger]}>Delete Spark</Text>
+                <Ionicons name="trash-outline" size={20} color="#C0394B" />
               </Pressable>
             </View>
           ) : null}
@@ -258,91 +312,144 @@ export default function SparkPanel({
           {showMerge ? (
             <View style={styles.menu}>
               <Text style={styles.mergeTitle}>Merge into…</Text>
-              {mergeTargets.length === 0 ? <Text style={styles.metaPad}>No other Sparks in this chat.</Text> : null}
+              {mergeTargets.length === 0 ? <Text style={styles.empty}>No other Sparks in this chat.</Text> : null}
               {mergeTargets.map((target) => (
                 <Pressable key={target.id} style={styles.menuItem} onPress={() => mergeInto(target)}>
-                  <View style={[styles.smallDot, { backgroundColor: sparkColor(target) }]} />
-                  <Text style={styles.menuText} numberOfLines={1}>
-                    {target.subject}
-                  </Text>
+                  <View style={styles.menuText}>
+                    <Text style={styles.menuLabel} numberOfLines={1}>
+                      {target.subject}
+                    </Text>
+                    <Text style={styles.menuHint}>
+                      {target.active ? `Active · ${target.participantCount} people` : "Quiet"}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={MUTED} />
                 </Pressable>
               ))}
-              <Pressable style={styles.menuItem} onPress={() => setShowMerge(false)}>
-                <Text style={[styles.menuText, styles.muted]}>Cancel</Text>
+              <Pressable style={[styles.menuItem, styles.menuLast]} onPress={() => setShowMerge(false)}>
+                <Text style={[styles.menuLabel, styles.muted]}>Cancel</Text>
               </Pressable>
             </View>
           ) : null}
 
-          {/* SUMMARY */}
-          {spark?.summary ? (
-            <View style={styles.summary}>
-              <View style={styles.summaryHead}>
-                <Ionicons name="sparkles" size={13} color={PINK} />
-                <Text style={styles.summaryLabel}>{spark.summarizedByAi ? "Summary (Sparks bot)" : "Summary"}</Text>
-              </View>
-              <Text style={styles.summaryText}>{spark.summary}</Text>
-            </View>
-          ) : null}
-
-          {/* MESSAGES (oldest first) */}
           {loading ? (
             <ActivityIndicator color={PINK} style={styles.loading} />
           ) : (
             <ScrollView ref={listRef} style={styles.list} contentContainerStyle={styles.listContent}>
+              {/* RUNNING SUMMARY */}
+              {spark?.summary ? (
+                <View style={styles.summary}>
+                  <Text style={styles.summaryLabel}>Sparks bot · Running summary</Text>
+                  <Text style={styles.summaryText}>{spark.summary}</Text>
+                </View>
+              ) : null}
+
+              {/* LEGEND (revived): past -> history -> today */}
+              {revived ? (
+                <View style={styles.legend}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: eraColor(0, totalEras) }]} />
+                    <Text style={styles.legendText}>{monthYear(firstEra)}</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: "#7E95D8" }]} />
+                    <Text style={styles.legendText}>History</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: eraColor(totalEras - 1, totalEras) }]} />
+                    <Text style={styles.legendText}>{monthYear(lastEra)}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* MESSAGES (oldest first) */}
               {messages.map((message) => {
                 const seam = seamBefore.get(message.id);
                 const era = message.spark?.era ?? 0;
                 const color = eraColor(era, totalEras);
+                const name = message.sender?.name || message.sender?.username || "Someone";
+                const mine = String(message.sender?.id || message.sender?._id || "") === myUserId;
 
                 return (
                   <View key={message.id}>
                     {seam ? (
                       <View style={styles.seam}>
-                        <View style={styles.seamLine} />
-                        <Text style={styles.seamText}>{seam}</Text>
-                        <View style={styles.seamLine} />
+                        <Text style={styles.seamTitle}>{seam}</Text>
+                        <Text style={styles.seamText}>Conversation resumed · {stampOf(message.createdAt).split(" · ")[0]}</Text>
                       </View>
                     ) : null}
 
-                    <View style={styles.message}>
-                      {/* where it sits in time: past -> present */}
-                      <View style={[styles.eraMarker, { backgroundColor: color }]} />
-                      <View style={styles.messageBody}>
-                        <View style={styles.messageHead}>
-                          <Text style={styles.sender} numberOfLines={1}>
-                            {message.sender?.name || message.sender?.username || "Someone"}
-                          </Text>
-                          <Text style={styles.time}>{message.createdAt ? timeLabel(message.createdAt) : ""}</Text>
+                    <View style={[styles.messageWrap, revived && styles.timeline, revived && { borderLeftColor: color }]}>
+                      <View style={styles.stampRow}>
+                        <View style={[styles.stampDot, { backgroundColor: color }]} />
+                        <Text style={[styles.stamp, { color }]}>{stampOf(message.createdAt)}</Text>
+                      </View>
+
+                      <View style={styles.senderRow}>
+                        <View style={[styles.avatar, { backgroundColor: avatarTint(name) }]}>
+                          <Text style={styles.avatarText}>{initialsOf(name)}</Text>
                         </View>
-                        <Text style={styles.messageText}>{messageText(message)}</Text>
+                        <View style={styles.senderText}>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.name} numberOfLines={1}>
+                              {name}
+                            </Text>
+                            {message.senderGroupRole ? (
+                              <Text style={styles.role}>{message.senderGroupRole === "owner" ? "Owner" : "Admin"}</Text>
+                            ) : null}
+                          </View>
+                          <RankLine rank={message.sender?.rank} />
+                        </View>
+                      </View>
+
+                      <View style={[styles.bubble, mine && styles.bubbleMine]}>
+                        <Text style={styles.bubbleText}>{messageText(message)}</Text>
+                        <Text style={styles.bubbleTime}>
+                          {timeOf(message.createdAt)}
+                          {mine ? " · ✓✓" : ""}
+                        </Text>
                       </View>
                     </View>
                   </View>
                 );
               })}
-              {!messages.length ? <Text style={styles.metaPad}>No messages yet.</Text> : null}
+              {!messages.length ? <Text style={styles.empty}>No messages yet.</Text> : null}
             </ScrollView>
           )}
 
-          {/* REPLY (posts in the Spark, and shows in the main chat) */}
+          {/* REPLY */}
           <View style={styles.composer}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Reply in this Spark…"
-              placeholderTextColor="#9C9CAA"
+              placeholder="Reply to this Spark"
+              placeholderTextColor={MUTED}
               multiline
               maxLength={2000}
               style={styles.input}
             />
             <Pressable
+              hitSlop={6}
+              onPress={() => Alert.alert("Voice replies", "Voice replies inside a Spark are coming soon.")}
+              accessibilityLabel="Voice reply">
+              <Ionicons name="mic-outline" size={24} color={PINK} />
+            </Pressable>
+            <Pressable
               style={[styles.sendButton, (!draft.trim() || sending) && styles.sendOff]}
               disabled={!draft.trim() || sending}
               onPress={send}
               accessibilityLabel="Send">
-              {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="send" size={16} color="#FFFFFF" />}
+              {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="arrow-up" size={22} color="#FFFFFF" />}
             </Pressable>
           </View>
+
+          {spark?.active && !revived ? (
+            <Text style={styles.footer}>Also visible in the main conversation</Text>
+          ) : (
+            <Pressable onPress={onClose} hitSlop={6}>
+              <Text style={styles.footerLink}>← Return to main conversation</Text>
+            </Pressable>
+          )}
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -352,104 +459,146 @@ export default function SparkPanel({
 const styles = StyleSheet.create({
   overlay: { flex: 1, flexDirection: "row" },
 
-  dim: { flex: 1, backgroundColor: "rgba(0,0,0,0.25)" },
+  dim: { flex: 1, backgroundColor: "rgba(36,40,60,0.18)" },
 
   panel: {
-    width: "86%",
+    width: "81%",
     maxWidth: 440,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 22,
-    borderBottomLeftRadius: 22,
-    paddingHorizontal: 14,
-    shadowColor: "#000000",
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    shadowOffset: { width: -4, height: 0 },
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    shadowColor: "#24283C",
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: -4, height: 4 },
     elevation: 10,
   },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 10 },
-
-  headerDot: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  // HEADER
+  header: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingBottom: 12 },
 
   headerText: { flex: 1, minWidth: 0 },
 
-  subject: { fontFamily: FONTS.semibold, fontSize: 16, color: INK },
+  subject: { fontFamily: FONTS.semibold, fontSize: 18, lineHeight: 24, color: INK },
 
-  meta: { marginTop: 1, fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
 
-  metaPad: { paddingVertical: 10, fontFamily: FONTS.regular, fontSize: 12.5, color: MUTED },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
 
-  menu: {
-    marginBottom: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
-    backgroundColor: "#F7F2F6",
+  status: { flexShrink: 1, fontFamily: FONTS.regular, fontSize: 12.5 },
+
+  // ADMIN MENU
+  menu: { marginBottom: 12, paddingHorizontal: 12, borderRadius: 16, backgroundColor: LILAC },
+
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(36,40,60,0.08)",
   },
 
-  menuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  menuLast: { borderBottomWidth: 0 },
 
-  menuText: { flex: 1, fontFamily: FONTS.medium, fontSize: 13.5, color: INK },
+  menuText: { flex: 1, minWidth: 0 },
 
-  mergeTitle: { paddingHorizontal: 12, paddingTop: 8, fontFamily: FONTS.semibold, fontSize: 12, color: MUTED },
+  menuLabel: { fontFamily: FONTS.semibold, fontSize: 14, color: INK },
 
-  smallDot: { width: 10, height: 10, borderRadius: 5 },
+  menuHint: { marginTop: 1, fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
 
-  danger: { color: "#D64545" },
+  mergeTitle: { paddingTop: 12, fontFamily: FONTS.semibold, fontSize: 12, color: MUTED },
+
+  danger: { color: "#C0394B" },
 
   muted: { color: MUTED },
-
-  summary: {
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: "rgba(195,77,156,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(195,77,156,0.2)",
-  },
-
-  summaryHead: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
-
-  summaryLabel: { fontFamily: FONTS.medium, fontSize: 11, color: PINK },
-
-  summaryText: { fontFamily: FONTS.regular, fontSize: 13, lineHeight: 19, color: "#3B3B42" },
 
   loading: { paddingVertical: 30 },
 
   list: { flex: 1 },
 
-  listContent: { paddingBottom: 10 },
+  listContent: { paddingBottom: 12 },
 
-  seam: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 10 },
+  // SUMMARY
+  summary: { padding: 14, borderRadius: 16, backgroundColor: LILAC, marginBottom: 14 },
 
-  seamLine: { flex: 1, height: 1, backgroundColor: "rgba(142,145,242,0.4)" },
+  summaryLabel: { fontFamily: FONTS.semibold, fontSize: 12, color: PINK, marginBottom: 6 },
 
-  seamText: { fontFamily: FONTS.semibold, fontSize: 11, color: "#8E91F2" },
+  summaryText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 21, color: INK },
 
-  message: { flexDirection: "row", gap: 10, paddingVertical: 7 },
+  // LEGEND (revived)
+  legend: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12, paddingHorizontal: 2 },
 
-  eraMarker: { width: 4, borderRadius: 2 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
 
-  messageBody: { flex: 1, minWidth: 0 },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
 
-  messageHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  legendText: { fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
 
-  sender: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 12.5, color: PINK },
+  // MESSAGES
+  messageWrap: { paddingBottom: 14 },
 
-  time: { fontFamily: FONTS.regular, fontSize: 10.5, color: MUTED },
+  // Revived: the coloured timeline line down the left.
+  timeline: { borderLeftWidth: 3, paddingLeft: 10, marginLeft: 2 },
 
-  messageText: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 14, lineHeight: 19, color: INK },
+  stampRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6 },
 
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8 },
+  stampDot: { width: 7, height: 7, borderRadius: 4 },
+
+  stamp: { fontFamily: FONTS.regular, fontSize: 11.5 },
+
+  senderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+
+  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+
+  avatarText: { fontFamily: FONTS.bold, fontSize: 10, color: "#7D356D" },
+
+  senderText: { flex: 1, minWidth: 0, gap: 3 },
+
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  name: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 13, color: INK },
+
+  role: { fontFamily: FONTS.semibold, fontSize: 11, color: PINK },
+
+  bubble: {
+    marginTop: 8,
+    marginLeft: 38,
+    padding: 12,
+    borderRadius: 16,
+    borderTopLeftRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+
+  bubbleMine: { backgroundColor: "#F3DDED" },
+
+  bubbleText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: INK },
+
+  bubbleTime: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 11, color: MUTED },
+
+  // SEAM ("11 months later")
+  seam: { marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: "#DDEFF8" },
+
+  seamTitle: { fontFamily: FONTS.semibold, fontSize: 14, color: TEAL },
+
+  seamText: { marginTop: 3, fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
+
+  empty: { paddingVertical: 12, fontFamily: FONTS.regular, fontSize: 12.5, color: MUTED },
+
+  // REPLY
+  composer: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10 },
 
   input: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     maxHeight: 110,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 21,
-    backgroundColor: "rgba(11,7,19,0.07)",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 22,
+    backgroundColor: "#F0F4F9",
     fontFamily: FONTS.regular,
     fontSize: 14,
     color: INK,
@@ -457,13 +606,17 @@ const styles = StyleSheet.create({
   },
 
   sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: PINK,
   },
 
   sendOff: { opacity: 0.5 },
+
+  footer: { marginTop: 12, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
+
+  footerLink: { marginTop: 12, fontFamily: FONTS.medium, fontSize: 12.5, color: PINK },
 });

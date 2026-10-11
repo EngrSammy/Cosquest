@@ -95,6 +95,12 @@ export type ChatMessage = {
   // Sparks: the sub-conversation this message is part of.
   spark?: MessageSparkTag | null;
 
+  // Albums: several photos/videos in one message (caption = content).
+  album?: { kind: "image" | "video"; url?: string; thumbnailUrl?: string | null; duration?: number | null }[] | null;
+
+  // Your own edited messages: the wording "Undo" would restore.
+  previousContent?: string | null;
+
   // @ mentions: the user ids tagged, or everyone in the chat.
   mentions?: string[];
   mentionsEveryone?: boolean;
