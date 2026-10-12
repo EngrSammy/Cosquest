@@ -4,11 +4,11 @@
 // useSparksBoot(): start the SDK once after login (Chats hub, chat screen).
 // useSparksFeed(chatId, messages): give the SDK the open chat's members and
 //   every message on screen, so this phone can do AI work for the group.
-// Both do nothing on the website or while EXPO_PUBLIC_SPARKS_ENGINE isn't "qlm".
+// Both do nothing on the website or while EXPO_PUBLIC_SPARKS_ENGINE isn't "module".
 import { useEffect, useRef } from "react";
 
+import { apiRequest } from "@/services/api";
 import { userIdFromToken } from "@/services/calls";
-import { getChatMembers } from "@/services/chats";
 import { feedMembers, feedMessages, sparksEnabled, startSparks } from "@/services/sparksSdk";
 import { useAppSelector } from "@/store/hooks";
 
@@ -23,7 +23,7 @@ export function useSparksBoot() {
 
   useEffect(() => {
     if (!sparksEnabled() || !token || !userId) return;
-    startSparks(userId).catch(() => {});
+    startSparks(userId, () => token).catch(() => {});
   }, [token, userId]);
 }
 
@@ -36,11 +36,12 @@ export function useSparksFeed(chatId: string | undefined, messages: any[]) {
     if (!sparksEnabled() || !token || !userId || !chatId) return;
     let cancelled = false;
     (async () => {
-      const sdk = await startSparks(userId);
+      const sdk = await startSparks(userId, () => token);
       if (!sdk || cancelled) return;
       try {
-        const result = await getChatMembers(chatId, { limit: 100 }, token);
-        if (!cancelled) await feedMembers(chatId, result.members as any[]);
+        // Members as Sparks sees them (roles, ranks, admin flags).
+        const result = await apiRequest<any>(`/api/chats/${encodeURIComponent(chatId)}/sparks/members`, { token });
+        if (!cancelled) await feedMembers(chatId, result?.members || []);
       } catch {}
       if (!cancelled) ready.current = chatId;
     })();

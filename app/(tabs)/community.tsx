@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -63,9 +64,10 @@ export default function Community() {
         contentContainerStyle={[
           styles.scroll,
           {
-            // Figma: the header starts 52 from the top (status bar area).
-            // On the website there's no status bar, so use 52 there too.
-            paddingTop: Math.max(insets.top, 52),
+            // Figma: the header starts 52 from the top on phones (that
+            // includes the status bar). In a browser there's no status bar
+            // and the browser has its own top bar, so only a small gap.
+            paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 52),
           },
         ]}
         showsVerticalScrollIndicator={false}>

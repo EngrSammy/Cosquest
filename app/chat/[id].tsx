@@ -2425,28 +2425,31 @@ export default function ChatScreen() {
     conversation?.type === "group" &&
     isInFuture(conversation.group?.mutedByAdminUntil);
 
+  // SPARKS run in group chats and DMs (Subomi's engine supports both).
+  const sparksChat = groupChat || conversation?.type === "dm";
+
   // SPARKS: this chat's Sparks (refreshed every minute so circles stop
   // pulsing once a Spark goes quiet).
   const reloadSparks = useCallback(() => {
-    if (!token || !conversationId || !groupChat) {
+    if (!token || !conversationId || !sparksChat) {
       return;
     }
 
     listSparks(conversationId, token)
       .then((result) => setSparks(result.sparks))
       .catch(() => {});
-  }, [token, conversationId, groupChat]);
+  }, [token, conversationId, sparksChat]);
 
   useEffect(() => {
     reloadSparks();
 
-    if (!groupChat) {
+    if (!sparksChat) {
       return;
     }
 
     const timer = setInterval(reloadSparks, 60000);
     return () => clearInterval(timer);
-  }, [reloadSparks, groupChat]);
+  }, [reloadSparks, sparksChat]);
 
   const sparkContextValue = useMemo(
     () => ({
@@ -4811,7 +4814,7 @@ export default function ChatScreen() {
       ) : null}
 
       {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}
-      {groupChat && !selectionMode && SPARK_LAYOUT === "orbit" ? (
+      {sparksChat && !selectionMode && SPARK_LAYOUT === "orbit" ? (
         <SparksOrbit
           sparks={sparks}
           onOpen={(spark) => setOpenSparkId(spark.id)}
@@ -4982,7 +4985,7 @@ export default function ChatScreen() {
       )}
 
       {/* SPARKS RAIL (layout option A: side rail) */}
-      {groupChat && !selectionMode && SPARK_LAYOUT === "rail" ? (
+      {sparksChat && !selectionMode && SPARK_LAYOUT === "rail" ? (
         <SparksRail
           sparks={sparks}
           top={insets.top + (pinnedMessageId ? 136 : 76)}
@@ -5370,9 +5373,9 @@ export default function ChatScreen() {
         transparent
         animationType="fade"
         onRequestClose={closeMenu}>
-        <Pressable style={styles.menuBackdrop} onPress={menuTap(closeMenu)}>
+        <Pressable style={[styles.menuBackdrop, styles.sheetBackdrop]} onPress={menuTap(closeMenu)}>
           <Pressable
-            style={styles.menuColumn}
+            style={[styles.menuColumn, styles.sheetColumn]}
             onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetTitleRow}>
               <Text style={styles.sheetTitle}>Message actions</Text>
@@ -5507,7 +5510,7 @@ export default function ChatScreen() {
                 />
               ) : null}
 
-              {groupChat && selectedMessage && !selectedMessage.deleted ? (
+              {sparksChat && selectedMessage && !selectedMessage.deleted ? (
                 selectedMessage.spark ? (
                   <MenuItem
                     icon="sparkles"

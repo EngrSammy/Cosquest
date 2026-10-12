@@ -2,17 +2,19 @@
 // SPARKS SDK (Subomi's on-phone AI) - PHONES ONLY
 // ==========================================
 // The website uses services/sparksSdk.ts instead (it can't run the SDK).
-// OFF unless EXPO_PUBLIC_SPARKS_ENGINE=qlm (and the backend has it on too).
+// OFF unless EXPO_PUBLIC_SPARKS_ENGINE=module (and the backend has SPARKS_ENGINE=module).
 //
 // What it does on a phone:
-//  - starts the SDK once per login, over our existing socket ("sparks" channel)
+//  - starts the SDK once per login, over our existing socket ("sparks" channel),
+//    and wipes it on logout (Subomi: sdk.wipe(); the model files stay)
 //  - feeds it each open chat's members and messages (it does AI work for the group)
-//  - downloads the model on request (about 1 GB, Wi-Fi) on capable phones
+//  - downloads the model by itself after login, Wi-Fi only (about 1 GB full,
+//    336 MB lite); the "Sparks AI on this phone" screen shows progress
 // Sparks themselves are still shown by our own screens, from our backend.
-import * as SecureStore from "expo-secure-store";
 import { AppState } from "react-native";
 
 import { getSocket } from "@/services/socket";
+import { store } from "@/store/store";
 
 import type {
   BackendToSdk,
@@ -25,11 +27,15 @@ import type {
 
 export type { ModelStatus, DeviceCapabilities };
 
-const ENABLED = process.env.EXPO_PUBLIC_SPARKS_ENGINE === "qlm";
+// "module" (the backend's name for it) or "qlm": on. Anything else: off.
+const ENABLED = ["module", "qlm"].includes(String(process.env.EXPO_PUBLIC_SPARKS_ENGINE || ""));
 
-// Subomi's published model list (see HANDOVER: "the model is live").
-export const SPARKS_MODEL_MANIFEST =
-  process.env.EXPO_PUBLIC_SPARKS_MODEL_MANIFEST || "https://cosquest-models.204.168.162.79.sslip.io/v1/model";
+// Our backend (it redirects /v1/model to the model list Subomi publishes, so
+// moving the model to our own domain later needs no app update).
+const API = (process.env.EXPO_PUBLIC_API_URL || "https://cosquest-1.onrender.com").replace(/\/$/, "");
+
+// The model list, through our backend (override with EXPO_PUBLIC_SPARKS_MODEL_MANIFEST).
+export const SPARKS_MODEL_MANIFEST = process.env.EXPO_PUBLIC_SPARKS_MODEL_MANIFEST || `${API}/v1/model`;
 
 let sdk: SparksSdk | null = null;
 let sdkUserId: string | null = null;
@@ -46,15 +52,50 @@ export function getSparksSdk() {
   return sdk;
 }
 
-// One local store per login (a new session id opens a fresh store).
-async function sessionIdFor(userId: string) {
-  const key = `sparks_session_${userId}`;
-  let id = await SecureStore.getItemAsync(key).catch(() => null);
-  if (!id) {
-    id = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    await SecureStore.setItemAsync(key, id).catch(() => {});
+// A new session id for every login (Subomi): it opens a clean local store.
+// Each login gets a new token, so the id is derived from it.
+function sessionIdFor(userId: string, token: string | null | undefined) {
+  let hash = 2166136261;
+  for (const char of `${userId}:${token || ""}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
   }
-  return id;
+  return `s_${userId.slice(-6)}_${hash.toString(36)}`;
+}
+
+// LOGOUT: when the login token goes away, wipe this user's Sparks data and
+// device key from the phone (the model files stay, so no second download).
+// A different token (a new login) closes the old session first.
+let watching = false;
+let lastToken: string | null = null;
+function watchLogin() {
+  if (watching) return;
+  watching = true;
+  lastToken = (store.getState() as any).auth?.token || null;
+  store.subscribe(() => {
+    const token = (store.getState() as any).auth?.token || null;
+    if (token === lastToken) return;
+    const previous = lastToken;
+    lastToken = token;
+    if (previous && !token) stopSparks({ wipe: true }).catch(() => {});
+    else if (previous && token) stopSparks({ wipe: false }).catch(() => {});
+  });
+}
+
+// Start the model download by itself on capable phones (Subomi: after login,
+// Wi-Fi only; the SDK waits for Wi-Fi on its own), then load it.
+async function autoDownload(created: SparksSdk) {
+  try {
+    const caps = await created.getCapabilities();
+    if (!caps || caps.tier === "none") return;
+    const status = created.model.status();
+    if (status.phase === "ready") return void created.model.load().catch(() => {});
+    if (status.phase !== "not_downloaded" && status.phase !== "download_paused" && status.phase !== "error") return;
+    const done = await created.model.ensure({ allowCellular: false });
+    if (done.phase === "ready" && sdk === created) await created.model.load();
+  } catch (error: any) {
+    console.warn("[sparks] model download:", error?.message || error);
+  }
 }
 
 // Listen BEFORE creating the SDK: the backend answers device.register at once.
@@ -68,7 +109,10 @@ function listen(socket: any) {
 }
 
 /** Start the SDK for this user (once). Safe to call from many screens. */
-export async function startSparks(userId: string | null | undefined): Promise<SparksSdk | null> {
+export async function startSparks(
+  userId: string | null | undefined,
+  getToken?: () => string | null | undefined,
+): Promise<SparksSdk | null> {
   if (!ENABLED || !userId) return null;
   if (sdk && sdkUserId === userId) return sdk;
   if (sdk && sdkUserId !== userId) await stopSparks({ wipe: true });
@@ -77,24 +121,29 @@ export async function startSparks(userId: string | null | undefined): Promise<Sp
   starting = (async () => {
     const socket: any = getSocket();
     if (!socket) return null;
+    watchLogin();
     listen(socket);
 
     const { createSparks } = await import("@cosquest/sparks-sdk");
     const created = await createSparks({
       userId,
-      sessionId: await sessionIdFor(userId),
+      sessionId: sessionIdFor(userId, getToken?.()),
       modelManifestUrl: SPARKS_MODEL_MANIFEST,
-      // Through our socket; a rejection makes the SDK retry with backoff.
+      getAuthToken: async () => getToken?.() || "",
+      // Through our socket. No answer in 10 s: emitWithAck rejects and the SDK
+      // retries with backoff. An answer with `error` is a refusal (retrying
+      // wouldn't help), so it resolves (as in Subomi's sparks.js).
       transport: {
         send: async (msg) => {
           const reply = await socket.timeout(10_000).emitWithAck("sparks", msg);
-          if (reply?.error && reply.error !== "schema") throw new Error(reply.error);
+          if (reply?.error) console.warn("[sparks] refused:", reply.error);
         },
       },
     });
 
     sdk = created;
     sdkUserId = userId;
+    created.on("error", (error: any) => console.warn("[sparks]", error?.message || error));
     for (const msg of early.splice(0)) created.receive(msg);
 
     // Background AI work only while the player isn't busy.
@@ -103,9 +152,8 @@ export async function startSparks(userId: string | null | undefined): Promise<Sp
       sdk?.setGameState(state === "active" ? "idle" : "background");
     });
 
-    // A phone with the model already downloaded loads it straight away.
-    const status = created.model.status();
-    if (status.phase === "ready") created.model.load().catch(() => {});
+    // Load the model if it's already here, or download it (Wi-Fi only).
+    autoDownload(created);
     return created;
   })()
     .catch((error) => {
@@ -119,10 +167,9 @@ export async function startSparks(userId: string | null | undefined): Promise<Sp
   return starting;
 }
 
-/** Logout: delete this phone's Sparks store and key (model files stay). */
+/** Logout (wipe): delete this user's Sparks data and device key (model files stay). */
 export async function stopSparks({ wipe = false } = {}) {
   const current = sdk;
-  const userId = sdkUserId;
   sdk = null;
   sdkUserId = null;
   fedMembers.clear();
@@ -130,7 +177,6 @@ export async function stopSparks({ wipe = false } = {}) {
   try {
     if (wipe) {
       await current.wipe();
-      if (userId) await SecureStore.deleteItemAsync(`sparks_session_${userId}`).catch(() => {});
     } else {
       await current.shutdown();
     }
@@ -138,61 +184,59 @@ export async function stopSparks({ wipe = false } = {}) {
 }
 
 // ---------------------------------------------------------------------
-// Feeding chats
+// Feeding chats (same mapping as Subomi's examples/expo-chat/sparks.js)
 // ---------------------------------------------------------------------
-const EXPERTISE_KEY = (label?: string | null) =>
-  label ? label.toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "") : null;
+// Backend message kinds -> the SDK's five (as the backend's messageRow.js).
+const KIND: Record<string, SparksMessage["kind"]> = {
+  text: "text",
+  image: "media",
+  video: "media",
+  file: "media",
+  sticker: "media",
+  album: "media",
+  audio: "voice",
+  call: "system",
+};
 
-export function toSparksMember(person: any): SparksMember {
-  const role = person.role || person.groupRole;
-  const expertise = EXPERTISE_KEY(person.expertise);
-  return {
-    userId: String(person.id ?? person._id),
-    displayName: person.name || person.username || "Member",
-    ...(person.rank?.key || person.rank?.name ? { rank: String(person.rank.key || person.rank.name).toLowerCase() } : {}),
-    roles: expertise ? [expertise] : [],
-    isAdmin: role === "owner" || role === "admin",
-  };
-}
-
-function wireKind(kind?: string): SparksMessage["kind"] {
-  if (kind === "audio") return "voice";
-  if (kind === "image" || kind === "video" || kind === "album" || kind === "file" || kind === "sticker") return "media";
-  if (kind === "poll") return "poll";
-  if (kind === "call") return "system";
-  return "text";
-}
-
+// A message as our API / message:new returns it -> the SDK's ChatMessage.
+// Messages without a seq (sent before the backend had Sparks) are skipped.
 export function toSparksMessage(chatId: string, message: any): SparksMessage | null {
-  const id = String(message?.id ?? message?._id ?? "");
-  // Only messages the server has numbered (temporary local copies are skipped).
-  if (!id || id.startsWith("local") || typeof message?.seq !== "number") return null;
-  const text =
-    message.kind === "poll"
-      ? [message.poll?.question, ...(message.poll?.options || []).map((o: any) => o.text)].filter(Boolean).join(" · ")
-      : message.kind === "audio"
-        ? message.media?.transcript || ""
+  if (typeof message?.seq !== "number" || !message?.id) return null;
+  const deleted = Boolean(message.deleted);
+  const text = deleted
+    ? ""
+    : message.kind === "audio"
+      ? message.media?.transcript || message.content || ""
+      : message.kind === "call"
+        ? ""
         : message.content || "";
   return {
-    messageId: id,
+    messageId: String(message.id),
     chatId,
     seq: message.seq,
-    senderId: String(message.sender?.id ?? message.sender?._id ?? message.senderId ?? ""),
-    kind: wireKind(message.kind),
+    senderId: String(message.sender?.id ?? ""),
+    kind: KIND[message.kind] || "text",
     text,
     sentAt: new Date(message.createdAt || Date.now()).toISOString(),
     ...(message.replyTo?.id ? { replyToMessageId: String(message.replyTo.id) } : {}),
-    ...(message.deleted ? { deleted: true } : {}),
-  };
+    sparkId: message.spark?.id || null,
+    ...(message.spark ? { sparkRevivalIndex: message.spark.era } : {}),
+    ...(message.spark?.postedInSpark ? { postedInSpark: true } : {}),
+    ...(deleted ? { deleted: true } : {}),
+  } as SparksMessage;
 }
 
-/** Members of a chat (first time per chat also asks the backend to catch up). */
-export async function feedMembers(chatId: string, people: any[]) {
-  if (!sdk || !people.length) return;
-  const key = `${chatId}:${people.length}`;
+/**
+ * Members of a chat, as the backend's GET /api/chats/:id/sparks/members gives
+ * them (already in the SDK's shape: roles, ranks, admin flags). The first
+ * call for a chat also makes the SDK catch up on its Sparks and history.
+ */
+export async function feedMembers(chatId: string, members: SparksMember[]) {
+  if (!sdk || !members?.length) return;
+  const key = `${chatId}:${members.length}`;
   if (fedMembers.has(key)) return;
   fedMembers.add(key);
-  await sdk.sparks.setMembers(chatId, people.map(toSparksMember)).catch(() => fedMembers.delete(key));
+  await sdk.sparks.setMembers(chatId, members).catch(() => fedMembers.delete(key));
 }
 
 /** Every message the screen shows (order and repeats don't matter). */

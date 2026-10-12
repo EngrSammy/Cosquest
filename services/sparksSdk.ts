@@ -18,15 +18,11 @@ export function getSparksSdk() {
   return null;
 }
 
-export async function startSparks(_userId: string | null | undefined) {
+export async function startSparks(_userId: string | null | undefined, _getToken?: () => string | null | undefined) {
   return null;
 }
 
 export async function stopSparks(_options: { wipe?: boolean } = {}) {}
-
-export function toSparksMember(_person: any) {
-  return null;
-}
 
 export function toSparksMessage(_chatId: string, _message: any) {
   return null;
