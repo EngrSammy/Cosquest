@@ -40,6 +40,8 @@ import {
   type SparkSeam,
 } from "@/services/sparks";
 import { useAppSelector } from "@/store/hooks";
+import { apiRequest } from "@/services/api";
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 
 const PINK = "#B63D91";
 const TEAL = "#2A8A92";
@@ -121,6 +123,64 @@ export default function SparkPanel({
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
+
+  // VOICE REPLIES inside the Spark: tap the mic to record, tap again to send.
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [recording, setRecording] = useState(false);
+
+  const toggleVoice = async () => {
+    if (!sparkId || sending) return;
+
+    if (!recording) {
+      try {
+        const permission = await requestRecordingPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert("Microphone", "Please allow CosQuest to use your microphone.");
+          return;
+        }
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+        setRecording(true);
+      } catch {
+        Alert.alert("Voice reply", "Couldn't start recording.");
+      }
+      return;
+    }
+
+    try {
+      setRecording(false);
+      setSending(true);
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) throw new Error("Nothing was recorded.");
+
+      const form = new FormData();
+      if (Platform.OS === "web") {
+        const blob = await (await fetch(uri)).blob();
+        form.append("media", blob, `voice-${Date.now()}.webm`);
+      } else {
+        form.append("media", { uri, name: `voice-${Date.now()}.m4a`, type: "audio/m4a" } as any);
+      }
+      form.append("sparkId", sparkId);
+
+      const response = await apiRequest<any>(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
+        method: "POST",
+        body: form as any,
+        token,
+      });
+      const raw = response?.message ?? response;
+      const message = { ...raw, id: String(raw?.id ?? raw?._id ?? ""), conversationId };
+      setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
+      onSent(message);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (error) {
+      Alert.alert("Voice reply", error instanceof Error ? error.message : "Couldn't send the voice reply.");
+    } finally {
+      setSending(false);
+      setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    }
+  };
 
   const load = useCallback(async () => {
     if (!sparkId || !token) return;
@@ -422,7 +482,7 @@ export default function SparkPanel({
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Reply to this Spark"
+              placeholder={recording ? "Recording… tap the red button to send" : "Reply to this Spark"}
               placeholderTextColor={MUTED}
               multiline
               maxLength={2000}
@@ -430,9 +490,13 @@ export default function SparkPanel({
             />
             <Pressable
               hitSlop={6}
-              onPress={() => Alert.alert("Voice replies", "Voice replies inside a Spark are coming soon.")}
-              accessibilityLabel="Voice reply">
-              <Ionicons name="mic-outline" size={24} color={PINK} />
+              onPress={toggleVoice}
+              accessibilityLabel={recording ? "Stop and send voice reply" : "Record a voice reply"}>
+              <Ionicons
+                name={recording ? "stop-circle" : "mic-outline"}
+                size={recording ? 30 : 24}
+                color={recording ? "#C0394B" : PINK}
+              />
             </Pressable>
             <Pressable
               style={[styles.sendButton, (!draft.trim() || sending) && styles.sendOff]}

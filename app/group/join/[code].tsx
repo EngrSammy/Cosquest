@@ -32,6 +32,7 @@ import { apiRequest } from "@/services/api";
 import { getInvite, type GroupKind, type GroupPreview, type JoinResult } from "@/services/groups";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
+import { cancelJoinRequest } from "@/services/chatPrefs";
 import { safeBack } from "@/utils/safeBack";
 
 const PINK = "#B63D91";
@@ -115,7 +116,23 @@ export default function GroupInvite() {
   };
 
   const cancelRequest = () => {
-    Alert.alert("Cancel join request", "Cancelling a request is coming soon. An admin can still decline it.");
+    if (!token || !preview) return;
+    Alert.alert("Cancel join request?", "You can ask again later.", [
+      { text: "Keep request", style: "cancel" },
+      {
+        text: "Cancel request",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await cancelJoinRequest(preview.id, token);
+            setSent(null);
+            setPreview({ ...preview, requestPending: false });
+          } catch (error) {
+            Alert.alert("Cancel join request", error instanceof Error ? error.message : "Couldn't cancel it.");
+          }
+        },
+      },
+    ]);
   };
 
   const approval = preview?.joinMode === "approval";

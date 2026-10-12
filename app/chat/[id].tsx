@@ -95,6 +95,9 @@ import SparkPanel from "@/components/chat/SparkPanel";
 import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
 import AlbumGrid from "@/components/chat/AlbumGrid";
+import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
+import { SPARK_LAYOUT } from "@/constants/sparkLayout";
+import { useSparksFeed } from "@/hooks/useSparks";
 import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
 import {
   eraColor,
@@ -2502,6 +2505,10 @@ export default function ChatScreen() {
   // Bubble in memo() above, means a bubble only re-renders when something
   // it actually depends on changes.
   // Figma M08: a quiet Spark shows a card under its latest message.
+  // Subomi's on-phone AI: this phone helps work out Sparks for the chat.
+  // Does nothing on the website or while EXPO_PUBLIC_SPARKS_ENGINE isn't "qlm".
+  useSparksFeed(conversationId, visibleMessages);
+
   const quietSparkCardAfter = useMemo(() => {
     const map = new Map<string, Spark>();
     const seen = new Set<string>();
@@ -2514,7 +2521,7 @@ export default function ChatScreen() {
       }
       seen.add(sparkId);
       const spark = sparks.find((item) => item.id === sparkId);
-      if (spark && !spark.active) {
+      if (spark && (!spark.active || SPARK_LAYOUT === "inline")) {
         map.set(message.id, spark);
       }
     }
@@ -4803,6 +4810,15 @@ export default function ChatScreen() {
         </Pressable>
       ) : null}
 
+      {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}
+      {groupChat && !selectionMode && SPARK_LAYOUT === "orbit" ? (
+        <SparksOrbit
+          sparks={sparks}
+          onOpen={(spark) => setOpenSparkId(spark.id)}
+          onShowAll={() => setShowAllSparks(true)}
+        />
+      ) : null}
+
       {/* ================================== */}
       {/* MESSAGES */}
       {/* ================================== */}
@@ -4919,7 +4935,7 @@ export default function ChatScreen() {
                   </SwipeToReply>
 
                   {quietSparkCardAfter.get(item.id) ? (
-                    <DormantSparkCard
+                    <SparkCard
                       spark={quietSparkCardAfter.get(item.id)!}
                       onOpen={(spark) => setOpenSparkId(spark.id)}
                     />
@@ -4966,7 +4982,7 @@ export default function ChatScreen() {
       )}
 
       {/* SPARKS RAIL (layout option A: side rail) */}
-      {groupChat && !selectionMode ? (
+      {groupChat && !selectionMode && SPARK_LAYOUT === "rail" ? (
         <SparksRail
           sparks={sparks}
           top={insets.top + (pinnedMessageId ? 136 : 76)}

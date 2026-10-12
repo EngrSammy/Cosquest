@@ -156,6 +156,7 @@ export function PersonRow({
           ) : null}
         </View>
         <RankLine rank={person.rank} />
+        {(person as any).expertise ? <Text style={styles.detail}>{(person as any).expertise}</Text> : null}
         {detail ? (
           <Text style={styles.detail} numberOfLines={2}>
             {detail}

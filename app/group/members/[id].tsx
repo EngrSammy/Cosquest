@@ -197,6 +197,7 @@ export default function GroupMembers() {
                   ) : null}
                 </View>
                 <RankLine rank={member.rank} />
+                {(member as any).expertise ? <Text style={styles.handle}>{(member as any).expertise}</Text> : null}
                 <Text style={styles.handle} numberOfLines={1}>
                   @{member.username}
                   {member.mutedUntil ? " · muted" : ""}
@@ -236,7 +237,7 @@ export default function GroupMembers() {
               </View>
 
               <View style={styles.chip}>
-                <Text style={styles.chipText}>@{selected.username}</Text>
+                <Text style={styles.chipText}>{(selected as any).expertise ? `${(selected as any).expertise} · expertise role` : `@${selected.username}`}</Text>
               </View>
               <Text style={styles.status}>{STATUS[selected.role] || STATUS.member}</Text>
 

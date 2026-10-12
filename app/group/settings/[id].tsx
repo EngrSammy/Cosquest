@@ -19,6 +19,8 @@ import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { FONTS } from "@/constants/fonts";
 import { getGroup, leaveGroup, muteGroup, type Group } from "@/services/groups";
 import { getPrivacy, updatePrivacy } from "@/services/privacy";
+import ExpertisePicker from "@/components/groups/ExpertisePicker";
+import { setSparksMuted } from "@/services/chatPrefs";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { safeBack } from "@/utils/safeBack";
@@ -83,6 +85,25 @@ export default function GroupSettings() {
   const [muted, setMuted] = useState(false);
   const [receipts, setReceipts] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [sparksMuted, setSparksMutedState] = useState(false);
+  const [showExpertise, setShowExpertise] = useState(false);
+  const [expertise, setExpertise] = useState<string | null>(user?.expertiseLabel || authUser?.expertiseLabel || null);
+
+  useEffect(() => {
+    setSparksMutedState(!!chatRow?.sparksMuted);
+  }, [chatRow?.sparksMuted]);
+
+  const toggleSparksMuted = async (next: boolean) => {
+    if (!token || !groupId) return;
+    setSparksMutedState(next);
+    try {
+      await setSparksMuted(groupId, next, token);
+      dispatch(fetchChats(token));
+    } catch (error) {
+      setSparksMutedState(!next);
+      Alert.alert("Mute thread activity", error instanceof Error ? error.message : "Couldn't change it.");
+    }
+  };
 
   useEffect(() => {
     setMuted(!!chatRow?.group?.muted);
@@ -246,8 +267,20 @@ export default function GroupSettings() {
             />
             <Row
               title="Mute thread activity only"
-              hint="Main chat stays audible · coming soon"
-              right={<PinkSwitch value={false} onChange={() => comingSoon("Muting only Sparks")} />}
+              hint="Replies inside Sparks stay quiet · main chat stays audible"
+              right={<PinkSwitch value={sparksMuted} onChange={toggleSparksMuted} />}
+            />
+            <Row
+              title="Your expertise role"
+              hint={expertise ? `${expertise} · shown under your name` : "Not set · e.g. Front-end, Design"}
+              icon="chevron-forward"
+              onPress={() => setShowExpertise(true)}
+            />
+            <Row
+              title="Sparks AI on this phone"
+              hint="Can this phone run the AI? Download it"
+              icon="chevron-forward"
+              onPress={() => router.push("/sparks-model")}
             />
             <Row
               title="Read receipts"
@@ -312,6 +345,14 @@ export default function GroupSettings() {
       ) : (
         <Text style={styles.empty}>This group isn't available.</Text>
       )}
+
+      <ExpertisePicker
+        visible={showExpertise}
+        token={token || ""}
+        current={expertise}
+        onClose={() => setShowExpertise(false)}
+        onSaved={setExpertise}
+      />
     </LinearGradient>
   );
 }

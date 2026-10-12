@@ -46,6 +46,7 @@ import {
 } from "@/services/groups";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
+import { setSparksMuted } from "@/services/chatPrefs";
 import { safeBack } from "@/utils/safeBack";
 
 const PINK = "#B63D91";
@@ -312,6 +313,9 @@ export default function NewGroup() {
       // needs a backend option that isn't there yet, so it stays audible.)
       if (notify === "mute") {
         muteGroup(result.group.id, true, "always", token).catch(() => {});
+      }
+      if (notify === "sparks") {
+        setSparksMuted(result.group.id, true, token).catch(() => {});
       }
 
       dispatch(fetchChats(token));
@@ -592,7 +596,7 @@ export default function NewGroup() {
                 <ChoiceRow title="All activity audible" on={notify === "all"} onPress={() => setNotify("all")} />
                 <ChoiceRow
                   title="Mute only Sparks / thread activity"
-                  hint="Main conversation stays audible (coming soon)"
+                  hint="Main conversation stays audible"
                   on={notify === "sparks"}
                   onPress={() => setNotify("sparks")}
                 />

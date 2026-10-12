@@ -225,6 +225,7 @@ export default function MentionPicker({
                     ) : null}
                   </View>
                   <RankLine rank={person.rank} />
+                  {(person as any).expertise ? <Text style={styles.handle}>{(person as any).expertise}</Text> : null}
                   <Text style={styles.handle} numberOfLines={1}>
                     @{person.username}
                   </Text>

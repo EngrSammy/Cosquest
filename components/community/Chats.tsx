@@ -29,6 +29,7 @@ import { apiRequest } from "@/services/api";
 import { FollowUser } from "@/services/follow";
 import { getSocket } from "@/services/socket";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useSparksBoot } from "@/hooks/useSparks";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
 import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
 
@@ -79,6 +80,7 @@ type ChatItem = {
     photoUrl?: string | null;
     muted?: boolean;
     myRole?: string;
+    scope?: "local" | "regional";
   };
 };
 
@@ -165,7 +167,7 @@ function groupLook(chat: ChatItem): { icon: keyof typeof Ionicons.glyphMap; labe
   if (chat.type === "faction") return { icon: "shield-outline", label: "Your faction room" };
   switch (chat.group?.kind) {
     case "faction":
-      return { icon: "shield-outline", label: "Local faction" };
+      return { icon: "shield-outline", label: chat.group?.scope === "regional" ? "Regional faction" : "Local faction" };
     case "open":
       return { icon: "globe-outline", label: "Open space" };
     default:
@@ -238,6 +240,9 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
 
 export function Chats() {
   const dispatch = useAppDispatch();
+
+  // Subomi's on-phone AI (phones only, when switched on).
+  useSparksBoot();
 
   const token = useAppSelector((state) => state.auth.token);
   const authUser = useAppSelector((state) => state.auth.user);
