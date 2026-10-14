@@ -28,7 +28,7 @@ import { useAppSelector } from "@/store/hooks";
 
 function stateLabel(spark: Spark) {
   if (spark.active) return `Active · ${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`;
-  return `Quiet · ${spark.messageCount} messages${spark.revived ? " · revived" : ""}`;
+  return `Quiet · ${spark.messageCount} ${spark.messageCount === 1 ? "message" : "messages"}${spark.revived ? " · revived" : ""}`;
 }
 
 export default function ManageSparks() {

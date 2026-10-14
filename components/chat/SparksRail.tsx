@@ -217,7 +217,7 @@ export function SparksListSheet({
                 </View>
                 <Text style={styles.cardMeta}>
                   {spark.active ? `Active · ${spark.participantCount} people` : `Quiet · ${timeOf(spark.lastActivityAt)}`} ·{" "}
-                  {spark.messageCount} messages{spark.revived ? " · revived" : ""}
+                  {spark.messageCount} {spark.messageCount === 1 ? "message" : "messages"}{spark.revived ? " · revived" : ""}
                 </Text>
                 {spark.summary ? (
                   <Text style={styles.cardSummary} numberOfLines={2}>
