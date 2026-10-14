@@ -79,7 +79,7 @@
             "ndkVersion": "27.1.12297006"
           },
           "ios": {
-            "deploymentTarget": "16.0"
+            "deploymentTarget": "16.4"
           }
         }
       ]
@@ -93,6 +93,14 @@
       "eas": {
         "projectId": "4cb596a0-3a90-4c2d-b8f7-2e090efcd80f"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4cb596a0-3a90-4c2d-b8f7-2e090efcd80f",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
     }
   }
 }
