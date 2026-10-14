@@ -39,6 +39,8 @@ import GroupCallMembers, {
 } from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
+import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { setCallMinimized } from "@/components/calls/callUi";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
@@ -141,6 +143,10 @@ export default function CallSession() {
   const [endMessage, setEndMessage] = useState<string | null>(null);
   const [remoteCount, setRemoteCount] = useState(0);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  // FOCUS MODE: hear nobody, stay in the call.
+  const [focusOn, setFocusOn] = useState(false);
+  const focusRef = useRef(false);
+  focusRef.current = focusOn;
   // Who's talking right now (LiveKit identities are user ids).
   const [speakingIds, setSpeakingIds] = useState<string[]>([]);
 
@@ -291,6 +297,7 @@ export default function CallSession() {
         // Remote voice: play it through a hidden <audio> element.
         const element = track.attach();
         element.style.display = "none";
+        element.muted = focusRef.current;
         document.body.appendChild(element);
         audioElementsRef.current.push(element);
       } else if (track.kind === Track.Kind.Video) {
@@ -468,6 +475,13 @@ export default function CallSession() {
     }
   }, [status, finish]);
 
+  // FOCUS MODE: silence everyone's voice (still in the call, circle stays).
+  useEffect(() => {
+    audioElementsRef.current.forEach((element) => {
+      element.muted = focusOn;
+    });
+  }, [focusOn]);
+
   // ---------- controls ----------
 
   const toggleMic = async () => {
@@ -641,6 +655,64 @@ export default function CallSession() {
       </View>
     </View>
   );
+
+  // ==========================================
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
+  // ==========================================
+
+  if (isGroup) {
+    const people: OrbitPerson[] = active.call.members
+      .filter((member) => member.status === "joined" || member.status === "ringing")
+      .map((member) => {
+        const isMe = !!myUserId && member.user.id === myUserId;
+        const remote = remotePeople.find((p) => p.identity === member.user.id);
+        return {
+          id: member.user.id,
+          name: member.user.name || member.user.username || "Someone",
+          avatar: getAvatarSource(member.user),
+          speaking: speakingIds.includes(member.user.id),
+          micOff: isMe ? !micOn : remote ? !remote.micOn : false,
+          ringing: member.status === "ringing" && !remote && !isMe,
+          isMe,
+          rankLevel: (member.user as any).rank?.level ?? null,
+          hasVideo: isMe ? !!localVideo : !!remote?.video,
+        };
+      });
+
+    const renderVideo = (id: string) => {
+      if (id === myUserId) {
+        return localVideo ? <WebVideo track={localVideo} mirror={facing === "user"} /> : null;
+      }
+      const remote = remotePeople.find((p) => p.identity === id);
+      return remote?.video ? <WebVideo track={remote.video} /> : null;
+    };
+
+    const onCall = people.filter((person) => !person.ringing).length;
+
+    return (
+      <>
+        <OrbitCallScreen
+          title={displayName}
+          subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
+          people={people}
+          pinnedId={active.call.caller?.id || null}
+          renderVideo={renderVideo}
+          micOn={micOn}
+          cameraOn={cameraOn}
+          focusOn={focusOn}
+          ended={!!endMessage}
+          onToggleMic={toggleMic}
+          onToggleCamera={toggleCamera}
+          onToggleFocus={() => setFocusOn((value) => !value)}
+          onLeave={hangUp}
+          onMinimize={() => setCallMinimized(true)}
+          onPeople={() => setAddPeopleOpen(true)}
+          extra={audioTapButton}
+        />
+        {addPeopleSheet}
+      </>
+    );
+  }
 
   // ==========================================
   // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)

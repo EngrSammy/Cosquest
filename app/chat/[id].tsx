@@ -98,6 +98,8 @@ import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
 import { SPARK_LAYOUT } from "@/constants/sparkLayout";
 import { useSparksFeed } from "@/hooks/useSparks";
+import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
+import { voiceChatAllowed } from "@/services/voiceRooms";
 import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
 import {
   eraColor,
@@ -4771,6 +4773,12 @@ export default function ChatScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Chat options">
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+                {voiceChatAllowed(conversation?.type) ? (
+                  <VoiceStartButton
+                    conversationId={conversationId}
+                    title={(conversation as any)?.title || "Voice chat"}
+                  />
+                ) : null}
                 <Pressable
                   hitSlop={8}
                   accessibilityLabel="Search in chat"
@@ -4811,6 +4819,11 @@ export default function ChatScreen() {
 
           <Ionicons name="chevron-forward" size={18} color="#B63D91" />
         </Pressable>
+      ) : null}
+
+      {/* VOICE CHAT: "Call live · Join call" (Group Calls doc) */}
+      {voiceChatAllowed(conversation?.type) ? (
+        <VoiceLiveCard conversationId={conversationId} title={(conversation as any)?.title || "Voice chat"} />
       ) : null}
 
       {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}

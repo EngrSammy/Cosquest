@@ -60,7 +60,7 @@ export default function ActiveCallOverlay() {
 
       {/* ⌄ minimize: go back to the app, the call keeps going */}
       <Pressable
-        style={[styles.minimize, { top: insets.top + 12 }]}
+        style={[styles.minimize, { top: insets.top + 12 }, active.call.isGroup && { display: "none" }]}
         onPress={() => setCallMinimized(true)}
         hitSlop={10}
         accessibilityRole="button"
