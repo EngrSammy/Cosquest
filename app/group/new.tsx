@@ -572,7 +572,7 @@ export default function NewGroup() {
                 maxLength={4}
                 style={styles.input}
               />
-              <Text style={styles.hint}>Your group's editable limit (members)</Text>
+              <Text style={styles.hint}>Your group&apos;s editable limit (members)</Text>
 
               <Text style={styles.section}>GROUP PRIVACY</Text>
               <View style={styles.card}>
