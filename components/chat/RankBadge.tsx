@@ -11,10 +11,12 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
 import type { Rank } from "@/services/ranks";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
 function Insignia({ rank, scale }: { rank: Rank; scale: number }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const chevrons = Math.min(rank.chevrons || 0, 3);
   const bars = Math.min(rank.bars || 0, 4);
 
@@ -70,6 +72,7 @@ export function RankBadge({
   // "Sergeant" instead of "Sgt".
   showName?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (!rank) {
     return null;
   }
@@ -93,6 +96,7 @@ export function RankBadge({
 const TEAL = "#2A8A92";
 
 export function RankLine({ rank }: { rank?: Rank | null }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (!rank) {
     return null;
   }
@@ -121,6 +125,7 @@ export function RankLine({ rank }: { rank?: Rank | null }) {
 
 // "Owner" (filled) or "Admin" (outlined) for whoever runs the chat.
 export function RoleBadge({ role }: { role?: string | null }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (role !== "owner" && role !== "admin") {
     return null;
   }
@@ -135,7 +140,7 @@ export function RoleBadge({ role }: { role?: string | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   badge: {
     flexDirection: "row",
     alignItems: "center",

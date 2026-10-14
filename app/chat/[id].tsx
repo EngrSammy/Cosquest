@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   AudioModule,
   RecordingPresets,
@@ -82,6 +82,7 @@ import {
   stopTyping,
 } from "@/services/socket";
 
+import { StatusBar } from "expo-status-bar";
 import { ChatWallpaperBackground } from "@/components/chat/ChatWallpaperBackground";
 import MentionPicker, {
   type MentionPerson,
@@ -96,7 +97,8 @@ import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
 import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
-import { SPARK_LAYOUT } from "@/constants/sparkLayout";
+import { useSparkLayout } from "@/constants/sparkLayout";
+import { themedStyles, useInk, useThemedStyles, DARK_CHAT_BG } from "@/constants/chatTheme";
 import { useSparksFeed } from "@/hooks/useSparks";
 import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
 import { voiceChatAllowed } from "@/services/voiceRooms";
@@ -701,11 +703,17 @@ function getMessageTypeIcon(
   }
 }
 
+// "Sarthak Lopez" -> "Sarthak" (the pinned bar says "Pinned by Sarthak").
+function firstNameOf(name: string) {
+  return name.trim().split(/\s+/)[0] || "";
+}
+
 // ==========================================
 // DATE SEPARATOR
 // ==========================================
 
 function DateSeparator({ message }: { message: Message }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.dateSeparatorContainer}>
       <View style={styles.dateSeparator}>
@@ -730,6 +738,7 @@ function SwipeToReply({
   onReply: () => void;
   children: React.ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const translateX = useRef(new Animated.Value(0)).current;
 
   const enabledRef = useRef(enabled);
@@ -893,8 +902,10 @@ function MessageMeta({
   variant: "inline" | "overlay" | "flow";
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const color =
-    variant === "overlay" ? "#FFFFFF" : "#66738A";
+    variant === "overlay" ? "#FFFFFF" : ink.text("#66738A");
 
   // No ticks on call entries (like WhatsApp).
   const tickState =
@@ -994,6 +1005,7 @@ const Bubble = memo(function Bubble({
 
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const onPhoto = useContext(PhotoWallpaperContext);
 
   // Someone mentioned me (or everyone): the bubble gets a pink edge.
@@ -1108,14 +1120,14 @@ const Bubble = memo(function Bubble({
           {/* (name, role and rank now sit above the bubble - Figma M02) */}
 
           {/* SPARK marker: this message is part of a Spark (tap to open) */}
-          {msg.spark && !msg.deleted && sparkCtx ? (
+          {msg.spark && !msg.deleted && sparkCtx && metaVariant !== "inline" ? (
             <Pressable
               onPress={() => msg.spark && sparkCtx.open(msg.spark.id)}
               hitSlop={6}
               style={[styles.sparkMarker, hasMedia && styles.mediaPad]}>
               <Ionicons
-                name="flash"
-                size={11}
+                name="sparkles"
+                size={10}
                 color={sparkCtx.colorFor(msg.spark.id, msg.spark.era)}
               />
               <Text
@@ -1339,8 +1351,31 @@ const Bubble = memo(function Bubble({
             </View>
           ) : null}
 
-          {/* TIME */}
-          {metaVariant === "inline" ? (
+          {/* TIME (Figma M03-M05: "✦ Next CosQuest" on the left of the time row) */}
+          {metaVariant === "inline" && msg.spark && !msg.deleted && sparkCtx ? (
+            <View style={styles.sparkFootRow}>
+              <Pressable
+                onPress={() => msg.spark && sparkCtx.open(msg.spark.id)}
+                hitSlop={6}
+                style={styles.sparkFoot}
+                accessibilityRole="button"
+                accessibilityLabel={`Open Spark ${sparkCtx.subjectFor(msg.spark.id)}`}>
+                <Ionicons name="sparkles" size={10} color={sparkCtx.colorFor(msg.spark.id, msg.spark.era)} />
+                <Text
+                  style={[styles.sparkFootText, { color: sparkCtx.colorFor(msg.spark.id, msg.spark.era) }]}
+                  numberOfLines={1}>
+                  {sparkCtx.subjectFor(msg.spark.id)}
+                </Text>
+              </Pressable>
+              <MessageMeta
+                msg={msg}
+                mine={mine}
+                pinned={pinned}
+                variant="flow"
+                otherParticipant={otherParticipant}
+              />
+            </View>
+          ) : metaVariant === "inline" ? (
             <MessageMeta
               msg={msg}
               mine={mine}
@@ -1404,6 +1439,7 @@ function RecordingIndicator({
   metering?: number;
   cancelArmed: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const blink = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -1512,6 +1548,7 @@ function ChatImage({
   uri: string;
   style: StyleProp<ImageStyle>;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const [loading, setLoading] = useState(true);
 
   return (
@@ -1556,6 +1593,7 @@ function getCloudinaryVideoPoster(url: string): string | null {
 }
 
 function VideoThumbnail({ uri }: { uri: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const posterUrl = useMemo(() => getCloudinaryVideoPoster(uri), [uri]);
 
   const [posterFailed, setPosterFailed] = useState(false);
@@ -1633,6 +1671,7 @@ function VideoThumbnail({ uri }: { uri: string }) {
 }
 
 function VideoViewer({ uri }: { uri: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const player = useVideoPlayer(uri, (videoPlayer) => {
     videoPlayer.loop = false;
   });
@@ -1680,6 +1719,7 @@ function AudioBubble({
   mine: boolean;
   msg: Message;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const player = useAudioPlayer(mediaUrl);
   const status = useAudioPlayerStatus(player);
 
@@ -1944,6 +1984,7 @@ function CallLogContent({
   onCallBack: (type: "audio" | "video") => void;
   onLongPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const log = msg.callLog || {};
   const video = log.type === "video";
   const status = log.status;
@@ -2036,6 +2077,7 @@ function MenuItem({
   danger?: boolean;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
       <Text style={[styles.menuItemText, danger && styles.dangerText]}>
@@ -2052,6 +2094,8 @@ function MenuItem({
 // ==========================================
 
 export default function ChatScreen() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const dispatch = useAppDispatch();
@@ -2514,6 +2558,7 @@ export default function ChatScreen() {
   // Does nothing on the website or while EXPO_PUBLIC_SPARKS_ENGINE isn't "qlm".
   useSparksFeed(conversationId, visibleMessages);
 
+  const sparkLayout = useSparkLayout();
   const quietSparkCardAfter = useMemo(() => {
     const map = new Map<string, Spark>();
     const seen = new Set<string>();
@@ -2526,13 +2571,13 @@ export default function ChatScreen() {
       }
       seen.add(sparkId);
       const spark = sparks.find((item) => item.id === sparkId);
-      if (spark && (!spark.active || SPARK_LAYOUT === "inline")) {
+      if (spark && (!spark.active || sparkLayout === "inline")) {
         map.set(message.id, spark);
       }
     }
 
     return map;
-  }, [visibleMessages, sparks]);
+  }, [visibleMessages, sparks, sparkLayout]);
 
   const listExtraData = useMemo(
     () => ({
@@ -2605,7 +2650,10 @@ export default function ChatScreen() {
     }
 
     if (conversation?.memberCount) {
-      return `${conversation.memberCount} members`;
+      // Figma M02: "24 members · 6 online"
+      const online = (conversation as any).onlineCount;
+      const members = `${conversation.memberCount} ${conversation.memberCount === 1 ? "member" : "members"}`;
+      return typeof online === "number" && online > 0 ? `${members} · ${online} online` : members;
     }
 
     return "Community";
@@ -2627,6 +2675,22 @@ export default function ChatScreen() {
   const pinnedMessage = pinnedMessageId
     ? messages.find((message) => message.id === pinnedMessageId)
     : undefined;
+
+  // Figma M02: "Pinned by Sarthak". The pin only carries the pinner's id, so
+  // the name comes from a message they sent that's already loaded.
+  const pinnedInfo = (conversation as any)?.pinnedMessage as
+    | { id?: string; pinnedBy?: string; content?: string; preview?: string }
+    | null
+    | undefined;
+  const pinnedByName = useMemo(() => {
+    const pinnedBy = pinnedInfo?.pinnedBy;
+    if (!pinnedBy) return "";
+    if (pinnedBy === currentUserId) return "you";
+    const fromMessage = messages.find(
+      (message) => (message.sender?.id || message.sender?._id) === pinnedBy,
+    )?.sender as any;
+    return firstNameOf(fromMessage?.name || fromMessage?.displayName || fromMessage?.username || "");
+  }, [pinnedInfo?.pinnedBy, currentUserId, messages]);
 
   // ========================================
   // OWNERSHIP
@@ -4624,6 +4688,8 @@ export default function ChatScreen() {
       <PhotoWallpaperContext.Provider value={shownWallpaper.kind === "photo"}>
       <MyUserIdContext.Provider value={String(currentUserId)}>
       <SparkContext.Provider value={sparkContextValue}>
+      {/* Figma M06: the chat follows the phone's light / dark appearance */}
+      <StatusBar style={ink.dark ? "light" : "dark"} />
       {/* Chat wallpaper behind everything */}
       <ChatWallpaperBackground
         key={
@@ -4688,7 +4754,7 @@ export default function ChatScreen() {
                 onPress={() => safeBack()}
                 hitSlop={10}
                 style={styles.backButton}>
-                <Ionicons name="chevron-back" size={27} color="#191922" />
+                <Ionicons name="chevron-back" size={27} color={ink.text("#191922")} />
               </Pressable>
 
               {/* Tap their photo or name to see their profile (DMs) */}
@@ -4698,6 +4764,7 @@ export default function ChatScreen() {
                 disabled={!otherUsername && conversation?.type !== "group"}
                 accessibilityRole="button"
                 accessibilityLabel="View profile">
+                {groupChat && !headerAvatar ? null : (
                 <View style={styles.headerAvatarWrap}>
                   <View style={styles.headerAvatar}>
                     {headerAvatar ? (
@@ -4723,6 +4790,7 @@ export default function ChatScreen() {
                     <View style={styles.headerOnlineDot} />
                   ) : null}
                 </View>
+                )}
 
                 <View style={styles.headerText}>
                   <Text style={styles.headerName} numberOfLines={1}>
@@ -4783,9 +4851,9 @@ export default function ChatScreen() {
                   hitSlop={8}
                   accessibilityLabel="Search in chat"
                   onPress={() => router.push({ pathname: "/chat/search/[id]", params: { id: conversationId } })}>
-                  <Ionicons name="search-outline" size={22} color="#24283C" />
+                  <Ionicons name="search-outline" size={22} color={ink.text("#24283C")} />
                 </Pressable>
-                <Ionicons name="ellipsis-horizontal" size={24} color="#24283C" />
+                <Ionicons name="ellipsis-horizontal" size={24} color={ink.text("#24283C")} />
               </View>
               </Pressable>
             </>
@@ -4801,10 +4869,12 @@ export default function ChatScreen() {
         <Pressable
           style={styles.pinnedBanner}
           onPress={() => scrollToMessage(pinnedMessageId)}>
-          <Ionicons name="pin-outline" size={20} color="#B63D91" />
+          <MaterialCommunityIcons name="pin-outline" size={21} color={ink.text("#B63D91")} />
 
           <View style={styles.pinnedBannerText}>
-            <Text style={styles.pinnedBannerTitle}>Pinned message</Text>
+            <Text style={styles.pinnedBannerTitle}>
+              {pinnedByName ? `Pinned by ${pinnedByName}` : "Pinned message"}
+            </Text>
 
             <Text numberOfLines={1} style={styles.pinnedBannerBody}>
               {pinnedMessage
@@ -4813,11 +4883,11 @@ export default function ChatScreen() {
                   : pinnedMessage.content ||
                     getMessageTypeLabel(pinnedMessage) ||
                     "Message"
-                : "Tap to view"}
+                : pinnedInfo?.content || pinnedInfo?.preview || "Tap to view"}
             </Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color="#B63D91" />
+          <Ionicons name="chevron-forward" size={18} color={ink.text("#B63D91")} />
         </Pressable>
       ) : null}
 
@@ -4827,7 +4897,7 @@ export default function ChatScreen() {
       ) : null}
 
       {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}
-      {sparksChat && !selectionMode && SPARK_LAYOUT === "orbit" ? (
+      {sparksChat && !selectionMode && sparkLayout === "orbit" ? (
         <SparksOrbit
           sparks={sparks}
           onOpen={(spark) => setOpenSparkId(spark.id)}
@@ -4998,7 +5068,7 @@ export default function ChatScreen() {
       )}
 
       {/* SPARKS RAIL (layout option A: side rail) */}
-      {sparksChat && !selectionMode && SPARK_LAYOUT === "rail" ? (
+      {sparksChat && !selectionMode && sparkLayout === "rail" ? (
         <SparksRail
           sparks={sparks}
           top={insets.top + (pinnedMessageId ? 136 : 76)}
@@ -5200,7 +5270,7 @@ export default function ChatScreen() {
                   placeholder={
                     editingMessage ? "Edit message" : groupChat ? "Message your group" : "Message"
                   }
-                  placeholderTextColor="#66738A"
+                  placeholderTextColor={ink.text("#66738A")}
                   multiline
                   // Browsers make a multi-line box 2 rows tall by default,
                   // which made the input look too tall on the website.
@@ -5223,19 +5293,31 @@ export default function ChatScreen() {
                   </Pressable>
                 ) : null}
 
-                {!editingMessage && !draft.trim() ? (
+                {!editingMessage && !draft.trim() && !groupChat ? (
                   <Pressable
                     hitSlop={6}
                     style={styles.pillIcon}
                     onPress={takePhoto}>
-                    <Ionicons name="camera-outline" size={23} color="#8A8A90" />
+                    <Ionicons name="camera-outline" size={23} color={ink.text("#8A8A90")} />
                   </Pressable>
                 ) : null}
               </>
             )}
           </View>
 
-          {showSendButton ? (
+          {/* Figma M02: groups always show the mic AND the pink send circle
+              (the camera lives in the + sheet). */}
+          {groupChat && !editingMessage && !recording ? (
+            <View
+              style={[styles.circleButton, styles.micBare]}
+              accessibilityRole="button"
+              accessibilityLabel="Hold to record voice message"
+              {...micPanResponder.panHandlers}>
+              <Ionicons name="mic-outline" size={24} color={ink.text("#B63D91")} />
+            </View>
+          ) : null}
+
+          {showSendButton || (groupChat && !recording) ? (
             <Pressable
               style={[styles.circleButton, styles.sendCircle]}
               onPress={editingMessage ? saveEdit : send}
@@ -6149,6 +6231,7 @@ function AttachmentButton({
 
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable style={styles.attachmentButton} onPress={onPress}>
       <View style={styles.attachmentIcon}>
@@ -6164,7 +6247,7 @@ function AttachmentButton({
 // STYLES
 // ==========================================
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1, backgroundColor: "#D4ECF8" },
 
   center: {
@@ -6274,6 +6357,28 @@ const styles = StyleSheet.create({
   sparkMarkerText: {
     maxWidth: 170,
     fontFamily: FONTS.semibold,
+    fontSize: 10.5,
+  },
+
+  // Text messages: the Spark sits on the time row instead (Figma M03-M05).
+  sparkFootRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  sparkFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    flexShrink: 1,
+  },
+
+  sparkFootText: {
+    flexShrink: 1,
+    fontFamily: FONTS.medium,
     fontSize: 10.5,
   },
 
@@ -7200,6 +7305,9 @@ const styles = StyleSheet.create({
 
   // Figma M02: the pink send circle with an up arrow.
   sendCircle: { backgroundColor: "#B63D91" },
+
+  // The plain mic beside the send circle (groups, Figma M02).
+  micBare: { width: 30, marginRight: 4 },
 
   // Figma: pink paperclip circle at the left of the message bar.
   attachCircle: {

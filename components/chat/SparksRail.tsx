@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
 import { type Spark } from "@/services/sparks";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const TEAL = "#2A8A92";
@@ -33,6 +34,7 @@ function timeOf(value?: string) {
 }
 
 function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const pulse = useRef(new Animated.Value(0)).current;
   const color = spark.revived ? TEAL : PINK;
 
@@ -87,6 +89,7 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
 }
 
 function QuietCard({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable onPress={onPress} style={styles.quietCard} accessibilityLabel={`Quiet Spark: ${spark.subject}`}>
       <Text style={styles.quietTitle} numberOfLines={2}>
@@ -110,6 +113,7 @@ export default function SparksRail({
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (!sparks.length) {
     return null;
   }
@@ -139,6 +143,7 @@ export default function SparksRail({
 
 // Figma M08: a quiet Spark's card in the main chat, under its last message.
 export function DormantSparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spark: Spark) => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.dormant}>
       <View style={styles.dormantHead}>
@@ -176,6 +181,7 @@ export function SparksListSheet({
   onClose: () => void;
   onOpen: (spark: Spark) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   return (
@@ -227,7 +233,7 @@ export function SparksListSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   pressed: { opacity: 0.75 },
 
   // RAIL

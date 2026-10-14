@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
 import { sendAlbum, type PickedMedia } from "@/services/chatExtras";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -58,6 +59,7 @@ export default function ShareMediaSheet({
   // "Voice note": close and use the mic in the message bar.
   onVoiceNote: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   const [picked, setPicked] = useState<PickedMedia[]>([]);
@@ -213,7 +215,7 @@ export default function ShareMediaSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   backdrop: { flex: 1, backgroundColor: "rgba(36,40,60,0.35)" },
 
   sheet: {

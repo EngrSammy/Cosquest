@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { FONTS } from "@/constants/fonts";
 import { createPoll } from "@/services/polls";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -49,6 +50,7 @@ export default function PollCreator({
   // The new poll message (to show it straight away).
   onCreated: (message: any) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   const [question, setQuestion] = useState("");
@@ -197,7 +199,7 @@ export default function PollCreator({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
 
   flex: { flex: 1, minWidth: 0 },

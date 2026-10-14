@@ -15,6 +15,7 @@ import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 
 import { DormantSparkCard } from "@/components/chat/SparksRail";
 import { FONTS } from "@/constants/fonts";
 import { type Spark } from "@/services/sparks";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const TEAL = "#2A8A92";
@@ -27,6 +28,7 @@ function people(spark: Spark) {
 }
 
 function OrbitCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const pulse = useRef(new Animated.Value(0)).current;
   const color = spark.revived ? TEAL : PINK;
 
@@ -87,6 +89,7 @@ export default function SparksOrbit({
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (!sparks.length) return null;
 
   const circles = sparks.filter((spark) => spark.active || spark.pinned);
@@ -123,6 +126,7 @@ export default function SparksOrbit({
 // In the conversation after a Spark's latest message: the active inline
 // card (Option C), or the dormant card when the Spark has gone quiet (M08).
 export function SparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spark: Spark) => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   if (!spark.active) return <DormantSparkCard spark={spark} onOpen={onOpen} />;
 
   return (
@@ -141,31 +145,30 @@ export function SparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spark: Spa
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   // OPTION B: strip under the pinned bar
+  // Figma M04: the strip sits on the chat background, no band of its own.
   strip: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(36,40,60,0.06)",
+    backgroundColor: "transparent",
   },
 
-  row: { alignItems: "flex-start", gap: 18, paddingHorizontal: 18, paddingVertical: 14 },
+  row: { alignItems: "flex-start", gap: 14, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
 
-  item: { width: 96, alignItems: "center" },
+  item: { width: 84, alignItems: "center" },
 
-  circleWrap: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+  circleWrap: { width: 50, height: 50, alignItems: "center", justifyContent: "center" },
 
-  pulse: { position: "absolute", width: 56, height: 56, borderRadius: 28, borderWidth: 3 },
+  pulse: { position: "absolute", width: 50, height: 50, borderRadius: 25, borderWidth: 2 },
 
   circle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3DDED",
-    borderWidth: 3,
-    borderColor: "rgba(182,61,145,0.16)",
+    backgroundColor: "#FBE7F1",
+    borderWidth: 1.5,
+    borderColor: "rgba(182,61,145,0.35)",
   },
 
   circleRevived: { backgroundColor: "#DDEFF2", borderColor: "rgba(42,138,146,0.18)" },
@@ -184,17 +187,29 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
   },
 
-  subject: { marginTop: 6, textAlign: "center", fontFamily: FONTS.semibold, fontSize: 12.5, lineHeight: 16, color: INK },
+  subject: { marginTop: 5, textAlign: "center", fontFamily: FONTS.medium, fontSize: 11.5, lineHeight: 15, color: INK },
 
-  people: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5 },
+  people: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 10.5 },
 
-  quiet: { width: 130, padding: 12, borderRadius: 16, backgroundColor: LILAC },
+  // Figma M04: quiet Sparks are small white cards ("Route ideas · Quiet · Open ->").
+  quiet: {
+    width: 112,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#24283C",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
 
-  quietTitle: { fontFamily: FONTS.semibold, fontSize: 13, lineHeight: 17, color: INK },
+  quietTitle: { fontFamily: FONTS.semibold, fontSize: 12, lineHeight: 16, color: INK },
 
-  quietState: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 11.5, color: MUTED },
+  quietState: { marginTop: 3, fontFamily: FONTS.regular, fontSize: 10.5, color: MUTED },
 
-  quietOpen: { marginTop: 6, fontFamily: FONTS.medium, fontSize: 12.5, color: PINK },
+  quietOpen: { marginTop: 4, fontFamily: FONTS.medium, fontSize: 11, color: PINK },
 
   all: { alignSelf: "center", paddingHorizontal: 12, height: 30, borderRadius: 15, justifyContent: "center", backgroundColor: LILAC },
 
@@ -208,15 +223,15 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: LILAC,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "rgba(182,61,145,0.18)",
+    borderColor: "rgba(182,61,145,0.12)",
   },
 
   inlineText: { flex: 1, minWidth: 0 },
 
-  inlineTitle: { fontFamily: FONTS.semibold, fontSize: 16, color: INK },
+  inlineTitle: { fontFamily: FONTS.semibold, fontSize: 14, color: INK },
 
   inlineMeta: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12.5, color: MUTED },
 });

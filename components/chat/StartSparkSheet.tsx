@@ -27,6 +27,7 @@ import { RankLine } from "@/components/chat/RankBadge";
 import { FONTS } from "@/constants/fonts";
 import type { Rank } from "@/services/ranks";
 import { addToSpark, monthYear, startSpark, type Spark } from "@/services/sparks";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -57,6 +58,7 @@ export type SparkSeedMessage = {
 
 // The pressed message, as in the chat (avatar, name, rank, bubble).
 function SeedPreview({ message }: { message: SparkSeedMessage }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const name = message.senderName || "Someone";
   return (
     <View style={styles.seed}>
@@ -101,6 +103,7 @@ export default function StartSparkSheet({
   // The Spark the message ended up in (new or existing).
   onDone: (spark: Spark) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   const [subject, setSubject] = useState("");
@@ -272,7 +275,7 @@ export default function StartSparkSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   backdrop: { flex: 1, backgroundColor: "rgba(36,40,60,0.35)" },
 
   sheet: {

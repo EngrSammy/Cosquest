@@ -42,6 +42,7 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { apiRequest } from "@/services/api";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const TEAL = "#2A8A92";
@@ -110,6 +111,7 @@ export default function SparkPanel({
   // Deleted / merged away.
   onRemoved: (sparkId: string) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const listRef = useRef<ScrollView>(null);
   const myUserId = useAppSelector((state) => String((state.auth.user as any)?.id || (state.call as any)?.myUserId || ""));
@@ -520,7 +522,7 @@ export default function SparkPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   overlay: { flex: 1, flexDirection: "row" },
 
   dim: { flex: 1, backgroundColor: "rgba(36,40,60,0.18)" },
