@@ -95,6 +95,7 @@ import type { Rank } from "@/services/ranks";
 import SparkPanel from "@/components/chat/SparkPanel";
 import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
+import RolePingCard from "@/components/chat/RolePingCard";
 import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
 import { useSparkLayout } from "@/constants/sparkLayout";
@@ -108,6 +109,7 @@ import {
   listSparks,
   type MessageSparkTag,
   type Spark,
+  type SparkRolePing,
 } from "@/services/sparks";
 import type { PollSummary } from "@/services/polls";
 import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
@@ -309,7 +311,16 @@ const MENU_TAP_GUARD_MS = 450;
 const DELETE_FOR_EVERYONE_WINDOW_MS = 5 * 60 * 1000;
 const EMPTY_MESSAGE_IDS: string[] = [];
 
+// Figma M10: the five quick reactions, then "+" opens the full set.
+const QUICK_REACTIONS = ["❤️", "🙌", "😂", "👍", "🔥"];
 const REACTION_EMOJIS = ["❤️", "😂", "😍", "😮", "😢", "😡", "👍", "👎"];
+const REACTION_EMOJIS_ALL = [...QUICK_REACTIONS, ...REACTION_EMOJIS.filter((e) => !QUICK_REACTIONS.includes(e))];
+
+// The display name on a message ("Maya Chen"), for the long-press card.
+function senderNameOf(message: Message) {
+  const sender = message.sender as any;
+  return sender?.name || sender?.displayName || sender?.username || "Someone";
+}
 
 const SWIPE_REPLY_THRESHOLD = 60;
 const VOICE_CANCEL_THRESHOLD = -80;
@@ -2232,6 +2243,8 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   const [showActions, setShowActions] = useState(false);
+  // Figma M10: "+" in the reaction row shows every reaction.
+  const [showAllReactions, setShowAllReactions] = useState(false);
 
   // When the long-press menu opened (see MENU_TAP_GUARD_MS) and a short
   // "Copied ✓" note shown inside it.
@@ -2559,6 +2572,28 @@ export default function ChatScreen() {
   useSparksFeed(conversationId, visibleMessages);
 
   const sparkLayout = useSparkLayout();
+  // Figma M32 (concept): the Sparks bot's automatic role pings, shown after
+  // the latest Spark message sent before each ping.
+  const rolePingsAfter = useMemo(() => {
+    const map = new Map<string, SparkRolePing[]>();
+    for (const spark of sparks) {
+      for (const ping of spark.rolePings || []) {
+        const at = new Date(ping.at).getTime();
+        // visibleMessages is newest first.
+        const anchor = visibleMessages.find(
+          (message) =>
+            message.spark?.id === spark.id &&
+            !Number.isNaN(at) &&
+            new Date(message.createdAt || 0).getTime() <= at + 1000,
+        );
+        if (anchor && ping.userIds?.length) {
+          map.set(anchor.id, [...(map.get(anchor.id) || []), ping]);
+        }
+      }
+    }
+    return map;
+  }, [sparks, visibleMessages]);
+
   const quietSparkCardAfter = useMemo(() => {
     const map = new Map<string, Spark>();
     const seen = new Set<string>();
@@ -4569,6 +4604,7 @@ export default function ChatScreen() {
   const closeMenu = () => {
     setShowActions(false);
     setSelectedMessage(null);
+    setShowAllReactions(false);
   };
 
   // Wraps a menu action: ignored right after the menu opens (the finger
@@ -4924,7 +4960,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            extraData={[listExtraData, quietSparkCardAfter]}
+            extraData={[listExtraData, quietSparkCardAfter, rolePingsAfter]}
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -5024,6 +5060,19 @@ export default function ChatScreen() {
                     <SparkCard
                       spark={quietSparkCardAfter.get(item.id)!}
                       onOpen={(spark) => setOpenSparkId(spark.id)}
+                    />
+                  ) : null}
+
+                  {rolePingsAfter.get(item.id) && token ? (
+                    <RolePingCard
+                      conversationId={conversationId}
+                      token={token}
+                      pings={rolePingsAfter.get(item.id)!}
+                      onOpenMember={
+                        groupChat
+                          ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
+                          : undefined
+                      }
                     />
                   ) : null}
 
@@ -5479,9 +5528,9 @@ export default function ChatScreen() {
               </Pressable>
             </View>
 
-            {/* QUICK REACTIONS */}
+            {/* QUICK REACTIONS (Figma M10: ❤️ 🙌 😂 👍 🔥 and + for more) */}
             <View style={[styles.quickReactions, styles.sheetReactions]}>
-              {REACTION_EMOJIS.map((emoji) => (
+              {(showAllReactions ? REACTION_EMOJIS_ALL : QUICK_REACTIONS).map((emoji) => (
                 <Pressable
                   key={emoji}
                   style={[
@@ -5490,6 +5539,7 @@ export default function ChatScreen() {
                       findMyReaction(selectedMessage)?.emoji === emoji &&
                       styles.quickReactionActive,
                   ]}
+                  accessibilityLabel={`React ${emoji}`}
                   onPress={menuTap(() => {
                     if (selectedMessage) {
                       reactToMessage(selectedMessage, emoji);
@@ -5498,36 +5548,52 @@ export default function ChatScreen() {
                   <Text style={styles.quickReactionText}>{emoji}</Text>
                 </Pressable>
               ))}
+              {!showAllReactions ? (
+                <Pressable
+                  style={styles.quickReaction}
+                  onPress={() => setShowAllReactions(true)}
+                  accessibilityLabel="More reactions">
+                  <Ionicons name="add" size={24} color={ink.text("#24283C")} />
+                </Pressable>
+              ) : null}
             </View>
 
-            {/* ACTIONS */}
-            <View style={[styles.menuCard, styles.sheetCard]}>
-              {selectedMessage ? (
-                <View style={styles.menuPreview}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.menuPreviewText,
-                      menuNotice ? styles.menuNoticeText : null,
-                    ]}>
-                    {menuNotice ||
-                      selectedMessage.content ||
-                      getMessageTypeLabel(selectedMessage) ||
-                      "Message"}
-                  </Text>
-
-                  {/* ✕ back to the chat */}
-                  <Pressable
-                    onPress={closeMenu}
-                    hitSlop={10}
-                    style={styles.menuClose}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close menu">
-                    <Ionicons name="close" size={18} color="#55555E" />
-                  </Pressable>
+            {/* THE MESSAGE (Figma M10: who sent it, their rank, the bubble) */}
+            {selectedMessage ? (
+              <View style={styles.menuMessage}>
+                <View style={[styles.menuMessageAvatar, { backgroundColor: ink.surface(avatarTint(senderNameOf(selectedMessage))) }]}>
+                  <Text style={styles.menuMessageInitials}>{initialsOf(senderNameOf(selectedMessage))}</Text>
                 </View>
-              ) : null}
+                <View style={styles.menuMessageBody}>
+                  <View style={styles.msgNameRow}>
+                    <Text style={styles.msgName} numberOfLines={1}>
+                      {senderNameOf(selectedMessage)}
+                    </Text>
+                    {selectedMessage.senderGroupRole ? (
+                      <Text style={styles.msgRole}>
+                        {selectedMessage.senderGroupRole === "owner" ? "Owner" : "Admin"}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <RankLine rank={selectedMessage.sender?.rank} />
+                  <View style={styles.menuMessageBubble}>
+                    <Text
+                      numberOfLines={4}
+                      style={[styles.menuMessageText, menuNotice ? styles.menuNoticeText : null]}>
+                      {menuNotice ||
+                        selectedMessage.content ||
+                        getMessageTypeLabel(selectedMessage) ||
+                        "Message"}
+                    </Text>
+                    <Text style={styles.menuMessageTime}>{formatMessageTime(selectedMessage.createdAt)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
 
+            {/* ACTIONS: the design's four first, then the rest */}
+            <ScrollView style={styles.menuScroll} bounces={false}>
+            <View style={[styles.menuCard, styles.sheetCard]}>
               <MenuItem
                 icon="arrow-undo-outline"
                 label="Reply to quote"
@@ -5535,6 +5601,63 @@ export default function ChatScreen() {
                   () => selectedMessage && startReply(selectedMessage),
                 )}
               />
+
+              {sparksChat && selectedMessage && !selectedMessage.deleted ? (
+                selectedMessage.spark ? (
+                  <MenuItem
+                    icon="sparkles"
+                    label="Open Spark"
+                    onPress={menuTap(() => {
+                      const sparkId = selectedMessage?.spark?.id;
+                      closeMenu();
+                      if (sparkId) {
+                        setTimeout(() => setOpenSparkId(sparkId), 300);
+                      }
+                    })}
+                  />
+                ) : (
+                  <MenuItem
+                    icon="sparkles-outline"
+                    label="Start a Spark"
+                    onPress={menuTap(() => {
+                      const seed = selectedMessage;
+                      closeMenu();
+                      if (seed) {
+                        setTimeout(() => setSparkSeed(seed), 300);
+                      }
+                    })}
+                  />
+                )
+              ) : null}
+
+              {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
+                <MenuItem
+                  icon="pencil-outline"
+                  label="Edit your message"
+                  onPress={menuTap(
+                    () => selectedMessage && startEditing(selectedMessage),
+                  )}
+                />
+              ) : null}
+
+              <MenuItem
+                icon="trash-outline"
+                label={selectedMessageIsMine ? "Delete your message" : "Delete"}
+                danger
+                onPress={menuTap(
+                  () => selectedMessage && deletePrompt(selectedMessage),
+                )}
+              />
+
+              {selectedMessageIsMine && selectedMessage?.canRollback ? (
+                <MenuItem
+                  icon="arrow-undo-circle-outline"
+                  label="Undo edit"
+                  onPress={menuTap(
+                    () => selectedMessage && undoEdit(selectedMessage),
+                  )}
+                />
+              ) : null}
 
               {selectedMessage?.content?.trim() ? (
                 <MenuItem
@@ -5575,26 +5698,6 @@ export default function ChatScreen() {
                 />
               ) : null}
 
-              {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
-                <MenuItem
-                  icon="pencil-outline"
-                  label="Edit your message"
-                  onPress={menuTap(
-                    () => selectedMessage && startEditing(selectedMessage),
-                  )}
-                />
-              ) : null}
-
-              {selectedMessageIsMine && selectedMessage?.canRollback ? (
-                <MenuItem
-                  icon="arrow-undo-circle-outline"
-                  label="Undo edit"
-                  onPress={menuTap(
-                    () => selectedMessage && undoEdit(selectedMessage),
-                  )}
-                />
-              ) : null}
-
               {selectedMessageIsMine ? (
                 <MenuItem
                   icon="information-circle-outline"
@@ -5603,34 +5706,6 @@ export default function ChatScreen() {
                     () => selectedMessage && openMessageInfo(selectedMessage),
                   )}
                 />
-              ) : null}
-
-              {sparksChat && selectedMessage && !selectedMessage.deleted ? (
-                selectedMessage.spark ? (
-                  <MenuItem
-                    icon="sparkles"
-                    label="Open Spark"
-                    onPress={menuTap(() => {
-                      const sparkId = selectedMessage?.spark?.id;
-                      closeMenu();
-                      if (sparkId) {
-                        setTimeout(() => setOpenSparkId(sparkId), 300);
-                      }
-                    })}
-                  />
-                ) : (
-                  <MenuItem
-                    icon="sparkles-outline"
-                    label="Start a Spark"
-                    onPress={menuTap(() => {
-                      const seed = selectedMessage;
-                      closeMenu();
-                      if (seed) {
-                        setTimeout(() => setSparkSeed(seed), 300);
-                      }
-                    })}
-                  />
-                )
               ) : null}
 
               <MenuItem
@@ -5648,16 +5723,12 @@ export default function ChatScreen() {
                   () => selectedMessage && selectMessage(selectedMessage),
                 )}
               />
-
-              <MenuItem
-                icon="trash-outline"
-                label={selectedMessageIsMine ? "Delete your message" : "Delete"}
-                danger
-                onPress={menuTap(
-                  () => selectedMessage && deletePrompt(selectedMessage),
-                )}
-              />
             </View>
+            </ScrollView>
+
+            {selectedMessageIsMine ? (
+              <Text style={styles.menuFootnote}>Your message · only you can edit this text</Text>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -7428,6 +7499,47 @@ const STYLE_PAIR = themedStyles({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F3",
     marginBottom: 2,
+  },
+
+  // Figma M10: the pressed message, shown at the top of the sheet.
+  menuMessage: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  menuMessageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  menuMessageInitials: { fontFamily: FONTS.semibold, fontSize: 11, color: "#7D356D" },
+
+  menuMessageBody: { flex: 1, minWidth: 0 },
+
+  menuMessageBubble: {
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+    backgroundColor: "#F0F4F9",
+  },
+
+  menuMessageText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#24283C" },
+
+  menuMessageTime: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 11, color: "#66738A" },
+
+  menuScroll: { flexGrow: 0, maxHeight: 330 },
+
+  menuFootnote: {
+    marginTop: 10,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#66738A",
   },
 
   menuPreviewText: {
