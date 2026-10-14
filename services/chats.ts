@@ -729,6 +729,13 @@ export type ChatMember = {
   name?: string | null;
   avatarKey?: string | null;
   avatarPhotoUrl?: string | null;
+  faction?: string | null;
+  // "Front-end", "Design"... (their expertise role, if set).
+  expertise?: string | null;
+  // Faction rank (newer backends only).
+  rank?: Rank | null;
+  // Owner / admin (only if the backend sends it).
+  role?: "owner" | "admin" | "member" | null;
 };
 
 export async function getChatMembers(
@@ -762,6 +769,11 @@ export async function getChatMembers(
         name: member?.name || null,
         avatarKey: member?.avatarKey ?? null,
         avatarPhotoUrl: member?.avatarPhotoUrl ?? null,
+        faction: member?.faction ?? null,
+        expertise: typeof member?.expertise === "string" && member.expertise ? member.expertise : null,
+        rank: member?.rank && typeof member.rank === "object" && member.rank.name ? (member.rank as Rank) : null,
+        role:
+          member?.role === "owner" || member?.role === "admin" || member?.role === "member" ? member.role : null,
       }))
       .filter((member) => member.id && member.username),
     total: response?.pagination?.total ?? list.length,
