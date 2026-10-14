@@ -27,6 +27,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
 import {
+  STAGE_ENTER_ABOVE,
+  manageCallSubscriptions,
+  useJoinConnectOptions,
+} from "@/components/calls/callSubscriptions";
+import StageLayout, {
+  type RenderStageVideo,
+} from "@/components/calls/StageLayout";
+import { useStageMode } from "@/components/calls/stageModel";
+import {
   AnimatedDots,
   CALL_COLORS,
   CallAvatar,
@@ -114,6 +123,15 @@ function WebVideo({
   );
 }
 
+// One camera on the big-call stage (module level, so it never changes).
+const renderStageVideo: RenderStageVideo = (_participant, publication, { mirror }) =>
+  publication.track ? (
+    <WebVideo track={publication.track as VideoTrack} mirror={mirror} />
+  ) : null;
+
+// Big rooms: rebuild the people list at most this often.
+const BIG_ROOM_REFRESH_MS = 300;
+
 // ==========================================
 // CALL SCREEN
 // ==========================================
@@ -171,6 +189,15 @@ export default function CallSession() {
   const [needsAudioTap, setNeedsAudioTap] = useState(false);
 
   const roomRef = useRef<Room | null>(null);
+  // The same room, as state, for the big-call stage.
+  const [stageRoom, setStageRoom] = useState<Room | null>(null);
+
+  // Joining a call that's already big: cameras are subscribed by hand
+  // (only the ones on screen). See callSubscriptions.ts.
+  const connectOptions = useJoinConnectOptions(active?.call);
+
+  // More than 8 people → the speaker stage instead of the grid.
+  const stageMode = useStageMode(remoteCount + 1);
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
   const leavingRef = useRef(false);
   const notifyServerRef = useRef(true);
@@ -247,8 +274,18 @@ export default function CallSession() {
 
     roomRef.current = room;
 
+    // Receive only the cameras on screen once the call is big.
+    const stopSubscriptions = manageCallSubscriptions(
+      room,
+      connectOptions.autoSubscribe,
+    );
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
     // Rebuilds the list of people (and their videos) from the room.
-    const refreshRemotes = () => {
+    const refreshRemotesNow = () => {
+      refreshTimer = null;
+
       const people: {
         identity: string;
         name: string;
@@ -279,6 +316,16 @@ export default function CallSession() {
 
       setRemotePeople(people);
       setRemoteVideo(people.find((person) => person.video)?.video || null);
+    };
+
+    // Small calls: straight away, as before. Big rooms: joins and camera
+    // changes can arrive many times a second, so batch them.
+    const refreshRemotes = () => {
+      if (room.remoteParticipants.size <= STAGE_ENTER_ABOVE) {
+        refreshRemotesNow();
+      } else if (refreshTimer === null) {
+        refreshTimer = setTimeout(refreshRemotesNow, BIG_ROOM_REFRESH_MS);
+      }
     };
 
     const updateRemoteCount = () => {
@@ -348,12 +395,13 @@ export default function CallSession() {
 
     (async () => {
       try {
-        await room.connect(livekitUrl, livekitToken);
+        await room.connect(livekitUrl, livekitToken, connectOptions);
 
         if (cancelled) {
           return;
         }
 
+        setStageRoom(room);
         updateRemoteCount();
 
         // The browser shows its own microphone / camera permission popup here.
@@ -386,14 +434,21 @@ export default function CallSession() {
     return () => {
       cancelled = true;
 
+      stopSubscriptions();
+
+      if (refreshTimer !== null) {
+        clearTimeout(refreshTimer);
+      }
+
       audioElementsRef.current.forEach((element) => element.remove());
       audioElementsRef.current = [];
 
       room.removeAllListeners();
       room.disconnect();
       roomRef.current = null;
+      setStageRoom(null);
     };
-  }, [livekitUrl, livekitToken, isVideoCall, finish]);
+  }, [livekitUrl, livekitToken, isVideoCall, finish, connectOptions]);
 
   // ---------- connection state ----------
 
@@ -641,6 +696,29 @@ export default function CallSession() {
       </View>
     </View>
   );
+
+  // ==========================================
+  // BIG CALL (more than 8 people): speaker stage + list, audio or video.
+  // Only the tiles on screen receive video. See StageLayout.
+  // ==========================================
+
+  if (stageMode && stageRoom) {
+    return (
+      <StageLayout
+        room={stageRoom}
+        call={active.call}
+        title={displayName}
+        status={statusText}
+        live={answered && !endMessage}
+        waiting={waiting}
+        mirrorSelf={facing === "user"}
+        renderVideo={renderStageVideo}
+        controls={videoBar}
+        overlay={addPeopleSheet}
+        topExtra={audioTapButton}
+      />
+    );
+  }
 
   // ==========================================
   // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)
