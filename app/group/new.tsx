@@ -206,6 +206,11 @@ export default function NewGroup() {
   const authUser = useAppSelector((state) => state.auth.user) as any;
   const myFaction: string | null = user?.faction || authUser?.faction || null;
   const myUsername: string = user?.profile?.username || authUser?.profile?.username || "you";
+  // Figma M24: "by Sarthak" - the display name when there is one.
+  const myName = useAppSelector((state) => {
+    const profile = (state.auth.user as any)?.profile;
+    return profile?.displayName || profile?.firstName || "";
+  }) || myUsername;
 
   const [step, setStep] = useState<Step>(1);
 
@@ -388,7 +393,7 @@ export default function NewGroup() {
             {created ? (
               <Text style={styles.subtitle}>
                 Created {new Date().toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })} · by{" "}
-                {myUsername}
+                {myName}
               </Text>
             ) : step === 4 ? (
               <Text style={styles.subtitle}>{KIND_LABEL[kind]} group</Text>
