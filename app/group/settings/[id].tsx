@@ -1,12 +1,14 @@
 ﻿// ==========================================
 // GROUP SETTINGS (Figma M27)
 // ==========================================
-// Group controls (admins): name/photo/description, joining & privacy.
-// Your personal preferences: mute all group activity, mute thread activity
-// only (coming soon), read receipts (your account-wide setting).
-// Conversation: search chat history (coming soon), pinned messages & media.
-// Management (admins): members & administrators, join requests,
-// moderation & slow mode. Plus Leave group. Built from the screenshot.
+// In the design's order: the group header ("Sarthak · Owner"); GROUP
+// CONTROLS · ADMIN ONLY (name, photo & description; joining & privacy);
+// YOUR PERSONAL PREFERENCES (mute all, mute thread activity only, read
+// receipts); CONVERSATION (search, pinned messages & media); MANAGEMENT ·
+// ADMIN ONLY (members & administrators, join requests, moderation & slow
+// mode) - or a plain "Members" row for everyone else. Things the design
+// doesn't show (Manage Sparks, Sparks AI, administrators, your expertise
+// role, invite link, leave group) follow under SPARKS and MORE.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { FONTS } from "@/constants/fonts";
-import { getGroup, leaveGroup, muteGroup, type Group } from "@/services/groups";
+import { getGroup, getGroupMembers, leaveGroup, muteGroup, type Group } from "@/services/groups";
 import { getPrivacy, updatePrivacy } from "@/services/privacy";
 import ExpertisePicker from "@/components/groups/ExpertisePicker";
 import { setSparksMuted } from "@/services/chatPrefs";
@@ -36,6 +38,18 @@ const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   open: "globe-outline",
   private: "lock-closed-outline",
 };
+
+function plural(count: number, word: string) {
+  return `${count} ${count === 1 ? word : `${word}s`}`;
+}
+
+// "Admin approval · limit 100 · members only"
+function joiningHint(group: Group) {
+  const joining =
+    group.kind === "faction" ? "Faction members" : group.joinMode === "approval" ? "Admin approval" : "Anyone can join";
+  const list = group.memberListVisibility === "admins" ? "admins only" : "members only";
+  return `${joining} · limit ${group.sizeLimit} · ${list}`;
+}
 
 function Row({
   title,
@@ -74,7 +88,12 @@ export default function GroupSettings() {
   const token = useAppSelector((state) => state.auth.token);
   const user = useAppSelector((state) => state.user.user) as any;
   const authUser = useAppSelector((state) => state.auth.user) as any;
-  const myName = user?.profile?.username || authUser?.profile?.username || "You";
+  const myName =
+    user?.profile?.firstName ||
+    authUser?.profile?.firstName ||
+    user?.profile?.username ||
+    authUser?.profile?.username ||
+    "You";
   // My mute for this group comes with the chat list.
   const chatRow = useAppSelector((state) =>
     (state.chat.conversations as any[]).find((chat) => String(chat.id) === String(groupId)),
@@ -87,6 +106,8 @@ export default function GroupSettings() {
   const [busy, setBusy] = useState<string | null>(null);
   const [sparksMuted, setSparksMutedState] = useState(false);
   const [showExpertise, setShowExpertise] = useState(false);
+  // "2 administrators" (null = unknown, so it's left out).
+  const [adminCount, setAdminCount] = useState<number | null>(null);
   const [expertise, setExpertise] = useState<string | null>(user?.expertiseLabel || authUser?.expertiseLabel || null);
 
   useEffect(() => {
@@ -126,6 +147,29 @@ export default function GroupSettings() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Count the owner/admins with ONE request (up to 100 people). Bigger
+  // groups would need many pages, so the count is left out for them unless
+  // the backend sends it with the group.
+  const isAdmin = group?.myRole === "owner" || group?.myRole === "admin";
+  const sentAdminCount = Number((group as any)?.adminCount);
+  useEffect(() => {
+    if (!token || !groupId || !isAdmin) return;
+    if (Number.isFinite(sentAdminCount) && sentAdminCount > 0) {
+      setAdminCount(sentAdminCount);
+      return;
+    }
+    let cancelled = false;
+    getGroupMembers(groupId, { limit: 100 }, token)
+      .then((result) => {
+        if (cancelled || result.hasMore) return;
+        setAdminCount(result.members.filter((member) => member.role === "owner" || member.role === "admin").length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, groupId, isAdmin, sentAdminCount]);
 
   const toggleMute = async (next: boolean) => {
     if (!token || !groupId) return;
@@ -176,11 +220,10 @@ export default function GroupSettings() {
     ]);
   };
 
-  const comingSoon = (what: string) => Alert.alert(what, `${what} is coming soon.`);
   const openInfo = () => router.push({ pathname: "/group/[id]", params: { id: groupId } });
   const openChat = () => router.push({ pathname: "/chat/[id]", params: { id: groupId } });
 
-  const admin = group?.myRole === "owner" || group?.myRole === "admin";
+  const admin = isAdmin;
   const roleLabel = group?.myRole === "owner" ? "Owner" : group?.myRole === "admin" ? "Admin" : "Member";
 
   return (
@@ -235,25 +278,7 @@ export default function GroupSettings() {
               <Text style={styles.section}>GROUP CONTROLS · ADMIN ONLY</Text>
               <View style={styles.card}>
                 <Row title="Name, photo & description" hint="Edit the group profile" icon="pencil-outline" onPress={openInfo} />
-                <Row
-                  title="Joining & privacy"
-                  hint={`${group.joinMode === "approval" ? "Admin approval" : "Instant join"} · limit ${group.sizeLimit} · list visible to ${group.memberListVisibility}`}
-                  icon="chevron-forward"
-                  onPress={() => router.push({ pathname: "/group/moderation/[id]", params: { id: groupId } })}
-                />
-                <Row
-                  title="Administrators"
-                  hint="Promote a member to admin"
-                  icon="chevron-forward"
-                  onPress={() => router.push({ pathname: "/group/admins/[id]", params: { id: groupId } })}
-                />
-                <Row
-                  title="Manage Sparks"
-                  hint="Pin, delete or merge Sparks"
-                  icon="chevron-forward"
-                  onPress={() => router.push({ pathname: "/group/sparks/[id]", params: { id: groupId } })}
-                  last
-                />
+                <Row title="Joining & privacy" hint={joiningHint(group)} icon="chevron-forward" onPress={openInfo} last />
               </View>
             </>
           ) : null}
@@ -267,24 +292,12 @@ export default function GroupSettings() {
             />
             <Row
               title="Mute thread activity only"
-              hint="Replies inside Sparks stay quiet · main chat stays audible"
+              hint="Main chat stays audible"
               right={<PinkSwitch value={sparksMuted} onChange={toggleSparksMuted} />}
             />
             <Row
-              title="Your expertise role"
-              hint={expertise ? `${expertise} · shown under your name` : "Not set · e.g. Front-end, Design"}
-              icon="chevron-forward"
-              onPress={() => setShowExpertise(true)}
-            />
-            <Row
-              title="Sparks AI on this phone"
-              hint="Can this phone run the AI? Download it"
-              icon="chevron-forward"
-              onPress={() => router.push("/sparks-model")}
-            />
-            <Row
               title="Read receipts"
-              hint={`Optional · currently ${receipts ? "on" : "off"} (all your chats)`}
+              hint={`Optional · currently ${receipts ? "on" : "off"}`}
               right={<PinkSwitch value={receipts} onChange={toggleReceipts} disabled={busy === "receipts"} />}
               last
             />
@@ -298,52 +311,93 @@ export default function GroupSettings() {
               icon="search-outline"
               onPress={() => router.push({ pathname: "/chat/search/[id]", params: { id: groupId } })}
             />
-            <Row title="Pinned messages & media" hint="Open the chat to see pins" icon="pin-outline" onPress={openChat} />
-            {!admin && group.canSeeMembers ? (
-              <Row
-                title="Members"
-                hint={`${group.memberCount} members`}
-                icon="chevron-forward"
-                onPress={() => router.push({ pathname: "/group/members/[id]", params: { id: groupId } })}
-              />
-            ) : null}
-            <Row title="Invite link" hint="Copy, share or reset" icon="link-outline" onPress={openInfo} last />
+            <Row title="Pinned messages & media" hint="Open the chat to see pins" icon="pin-outline" onPress={openChat} last />
           </View>
 
-          {/* MANAGEMENT (admins) */}
+          {/* MANAGEMENT (admins) / MEMBERS (everyone else) */}
           {admin ? (
             <>
               <Text style={styles.section}>MANAGEMENT · ADMIN ONLY</Text>
               <View style={styles.card}>
                 <Row
                   title="Members & administrators"
-                  hint={`${group.memberCount} members`}
+                  hint={`${plural(group.memberCount, "member")}${adminCount !== null ? ` · ${plural(adminCount, "administrator")}` : ""}`}
                   icon="chevron-forward"
                   onPress={() => router.push({ pathname: "/group/members/[id]", params: { id: groupId } })}
                 />
                 <Row
                   title="Join requests"
-                  hint={group.pendingRequestCount ? `${group.pendingRequestCount} awaiting review` : "None waiting"}
+                  hint={`${group.pendingRequestCount} awaiting review`}
                   icon="chevron-forward"
                   onPress={() => router.push({ pathname: "/group/requests/[id]", params: { id: groupId } })}
                 />
                 <Row
                   title="Moderation & slow mode"
-                  hint={`Manage members and posting frequency${group.slowModeSeconds ? ` · slow mode ${group.slowModeSeconds}s` : ""}`}
+                  hint="Manage members and posting frequency"
                   icon="chevron-forward"
-                  onPress={openInfo}
+                  onPress={() => router.push({ pathname: "/group/moderation/[id]", params: { id: groupId } })}
+                  last
+                />
+              </View>
+            </>
+          ) : group.canSeeMembers !== false ? (
+            <>
+              <Text style={styles.section}>MEMBERS</Text>
+              <View style={styles.card}>
+                <Row
+                  title="Members"
+                  hint={plural(group.memberCount, "member")}
+                  icon="chevron-forward"
+                  onPress={() => router.push({ pathname: "/group/members/[id]", params: { id: groupId } })}
                   last
                 />
               </View>
             </>
           ) : null}
 
-          <View style={[styles.card, styles.leaveCard]}>
+          {/* SPARKS */}
+          <Text style={styles.section}>SPARKS</Text>
+          <View style={styles.card}>
+            {admin ? (
+              <Row
+                title="Manage Sparks"
+                hint="Pin, delete or merge Sparks"
+                icon="chevron-forward"
+                onPress={() => router.push({ pathname: "/group/sparks/[id]", params: { id: groupId } })}
+              />
+            ) : null}
+            <Row
+              title="Sparks AI on this phone"
+              hint="Can this phone run the AI? Download it"
+              icon="chevron-forward"
+              onPress={() => router.push("/sparks-model")}
+              last
+            />
+          </View>
+
+          {/* MORE */}
+          <Text style={styles.section}>MORE</Text>
+          <View style={styles.card}>
+            {admin ? (
+              <Row
+                title="Administrators"
+                hint="Promote a member to admin"
+                icon="chevron-forward"
+                onPress={() => router.push({ pathname: "/group/admins/[id]", params: { id: groupId } })}
+              />
+            ) : null}
+            <Row
+              title="Your expertise role"
+              hint={expertise ? `${expertise} · shown under your name` : "Not set · e.g. Front-end, Design"}
+              icon="chevron-forward"
+              onPress={() => setShowExpertise(true)}
+            />
+            <Row title="Invite link" hint="Copy, share or reset" icon="link-outline" onPress={openInfo} />
             <Row title="Leave group" icon="exit-outline" onPress={confirmLeave} danger last />
           </View>
         </ScrollView>
       ) : (
-        <Text style={styles.empty}>This group isn't available.</Text>
+        <Text style={styles.empty}>This group isn&apos;t available.</Text>
       )}
 
       <ExpertisePicker
@@ -396,8 +450,6 @@ const styles = StyleSheet.create({
   section: { marginTop: 22, marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 12, letterSpacing: 0.4, color: MUTED },
 
   card: { paddingHorizontal: 14, borderRadius: 18, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: LINE },
-
-  leaveCard: { marginTop: 22 },
 
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: LINE },
 
