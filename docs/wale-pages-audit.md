@@ -56,4 +56,71 @@ so no rank shows today. See the final status below.
 
 ## Final status (after this branch)
 
-Filled in at the end of the work. See the section below.
+Screenshots: `docs/wale-pages/MNN.png` puts each design next to the built
+screen (design | built). They were taken from the web build at 390 x 844.
+The data came from the `wale-pages-backend` branch running locally on an
+in-memory database, seeded to match the designs: 24 members, with ranks,
+expertise, Sparks, a revived Spark, a poll and join requests. See "How the
+screenshots were made" below.
+
+Emoji show as empty boxes in the screenshots because the headless browser
+has no emoji font. That is not an app bug.
+
+| Screen | Status | Remaining differences from the design |
+|---|---|---|
+| M01 Chat hub | done | The hub is a tab, so it keeps the app's tab header (avatar and bell) and tab bar instead of back/close. "Create a group" is at the end of the list rather than pinned above the tab bar. |
+| M02 Conversation | done | The header keeps a search icon (the design reaches search through group settings). Your own bubbles are a lighter pink than the design's mauve. "N online" counts members connected right now (backend `onlineCount`). |
+| M03 Option A, side rail | done (pending choice) | One setting in Settings › Appearance picks A, B or C. It is per device and B is the default. Revived Sparks use a teal clock icon; the design's ring colour differs slightly. |
+| M04 Option B, top orbit | done (pending choice, default) | |
+| M05 Option C, inline cards | done (pending choice) | The inline card's second line is the Spark summary (or "active now"), not a hand-written line like "3 people planning Saturday". |
+| M06 Dark mode | done | The chat follows the phone's appearance (or the Light/Dark choice in Appearance). The colours are derived from the light theme, so some tints differ slightly from the mock-up. The other app screens stay light, as before. |
+| M07 Active Spark overlay | done | The panel is a full-height sheet from the right rather than a floating card. The running summary only exists once a phone has run the summary job (Sparks SDK); before that, no card is shown. |
+| M08 Dormant Spark card | done | |
+| M09 Revived Spark history | done | The seam label comes from the Sparks module ("10 months later" etc.). |
+| M10 Long-press actions | done | The extra actions (Undo edit, Copy, Forward, Pin, Info, Copy link, Select) are listed below the design's four. |
+| M11 Start a Spark | done | |
+| M12 Topic match decision | done | Matches come from the backend (lexical). The SDK's on-phone match runs only where the SDK is on. |
+| M13 Checkbox mentions | done | The search box and the summary/button stay fixed while the list scrolls, so the picker stays usable with 1,000 members. |
+| M14 Quote reply with mentions | done | |
+| M15 Own-message edit and rollback | done | |
+| M16 In-chat search | done | Results match the text literally, as before; the backend has no fuzzy search. The date filter needs the backend branch. |
+| M17 Media and voice share | done | The screenshot shows the sheet before media is picked (a browser can't be driven through the file picker). |
+| M18 Create poll | done | |
+| M19 Poll results and media | done | |
+| M20 to M24 Create-group flow | done | |
+| M25 Invite and pending approval | done | |
+| M26 Roster and member detail | done | Ranks need the backend branch. |
+| M27 Group settings | done | Extra rows that are not in the design (Manage Sparks, your expertise role, Sparks AI on this phone, Administrators, Invite link, Leave group) sit in two sections below the design's. "Pinned messages & media" still opens the chat instead of a pins list (the backend keeps one pin per chat). |
+| M28 Promote admin | done | |
+| M29 Join request moderation | done | |
+| M30 Member moderation and slow mode | done | |
+| M31 Manage Sparks | built to the current concept | Pin, delete and merge, each with a confirmation, for admins only. Awaiting Mark's requirements; no extra rules invented. Merge suggestions (SDK `suggestMerges`) are not shown: they only exist on a phone with the model, and the panel's requirements are pending. |
+| M32 Role pings | built to the current concept | Shows the Sparks bot's automatic role pings (`rolePings` on the Spark, recorded by the backend when the module applies a ping). The "earlier context" half shows only its "requirements pending" note. The SDK's retrieval (`findRelated`) is marked provisional, so no context is invented. |
+
+### Backend changes this needs (`wale-pages-backend`)
+
+The test server runs `main`, so until this branch is deployed:
+
+- ranks don't show;
+- "N online" doesn't show;
+- "Owner" / "Admin" doesn't show beside names in the chat;
+- the date filter in search doesn't narrow results on the server (the app also filters on the client);
+- the role-ping card never appears.
+
+What the branch adds:
+
+- `GET /api/ranks` and `rank` on every person in chat. The point levels are placeholders, waiting for Mark's ladder.
+- `onlineCount` on `GET /api/chats/:id`.
+- `from`, `to` and `sort` on chat search.
+- `rolePings` on Spark JSON.
+- `senderGroupRole` on messages.
+
+### How the screenshots were made
+
+- The web build was served locally and driven with Playwright and Chromium at 390 x 844, 2x.
+- The backend was `wale-pages-backend` run locally the way its test runner does (in-memory Mongo and Redis, `SPARKS_ENGINE=module`), with design-like data seeded through its REST API.
+- Three things a phone or the passage of time would normally produce were written straight into the local store:
+  - the two running summaries (a phone's summary job);
+  - the role pings (a phone's role-ping job, saved through the backend's own `addPing`);
+  - 11 months of silence before the revived Spark. Today's messages then revived it for real, and the module drew the seam.
+- The TEST backend could not be used for the full set because it rate-limited logins from this machine. A first pass against TEST (before any changes) is what the audit table above is based on.
