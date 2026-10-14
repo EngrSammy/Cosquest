@@ -95,7 +95,8 @@ export default function RootLayout() {
             {/* Ringing screen — shows on top of any screen when someone calls */}
             <IncomingCallListener />
 
-            <StatusBar style="auto" />
+            {/* Dark icons: most screens are light even when the phone is dark (the chat sets its own). */}
+            <StatusBar style="dark" />
           </UserProvider>
         </GestureHandlerRootView>
       </SessionGate>
