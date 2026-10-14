@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  formatCount,
   inviterOf,
   otherActiveMembers,
   personName,
@@ -31,6 +32,7 @@ import {
   CallBackground,
   CallLogo,
 } from "./CallVisuals";
+import { CallAvatarStack } from "./GroupCallMembers";
 import { useCallTone } from "./useCallTone";
 
 // Shows full screen whenever state.call.incoming is set. That happens
@@ -98,7 +100,7 @@ export default function IncomingCallListener() {
       ? `with ${others
           .slice(0, 3)
           .map((member) => personName(member.user).split(" ")[0])
-          .join(", ")}${others.length > 3 ? ` +${others.length - 3}` : ""}`
+          .join(", ")}${others.length > 3 ? ` +${formatCount(others.length - 3)}` : ""}`
       : "added you to a call"
     : null;
 
@@ -160,6 +162,12 @@ export default function IncomingCallListener() {
             <Text style={styles.groupLine} numberOfLines={1}>
               {groupLine}
             </Text>
+          ) : null}
+
+          {others.length > 1 ? (
+            <View style={styles.stack}>
+              <CallAvatarStack people={others.map((member) => member.user)} />
+            </View>
           ) : null}
 
           <View style={styles.statusRow}>
@@ -245,6 +253,8 @@ const styles = StyleSheet.create({
   },
 
   status: { fontSize: 16, color: CALL_COLORS.muted },
+
+  stack: { marginTop: 12 },
 
   groupLine: {
     marginTop: 6,
