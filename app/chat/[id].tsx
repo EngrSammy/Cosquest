@@ -5110,11 +5110,11 @@ export default function ChatScreen() {
                 </View>
               );
             }}
-            contentContainerStyle={[
-              styles.list,
-              // Option A: leave room on the right for the side rail (M03).
-              sparksChat && sparkLayout === "rail" && sparks.length ? styles.listWithRail : null,
-            ]}
+            // Option A: the list itself stops short of the side rail (M03),
+            // so bubbles never run under it (a content padding wasn't enough
+            // on Android).
+            style={sparksChat && sparkLayout === "rail" && sparks.length ? styles.listWithRail : undefined}
+            contentContainerStyle={styles.list}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           />
@@ -6438,7 +6438,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   // Text messages: the Spark sits on the time row instead (Figma M03-M05).
-  listWithRail: { paddingRight: 92 },
+  listWithRail: { marginRight: 84 },
 
   sparkFootRow: {
     flexDirection: "row",
