@@ -86,7 +86,13 @@ export default function Community() {
               </View>
             </Pressable>
 
-            <Text style={styles.headerTitle}>Community</Text>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.headerTitle}>Community</Text>
+              {/* Figma M01 (chat hub) */}
+              {tab === "Chats" ? (
+                <Text style={styles.headerSubtitle}>Your people. Your next adventure.</Text>
+              ) : null}
+            </View>
 
             <Pressable
               onPress={() => router.push("/notifications")}
@@ -174,6 +180,15 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.semibold,
     fontSize: 22,
     color: "#000000",
+  },
+
+  headerTitleWrap: { alignItems: "center" },
+
+  headerSubtitle: {
+    marginTop: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#66738A",
   },
 
   // Figma: a bigger avatar on a soft pink circle.
