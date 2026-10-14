@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^15.0.2",
-    "@cosquest/sparks-sdk": "file:vendor/cosquest-sparks-sdk-1.2.1.tgz",
+    "@cosquest/sparks-sdk": "file:vendor/cosquest-sparks-sdk-1.2.4.tgz",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@livekit/react-native": "^3.0.0",

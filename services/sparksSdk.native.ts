@@ -106,6 +106,13 @@ function listen(socket: any) {
     if (sdk) sdk.receive(msg);
     else early.push(msg);
   });
+  // A reconnected socket is a new connection to the backend, which no longer
+  // knows this device: the SDK registers again (SDK 1.2.4).
+  let connectedBefore = !!socket.connected;
+  socket.on("connect", () => {
+    if (connectedBefore) void sdk?.transportReconnected().catch(() => undefined);
+    connectedBefore = true;
+  });
 }
 
 /** Start the SDK for this user (once). Safe to call from many screens. */
@@ -131,14 +138,19 @@ export async function startSparks(
       modelManifestUrl: SPARKS_MODEL_MANIFEST,
       getAuthToken: async () => getToken?.() || "",
       // Through our socket. No answer in 10 s: emitWithAck rejects and the SDK
-      // retries with backoff. An answer with `error` is a refusal (retrying
-      // wouldn't help), so it resolves (as in Subomi's sparks.js).
+      // retries with backoff. An answer with `error` is a refusal; it is
+      // returned so the SDK can act on it (on "register first" it registers
+      // again by itself, SDK 1.2.4).
       transport: {
         send: async (msg) => {
           const reply = await socket.timeout(10_000).emitWithAck("sparks", msg);
           if (reply?.error) console.warn("[sparks] refused:", reply.error);
+          return reply;
         },
       },
+      // Dev builds log every job step (offer, accepted or refused and why, each
+      // model call with its timing, result or release).
+      logLevel: __DEV__ ? "info" : "warn",
     });
 
     sdk = created;
