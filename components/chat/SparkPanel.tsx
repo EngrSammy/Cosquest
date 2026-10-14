@@ -393,17 +393,21 @@ export default function SparkPanel({
             </View>
           ) : null}
 
+          {/* RUNNING SUMMARY (Figma M07/M09: stays at the top while the
+              messages scroll under it) */}
+          {!loading && spark?.summary ? (
+            <View style={styles.summary}>
+              <Text style={styles.summaryLabel}>Sparks bot · Running summary</Text>
+              <Text style={styles.summaryText} numberOfLines={6}>
+                {spark.summary}
+              </Text>
+            </View>
+          ) : null}
+
           {loading ? (
             <ActivityIndicator color={PINK} style={styles.loading} />
           ) : (
             <ScrollView ref={listRef} style={styles.list} contentContainerStyle={styles.listContent}>
-              {/* RUNNING SUMMARY */}
-              {spark?.summary ? (
-                <View style={styles.summary}>
-                  <Text style={styles.summaryLabel}>Sparks bot · Running summary</Text>
-                  <Text style={styles.summaryText}>{spark.summary}</Text>
-                </View>
-              ) : null}
 
               {/* LEGEND (revived): past -> history -> today */}
               {revived ? (
