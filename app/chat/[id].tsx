@@ -41,6 +41,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import CallNotesSheet, { callNotesEnabled } from "@/components/calls/CallNotesSheet";
 
 import {
   createMessage,
@@ -1974,7 +1975,25 @@ function CallLogContent({
   const subColor = mine ? "#6B6B72" : "#8A8A90";
   const arrowColor = missedForMe ? "#E5484D" : mine ? "#C5399A" : "#2FB36B";
 
+  // The call's Sparks: answered calls only, opened from the "Sparks" link.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const token = useAppSelector((state) => state.auth.token);
+  const authUser = useAppSelector((state) => state.auth.user);
+  const conversation = useAppSelector((state) =>
+    msg.conversationId ? state.chat.conversationDetails[msg.conversationId] : undefined,
+  ) as Chat | undefined;
+  const showNotes = callNotesEnabled && answered && Boolean(log.callId);
+
+  const nameOf = (userId: string) => {
+    const meId = authUser?.id || (authUser as any)?._id;
+    if (userId === meId) return "you";
+    const other = conversation?.otherParticipant;
+    if (other && (other.id === userId || other._id === userId)) return other.username || "them";
+    return "someone on the call";
+  };
+
   return (
+    <>
     <Pressable
       onPress={() => onCallBack(video ? "video" : "audio")}
       onLongPress={onLongPress}
@@ -2014,8 +2033,31 @@ function CallLogContent({
             {detail}
           </Text>
         </View>
+
+        {showNotes ? (
+          <Pressable
+            onPress={() => setNotesOpen(true)}
+            hitSlop={8}
+            style={styles.callLogNotes}
+            accessibilityRole="button"
+            accessibilityLabel="Sparks from this call">
+            <Ionicons name="sparkles" size={12} color="#C5399A" />
+            <Text style={styles.callLogNotesText}>Sparks</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
+
+    {showNotes ? (
+      <CallNotesSheet
+        callId={String(log.callId)}
+        token={token}
+        visible={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        nameOf={nameOf}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -6985,6 +7027,20 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     fontSize: 12,
     fontVariant: ["tabular-nums"],
+  },
+
+  callLogNotes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+
+  callLogNotesText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#C5399A",
   },
 
   // DOCUMENT

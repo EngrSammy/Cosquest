@@ -4,7 +4,7 @@
 // Subomi's SDK is native (iOS and Android only), so the website never loads
 // it. Phones use services/sparksSdk.native.ts. The website still shows every
 // Spark: they come from our backend, worked out by members' phones.
-import type { DeviceCapabilities, ModelStatus } from "@cosquest/sparks-sdk";
+import type { DeviceCapabilities, ModelStatus, SparksSdk } from "@cosquest/sparks-sdk";
 
 export type { ModelStatus, DeviceCapabilities };
 
@@ -14,7 +14,7 @@ export function sparksEnabled() {
   return false;
 }
 
-export function getSparksSdk() {
+export function getSparksSdk(): SparksSdk | null {
   return null;
 }
 

@@ -12,7 +12,7 @@ import {
 } from "@livekit/react-native";
 import { LocalVideoTrack, RoomOptions, Track } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
@@ -27,10 +27,14 @@ import {
 import GroupCallMembers, {
   groupCallTitle,
 } from "@/components/calls/GroupCallMembers";
+import SparksCallNotes from "@/components/calls/SparksCallNotes";
+import SparksCallPanel from "@/components/calls/SparksCallPanel";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
 import type { Call } from "@/services/calls";
 import { otherActiveMembers } from "@/services/calls";
+import { useSparksCallNotes } from "@/services/sparksCallNotes";
+import { useSparksBoot } from "@/hooks/useSparks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
@@ -42,6 +46,10 @@ const RING_TIMEOUT_MS = 47_000;
 
 // Backup check while ringing, in case a call:updated socket event is missed.
 const RINGING_SAFETY_POLL_MS = 5000;
+
+// Height of the audio layout's control card (buttons + End pill): Sparks
+// call notes float just above it.
+const AUDIO_CARD_HEIGHT = 200;
 
 // How long "Call declined" / "No answer" stays on screen before closing.
 const END_MESSAGE_MS = 1400;
@@ -147,6 +155,10 @@ async function routeAudio(speakerOn: boolean) {
 // person minimizes it and uses the rest of the app (chat, feed, ...).
 export default function CallSession() {
   const dispatch = useAppDispatch();
+
+  // Sparks may not be running yet (it starts when Chats opens): a call
+  // answered straight from the ringing screen needs it for call notes.
+  useSparksBoot();
 
   const callId = useAppSelector((state) => state.call.active?.call.id);
 
@@ -384,6 +396,48 @@ function CallStage({
 
   const answered = answeredAt !== null;
   const remoteCount = remoteParticipants.length;
+
+  // Sparks call notes (phones with Sparks on): this user's speech becomes
+  // text on their own phone while the call is answered and they're unmuted.
+  const notes = useSparksCallNotes({
+    callId: call.id,
+    chatId: call.conversationId,
+    startedAt:
+      call.answeredAt ||
+      (answeredAt !== null ? new Date(answeredAt).toISOString() : null),
+    active: answered && call.status === "accepted" && !endMessage,
+    micOn: isMicrophoneEnabled,
+  });
+
+  // Two pages: the call, and its Sparks (swipe across, or "Sparks ›").
+  const { width: pageWidth } = useWindowDimensions();
+  const pages = useRef<ScrollView>(null);
+  const openSparks = useCallback(() => pages.current?.scrollTo({ x: pageWidth, animated: true }), [pageWidth]);
+  const backToCall = useCallback(() => pages.current?.scrollTo({ x: 0, animated: true }), []);
+  const pager = (callPage: React.ReactElement) => (
+    <ScrollView
+      ref={pages}
+      horizontal
+      pagingEnabled
+      bounces={false}
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.pages}>
+      <View style={{ width: pageWidth }}>{callPage}</View>
+      <View style={{ width: pageWidth }}>
+        <CallBackground>
+          <SparksCallPanel
+            notes={notes}
+            call={call}
+            myUserId={myUserId}
+            topInset={insets.top}
+            bottomInset={insets.bottom}
+            onBack={backToCall}
+          />
+        </CallBackground>
+      </View>
+    </ScrollView>
+  );
 
   // Who's talking right now (LiveKit identities are user ids).
   const speakingIds = [
@@ -640,7 +694,7 @@ function CallStage({
       a.participant.isLocal ? -1 : b.participant.isLocal ? 1 : 0,
     );
 
-    return (
+    return pager(
       <View style={styles.videoRoot}>
         <View
           style={[
@@ -698,6 +752,14 @@ function CallStage({
           </View>
         </View>
 
+        <SparksCallNotes
+          notes={notes}
+          call={call}
+          myUserId={myUserId}
+          style={[styles.notesOverlay, { bottom: insets.bottom + 112 }]}
+          onOpenSparks={openSparks}
+        />
+
         {videoBar}
 
         {addPeopleSheet}
@@ -708,7 +770,7 @@ function CallStage({
   if (videoLayout) {
     const localFullScreen = myCameraOn && !remoteTrack;
 
-    return (
+    return pager(
       <View style={styles.videoRoot}>
         {remoteTrack ? (
           <VideoTrack
@@ -765,6 +827,14 @@ function CallStage({
           </View>
         ) : null}
 
+        <SparksCallNotes
+          notes={notes}
+          call={call}
+          myUserId={myUserId}
+          style={[styles.notesOverlay, { bottom: insets.bottom + 112 }]}
+          onOpenSparks={openSparks}
+        />
+
         {videoBar}
 
         {addPeopleSheet}
@@ -776,7 +846,7 @@ function CallStage({
   // AUDIO / REQUESTING LAYOUT (Figma: cosquest-call-request)
   // ==========================================
 
-  return (
+  return pager(
     <CallBackground>
       <View style={[styles.audioTop, { paddingTop: insets.top + 24 }]}>
         <CallLogo />
@@ -802,6 +872,14 @@ function CallStage({
           {waiting ? <AnimatedDots /> : null}
         </View>
       </View>
+
+      <SparksCallNotes
+        notes={notes}
+        call={call}
+        myUserId={myUserId}
+        overlayBottom={insets.bottom + AUDIO_CARD_HEIGHT + 32}
+        onOpenSparks={openSparks}
+      />
 
       <View style={[styles.audioCard, { marginBottom: insets.bottom + 20 }]}>
         <View style={styles.audioControls}>
@@ -858,6 +936,12 @@ function CallStage({
 
 const styles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: "#1B0714" },
+
+  // SPARKS CALL NOTES
+
+  notesOverlay: { position: "absolute", left: 0, right: 0 },
+
+  pages: { flex: 1 },
 
   // AUDIO / REQUESTING
 

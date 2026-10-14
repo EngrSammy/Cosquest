@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.sparkscallaudio'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.sparkscallaudio"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  implementation project(':livekit_react-native')
+  implementation project(':livekit_react-native-webrtc')
+  implementation project(':cosquest_sparks-sdk')
+}

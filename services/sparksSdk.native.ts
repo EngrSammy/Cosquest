@@ -87,10 +87,16 @@ function watchLogin() {
 async function autoDownload(created: SparksSdk) {
   try {
     const caps = await created.getCapabilities();
-    if (!caps || caps.tier === "none") return;
+    if (!caps) return;
+    // Phones too old for the model still note their owner's speech on calls:
+    // ensure() fetches just the speech files for them.
+    if (caps.tier === "none") return void (await created.model.ensure({ allowCellular: false }));
     const status = created.model.status();
-    if (status.phase === "ready") return void created.model.load().catch(() => {});
-    if (status.phase !== "not_downloaded" && status.phase !== "download_paused" && status.phase !== "error") return;
+    // ensure() also when the model is already here: it checks the speech
+    // files too (call notes) and fetches any that are missing or were never
+    // verified (SDK 1.2.1 could leave one unfinished). Files already verified
+    // are not downloaded again.
+    if (!["ready", "not_downloaded", "download_paused", "error"].includes(status.phase)) return;
     const done = await created.model.ensure({ allowCellular: false });
     if (done.phase === "ready" && sdk === created) await created.model.load();
   } catch (error: any) {
