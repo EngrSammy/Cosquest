@@ -18,6 +18,7 @@ import {
   SoftButton,
   adminStyles,
 } from "@/components/groups/AdminUi";
+import { RankLine } from "@/components/chat/RankBadge";
 import { FONTS } from "@/constants/fonts";
 import { answerJoinRequest, getGroup, getJoinRequests, type Group, type JoinRequest } from "@/services/groups";
 import { useAppSelector } from "@/store/hooks";
@@ -97,6 +98,11 @@ export default function JoinRequests() {
         return (
           <View key={request.id} style={styles.card}>
             <Text style={styles.name}>{name}</Text>
+            {request.user.rank ? (
+              <View style={styles.rank}>
+                <RankLine rank={request.user.rank} />
+              </View>
+            ) : null}
             <Text style={styles.meta}>
               {whenLabel(request.createdAt)} · {request.via === "link" ? "group invitation link" : "asked to join"}
             </Text>
@@ -155,6 +161,8 @@ const styles = StyleSheet.create({
   },
 
   name: { fontFamily: FONTS.semibold, fontSize: 17, color: A.ink },
+
+  rank: { marginTop: 3 },
 
   meta: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 12, color: A.muted },
 
