@@ -34,6 +34,7 @@ import { getChatMembers } from "@/services/chats";
 import { getGroupMembers } from "@/services/groups";
 import type { Rank } from "@/services/ranks";
 import { useAppSelector } from "@/store/hooks";
+import { DARK_SCREEN_GRADIENT, LIGHT_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -95,6 +96,7 @@ function namesOf(people: MentionPerson[]) {
 }
 
 function Checkbox({ checked }: { checked: boolean }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={[styles.check, checked && styles.checkOn]}>
       {checked ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
@@ -115,6 +117,7 @@ const MemberRow = memo(function MemberRow({
   disabled: boolean;
   onToggle: (person: MentionPerson) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const name = person.name || person.username;
   const expertise = person.expertise || null;
   return (
@@ -154,6 +157,7 @@ const MemberRow = memo(function MemberRow({
 });
 
 function Separator() {
+  const styles = useThemedStyles(STYLE_PAIR);
   return <View style={styles.separator} />;
 }
 
@@ -173,6 +177,8 @@ export default function MentionPicker({
   // Shown under the title (defaults to the chat's own title).
   groupTitle?: string;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const screenGradient = useInk().dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
   const insets = useSafeAreaInsets();
 
   const chat = useAppSelector(
@@ -316,7 +322,7 @@ export default function MentionPicker({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
+      <LinearGradient colors={screenGradient} style={styles.screen}>
         {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Back">
@@ -426,7 +432,7 @@ export default function MentionPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
 
   flex: { flex: 1, minWidth: 0 },

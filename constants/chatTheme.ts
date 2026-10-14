@@ -200,3 +200,8 @@ export function useInk() {
     [dark],
   );
 }
+
+// The pale sheet / screen gradient used by the chat's full-screen pickers,
+// and its dark twin.
+export const LIGHT_SCREEN_GRADIENT = ["#F6F9FE", "#E3F0FC"] as const;
+export const DARK_SCREEN_GRADIENT = [DARK_CHAT_BG_2, DARK_CHAT_BG] as const;

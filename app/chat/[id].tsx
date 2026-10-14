@@ -1017,6 +1017,7 @@ const Bubble = memo(function Bubble({
   otherParticipant?: Chat["otherParticipant"];
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const onPhoto = useContext(PhotoWallpaperContext);
 
   // Someone mentioned me (or everyone): the bubble gets a pink edge.
@@ -1077,7 +1078,7 @@ const Bubble = memo(function Bubble({
       {groupChat ? (
         <View style={styles.avatarSlot}>
           {firstInGroup ? (
-            <View style={[styles.messageAvatar, { backgroundColor: avatarTint(senderName) }]}>
+            <View style={[styles.messageAvatar, { backgroundColor: ink.surface(avatarTint(senderName)) }]}>
               {avatar ? (
                 <ExpoImage
                   source={{
@@ -5109,7 +5110,11 @@ export default function ChatScreen() {
                 </View>
               );
             }}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[
+              styles.list,
+              // Option A: leave room on the right for the side rail (M03).
+              sparksChat && sparkLayout === "rail" && sparks.length ? styles.listWithRail : null,
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           />
@@ -5188,9 +5193,10 @@ export default function ChatScreen() {
 
             <View style={styles.editingContent}>
               <Text style={styles.editingTitle}>
+                {/* Figma M14: "Replying to Diego Ruiz" */}
                 {isMyMessage(replyingTo)
-                  ? "You"
-                  : replyingTo.sender?.username || "User"}
+                  ? "Replying to yourself"
+                  : `Replying to ${senderNameOf(replyingTo)}`}
               </Text>
 
               <Text numberOfLines={1} style={styles.editingText}>
@@ -6432,6 +6438,8 @@ const STYLE_PAIR = themedStyles({
   },
 
   // Text messages: the Spark sits on the time row instead (Figma M03-M05).
+  listWithRail: { paddingRight: 92 },
+
   sparkFootRow: {
     flexDirection: "row",
     alignItems: "center",

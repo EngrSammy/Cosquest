@@ -34,6 +34,7 @@ import { getMessageContext, searchChat, type SearchResult } from "@/services/cha
 import { useAppSelector } from "@/store/hooks";
 import { getPref, setPref } from "@/utils/prefsStorage";
 import { safeBack } from "@/utils/safeBack";
+import { DARK_SCREEN_GRADIENT, LIGHT_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -85,6 +86,7 @@ function textOf(message: any) {
 
 // Avatar, name + Owner/Admin, rank line, and the message bubble.
 function MessageBlock({ message, highlight }: { message: any; highlight?: boolean }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const sender = message.sender || {};
   const name = sender.name || sender.username || "Someone";
   const role = message.senderGroupRole;
@@ -119,6 +121,7 @@ const ResultCard = memo(function ResultCard({
   result: SearchResult;
   onJump: (result: SearchResult) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.card}>
       <Text style={styles.date}>{dateOf(result.message.createdAt)}</Text>
@@ -136,6 +139,8 @@ const ResultCard = memo(function ResultCard({
 });
 
 export default function SearchInChat() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const screenGradient = useInk().dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const conversationId = Array.isArray(id) ? id[0] : id;
@@ -300,7 +305,7 @@ export default function SearchInChat() {
   const recentShown = useMemo(() => recent.slice(0, RECENT_LIMIT), [recent]);
 
   return (
-    <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
+    <LinearGradient colors={screenGradient} style={styles.screen}>
       {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
@@ -441,7 +446,7 @@ export default function SearchInChat() {
 
       {/* SURROUNDING CONVERSATION */}
       <Modal visible={!!context} animationType="slide" onRequestClose={() => setContext(null)}>
-        <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
+        <LinearGradient colors={screenGradient} style={styles.screen}>
           <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
             <Pressable onPress={() => setContext(null)} hitSlop={10} accessibilityLabel="Back to results">
               <Ionicons name="chevron-back" size={26} color={INK} />
@@ -487,7 +492,7 @@ export default function SearchInChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
 
   flex: { flex: 1, minWidth: 0 },

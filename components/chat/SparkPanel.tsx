@@ -636,12 +636,13 @@ const STYLE_PAIR = themedStyles({
     padding: 12,
     borderRadius: 16,
     borderTopLeftRadius: 4,
-    backgroundColor: "#FFFFFF",
+    // Figma M07/M09: soft grey bubbles on the white panel.
+    backgroundColor: "#EEF1F6",
   },
 
-  bubbleMine: { backgroundColor: "#F3DDED" },
+  bubbleMine: { backgroundColor: "#EBCBE6" },
 
-  bubbleText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: INK },
+  bubbleText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: INK },
 
   bubbleTime: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 11, color: MUTED },
 
