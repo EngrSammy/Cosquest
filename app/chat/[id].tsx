@@ -99,7 +99,7 @@ import RolePingCard from "@/components/chat/RolePingCard";
 import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
 import { useSparkLayout } from "@/constants/sparkLayout";
-import { themedStyles, useInk, useThemedStyles, DARK_CHAT_BG } from "@/constants/chatTheme";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useSparksFeed } from "@/hooks/useSparks";
 import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
 import { voiceChatAllowed } from "@/services/voiceRooms";

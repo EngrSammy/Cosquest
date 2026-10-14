@@ -7,7 +7,7 @@
 // (Drawn from the rank's chevrons / bars / star, so new rank names from the
 // team just work. The designer's version can replace the drawing here.)
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
 import type { Rank } from "@/services/ranks";

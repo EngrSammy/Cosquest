@@ -10,7 +10,7 @@
 // Which layout shows is set in constants/sparkLayout.ts.
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, ScrollView, Text, View } from "react-native";
 
 import { DormantSparkCard } from "@/components/chat/SparksRail";
 import { FONTS } from "@/constants/fonts";

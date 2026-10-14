@@ -8,7 +8,7 @@
 // "Final results".
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
 import { pollIsClosed, votePoll, type PollSummary } from "@/services/polls";

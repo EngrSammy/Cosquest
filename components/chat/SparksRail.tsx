@@ -8,7 +8,7 @@
 // last message. Built from the screenshots for testing.
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
