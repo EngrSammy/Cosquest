@@ -534,8 +534,9 @@ const STYLE_PAIR = themedStyles({
     width: "81%",
     maxWidth: 440,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
+    // Figma M07/M09: a floating card over the chat, not a flush sheet.
+    borderRadius: 24,
+    marginRight: 10,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,

@@ -6687,7 +6687,8 @@ const STYLE_PAIR = themedStyles({
 
   bubbleTheirs: { backgroundColor: "#FFFFFF" },
 
-  bubbleMine: { backgroundColor: "#F3DDED" },
+  // Figma M02-M05: your own messages sit on a soft mauve.
+  bubbleMine: { backgroundColor: "#E9CDE6" },
 
 
   // On a photo wallpaper: solid, so the picture doesn't show through.

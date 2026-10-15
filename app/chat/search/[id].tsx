@@ -30,6 +30,7 @@ import { RankLine } from "@/components/chat/RankBadge";
 import { PersonAvatar } from "@/components/groups/AdminUi";
 import { FONTS } from "@/constants/fonts";
 import { getMessageContext, searchChat, type SearchResult } from "@/services/chatExtras";
+import { getConversation } from "@/services/chats";
 import { useAppSelector } from "@/store/hooks";
 import { getPref, setPref } from "@/utils/prefsStorage";
 import { safeBack } from "@/utils/safeBack";
@@ -150,7 +151,22 @@ export default function SearchInChat() {
       state.chat.conversationDetails[conversationId] ||
       (state.chat.conversations as any[]).find((item) => String(item.id) === String(conversationId)),
   ) as { title?: string; name?: string } | undefined;
-  const chatTitle = chat?.title || chat?.name || "";
+  // Opened straight from a link: ask the server for the chat's name (M16).
+  const [fetchedTitle, setFetchedTitle] = useState("");
+  const knownTitle = chat?.title || chat?.name || "";
+  useEffect(() => {
+    if (knownTitle || !token || !conversationId) return;
+    let cancelled = false;
+    getConversation(conversationId, token)
+      .then((detail: any) => {
+        if (!cancelled) setFetchedTitle(detail?.title || detail?.name || "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [knownTitle, token, conversationId]);
+  const chatTitle = knownTitle || fetchedTitle;
 
   const [query, setQuery] = useState("");
   const [range, setRange] = useState<DateRange>("all");
