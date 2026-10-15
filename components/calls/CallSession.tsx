@@ -8,6 +8,7 @@ import {
   isTrackReference,
   useLocalParticipant,
   useRemoteParticipants,
+  useRoomContext,
   useTracks,
 } from "@livekit/react-native";
 import { LocalVideoTrack, RoomOptions, Track } from "livekit-client";
@@ -16,6 +17,12 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
+import CallSubscriptionManager from "@/components/calls/CallSubscriptionManager";
+import { useJoinConnectOptions } from "@/components/calls/callSubscriptions";
+import StageLayout, {
+  type RenderStageVideo,
+} from "@/components/calls/StageLayout";
+import { useStageMode } from "@/components/calls/stageModel";
 import {
   AnimatedDots,
   CALL_COLORS,
@@ -163,6 +170,10 @@ export default function CallSession() {
 
   const myUserId = useAppSelector((state) => state.call.myUserId);
 
+  // Joining a call that's already big: cameras are subscribed by hand
+  // (only the ones on screen). See callSubscriptions.ts.
+  const connectOptions = useJoinConnectOptions(active?.call);
+
   const [endMessage, setEndMessage] = useState<string | null>(null);
 
   const leavingRef = useRef(false);
@@ -283,6 +294,7 @@ export default function CallSession() {
         audio
         video={active.call.type === "video"}
         options={ROOM_OPTIONS}
+        connectOptions={connectOptions}
         onError={(error) => {
           // Show and log the REAL reason (e.g. invalid token, wrong
           // LIVEKIT_URL, no network) instead of only "Connection lost".
@@ -299,6 +311,9 @@ export default function CallSession() {
             ERROR_MESSAGE_MS,
           );
         }}>
+        <CallSubscriptionManager
+          autoSubscribe={connectOptions.autoSubscribe}
+        />
         <CallStage
           call={active.call}
           direction={active.direction}
@@ -314,6 +329,20 @@ export default function CallSession() {
     </View>
   );
 }
+
+// One camera on the big-call stage (module level, so it never changes).
+const renderStageVideo: RenderStageVideo = (
+  participant,
+  publication,
+  { mirror },
+) => (
+  <VideoTrack
+    trackRef={{ participant, publication, source: Track.Source.Camera }}
+    style={StyleSheet.absoluteFill}
+    objectFit="cover"
+    mirror={mirror}
+  />
+);
 
 // ==========================================
 // CALL STAGE (inside the LiveKit room)
@@ -719,6 +748,31 @@ function CallStage({
       </View>
     </View>
   );
+
+  // ==========================================
+  // BIG CALL (more than 8 people): speaker stage + list, audio or video.
+  // Only the tiles on screen receive video. See StageLayout.
+  // ==========================================
+
+  const room = useRoomContext();
+  const stageMode = useStageMode(remoteCount + 1);
+
+  if (stageMode) {
+    return (
+      <StageLayout
+        room={room}
+        call={call}
+        title={displayName}
+        status={statusText}
+        live={answered && !endMessage}
+        waiting={waiting}
+        mirrorSelf={facing === "user"}
+        renderVideo={renderStageVideo}
+        controls={videoBar}
+        overlay={addPeopleSheet}
+      />
+    );
+  }
 
   // ==========================================
   // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)
