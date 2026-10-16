@@ -1,5 +1,6 @@
 import AvatarCatalogLoader from "@/components/AvatarCatalogLoader";
 import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";
+import VoiceRoomOverlay from "@/components/voice/VoiceRoomOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
 import SessionGate from "@/components/SessionGate";
@@ -89,11 +90,13 @@ export default function RootLayout() {
 
             {/* The ongoing call - stays mounted, so minimizing never ends it */}
             <ActiveCallOverlay />
+              <VoiceRoomOverlay />
 
             {/* Ringing screen — shows on top of any screen when someone calls */}
             <IncomingCallListener />
 
-            <StatusBar style="auto" />
+            {/* Dark icons: most screens are light even when the phone is dark (the chat sets its own). */}
+            <StatusBar style="dark" />
           </UserProvider>
         </GestureHandlerRootView>
       </SessionGate>

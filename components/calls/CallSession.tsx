@@ -36,6 +36,8 @@ import GroupCallMembers, {
 } from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
+import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { setCallMinimized } from "@/components/calls/callUi";
 import type { Call } from "@/services/calls";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -410,6 +412,8 @@ function CallStage({
   const [facing, setFacing] = useState<"user" | "environment">("user");
 
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  // FOCUS MODE: hear nobody, stay in the call.
+  const [focusOn, setFocusOn] = useState(false);
 
   const answered = answeredAt !== null;
   const remoteCount = remoteParticipants.length;
@@ -460,6 +464,26 @@ function CallStage({
 
     return () => clearInterval(interval);
   }, [answeredAt]);
+
+  // FOCUS MODE: stop receiving everyone's voice (still in the call, circle stays).
+  useEffect(() => {
+    remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((publication: any) => {
+        try {
+          publication.setSubscribed?.(!focusOn);
+        } catch {
+          // Not subscribed yet: picked up on the next change.
+        }
+      });
+    });
+  }, [focusOn, remoteParticipants]);
+
+  // Group calls start on the loudspeaker (several people talking).
+  useEffect(() => {
+    if (isGroup) {
+      setSpeakerOn(true);
+    }
+  }, [isGroup]);
 
   // Caller, while ringing: backup check + backup timeout.
   useEffect(() => {
@@ -602,6 +626,71 @@ function CallStage({
       : direction === "outgoing"
         ? "Requesting"
         : "Connecting";
+
+  // ==========================================
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
+  // ==========================================
+
+  if (isGroup) {
+    const people: OrbitPerson[] = call.members
+      .filter((member) => member.status === "joined" || member.status === "ringing")
+      .map((member) => {
+        const isMe = !!myUserId && member.user.id === myUserId;
+        const remote = remoteParticipants.find((p) => p.identity === member.user.id);
+        const slot = cameraSlots.find((s) => s.participant.identity === member.user.id);
+        return {
+          id: member.user.id,
+          name: member.user.name || member.user.username || "Someone",
+          avatar: getAvatarSource(member.user),
+          speaking: speakingIds.includes(member.user.id),
+          micOff: isMe ? !isMicrophoneEnabled : remote ? !remote.isMicrophoneEnabled : false,
+          ringing: member.status === "ringing" && !remote && !isMe,
+          isMe,
+          rankLevel: (member.user as any).rank?.level ?? null,
+          hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
+        };
+      });
+
+    const renderVideo = (id: string) => {
+      const slot = cameraSlots.find((s) => s.participant.identity === id);
+      if (!slot || !isTrackReference(slot) || slot.publication.isMuted) {
+        return null;
+      }
+      return (
+        <VideoTrack
+          trackRef={slot as TrackReference}
+          style={StyleSheet.absoluteFill}
+          objectFit="cover"
+          mirror={slot.participant.isLocal && facing === "user"}
+        />
+      );
+    };
+
+    const onCall = people.filter((person) => !person.ringing).length;
+
+    return (
+      <>
+        <OrbitCallScreen
+          title={displayName}
+          subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
+          people={people}
+          pinnedId={call.caller?.id || null}
+          renderVideo={renderVideo}
+          micOn={isMicrophoneEnabled}
+          cameraOn={isCameraEnabled}
+          focusOn={focusOn}
+          ended={!!endMessage}
+          onToggleMic={toggleMic}
+          onToggleCamera={toggleCamera}
+          onToggleFocus={() => setFocusOn((value) => !value)}
+          onLeave={hangUp}
+          onMinimize={() => setCallMinimized(true)}
+          onPeople={openAddPeople}
+        />
+        {addPeopleSheet}
+      </>
+    );
+  }
 
   // ==========================================
   // VIDEO LAYOUT (Figma: video-call-screen)

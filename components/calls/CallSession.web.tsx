@@ -48,6 +48,8 @@ import GroupCallMembers, {
 } from "@/components/calls/GroupCallMembers";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
+import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { setCallMinimized } from "@/components/calls/callUi";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
@@ -159,6 +161,10 @@ export default function CallSession() {
   const [endMessage, setEndMessage] = useState<string | null>(null);
   const [remoteCount, setRemoteCount] = useState(0);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  // FOCUS MODE: hear nobody, stay in the call.
+  const [focusOn, setFocusOn] = useState(false);
+  const focusRef = useRef(false);
+  focusRef.current = focusOn;
   // Who's talking right now (LiveKit identities are user ids).
   const [speakingIds, setSpeakingIds] = useState<string[]>([]);
 
@@ -338,6 +344,7 @@ export default function CallSession() {
         // Remote voice: play it through a hidden <audio> element.
         const element = track.attach();
         element.style.display = "none";
+        element.muted = focusRef.current;
         document.body.appendChild(element);
         audioElementsRef.current.push(element);
       } else if (track.kind === Track.Kind.Video) {
@@ -522,6 +529,13 @@ export default function CallSession() {
       finish("Call ended", false);
     }
   }, [status, finish]);
+
+  // FOCUS MODE: silence everyone's voice (still in the call, circle stays).
+  useEffect(() => {
+    audioElementsRef.current.forEach((element) => {
+      element.muted = focusOn;
+    });
+  }, [focusOn]);
 
   // ---------- controls ----------
 

@@ -5,18 +5,18 @@
 // person for the MEMBER DETAIL card: rank, chat status (Owner / Admin /
 // Member · no admin powers), "Message …", and "Manage …" for admins.
 // "Faction rank is visual identity" - rank never gives chat powers.
-// Built from the screenshot for testing.
+// Paged from the server (50 at a time, more as you scroll) so groups of
+// 1,000 people stay smooth.
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
+import { PersonAvatar } from "@/components/groups/AdminUi";
 import { FONTS } from "@/constants/fonts";
 import { userIdFromToken } from "@/services/calls";
 import { canActOn, getGroup, getGroupMembers, type Group, type GroupMember } from "@/services/groups";
@@ -38,42 +39,66 @@ const MUTED = "#66738A";
 const LILAC = "#F0EDF9";
 const LINE = "rgba(36,40,60,0.08)";
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
-
-function avatarTint(name?: string) {
-  let hash = 0;
-  for (const char of String(name || "")) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
-}
-
-function initialsOf(name?: string) {
-  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : (parts[0] || "?").slice(0, 2);
-  return letters.toUpperCase();
-}
-
-function Avatar({ member, size }: { member: GroupMember; size: number }) {
-  const name = member.name || member.username;
-  const round = { width: size, height: size, borderRadius: size / 2 };
-  return member.avatarPhotoUrl ? (
-    <Image source={{ uri: member.avatarPhotoUrl }} style={round} contentFit="cover" />
-  ) : (
-    <View style={[round, styles.avatar, { backgroundColor: avatarTint(name) }]}>
-      <Text style={[styles.avatarText, { fontSize: size > 50 ? 18 : 12 }]}>{initialsOf(name)}</Text>
-    </View>
-  );
-}
-
 const STATUS: Record<string, string> = {
   owner: "Chat status: Owner · runs this group",
   admin: "Chat status: Admin · manages people, messages and Sparks",
   member: "Chat status: Member · no admin powers",
 };
 
+function expertiseOf(member: GroupMember) {
+  const value = (member as GroupMember & { expertise?: string | null }).expertise;
+  return typeof value === "string" && value ? value : null;
+}
+
+// Name + Owner/Admin, rank line, then the expertise role (or @username when
+// there's no rank and no expertise).
+const MemberRow = memo(function MemberRow({
+  member,
+  isMe,
+  selected,
+  onPress,
+}: {
+  member: GroupMember;
+  isMe: boolean;
+  selected: boolean;
+  onPress: (member: GroupMember) => void;
+}) {
+  const name = member.name || member.username;
+  const expertise = expertiseOf(member);
+  const base = expertise || (member.rank ? null : `@${member.username}`);
+  const detail = member.mutedUntil ? (base ? `${base} · muted` : "Muted") : base;
+  return (
+    <Pressable style={[styles.row, selected && styles.rowOn]} onPress={() => onPress(member)}>
+      <PersonAvatar person={member} size={44} />
+      <View style={styles.flex}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {isMe ? `${name} (you)` : name}
+          </Text>
+          {member.role === "owner" || member.role === "admin" ? (
+            <Text style={styles.role}>{member.role === "owner" ? "Owner" : "Admin"}</Text>
+          ) : null}
+        </View>
+        <RankLine rank={member.rank} />
+        {detail ? (
+          <Text style={styles.handle} numberOfLines={1}>
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={MUTED} />
+    </Pressable>
+  );
+});
+
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
 export default function GroupMembers() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<GroupMember>>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
 
@@ -86,24 +111,39 @@ export default function GroupMembers() {
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  // The page being loaded (0 = idle).
+  const [loadingPage, setLoadingPage] = useState(1);
   const [selected, setSelected] = useState<GroupMember | null>(null);
   const [messaging, setMessaging] = useState(false);
+
+  const requestRef = useRef(0);
+  const loadingRef = useRef(false);
 
   const load = useCallback(
     async (nextPage: number, query: string) => {
       if (!token || !groupId) return;
+      const request = ++requestRef.current;
+      loadingRef.current = true;
       try {
-        setLoading(true);
+        setLoadingPage(nextPage);
         const result = await getGroupMembers(groupId, { search: query.trim() || undefined, page: nextPage }, token);
-        setMembers((current) => (nextPage === 1 ? result.members : [...current, ...result.members]));
+        if (request !== requestRef.current) return;
+        setMembers((current) => {
+          if (nextPage === 1) return result.members;
+          const seen = new Set(current.map((member) => member.id));
+          return [...current, ...result.members.filter((member) => !seen.has(member.id))];
+        });
         setTotal(result.total);
         setHasMore(result.hasMore);
         setPage(nextPage);
       } catch (error) {
+        if (request !== requestRef.current) return;
         Alert.alert("Group members", error instanceof Error ? error.message : "Couldn't load members.");
       } finally {
-        setLoading(false);
+        if (request === requestRef.current) {
+          loadingRef.current = false;
+          setLoadingPage(0);
+        }
       }
     },
     [token, groupId],
@@ -122,10 +162,22 @@ export default function GroupMembers() {
     return () => clearTimeout(timer);
   }, [search, load]);
 
-  const choose = (member: GroupMember) => {
-    setSelected(member);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-  };
+  const loadMore = useCallback(() => {
+    if (loadingRef.current || !hasMore) return;
+    load(page + 1, search);
+  }, [hasMore, load, page, search]);
+
+  // The detail card sits under the list once everyone is loaded (as in the
+  // design); in a big group it's pinned to the bottom of the screen instead.
+  const detailInList = !hasMore;
+
+  const choose = useCallback(
+    (member: GroupMember) => {
+      setSelected(member);
+      if (detailInList) setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    },
+    [detailInList],
+  );
 
   const message = async (member: GroupMember) => {
     if (!token || messaging) return;
@@ -143,6 +195,63 @@ export default function GroupMembers() {
   const firstName = (member: GroupMember) => (member.name || member.username).split(" ")[0];
   const canManage = (member: GroupMember) => member.id !== myUserId && canActOn(group?.myRole, member.role);
 
+  const renderItem = useCallback(
+    ({ item }: { item: GroupMember }) => (
+      <MemberRow member={item} isMe={item.id === myUserId} selected={selected?.id === item.id} onPress={choose} />
+    ),
+    [myUserId, selected?.id, choose],
+  );
+
+  const detailCard = selected ? (
+    <>
+      <View style={styles.sectionRow}>
+        <Text style={styles.section}>MEMBER DETAIL</Text>
+        {!detailInList ? (
+          <Pressable onPress={() => setSelected(null)} hitSlop={10} accessibilityLabel="Close member detail">
+            <Ionicons name="close" size={20} color={MUTED} />
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={styles.detail}>
+        <View style={styles.detailHead}>
+          <PersonAvatar person={selected} size={64} />
+          <View style={styles.flex}>
+            <View style={styles.nameRow}>
+              <Text style={styles.detailName} numberOfLines={1}>
+                {selected.name || selected.username}
+              </Text>
+              {selected.role === "owner" || selected.role === "admin" ? (
+                <Text style={styles.role}>{selected.role === "owner" ? "Owner" : "Admin"}</Text>
+              ) : null}
+            </View>
+            <RankLine rank={selected.rank} />
+          </View>
+        </View>
+
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>
+            {expertiseOf(selected) ? `${expertiseOf(selected)} · expertise role` : `@${selected.username}`}
+          </Text>
+        </View>
+        <Text style={styles.status}>{STATUS[selected.role] || STATUS.member}</Text>
+
+        {selected.id !== myUserId ? (
+          <Pressable style={[styles.soft, messaging && styles.off]} disabled={messaging} onPress={() => message(selected)}>
+            {messaging ? <ActivityIndicator color={PINK} /> : <Text style={styles.softText}>Message {firstName(selected)}</Text>}
+          </Pressable>
+        ) : null}
+
+        {canManage(selected) ? (
+          <Pressable
+            style={styles.soft}
+            onPress={() => router.push({ pathname: "/group/moderation/[id]", params: { id: groupId, userId: selected.id } })}>
+            <Text style={styles.softText}>Manage {firstName(selected)}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </>
+  ) : null;
+
   return (
     <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -153,7 +262,7 @@ export default function GroupMembers() {
           <Text style={styles.title}>Group members</Text>
           <Text style={styles.subtitle} numberOfLines={1}>
             {group?.name ? `${group.name} · ` : ""}
-            {total || group?.memberCount || members.length} members
+            {group?.memberCount || total || members.length} members
           </Text>
         </View>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Close">
@@ -161,11 +270,7 @@ export default function GroupMembers() {
         </Pressable>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+      <View style={styles.top}>
         <View style={styles.search}>
           <Ionicons name="ellipse-outline" size={16} color={MUTED} />
           <TextInput
@@ -177,98 +282,52 @@ export default function GroupMembers() {
             autoCorrect={false}
             style={styles.searchInput}
           />
+          {loadingPage === 1 && members.length ? <ActivityIndicator size="small" color={PINK} /> : null}
         </View>
+      </View>
 
-        {members.map((member, index) => {
-          const name = member.name || member.username;
-          return (
-            <Pressable
-              key={member.id}
-              style={[styles.row, index === members.length - 1 && styles.rowLast, selected?.id === member.id && styles.rowOn]}
-              onPress={() => choose(member)}>
-              <Avatar member={member} size={44} />
-              <View style={styles.flex}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {member.id === myUserId ? `${name} (you)` : name}
-                  </Text>
-                  {member.role !== "member" ? (
-                    <Text style={styles.role}>{member.role === "owner" ? "Owner" : "Admin"}</Text>
-                  ) : null}
-                </View>
-                <RankLine rank={member.rank} />
-                {(member as any).expertise ? <Text style={styles.handle}>{(member as any).expertise}</Text> : null}
-                <Text style={styles.handle} numberOfLines={1}>
-                  @{member.username}
-                  {member.mutedUntil ? " · muted" : ""}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={MUTED} />
-            </Pressable>
-          );
-        })}
-
-        {loading ? <ActivityIndicator color={PINK} style={styles.loading} /> : null}
-        {!loading && !members.length ? <Text style={styles.empty}>No members found.</Text> : null}
-        {!loading && hasMore ? (
-          <Pressable style={styles.more} onPress={() => load(page + 1, search)}>
-            <Text style={styles.moreText}>Load more</Text>
-          </Pressable>
-        ) : null}
-
-        {/* MEMBER DETAIL */}
-        {selected ? (
+      <FlatList
+        ref={listRef}
+        style={styles.flex}
+        contentContainerStyle={[styles.content, { paddingBottom: detailInList ? insets.bottom + 30 : 16 }]}
+        data={members}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={Separator}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === "android"}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          loadingPage ? (
+            <ActivityIndicator color={PINK} style={styles.loading} />
+          ) : (
+            <Text style={styles.empty}>No members found.</Text>
+          )
+        }
+        ListFooterComponent={
           <>
-            <Text style={styles.section}>MEMBER DETAIL</Text>
-            <View style={styles.detail}>
-              <View style={styles.detailHead}>
-                <Avatar member={selected} size={64} />
-                <View style={styles.flex}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.detailName} numberOfLines={1}>
-                      {selected.name || selected.username}
-                    </Text>
-                    {selected.role !== "member" ? (
-                      <Text style={styles.role}>{selected.role === "owner" ? "Owner" : "Admin"}</Text>
-                    ) : null}
-                  </View>
-                  <RankLine rank={selected.rank} />
-                </View>
-              </View>
-
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{(selected as any).expertise ? `${(selected as any).expertise} · expertise role` : `@${selected.username}`}</Text>
-              </View>
-              <Text style={styles.status}>{STATUS[selected.role] || STATUS.member}</Text>
-
-              {selected.id !== myUserId ? (
-                <Pressable style={[styles.soft, messaging && styles.off]} disabled={messaging} onPress={() => message(selected)}>
-                  {messaging ? (
-                    <ActivityIndicator color={PINK} />
-                  ) : (
-                    <Text style={styles.softText}>Message {firstName(selected)}</Text>
-                  )}
-                </Pressable>
-              ) : null}
-
-              {canManage(selected) ? (
-                <Pressable
-                  style={styles.soft}
-                  onPress={() =>
-                    router.push({ pathname: "/group/moderation/[id]", params: { id: groupId, userId: selected.id } })
-                  }>
-                  <Text style={styles.softText}>Manage {firstName(selected)}</Text>
-                </Pressable>
-              ) : null}
-            </View>
+            {loadingPage > 1 ? <ActivityIndicator color={PINK} style={styles.loading} /> : null}
+            {detailInList ? detailCard : null}
+            {detailInList ? (
+              <Text style={styles.footnote}>
+                Faction rank is visual identity. Admin status alone grants chat powers; a Private can be an admin and a
+                Sergeant can be a member.
+              </Text>
+            ) : null}
           </>
-        ) : null}
+        }
+      />
 
-        <Text style={styles.footnote}>
-          Faction rank is visual identity. Admin status alone grants chat powers; a Private can be an admin and a
-          Sergeant can be a member.
-        </Text>
-      </ScrollView>
+      {/* Big groups: the detail stays on screen under the list. */}
+      {!detailInList && selected ? (
+        <View style={[styles.docked, { paddingBottom: insets.bottom + 14 }]}>{detailCard}</View>
+      ) : null}
     </LinearGradient>
   );
 }
@@ -286,7 +345,9 @@ const styles = StyleSheet.create({
 
   subtitle: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
 
-  content: { paddingHorizontal: 18, paddingTop: 12 },
+  top: { paddingHorizontal: 18, paddingTop: 12 },
+
+  content: { paddingHorizontal: 18 },
 
   search: {
     height: 48,
@@ -310,15 +371,11 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: LINE },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
 
-  rowLast: { borderBottomWidth: 0 },
+  separator: { height: 1, backgroundColor: LINE },
 
   rowOn: { backgroundColor: "rgba(182,61,145,0.05)" },
-
-  avatar: { alignItems: "center", justifyContent: "center" },
-
-  avatarText: { fontFamily: FONTS.bold, color: "#7D356D" },
 
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
 
@@ -332,11 +389,17 @@ const styles = StyleSheet.create({
 
   empty: { paddingVertical: 20, textAlign: "center", fontFamily: FONTS.regular, fontSize: 13, color: MUTED },
 
-  more: { alignSelf: "center", marginTop: 10, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: LILAC },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 8 },
 
-  moreText: { fontFamily: FONTS.semibold, fontSize: 13, color: PINK },
+  section: { fontFamily: FONTS.semibold, fontSize: 12, letterSpacing: 0.4, color: MUTED },
 
-  section: { marginTop: 20, marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 12, letterSpacing: 0.4, color: MUTED },
+  docked: {
+    maxHeight: "60%",
+    paddingHorizontal: 18,
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    backgroundColor: "rgba(246,249,254,0.97)",
+  },
 
   detail: { padding: 16, borderRadius: 20, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: LINE },
 

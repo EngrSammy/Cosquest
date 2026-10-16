@@ -1,5 +1,11 @@
 import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { FONTS } from "@/constants/fonts";
+import {
+  DEFAULT_SPARK_LAYOUT,
+  SPARK_LAYOUTS,
+  setSparkLayout,
+  useSparkLayout,
+} from "@/constants/sparkLayout";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchAppearanceSettings,
@@ -184,6 +190,7 @@ function FontSizeSelector({
 
 export default function Appearance() {
   const insets = useSafeAreaInsets();
+  const sparkLayout = useSparkLayout();
 
   const dispatch = useAppDispatch();
 
@@ -432,6 +439,45 @@ export default function Appearance() {
           </View>
         </View>
 
+        {/* Figma M03-M05 "Layout choice pending": all three are built; this
+            picks one on this device until Mark / the team choose. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>SPARKS LAYOUT · PREVIEW</Text>
+
+          {SPARK_LAYOUTS.map((option) => {
+            const selected = sparkLayout === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                style={styles.row}
+                onPress={() => setSparkLayout(option.key)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`Option ${option.option}: ${option.title}`}>
+                <View style={styles.rowIcon}>
+                  <Ionicons
+                    name={selected ? "radio-button-on" : "radio-button-off"}
+                    size={20}
+                    color={PINK}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>
+                    Option {option.option} · {option.title}
+                    {option.key === DEFAULT_SPARK_LAYOUT ? " (default)" : ""}
+                  </Text>
+                  <Text style={styles.layoutDetail}>{option.detail}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+
+          <Text style={styles.layoutNote}>
+            Layout choice pending. Saved on this device only.
+          </Text>
+        </View>
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={PINK} />
@@ -443,6 +489,20 @@ export default function Appearance() {
 }
 
 const styles = StyleSheet.create({
+  layoutDetail: {
+    marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#66738A",
+  },
+
+  layoutNote: {
+    marginTop: 8,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#66738A",
+  },
+
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

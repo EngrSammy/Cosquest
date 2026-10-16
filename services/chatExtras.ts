@@ -15,8 +15,20 @@ function chatPath(conversationId: string) {
   return `/api/chats/${encodeURIComponent(conversationId)}`;
 }
 
-export async function searchChat(conversationId: string, query: string, page: number, token: string) {
+// options.from / options.to: ISO dates (inclusive, on when it was sent).
+// options.sort "oldest": oldest first (newest first otherwise).
+// Older backends ignore these.
+export async function searchChat(
+  conversationId: string,
+  query: string,
+  page: number,
+  token: string,
+  options: { from?: string | null; to?: string | null; sort?: "newest" | "oldest" } = {},
+) {
   const params = new URLSearchParams({ q: query, page: String(page), limit: "20" });
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+  if (options.sort === "oldest") params.set("sort", "oldest");
   const response = await apiRequest<any>(`${chatPath(conversationId)}/search?${params.toString()}`, { token });
   return {
     results: (response?.results || []).map((item: any) => ({

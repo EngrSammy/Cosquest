@@ -18,7 +18,9 @@ import {
 import { FONTS } from "@/constants/fonts";
 import type { GroupPerson } from "@/services/groups";
 import { searchPeople } from "@/services/share";
-import { useAppSelector } from "@/store/hooks";
+import { fetchChats } from "@/store/thunks/chatThunks";
+import { fetchFollowing } from "@/store/thunks/followThunks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { getAvatarSource } from "@/utils/callHelpers";
 
 import { INK, MILKY, MUTED, PINK } from "./GroupUi";
@@ -42,6 +44,19 @@ export default function PeoplePicker({
   const token = useAppSelector((state) => state.auth.token);
   const following = useAppSelector((state) => state.follow.following);
   const conversations = useAppSelector((state) => state.chat.conversations);
+
+  const dispatch = useAppDispatch();
+  const myUsername = useAppSelector((state) => (state.auth.user as any)?.profile?.username as string | undefined);
+
+  // Opened straight from a link (no Community tab visited yet): load the
+  // chats and the people you follow, so the contact list isn't empty (M22).
+  useEffect(() => {
+    if (!token) return;
+    if (!conversations.length) dispatch(fetchChats(token));
+    if (!following.length && myUsername) dispatch(fetchFollowing({ username: myUsername, token }));
+    // Only on open: the lists then stay up to date through the store.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, myUsername]);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GroupPerson[]>([]);
