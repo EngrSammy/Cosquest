@@ -8,7 +8,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { CallPerson } from "@/services/calls";
 import { getAvatarSource } from "@/utils/callHelpers";
@@ -33,6 +33,8 @@ export default function VideoGridTile({
   micOff,
   count,
   children,
+  onPress,
+  pinned,
 }: {
   person?: CallPerson | null;
   isMe?: boolean;
@@ -42,15 +44,28 @@ export default function VideoGridTile({
   count: number;
   // The video, when their camera is on.
   children?: ReactNode;
+  // Big calls (stage layout): tap a tile to pin / unpin that person.
+  onPress?: () => void;
+  pinned?: boolean;
 }) {
   const size = gridTileSize(count);
   const name = isMe
     ? "You"
     : (person?.name || person?.username || "Someone").split(" ")[0];
 
+  const Tile = onPress ? Pressable : View;
+
   return (
     <View style={[styles.cell, size]}>
-      <View style={[styles.tile, speaking && styles.tileSpeaking]}>
+      <Tile
+        style={[styles.tile, speaking && styles.tileSpeaking]}
+        {...(onPress
+          ? {
+              onPress,
+              accessibilityRole: "button" as const,
+              accessibilityLabel: pinned ? `Unpin ${name}` : `Pin ${name}`,
+            }
+          : null)}>
         {children ? (
           <View style={StyleSheet.absoluteFill}>{children}</View>
         ) : (
@@ -72,7 +87,13 @@ export default function VideoGridTile({
             {name}
           </Text>
         </View>
-      </View>
+
+        {pinned ? (
+          <View style={styles.pin}>
+            <Ionicons name="pin" size={13} color="#FFFFFF" />
+          </View>
+        ) : null}
+      </Tile>
     </View>
   );
 }
@@ -122,6 +143,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
+  pin: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: CALL_COLORS.pink,
   },
 
   labelText: {

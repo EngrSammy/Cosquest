@@ -112,6 +112,7 @@ import {
   type SparkRolePing,
 } from "@/services/sparks";
 import type { PollSummary } from "@/services/polls";
+import { formatCount } from "@/services/calls";
 import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
 import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
 import {
@@ -243,6 +244,9 @@ type Message = {
     status?: "ended" | "declined" | "missed" | "cancelled";
     durationSeconds?: number | null;
     callerId?: string;
+    // Group calls: someone was added, and how many people took part.
+    groupCall?: boolean;
+    participantCount?: number | null;
   } | null;
 };
 
@@ -2003,20 +2007,32 @@ function CallLogContent({
   const answered = status === "ended";
   const kindName = video ? "video call" : "voice call";
 
+  // Group calls: "12 people" (can be hundreds; formatted "1,234").
+  const peopleCount =
+    log.groupCall && (log.participantCount || 0) > 2
+      ? `${formatCount(log.participantCount || 0)} people`
+      : null;
+
   // Red "missed" style: only for the person who was called and didn't pick up.
   const missedForMe = !mine && (status === "missed" || status === "cancelled");
 
   const title =
     answered || mine
-      ? video
-        ? "Video call"
-        : "Voice call"
+      ? log.groupCall
+        ? video
+          ? "Group video call"
+          : "Group voice call"
+        : video
+          ? "Video call"
+          : "Voice call"
       : status === "declined"
         ? `You declined a ${kindName}`
         : `Missed ${kindName}`;
 
   const detail = answered
-    ? formatDuration(log.durationSeconds || 0)
+    ? [formatDuration(log.durationSeconds || 0), peopleCount]
+        .filter(Boolean)
+        .join(" · ")
     : mine
       ? status === "declined"
         ? "Declined"

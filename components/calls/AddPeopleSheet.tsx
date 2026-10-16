@@ -4,9 +4,13 @@
 // Opened from the "Add" button on the call screen. Lists people you follow
 // and people you chat with; you can also search by username. Pick one or
 // more, tap Add, and only THEIR phones ring - everyone else keeps talking.
+//
+// Limits come from the server (call.maxParticipants for the whole call,
+// call.maxInvitesPerRequest for one tap of "Add"); the server still has
+// the final say, and its own message is shown when it refuses.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
       ActivityIndicator,
       Alert,
@@ -22,6 +26,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Call, InviteSkipReason } from "@/services/calls";
+import { formatCount } from "@/services/calls";
 import { searchPeople } from "@/services/share";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { inviteToCall } from "@/store/thunks/callThunks";
@@ -91,6 +96,9 @@ export default function AddPeopleSheet({
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<Record<string, Person>>({});
   const [adding, setAdding] = useState(false);
+  // Inline messages (the limit was reached, or the server said no).
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // People already ringing or in the call can't be picked again.
   const inCall = useMemo(() => {
@@ -114,6 +122,9 @@ export default function AddPeopleSheet({
   ).length;
 
   const spotsLeft = Math.max(0, call.maxParticipants - activeCount);
+
+  // How many can be picked for this one request.
+  const pickLimit = Math.min(spotsLeft, call.maxInvitesPerRequest);
 
   // Friends the app already knows: people you chat with and people you follow.
   const friends = useMemo(() => {
@@ -163,6 +174,8 @@ export default function AddPeopleSheet({
     if (visible) {
       setQuery("");
       setSelected({});
+      setNotice(null);
+      setError(null);
     }
   }, [visible]);
 
@@ -174,27 +187,41 @@ export default function AddPeopleSheet({
 
   const selectedList = Object.values(selected);
 
-  const toggle = (person: Person) => {
+  // Kept in refs so toggle() stays the same function (memoised rows).
+  const limitsRef = useRef({ pickLimit, spotsLeft });
+  const selectedRef = useRef(selected);
+
+  useEffect(() => {
+    limitsRef.current = { pickLimit, spotsLeft };
+    selectedRef.current = selected;
+  }, [pickLimit, spotsLeft, selected]);
+
+  const toggle = useCallback((person: Person) => {
     const key = keyOf(person);
+    const current = selectedRef.current;
+    const { pickLimit: limit, spotsLeft: spots } = limitsRef.current;
 
-    setSelected((current) => {
-      if (current[key]) {
-        const next = { ...current };
-        delete next[key];
-        return next;
-      }
+    setError(null);
 
-      if (Object.keys(current).length >= spotsLeft) {
-        Alert.alert(
-          "Call is almost full",
-          `You can add ${spotsLeft} more ${spotsLeft === 1 ? "person" : "people"}.`,
-        );
-        return current;
-      }
+    if (current[key]) {
+      const next = { ...current };
+      delete next[key];
+      setSelected(next);
+      setNotice(null);
+      return;
+    }
 
-      return { ...current, [key]: person };
-    });
-  };
+    if (Object.keys(current).length >= limit) {
+      setNotice(
+        limit < spots
+          ? `You can add up to ${formatCount(limit)} people at a time. Add these, then open Add again for more.`
+          : `The call has room for ${formatCount(spots)} more ${spots === 1 ? "person" : "people"}.`,
+      );
+      return;
+    }
+
+    setSelected({ ...current, [key]: person });
+  }, []);
 
   const add = async () => {
     if (!token || adding || selectedList.length === 0) {
@@ -208,6 +235,7 @@ export default function AddPeopleSheet({
 
     try {
       setAdding(true);
+      setError(null);
 
       const result = await dispatch(
         inviteToCall({ callId: call.id, userIds, usernames, token }),
@@ -234,10 +262,14 @@ export default function AddPeopleSheet({
       }
 
       onClose();
-    } catch (error) {
-      Alert.alert(
-        "Add people",
-        typeof error === "string" ? error : "Couldn't add people to the call.",
+    } catch (failure) {
+      // Thunks reject with the server's own message (e.g. "This call is
+      // full (1000 people)." or "You can add up to 50 people at a time.").
+      // Shown in the sheet, which stays open so the choice can be changed.
+      setError(
+        typeof failure === "string" && failure
+          ? failure
+          : "Couldn't add people to the call.",
       );
     } finally {
       setAdding(false);
@@ -264,9 +296,11 @@ export default function AddPeopleSheet({
         </View>
 
         <Text style={styles.hint}>
-          {spotsLeft > 0
-            ? `Up to ${spotsLeft} more ${spotsLeft === 1 ? "person" : "people"}. Only they will be rung.`
-            : "This call is full."}
+          {spotsLeft <= 0
+            ? "This call is full."
+            : spotsLeft <= call.maxInvitesPerRequest
+              ? `Up to ${formatCount(spotsLeft)} more ${spotsLeft === 1 ? "person" : "people"}. Only they will be rung.`
+              : `Up to ${formatCount(call.maxInvitesPerRequest)} at a time, ${formatCount(spotsLeft)} spots left. Only they will be rung.`}
         </Text>
 
         <View style={styles.search}>
@@ -285,11 +319,40 @@ export default function AddPeopleSheet({
           ) : null}
         </View>
 
+        {selectedList.length ? (
+          <View style={styles.selectedRow}>
+            <Text style={styles.selectedText}>
+              {formatCount(selectedList.length)} of {formatCount(pickLimit)}{" "}
+              selected
+            </Text>
+            <Pressable
+              onPress={() => {
+                setSelected({});
+                setNotice(null);
+              }}
+              hitSlop={8}
+              accessibilityRole="button">
+              <Text style={styles.clearText}>Clear</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {error ? (
+          <Text style={styles.error} accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
+
         <FlatList
           data={list}
           keyExtractor={keyOf}
           style={styles.list}
           keyboardShouldPersistTaps="handled"
+          initialNumToRender={14}
+          maxToRenderPerBatch={20}
+          windowSize={7}
+          extraData={selected}
           ListEmptyComponent={
             <Text style={styles.empty}>
               {query.trim()
@@ -299,38 +362,13 @@ export default function AddPeopleSheet({
                 : "People you follow or chat with show up here. You can also search."}
             </Text>
           }
-          renderItem={({ item }) => {
-            const isSelected = !!selected[keyOf(item)];
-
-            return (
-              <Pressable
-                style={styles.row}
-                onPress={() => toggle(item)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}>
-                <Image
-                  source={getAvatarSource(item)}
-                  style={styles.avatar}
-                  contentFit="cover"
-                />
-
-                <View style={styles.rowText}>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {item.name || item.username}
-                  </Text>
-                  <Text style={styles.rowUsername} numberOfLines={1}>
-                    @{item.username}
-                  </Text>
-                </View>
-
-                <View style={[styles.check, isSelected && styles.checkOn]}>
-                  {isSelected ? (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  ) : null}
-                </View>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => (
+            <PersonRow
+              person={item}
+              selected={!!selected[keyOf(item)]}
+              onToggle={toggle}
+            />
+          )}
         />
 
         <Pressable
@@ -347,7 +385,7 @@ export default function AddPeopleSheet({
               <Ionicons name="person-add" size={18} color="#FFFFFF" />
               <Text style={styles.addText}>
                 {selectedList.length
-                  ? `Add ${selectedList.length} to call`
+                  ? `Add ${formatCount(selectedList.length)} to call`
                   : "Choose people to add"}
               </Text>
             </>
@@ -357,6 +395,46 @@ export default function AddPeopleSheet({
     </Modal>
   );
 }
+
+// One person in the list. Memoised: ticking one person re-renders one row.
+const PersonRow = memo(function PersonRow({
+  person,
+  selected,
+  onToggle,
+}: {
+  person: Person;
+  selected: boolean;
+  onToggle: (person: Person) => void;
+}) {
+  return (
+    <Pressable
+      style={styles.row}
+      onPress={() => onToggle(person)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}>
+      <Image
+        source={getAvatarSource(person)}
+        style={styles.avatar}
+        contentFit="cover"
+      />
+
+      <View style={styles.rowText}>
+        <Text style={styles.rowName} numberOfLines={1}>
+          {person.name || person.username}
+        </Text>
+        <Text style={styles.rowUsername} numberOfLines={1}>
+          @{person.username}
+        </Text>
+      </View>
+
+      <View style={[styles.check, selected && styles.checkOn]}>
+        {selected ? (
+          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+});
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -420,6 +498,43 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: CALL_COLORS.text,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  },
+
+  selectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  selectedText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: CALL_COLORS.text,
+    fontVariant: ["tabular-nums"],
+  },
+
+  clearText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: CALL_COLORS.pink,
+  },
+
+  notice: {
+    marginTop: 8,
+    fontSize: 13,
+    color: CALL_COLORS.teal,
+  },
+
+  error: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    fontSize: 13,
+    color: "#FFFFFF",
+    backgroundColor: "rgba(255,45,85,0.25)",
   },
 
   list: {
