@@ -6,10 +6,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 export type AlbumItem = {
   kind: "image" | "video";
@@ -25,6 +26,7 @@ function lengthOf(seconds?: number | null) {
 }
 
 export default function AlbumGrid({ items }: { items: AlbumItem[] }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const [viewing, setViewing] = useState<string | null>(null);
 
@@ -78,7 +80,7 @@ export default function AlbumGrid({ items }: { items: AlbumItem[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 6, width: 270, marginBottom: 8 },
 
   tile: { width: 132, height: 110, borderRadius: 14, overflow: "hidden", backgroundColor: "#E3E7EF" },

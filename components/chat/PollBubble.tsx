@@ -8,12 +8,13 @@
 // "Final results".
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
 import { pollIsClosed, votePoll, type PollSummary } from "@/services/polls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { socketPollUpdated } from "@/store/slices/chatSlice";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -30,6 +31,7 @@ export default function PollBubble({
   // Kept so the chat screen doesn't need to change.
   mine?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const dispatch = useAppDispatch();
   const token = useAppSelector((state) => state.auth.token);
 
@@ -122,7 +124,7 @@ export default function PollBubble({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   wrap: { minWidth: 250, maxWidth: 320, paddingVertical: 2 },
 
   question: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 22, color: INK },

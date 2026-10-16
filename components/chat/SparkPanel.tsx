@@ -18,7 +18,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -42,6 +41,7 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { apiRequest } from "@/services/api";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const TEAL = "#2A8A92";
@@ -110,6 +110,7 @@ export default function SparkPanel({
   // Deleted / merged away.
   onRemoved: (sparkId: string) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const listRef = useRef<ScrollView>(null);
   const myUserId = useAppSelector((state) => String((state.auth.user as any)?.id || (state.call as any)?.myUserId || ""));
@@ -392,17 +393,21 @@ export default function SparkPanel({
             </View>
           ) : null}
 
+          {/* RUNNING SUMMARY (Figma M07/M09: stays at the top while the
+              messages scroll under it) */}
+          {!loading && spark?.summary ? (
+            <View style={styles.summary}>
+              <Text style={styles.summaryLabel}>Sparks bot · Running summary</Text>
+              <Text style={styles.summaryText} numberOfLines={6}>
+                {spark.summary}
+              </Text>
+            </View>
+          ) : null}
+
           {loading ? (
             <ActivityIndicator color={PINK} style={styles.loading} />
           ) : (
             <ScrollView ref={listRef} style={styles.list} contentContainerStyle={styles.listContent}>
-              {/* RUNNING SUMMARY */}
-              {spark?.summary ? (
-                <View style={styles.summary}>
-                  <Text style={styles.summaryLabel}>Sparks bot · Running summary</Text>
-                  <Text style={styles.summaryText}>{spark.summary}</Text>
-                </View>
-              ) : null}
 
               {/* LEGEND (revived): past -> history -> today */}
               {revived ? (
@@ -520,7 +525,7 @@ export default function SparkPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   overlay: { flex: 1, flexDirection: "row" },
 
   dim: { flex: 1, backgroundColor: "rgba(36,40,60,0.18)" },
@@ -529,8 +534,9 @@ const styles = StyleSheet.create({
     width: "81%",
     maxWidth: 440,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
+    // Figma M07/M09: a floating card over the chat, not a flush sheet.
+    borderRadius: 24,
+    marginRight: 10,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
@@ -634,12 +640,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
     borderTopLeftRadius: 4,
-    backgroundColor: "#FFFFFF",
+    // Figma M07/M09: soft grey bubbles on the white panel.
+    backgroundColor: "#EEF1F6",
   },
 
-  bubbleMine: { backgroundColor: "#F3DDED" },
+  bubbleMine: { backgroundColor: "#EBCBE6" },
 
-  bubbleText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: INK },
+  bubbleText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: INK },
 
   bubbleTime: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 11, color: MUTED },
 

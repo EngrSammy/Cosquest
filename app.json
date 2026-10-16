@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/cosquest-logo.png",
     "scheme": "cosquest",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dammy0227.cosquest",

@@ -295,13 +295,14 @@ export async function updateGroup(
 
 export async function getGroupMembers(
   groupId: string,
-  options: { search?: string; page?: number },
+  options: { search?: string; page?: number; limit?: number },
   token: string,
 ): Promise<{ members: GroupMember[]; total: number; hasMore: boolean }> {
   const params = new URLSearchParams();
   if (options.search) params.set("search", options.search);
   if (options.page) params.set("page", String(options.page));
-  params.set("limit", "50");
+  // The backend allows up to 100 per page.
+  params.set("limit", String(Math.min(100, Math.max(1, options.limit || 50))));
 
   const response = await apiRequest<any>(
     `/api/groups/${encodeURIComponent(groupId)}/members?${params.toString()}`,

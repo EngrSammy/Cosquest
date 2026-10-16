@@ -12,6 +12,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
+import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import type { GroupMember, GroupPerson } from "@/services/groups";
 import { safeBack } from "@/utils/safeBack";
@@ -109,14 +110,27 @@ export function Note({ children }: { children: ReactNode }) {
   return <Text style={styles.note}>{children}</Text>;
 }
 
-export function PersonAvatar({ person, size = 44 }: { person: GroupPerson; size?: number }) {
+// Uploaded photo, else the preset avatar picked at signup (avatarKey), else
+// tinted initials ("MC").
+export function PersonAvatar({
+  person,
+  size = 44,
+}: {
+  person: Pick<GroupPerson, "username" | "name" | "avatarKey" | "avatarPhotoUrl">;
+  size?: number;
+}) {
   const name = person.name || person.username;
   const round = { width: size, height: size, borderRadius: size / 2 };
-  return person.avatarPhotoUrl ? (
-    <Image source={{ uri: person.avatarPhotoUrl }} style={round} contentFit="cover" />
-  ) : (
+  if (person.avatarPhotoUrl) {
+    return <Image source={{ uri: person.avatarPhotoUrl }} style={round} contentFit="cover" />;
+  }
+  const preset = person.avatarKey ? AVATARS.find((avatar) => avatar.id === person.avatarKey)?.source : null;
+  if (preset) {
+    return <Image source={preset as any} style={round} contentFit="cover" />;
+  }
+  return (
     <View style={[round, styles.avatar, { backgroundColor: avatarTint(name) }]}>
-      <Text style={styles.avatarText}>{initialsOf(name)}</Text>
+      <Text style={[styles.avatarText, { fontSize: size > 50 ? 18 : size < 36 ? 10 : 12 }]}>{initialsOf(name)}</Text>
     </View>
   );
 }

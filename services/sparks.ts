@@ -23,7 +23,16 @@ export type Spark = {
   startedByBot: boolean;
   lastActivityAt: string;
   createdAt: string;
+  // Figma M32 (concept): who the Sparks bot notified automatically, by
+  // expertise role. Filled by the backend's Sparks module from the SDK's
+  // role-ping jobs; older backends leave it out.
+  rolePings?: SparkRolePing[];
 };
+
+export type SparkRolePing = { role: string; userIds: string[]; at: string };
+
+// A chat member as the Sparks module sees them (expertise roles, admin).
+export type SparkMember = { userId: string; displayName: string; roles: string[]; isAdmin: boolean; rank?: any };
 
 export type SparkSeam = { beforeMessageId: string; label: string };
 
@@ -81,6 +90,25 @@ export type StartSparkResult =
   | { ok: true; spark: Spark }
   | { ok: false; code: "similar_sparks"; matches: Spark[]; error: string }
   | { ok: false; code: "already_in_spark"; spark?: Spark; error: string };
+
+// GET /api/chats/:id/sparks/members - names and expertise roles for the
+// role-ping card (M32). Cached per chat for the session: it's one list per
+// chat and roles rarely change.
+const memberCache = new Map<string, Promise<SparkMember[]>>();
+
+export function listSparkMembers(conversationId: string, token: string): Promise<SparkMember[]> {
+  let pending = memberCache.get(conversationId);
+  if (!pending) {
+    pending = apiRequest<any>(`${base(conversationId)}/members`, { token })
+      .then((response) => (Array.isArray(response?.members) ? response.members : []))
+      .catch(() => {
+        memberCache.delete(conversationId);
+        return [];
+      });
+    memberCache.set(conversationId, pending);
+  }
+  return pending;
+}
 
 // Uses fetch directly so the "similar Sparks" answer (409) keeps its list.
 export async function startSpark(

@@ -712,9 +712,8 @@ export default function CallSession() {
   );
 
   // ==========================================
-<<<<<<< HEAD
-  // GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
-  // ==========================================
+// GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
+// ==========================================
 
   if (isGroup) {
     const people: OrbitPerson[] = active.call.members
@@ -767,7 +766,9 @@ export default function CallSession() {
         />
         {addPeopleSheet}
       </>
-=======
+    );
+  }
+
   // BIG CALL (more than 8 people): speaker stage + list, audio or video.
   // Only the tiles on screen receive video. See StageLayout.
   // ==========================================
@@ -787,7 +788,6 @@ export default function CallSession() {
         overlay={addPeopleSheet}
         topExtra={audioTapButton}
       />
->>>>>>> origin/main
     );
   }
 

@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // GROUP INVITATION (Figma M25 · Invite & pending approval)
 // ==========================================
 // Opened from an invite link. Shows the group, then:
@@ -137,6 +137,9 @@ export default function GroupInvite() {
 
   const approval = preview?.joinMode === "approval";
   const pending = !!preview?.requestPending;
+  // After a reload the introduction comes back from the server (M25).
+  const myRequest = (preview as any)?.myRequest as { message?: string; createdAt?: string } | null | undefined;
+  const shownIntro = sent ?? (myRequest?.message ? { text: myRequest.message, at: new Date(myRequest.createdAt || Date.now()) } : null);
 
   return (
     <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
@@ -195,12 +198,12 @@ export default function GroupInvite() {
               </Pressable>
             ) : pending ? (
               <>
-                {sent?.text ? (
+                {shownIntro?.text ? (
                   <>
                     <Text style={styles.section}>YOUR INTRODUCTION · SENT</Text>
                     <View style={styles.introCard}>
-                      <Text style={styles.introText}>{sent.text}</Text>
-                      <Text style={styles.introTime}>{sentLabel(sent.at)}</Text>
+                      <Text style={styles.introText}>{shownIntro.text}</Text>
+                      <Text style={styles.introTime}>{sentLabel(shownIntro.at)}</Text>
                     </View>
                   </>
                 ) : null}
@@ -209,7 +212,7 @@ export default function GroupInvite() {
                   <Ionicons name="time-outline" size={30} color={PINK} />
                   <Text style={styles.pendingTitle}>Request pending</Text>
                   <Text style={styles.pendingText}>
-                    The group's admins will review your request. We'll notify you when you're approved.
+                    The group&apos;s admins will review your request. We&apos;ll notify you when you&apos;re approved.
                   </Text>
                   <Text style={styles.pendingNote}>Chat is available after approval</Text>
                   <Pressable onPress={cancelRequest} style={styles.cancelLink} hitSlop={6}>

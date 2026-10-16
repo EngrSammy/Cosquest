@@ -5,7 +5,8 @@
 // The approved admin powers work today: pin (keep visible through quiet
 // periods), delete, and merge two selected Sparks - "No automatic merge.
 // This requires your confirmation." Any member can start a Spark; only
-// admins pin, delete or merge them.
+// admins pin, delete or merge them - everyone else just sees a short note.
+// Pin, delete and merge each ask before acting.
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -27,7 +28,7 @@ import { useAppSelector } from "@/store/hooks";
 
 function stateLabel(spark: Spark) {
   if (spark.active) return `Active · ${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`;
-  return `Quiet · ${spark.messageCount} messages${spark.revived ? " · revived" : ""}`;
+  return `Quiet · ${spark.messageCount} ${spark.messageCount === 1 ? "message" : "messages"}${spark.revived ? " · revived" : ""}`;
 }
 
 export default function ManageSparks() {
@@ -60,7 +61,20 @@ export default function ManageSparks() {
     load();
   }, [load]);
 
-  const togglePin = async (spark: Spark) => {
+  const togglePin = (spark: Spark) => {
+    if (!token || !groupId) return;
+    const pinning = !spark.pinned;
+    Alert.alert(
+      pinning ? `Pin the "${spark.subject}" Spark?` : `Unpin the "${spark.subject}" Spark?`,
+      pinning ? "It stays visible to everyone through quiet periods." : "It can fade out again when it goes quiet.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: pinning ? "Pin Spark" : "Unpin Spark", onPress: () => applyPin(spark) },
+      ],
+    );
+  };
+
+  const applyPin = async (spark: Spark) => {
     if (!token || !groupId) return;
     try {
       setBusy(`pin-${spark.id}`);
@@ -121,11 +135,22 @@ export default function ManageSparks() {
     }
   };
 
+  // Keep the other one instead.
+  const swap = () => setPicked((current) => (current.length === 2 ? [current[1], current[0]] : current));
+
+  if (!loading && !canManage) {
+    return (
+      <AdminScreen title="Manage Sparks" subtitle={group ? `${group.name} · Admin only` : "Admin only"}>
+        <ConceptBanner title="Concept — requirements pending" text="Panel requirements to be specified by Mark Jones." />
+        <Note>Only group admins can pin, delete or merge Sparks.</Note>
+      </AdminScreen>
+    );
+  }
+
   return (
     <AdminScreen title="Manage Sparks" subtitle={group ? `${group.name} · Admin only` : "Admin only"} loading={loading}>
       <ConceptBanner title="Concept — requirements pending" text="Panel requirements to be specified by Mark Jones." />
 
-      {!canManage ? <Note>Only group admins can pin, delete or merge Sparks.</Note> : null}
       {sparks.length === 0 ? <Note>No Sparks in this group yet.</Note> : null}
 
       {/* APPROVED ADMIN POWERS */}
@@ -137,7 +162,7 @@ export default function ManageSparks() {
 
           <Pressable
             style={styles.actionRow}
-            disabled={!canManage || busy === `pin-${spark.id}`}
+            disabled={busy === `pin-${spark.id}`}
             onPress={() => togglePin(spark)}>
             <View style={styles.flex}>
               <Text style={styles.actionTitle}>{spark.pinned ? "Unpin Spark" : "Pin Spark"}</Text>
@@ -146,9 +171,9 @@ export default function ManageSparks() {
             <Ionicons name={spark.pinned ? "pin" : "pin-outline"} size={22} color={spark.pinned ? A.pink : A.muted} />
           </Pressable>
 
-          <Pressable style={[styles.actionRow, styles.actionLast]} disabled={!canManage} onPress={() => remove(spark)}>
+          <Pressable style={[styles.actionRow, styles.actionLast]} onPress={() => remove(spark)}>
             <Text style={[styles.actionTitle, styles.danger, styles.flex]}>Delete Spark</Text>
-            <Ionicons name="trash-outline" size={22} color={A.danger} />
+            <Ionicons name="trash-outline" size={22} color={A.pink} />
           </Pressable>
         </View>
       ))}
@@ -161,8 +186,10 @@ export default function ManageSparks() {
             <Text style={styles.pickedCount}>{picked.length} Sparks selected</Text>
             {sparks.map((spark) => {
               const on = picked.includes(spark.id);
+              // With two ticked: the first is kept, the second merges into it.
+              const tag = picked.length === 2 ? (spark.id === picked[0] ? "Kept" : spark.id === picked[1] ? "Merges in" : null) : null;
               return (
-                <Pressable key={spark.id} style={styles.pickRow} onPress={() => togglePick(spark)} disabled={!canManage}>
+                <Pressable key={spark.id} style={styles.pickRow} onPress={() => togglePick(spark)}>
                   <View style={[styles.checkbox, on && styles.checkboxOn]}>
                     {on ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
                   </View>
@@ -170,6 +197,7 @@ export default function ManageSparks() {
                     <Text style={styles.pickTitle}>{spark.subject}</Text>
                     <Text style={styles.actionHint}>{stateLabel(spark)}</Text>
                   </View>
+                  {tag ? <Text style={[styles.tag, tag === "Kept" && styles.tagKept]}>{tag}</Text> : null}
                 </Pressable>
               );
             })}
@@ -185,8 +213,14 @@ export default function ManageSparks() {
           confirmLabel="Confirm merge"
           onConfirm={merge}
           onCancel={() => setPicked([])}
-          busy={busy === "merge"}
-        />
+          busy={busy === "merge"}>
+          <Text style={styles.keptNote}>
+            {into.subject} is kept; {from.subject} merges into it.{" "}
+            <Text style={styles.swap} onPress={swap}>
+              Keep {from.subject} instead
+            </Text>
+          </Text>
+        </ConfirmCard>
       ) : null}
 
       <Note>Any member can start a Spark. Only admins can pin, delete or merge them.</Note>
@@ -226,7 +260,15 @@ const styles = StyleSheet.create({
 
   actionHint: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12, color: A.muted },
 
-  danger: { color: A.danger },
+  danger: { color: A.pink },
+
+  tag: { fontFamily: FONTS.semibold, fontSize: 11, color: A.muted },
+
+  tagKept: { color: A.pink },
+
+  keptNote: { marginTop: 10, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: A.muted },
+
+  swap: { fontFamily: FONTS.semibold, color: A.pink },
 
   pickedCount: { fontFamily: FONTS.regular, fontSize: 12.5, color: A.muted, marginBottom: 4 },
 
