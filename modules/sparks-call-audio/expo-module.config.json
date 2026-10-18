@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["SparksCallAudioModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.sparkscallaudio.SparksCallAudioModule"]
+  }
+}

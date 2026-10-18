@@ -1,0 +1,10 @@
+{
+  "name": "sparks-call-audio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hands this user's own LiveKit call audio to Sparks call notes, native to native.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "author": "CosQuest",
+  "homepage": "https://github.com/EngrSammy/Cosquest"
+}

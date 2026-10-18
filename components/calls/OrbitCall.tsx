@@ -359,6 +359,7 @@ export default function OrbitCallScreen({
   onLeave,
   onMinimize,
   onPeople,
+  onSparks,
   extra,
 }: {
   title: string;
@@ -376,6 +377,8 @@ export default function OrbitCallScreen({
   onLeave: () => void;
   onMinimize: () => void;
   onPeople: () => void;
+  // Opens the call's Sparks (live transcript, topics). Without it: "coming soon".
+  onSparks?: () => void;
   extra?: ReactNode;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
@@ -447,7 +450,7 @@ export default function OrbitCallScreen({
         <ControlButton icon={cameraOn ? "videocam" : "videocam-outline"} label="Video" active={cameraOn} onPress={onToggleCamera} disabled={ended} />
         <ControlButton icon="share-outline" label="Share" onPress={() => comingSoon("Screen sharing")} disabled={ended} />
         <ControlButton icon="headset-outline" label="Focus" active={focusOn} onPress={onToggleFocus} disabled={ended} />
-        <ControlButton icon="sparkles" label="Sparks" kind="sparks" onPress={() => comingSoon("Sparks in calls")} disabled={ended} />
+        <ControlButton icon="sparkles" label="Sparks" kind="sparks" onPress={onSparks || (() => comingSoon("Sparks in calls"))} disabled={ended} />
         <ControlButton icon="close" label="Leave" kind="leave" onPress={onLeave} disabled={ended} />
       </View>
     </LinearGradient>
