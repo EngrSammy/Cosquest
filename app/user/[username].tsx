@@ -41,6 +41,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchFollowing } from "@/store/thunks/followThunks";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
@@ -64,6 +65,7 @@ function avatarSource(profile: PublicProfile | null) {
 }
 
 function Stat({ value, label }: { value?: number; label: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{(value ?? 0).toLocaleString()}</Text>
@@ -73,6 +75,8 @@ function Stat({ value, label }: { value?: number; label: string }) {
 }
 
 export default function UserProfileScreen() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -346,7 +350,7 @@ export default function UserProfileScreen() {
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <Pressable onPress={goBack} hitSlop={10} style={styles.headerButton}>
-        <Ionicons name="chevron-back" size={26} color="#191922" />
+        <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
       </Pressable>
 
       <Text style={styles.headerTitle} numberOfLines={1}>
@@ -359,7 +363,7 @@ export default function UserProfileScreen() {
           hitSlop={10}
           style={styles.headerButton}
           accessibilityLabel="More options">
-          <Ionicons name="ellipsis-vertical" size={20} color="#191922" />
+          <Ionicons name="ellipsis-vertical" size={20} color={ink.text("#191922")} />
         </Pressable>
       ) : (
         <View style={styles.headerButton} />
@@ -372,13 +376,13 @@ export default function UserProfileScreen() {
   if (loading) {
     content = (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#C5399A" />
+        <ActivityIndicator size="large" color={ink.text("#C5399A")} />
       </View>
     );
   } else if (blockedByMe) {
     content = (
       <View style={styles.center}>
-        <Ionicons name="ban-outline" size={42} color="#8A8A93" />
+        <Ionicons name="ban-outline" size={42} color={ink.text("#8A8A93")} />
         <Text style={styles.centerTitle}>You blocked @{username}</Text>
         <Text style={styles.centerText}>
           Unblock them to see their profile and message each other again.
@@ -394,7 +398,7 @@ export default function UserProfileScreen() {
   } else if (unavailable || !profile) {
     content = (
       <View style={styles.center}>
-        <Ionicons name="lock-closed-outline" size={42} color="#8A8A93" />
+        <Ionicons name="lock-closed-outline" size={42} color={ink.text("#8A8A93")} />
         <Text style={styles.centerTitle}>Profile not available</Text>
         <Text style={styles.centerText}>
           This profile is private, or it no longer exists.
@@ -460,7 +464,7 @@ export default function UserProfileScreen() {
               {busy === "follow" ? (
                 <ActivityIndicator
                   size="small"
-                  color={iFollow ? "#C5399A" : "#FFFFFF"}
+                  color={ink.text(iFollow ? "#C5399A" : "#FFFFFF")}
                 />
               ) : (
                 <Text
@@ -477,7 +481,7 @@ export default function UserProfileScreen() {
               onPress={openMessage}
               disabled={!!busy}>
               {busy === "message" ? (
-                <ActivityIndicator size="small" color="#C5399A" />
+                <ActivityIndicator size="small" color={ink.text("#C5399A")} />
               ) : (
                 <Text style={styles.actionGhostText}>Message</Text>
               )}
@@ -504,7 +508,7 @@ export default function UserProfileScreen() {
                         : "chatbubble-ellipses-outline"
                   }
                   size={18}
-                  color={active ? "#C5399A" : "#9C9CAA"}
+                  color={ink.text(active ? "#C5399A" : "#9C9CAA")}
                 />
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>
                   {key}
@@ -533,7 +537,7 @@ export default function UserProfileScreen() {
                     <Ionicons
                       name="copy-outline"
                       size={16}
-                      color="#FFFFFF"
+                      color={ink.text("#FFFFFF")}
                       style={styles.thumbIcon}
                     />
                   ) : null}
@@ -570,7 +574,7 @@ export default function UserProfileScreen() {
                     <Ionicons
                       name="play"
                       size={22}
-                      color="#FFFFFF"
+                      color={ink.text("#FFFFFF")}
                       style={styles.playIcon}
                     />
                   </Pressable>
@@ -632,13 +636,13 @@ export default function UserProfileScreen() {
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={20}
-                  color="#191922"
+                  color={ink.text("#191922")}
                 />
                 <Text style={styles.menuText}>Unblock @{username}</Text>
               </Pressable>
             ) : (
               <Pressable style={styles.menuItem} onPress={block}>
-                <Ionicons name="ban-outline" size={20} color="#D9364F" />
+                <Ionicons name="ban-outline" size={20} color={ink.text("#D9364F")} />
                 <Text style={[styles.menuText, styles.menuDanger]}>
                   Block @{username}
                 </Text>
@@ -657,7 +661,7 @@ export default function UserProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",

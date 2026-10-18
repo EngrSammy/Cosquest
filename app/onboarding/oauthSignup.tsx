@@ -8,10 +8,13 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useAppSelector } from "../../store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthSignup() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const { loading } = useAppSelector((state) => state.auth);
 
   // Same Google flow as the Sign in screen — the backend decides whether
@@ -67,7 +70,7 @@ export default function AuthSignup() {
 
           {googleLoading ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
               <Text style={styles.loadingText}>
                 Connecting your Google account...
@@ -91,7 +94,7 @@ export default function AuthSignup() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

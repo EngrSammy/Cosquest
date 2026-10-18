@@ -2,8 +2,10 @@ import { AppBackground } from "@/components/AppBackground";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       onPress={onPress}
@@ -15,6 +17,7 @@ function Button({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 export default function Welcome() {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <AppBackground variant="plain">
       <View style={styles.screen}>
@@ -35,7 +38,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

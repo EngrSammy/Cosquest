@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -49,9 +50,11 @@ const MILKY = {
 } as const;
 
 function RowIcon({ name }: { name: keyof typeof Ionicons.glyphMap }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <View style={styles.rowIcon}>
-      <Ionicons name={name} size={15} color={PINK} />
+      <Ionicons name={name} size={15} color={ink.text(PINK)} />
     </View>
   );
 }
@@ -67,6 +70,7 @@ function DownloadRow({
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.row}>
       <RowIcon name={icon} />
@@ -155,6 +159,8 @@ async function clearApplicationCache(uri: string): Promise<void> {
 }
 
 export default function DataUsage() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -389,7 +395,7 @@ export default function DataUsage() {
     <View style={styles.screen}>
       {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -413,12 +419,12 @@ export default function DataUsage() {
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="server-outline" size={16} color={PINK} />
+              <Ionicons name="server-outline" size={16} color={ink.text(PINK)} />
             </View>
 
             <Text style={styles.headerTitle}>Data Usage</Text>
@@ -438,7 +444,7 @@ export default function DataUsage() {
               {isWeb ? (
                 <Text style={styles.storageValue}>On your phone</Text>
               ) : storageLoading ? (
-                <ActivityIndicator size="small" color={PINK} />
+                <ActivityIndicator size="small" color={ink.text(PINK)} />
               ) : (
                 <Text style={styles.storageValue}>
                   {formatBytes(usedStorageBytes)} /{" "}
@@ -491,7 +497,7 @@ export default function DataUsage() {
             </View>
 
             {cacheClearing ? (
-              <ActivityIndicator size="small" color={PINK} />
+              <ActivityIndicator size="small" color={ink.text(PINK)} />
             ) : null}
           </Pressable>
 
@@ -553,7 +559,7 @@ export default function DataUsage() {
                   </View>
 
                   {selected ? (
-                    <Ionicons name="checkmark-circle" size={22} color={PINK} />
+                    <Ionicons name="checkmark-circle" size={22} color={ink.text(PINK)} />
                   ) : null}
                 </Pressable>
               );
@@ -565,7 +571,7 @@ export default function DataUsage() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

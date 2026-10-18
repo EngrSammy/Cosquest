@@ -32,6 +32,7 @@ import { getMediaUrls, PostMedia } from "./PostMedia";
 import { PostMenu } from "./PostMenu";
 import { SharedPostEmbed } from "./SharedPostEmbed";
 import { ShareSheet } from "./ShareSheet";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 /* =========================================================
    HELPERS
@@ -180,6 +181,8 @@ function factionColor(faction: string) {
 }
 
 export function PostCard({ post, token }: { post: any; token: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const dispatch = useAppDispatch();
 
   /* =========================================================
@@ -570,7 +573,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         <Ionicons
           name="ellipsis-horizontal"
           size={20}
-          color={onPhoto ? "#FFFFFF" : "#65656D"}
+          color={ink.text(onPhoto ? "#FFFFFF" : "#65656D")}
         />
       </Pressable>
     ) : null;
@@ -677,7 +680,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
               editable={!savingEdit}
               style={styles.editInput}
               placeholder="Write something..."
-              placeholderTextColor="#9C9CAA"
+              placeholderTextColor={ink.text("#9C9CAA")}
             />
 
             <Pressable
@@ -729,7 +732,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
    STYLES
 ========================================================= */
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   // One post: the photo card (or text card) + the caption under it.
   post: {
     marginBottom: 26,

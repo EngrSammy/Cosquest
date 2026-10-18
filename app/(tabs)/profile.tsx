@@ -32,6 +32,7 @@ import {
 } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
@@ -86,6 +87,7 @@ function Stat({
   onPress?: () => void;
   align?: "flex-start" | "center" | "flex-end";
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const content = (
     <>
       <Text style={styles.statValue}>{value}</Text>
@@ -111,6 +113,7 @@ function Stat({
 }
 
 function GameStat({ value, label }: { value: number; label: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.gameStat}>
       <Text style={styles.gameStatValue}>{value}</Text>
@@ -126,6 +129,7 @@ function ActionButton({
   label: string;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       style={({ pressed }) => [styles.action, pressed && { opacity: 0.7 }]}
@@ -161,6 +165,8 @@ function FactionProfileCard({
   previewMembers: FactionMemberPreview[];
   rankInfo: FactionRankInfo;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   // Full bar at the top rank (or a rank set by hand).
   const progress = rankInfo.nextPoints
     ? Math.min(rankInfo.points / rankInfo.nextPoints, 1)
@@ -188,7 +194,7 @@ function FactionProfileCard({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.factionShield}>
-          <Ionicons name="shield-outline" size={24} color="#FFFFFF" />
+          <Ionicons name="shield-outline" size={24} color={ink.text("#FFFFFF")} />
         </LinearGradient>
 
         <View style={styles.factionIdentity}>
@@ -263,6 +269,8 @@ function FactionProfileCard({
 }
 
 function ReelItem({ post }: { post: Post }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const videoUrl = post.image;
 
   const player = useVideoPlayer(videoUrl || "", (player) => {
@@ -272,7 +280,7 @@ function ReelItem({ post }: { post: Post }) {
   if (!videoUrl) {
     return (
       <View style={styles.reelUnavailable}>
-        <Ionicons name="videocam-outline" size={32} color="#9C9CAA" />
+        <Ionicons name="videocam-outline" size={32} color={ink.text("#9C9CAA")} />
         <Text style={styles.reelUnavailableText}>Video unavailable</Text>
       </View>
     );
@@ -299,6 +307,7 @@ function ReelItem({ post }: { post: Post }) {
 }
 
 function ThoughtItem({ post }: { post: Post }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.thoughtCard}>
       <Text style={styles.thoughtText}>
@@ -313,6 +322,8 @@ function ThoughtItem({ post }: { post: Post }) {
 }
 
 export default function Profile() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -574,7 +585,7 @@ export default function Profile() {
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Create a post">
-            <Ionicons name="add" size={28} color="#191922" />
+            <Ionicons name="add" size={28} color={ink.text("#191922")} />
           </Pressable>
 
           <Pressable
@@ -582,13 +593,13 @@ export default function Profile() {
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Settings">
-            <Ionicons name="menu" size={26} color={PINK} />
+            <Ionicons name="menu" size={26} color={ink.text(PINK)} />
           </Pressable>
         </View>
 
         {profileLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="small" color={PINK} />
+            <ActivityIndicator size="small" color={ink.text(PINK)} />
 
             <Text style={styles.loadingText}>Loading profile...</Text>
           </View>
@@ -727,7 +738,7 @@ export default function Profile() {
         <View style={styles.highlights}>
           <View style={styles.highlight}>
             <View style={styles.highlightNew}>
-              <Ionicons name="add" size={24} color="#9899A4" />
+              <Ionicons name="add" size={24} color={ink.text("#9899A4")} />
             </View>
 
             <Text style={styles.highlightLabel}>New</Text>
@@ -781,7 +792,7 @@ export default function Profile() {
                         : "person-outline"
                   }
                   size={18}
-                  color={active ? "#191922" : "#9C9CAA"}
+                  color={ink.text(active ? "#191922" : "#9C9CAA")}
                 />
 
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>
@@ -820,7 +831,7 @@ export default function Profile() {
             </View>
           ) : (
             <View style={styles.emptyContent}>
-              <Ionicons name="images-outline" size={36} color="#9C9CAA" />
+              <Ionicons name="images-outline" size={36} color={ink.text("#9C9CAA")} />
 
               <Text style={styles.emptyTitle}>No posts yet</Text>
 
@@ -841,7 +852,7 @@ export default function Profile() {
             </View>
           ) : (
             <View style={styles.emptyContent}>
-              <Ionicons name="videocam-outline" size={36} color="#9C9CAA" />
+              <Ionicons name="videocam-outline" size={36} color={ink.text("#9C9CAA")} />
 
               <Text style={styles.emptyTitle}>No reels yet</Text>
 
@@ -865,7 +876,7 @@ export default function Profile() {
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={36}
-                color="#9C9CAA"
+                color={ink.text("#9C9CAA")}
               />
 
               <Text style={styles.emptyTitle}>No thoughts yet</Text>
@@ -905,7 +916,7 @@ const MILKY = {
   elevation: 2,
 } as const;
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: H_PAD,
     paddingBottom: 140,

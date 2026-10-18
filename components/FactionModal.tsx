@@ -21,6 +21,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // ==========================================
 // TYPES
@@ -54,6 +55,8 @@ export function FactionModal({
   onAgree,
   onClose,
 }: Props) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   // ==========================================
   // ANIMATION STATE
   // ==========================================
@@ -406,7 +409,7 @@ export function FactionModal({
                   <Ionicons
                     name={agreed ? "checkbox" : "square-outline"}
                     size={22}
-                    color={agreed ? "#C5399A" : "#5b5b5e"}
+                    color={ink.text(agreed ? "#C5399A" : "#5b5b5e")}
                   />
 
                   <View style={styles.agreeContent}>
@@ -453,7 +456,7 @@ export function FactionModal({
 // STYLES
 // ==========================================
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",

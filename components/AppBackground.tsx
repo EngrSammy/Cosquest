@@ -1,9 +1,10 @@
-import { Image } from "expo-image";
+﻿import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View } from "react-native";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
 type Variant = "plain" | "gradient" | "blueGradient" | "blueMap";
 
-// Which map image each variant shows behind the content (null = no map).
 const MAP_SOURCES = {
   plain: require("@/assets/images/map-texture.png"),
   gradient: require("@/assets/images/map-texture.png"),
@@ -19,13 +20,23 @@ export function AppBackground({
   variant?: Variant;
 }) {
   const map = MAP_SOURCES[variant];
+  const isDark = useColorScheme() === "dark";
 
   return (
-    <View style={styles.root}>
+    <View
+      style={[
+        styles.root,
+        { backgroundColor: isDark ? "#101116" : "#FFFFFF" },
+      ]}
+    >
       {map ? (
         <Image
           source={map}
-          style={[StyleSheet.absoluteFill, styles.map]}
+          style={[
+            StyleSheet.absoluteFill,
+            styles.map,
+            { opacity: isDark ? 0.18 : 0.5 },
+          ]}
           contentFit="cover"
         />
       ) : null}
@@ -42,7 +53,6 @@ export function AppBackground({
         />
       ) : null}
 
-      {/* blueMap: translucent blue over the street-map image so the map shows through */}
       {variant === "blueMap" ? (
         <LinearGradient
           colors={[
@@ -55,18 +65,27 @@ export function AppBackground({
         />
       ) : null}
 
-      {/* blueGradient (Community / Profile / Post screens), from the Figma:
-          linear-gradient(180deg, rgba(255,255,255,0.6) 5.29%,
-                                  rgba(184,232,255,0.6) 77.89%) */}
       {variant === "blueGradient" ? (
         <LinearGradient
-          colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+          colors={
+            isDark
+              ? ["rgba(16,17,22,0.78)", "rgba(25,35,52,0.88)"]
+              : ["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]
+          }
           locations={[0.0529, 0.7789]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
       ) : null}
+
+      {isDark ? (
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, styles.darkOverlay]}
+        />
+      ) : null}
+
       {children}
     </View>
   );
@@ -76,7 +95,9 @@ const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
-  map: { opacity: 0.5 },
+  map: {},
+  darkOverlay: {
+    backgroundColor: "rgba(10,11,17,0.72)",
+  },
 });

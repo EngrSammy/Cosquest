@@ -1,4 +1,4 @@
-// ==========================================
+﻿// ==========================================
 // SEARCH IN CHAT (Figma M16)
 // ==========================================
 // "Search in chat" + the chat's name, the search box, chips ("All dates ↓",
@@ -140,7 +140,8 @@ const ResultCard = memo(function ResultCard({
 
 export default function SearchInChat() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const screenGradient = useInk().dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
+  const ink = useInk();
+  const screenGradient = ink.dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const conversationId = Array.isArray(id) ? id[0] : id;
@@ -324,7 +325,7 @@ export default function SearchInChat() {
       {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={26} color={INK} />
+          <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title}>Search in chat</Text>
@@ -335,21 +336,21 @@ export default function SearchInChat() {
           ) : null}
         </View>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Close">
-          <Ionicons name="close" size={26} color={MUTED} />
+          <Ionicons name="close" size={26} color={ink.text(MUTED)} />
         </Pressable>
       </View>
 
       <View style={styles.top}>
         {/* SEARCH BOX */}
         <View style={styles.search}>
-          <Ionicons name="ellipse-outline" size={16} color={MUTED} />
+          <Ionicons name="ellipse-outline" size={16} color={ink.text(MUTED)} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => remember(query)}
             returnKeyType="search"
             placeholder="Search messages"
-            placeholderTextColor="#9AA3B5"
+            placeholderTextColor={ink.text("#9AA3B5")}
             autoFocus
             autoCapitalize="none"
             autoCorrect={false}
@@ -464,7 +465,7 @@ export default function SearchInChat() {
         <LinearGradient colors={screenGradient} style={styles.screen}>
           <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
             <Pressable onPress={() => setContext(null)} hitSlop={10} accessibilityLabel="Back to results">
-              <Ionicons name="chevron-back" size={26} color={INK} />
+              <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.title}>In the conversation</Text>
@@ -659,4 +660,17 @@ const STYLE_PAIR = themedStyles({
   primary: { height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: PINK },
 
   primaryText: { fontFamily: FONTS.semibold, fontSize: 16, color: "#FFFFFF" },
-});
+  }, {
+    // M16 dark-theme overrides
+    search: { backgroundColor: "#222431", borderColor: "rgba(255,255,255,0.16)" },
+    menu: { backgroundColor: "#222431", borderColor: "rgba(255,255,255,0.14)" },
+    card: { backgroundColor: "#222431", borderColor: "rgba(255,255,255,0.12)" },
+    bubble: { backgroundColor: "#2A2C3A" },
+    bubbleHighlight: { backgroundColor: "#40283B" },
+    chip: { backgroundColor: "#292B39" },
+    chipOn: { backgroundColor: "#40283B" },
+    contextChip: { backgroundColor: "#292B39" },
+    jump: { backgroundColor: "#292B39" },
+    more: { backgroundColor: "#292B39" },
+  },
+);

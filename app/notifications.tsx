@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatarSource(actor: AppNotificationItem["actor"]) {
   if (actor?.avatarPhotoUrl) {
@@ -87,6 +88,8 @@ function NotificationRow({
   followBusy: boolean;
   onToggleFollow: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const isFollowNotification = item.type === "follow" && !!item.actor;
 
   return (
@@ -121,7 +124,7 @@ function NotificationRow({
           disabled={followBusy}
           onPress={onToggleFollow}>
           {followBusy ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={ink.text("#FFFFFF")} />
           ) : (
             <Text style={following ? styles.followingText : styles.followText}>
               {following ? "Following" : "Follow"}
@@ -134,6 +137,8 @@ function NotificationRow({
 }
 
 export default function Notifications() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -204,7 +209,7 @@ export default function Notifications() {
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color="#191922" />
+          <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
         </Pressable>
 
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -214,7 +219,7 @@ export default function Notifications() {
 
       {loading && notifications.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator size="small" color="#C5399A" />
+          <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
           <Text style={styles.centerText}>Loading notifications...</Text>
         </View>
@@ -233,7 +238,7 @@ export default function Notifications() {
 
       {!loading && !error && notifications.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="notifications-outline" size={38} color="#9C9CAA" />
+          <Ionicons name="notifications-outline" size={38} color={ink.text("#9C9CAA")} />
 
           <Text style={styles.emptyTitle}>No notifications yet</Text>
         </View>
@@ -271,7 +276,7 @@ export default function Notifications() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1, paddingHorizontal: 16 },
 
   header: {

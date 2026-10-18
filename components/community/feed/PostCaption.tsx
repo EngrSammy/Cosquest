@@ -1,6 +1,7 @@
 import { FONTS } from "@/constants/fonts";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Long captions fold with "See more".
 const LONG_CAPTION_CHARS = 200;
@@ -40,6 +41,7 @@ export function PostCaption({
   username: string;
   content?: string;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const [expanded, setExpanded] = useState(false);
 
   if (!content) {
@@ -78,7 +80,7 @@ export function PostCaption({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   caption: {
     fontFamily: FONTS.regular,
     fontSize: CAPTION_SIZE,

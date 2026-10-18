@@ -5,10 +5,13 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthSignin() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   // Real Google sign-in (was a "Coming soon" placeholder). Same flow as
@@ -63,7 +66,7 @@ export default function AuthSignin() {
 
         {googleLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#C5399A" />
+            <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
             <Text style={styles.loadingText}>
               Connecting your Google account...
@@ -84,7 +87,7 @@ export default function AuthSignin() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

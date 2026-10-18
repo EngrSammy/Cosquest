@@ -6,19 +6,19 @@
 // option to vote (tap your pick again to remove your vote). Exactly as
 // designed (the CEO's doc + Figma): no "View votes", "Close poll" or
 // "Final results".
+//
+// Width: the poll fills the bubble it is in (it used to ask for 250px
+// minimum, which was wider than the bubble and got cut off on the right).
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 
+import { UI } from "@/components/chat/ui";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { pollIsClosed, votePoll, type PollSummary } from "@/services/polls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { socketPollUpdated } from "@/store/slices/chatSlice";
-import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
-
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
 
 export default function PollBubble({
   messageId,
@@ -32,6 +32,7 @@ export default function PollBubble({
   mine?: boolean;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const dispatch = useAppDispatch();
   const token = useAppSelector((state) => state.auth.token);
 
@@ -43,7 +44,9 @@ export default function PollBubble({
   const closed = pollIsClosed(shown);
   const myVotes = shown.myVotes || [];
   const total = shown.totalVoters || 0;
-  const myPicks = shown.options.filter((option) => myVotes.includes(option.id)).map((option) => option.text);
+  const myPicks = shown.options
+    .filter((option) => myVotes.includes(option.id))
+    .map((option) => option.text);
 
   const vote = async (optionId: string) => {
     if (!token || closed || busy) return;
@@ -63,19 +66,35 @@ export default function PollBubble({
     setOptimistic({
       ...shown,
       myVotes: nextVotes,
-      totalVoters: total + (willVote && !hadVoted ? 1 : 0) - (!willVote && hadVoted ? 1 : 0),
+      totalVoters:
+        total +
+        (willVote && !hadVoted ? 1 : 0) -
+        (!willVote && hadVoted ? 1 : 0),
       options: shown.options.map((option) => ({
         ...option,
-        votes: Math.max(0, option.votes - (myVotes.includes(option.id) ? 1 : 0) + (nextVotes.includes(option.id) ? 1 : 0)),
+        votes: Math.max(
+          0,
+          option.votes -
+            (myVotes.includes(option.id) ? 1 : 0) +
+            (nextVotes.includes(option.id) ? 1 : 0),
+        ),
       })),
     });
 
     try {
       setBusy(true);
-      const result = await votePoll(conversationId, messageId, nextVotes, token);
+      const result = await votePoll(
+        conversationId,
+        messageId,
+        nextVotes,
+        token,
+      );
       dispatch(socketPollUpdated({ conversationId, messageId, poll: result }));
     } catch (error) {
-      Alert.alert("Poll", error instanceof Error ? error.message : "Couldn't save your vote.");
+      Alert.alert(
+        "Poll",
+        error instanceof Error ? error.message : "Couldn't save your vote.",
+      );
     } finally {
       setOptimistic(null);
       setBusy(false);
@@ -87,13 +106,18 @@ export default function PollBubble({
       <Text style={styles.question}>{shown.question}</Text>
       <Text style={styles.meta}>
         {total} {total === 1 ? "vote" : "votes"}
-        {myPicks.length ? ` · Your vote: ${myPicks.join(", ")}` : shown.multiple ? " · Pick one or more" : ""}
+        {myPicks.length
+          ? ` · Your vote: ${myPicks.join(", ")}`
+          : shown.multiple
+            ? " · Pick one or more"
+            : ""}
       </Text>
 
       <View style={styles.options}>
         {shown.options.map((option) => {
           const picked = myVotes.includes(option.id);
-          const percent = total > 0 ? Math.round((option.votes / total) * 100) : 0;
+          const percent =
+            total > 0 ? Math.round((option.votes / total) * 100) : 0;
 
           return (
             <Pressable
@@ -106,9 +130,15 @@ export default function PollBubble({
               <View style={styles.optionTop}>
                 <Text style={styles.optionText} numberOfLines={2}>
                   {option.text}
-                  {picked ? " " : ""}
                 </Text>
-                {picked ? <Ionicons name="checkmark" size={16} color={INK} style={styles.tick} /> : null}
+                {picked ? (
+                  <Ionicons
+                    name="checkmark"
+                    size={14}
+                    color={ink.text(UI.INK)}
+                    style={styles.tick}
+                  />
+                ) : null}
                 <Text style={styles.count}>
                   {option.votes} · {percent}%
                 </Text>
@@ -125,25 +155,70 @@ export default function PollBubble({
 }
 
 const STYLE_PAIR = themedStyles({
-  wrap: { minWidth: 250, maxWidth: 320, paddingVertical: 2 },
+  // Fills the bubble. No minWidth wider than the bubble, so nothing is clipped.
+  wrap: {
+    alignSelf: "stretch",
+    width: "100%",
+    minWidth: 0,
+    maxWidth: 360,
+    paddingVertical: 2,
+  },
 
-  question: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 22, color: INK },
+  // Sizes measured from Figma M19 (question 14, details 11, option text 13).
+  question: {
+    fontFamily: FONTS.semibold,
+    fontSize: 14,
+    lineHeight: 20,
+    color: UI.INK,
+  },
 
-  meta: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
+  meta: {
+    marginTop: 8,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: UI.MUTED,
+  },
 
-  options: { marginTop: 10, gap: 8 },
+  options: { marginTop: 8, gap: 8, alignSelf: "stretch" },
 
-  option: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: "#FFFFFF" },
+  // Figma: the option cards are see-through white on the pink bubble, not solid white.
+  option: {
+    alignSelf: "stretch",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+  },
 
   optionTop: { flexDirection: "row", alignItems: "center" },
 
-  optionText: { flexShrink: 1, fontFamily: FONTS.regular, fontSize: 14.5, color: INK },
+  // The text only takes the room it needs, so the tick sits right after it.
+  optionText: {
+    flexShrink: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: UI.INK,
+  },
 
-  tick: { marginRight: 6 },
+  tick: { marginLeft: 4 },
 
-  count: { marginLeft: "auto", paddingLeft: 10, fontFamily: FONTS.medium, fontSize: 12.5, color: PINK },
+  count: {
+    marginLeft: "auto",
+    paddingLeft: 10,
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    color: UI.PINK,
+  },
 
-  track: { marginTop: 8, height: 5, borderRadius: 3, overflow: "hidden", backgroundColor: "#E3E7EF" },
+  track: {
+    marginTop: 6,
+    height: 5,
+    borderRadius: 3,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.7)",
+  },
 
-  bar: { height: 5, borderRadius: 3, backgroundColor: PINK },
+  bar: { height: 5, borderRadius: 3, backgroundColor: UI.PINK },
 });

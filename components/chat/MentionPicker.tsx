@@ -1,4 +1,4 @@
-// ==========================================
+﻿// ==========================================
 // MENTION MEMBERS (Figma M13 · Checkbox mentions)
 // ==========================================
 // Full screen: "Mention members" with the group's name under it, "Find a
@@ -517,4 +517,20 @@ const STYLE_PAIR = themedStyles({
   confirm: { height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: PINK },
 
   confirmText: { fontFamily: FONTS.semibold, fontSize: 16, color: "#FFFFFF" },
+}, {
+  // M13 dark-theme overrides; selection behaviour remains unchanged.
+  title: { color: "#F4F5FA" },
+  subtitle: { color: "#B5BBCB" },
+  search: { backgroundColor: "#252837", borderColor: "rgba(255,255,255,0.16)" },
+  searchInput: { color: "#F4F5FA" },
+  everyoneText: { color: "#F4F5FA" },
+  countChip: { backgroundColor: "#343044" },
+  countChipText: { color: "#D5D8E4" },
+  separator: { backgroundColor: "rgba(255,255,255,0.12)" },
+  check: { backgroundColor: "#252837", borderColor: "#737B91" },
+  name: { color: "#F4F5FA" },
+  detail: { color: "#B5BBCB" },
+  empty: { color: "#B5BBCB" },
+  selectedHint: { color: "#B5BBCB" },
 });
+

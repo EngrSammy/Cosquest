@@ -1,11 +1,10 @@
-﻿// ==========================================
+// ==========================================
 // SPARKS AI ON THIS PHONE
 // ==========================================
 // Can this phone run the Sparks AI (about 6 GB RAM in this release)? If so,
 // download the model (about 1 GB, Wi-Fi). Phones that can't still see every
 // Spark: other members' phones do the AI work for the group.
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +24,8 @@ import {
   type ModelStatus,
 } from "@/services/sparksSdk";
 import { safeBack } from "@/utils/safeBack";
+import { ScreenGradient } from "@/components/chat/ui";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -58,6 +59,8 @@ function gb(bytes?: number) {
 }
 
 export default function SparksModel() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   useSparksBoot();
 
@@ -133,7 +136,7 @@ export default function SparksModel() {
       </Text>
     );
   } else if (waiting) {
-    body = <ActivityIndicator color={PINK} style={styles.loading} />;
+    body = <ActivityIndicator color={ink.text(PINK)} style={styles.loading} />;
   } else if (!getSparksSdk()) {
     body = <Text style={styles.text}>The Sparks AI couldn't start. Check your connection and open this screen again.</Text>;
   } else {
@@ -145,7 +148,7 @@ export default function SparksModel() {
             <Ionicons
               name={capable ? "checkmark-circle" : "information-circle"}
               size={26}
-              color={capable ? "#2A8A92" : MUTED}
+              color={ink.text(capable ? "#2A8A92" : MUTED)}
             />
             <View style={styles.flex}>
               <Text style={styles.cardTitle}>
@@ -217,19 +220,20 @@ export default function SparksModel() {
   }
 
   return (
-    <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
+    <View style={styles.screen}>
+      <ScreenGradient />
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={26} color={INK} />
+          <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
         </Pressable>
         <Text style={styles.title}>Sparks AI on this phone</Text>
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}>{body}</ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
   flex: { flex: 1, minWidth: 0 },
   off: { opacity: 0.5 },

@@ -13,8 +13,11 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function UploadPicture() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -185,7 +188,7 @@ export default function UploadPicture() {
               style={styles.takePhotoBtn}
               onPress={takePhoto}
               disabled={isSaving}>
-              <Ionicons name="camera" size={18} color="#C5399A" />
+              <Ionicons name="camera" size={18} color={ink.text("#C5399A")} />
 
               <Text style={styles.takePhotoText}>Take photo</Text>
             </Pressable>
@@ -199,7 +202,7 @@ export default function UploadPicture() {
           </View>
 
           {data.photo ? (
-            <Ionicons name="checkmark-circle" size={32} color="#1FA85A" />
+            <Ionicons name="checkmark-circle" size={32} color={ink.text("#1FA85A")} />
           ) : null}
         </View>
 
@@ -261,7 +264,7 @@ export default function UploadPicture() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 80,

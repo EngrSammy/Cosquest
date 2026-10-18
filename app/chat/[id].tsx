@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+﻿import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   AudioModule,
   RecordingPresets,
@@ -95,6 +95,7 @@ import type { Rank } from "@/services/ranks";
 import SparkPanel from "@/components/chat/SparkPanel";
 import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
+import MessageActionsSheet from "@/components/chat/MessageActionsSheet";
 import RolePingCard from "@/components/chat/RolePingCard";
 import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
@@ -1117,7 +1118,7 @@ const Bubble = memo(function Bubble({
                 </Text>
               ) : null}
             </View>
-            <RankLine rank={msg.sender?.rank} />
+            <RankLine rank={msg.sender?.rank} groupRole={msg.senderGroupRole} />
           </View>
         ) : null}
 
@@ -2512,8 +2513,27 @@ export default function ChatScreen() {
     }
 
     listSparks(conversationId, token)
-      .then((result) => setSparks(result.sparks))
-      .catch(() => {});
+      .then((result) => {
+        if (__DEV__) {
+          console.info(
+            "[Sparks debug]",
+            result.sparks.map((spark) => ({
+              subject: spark.subject,
+              active: spark.active,
+              pinned: spark.pinned,
+              revived: spark.revived,
+              messageCount: spark.messageCount,
+              participantCount: spark.participantCount,
+            })),
+          );
+        }
+        setSparks(result.sparks);
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.warn("[Sparks debug] Fetch failed:", error);
+        }
+      });
   }, [token, conversationId, sparksChat]);
 
   useEffect(() => {
@@ -2958,7 +2978,11 @@ export default function ChatScreen() {
       markReadSoon();
     };
 
-    doJoin();
+    // Avoid a premature "Socket not connected" error during startup.
+    // The connect listener below performs the join once connected.
+    if (socket.connected) {
+      doJoin();
+    }
 
     // Room membership lives in the socket server's memory tied to one
     // physical connection — a dropped connection (a subway tunnel, wifi
@@ -5534,12 +5558,7 @@ export default function ChatScreen() {
       {/* LONG-PRESS MENU (reactions + actions) */}
       {/* ================================== */}
 
-      <Modal
-        visible={showActions && !!selectedMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={closeMenu}>
-        <Pressable style={[styles.menuBackdrop, styles.sheetBackdrop]} onPress={menuTap(closeMenu)}>
+      <MessageActionsSheet visible={showActions && !!selectedMessage} onRequestClose={closeMenu} backdropStyle={[styles.menuBackdrop, styles.sheetBackdrop]} onBackdropPress={menuTap(closeMenu)}>
           <Pressable
             style={[styles.menuColumn, styles.sheetColumn]}
             onPress={(event) => event.stopPropagation()}>
@@ -5597,7 +5616,7 @@ export default function ChatScreen() {
                       </Text>
                     ) : null}
                   </View>
-                  <RankLine rank={selectedMessage.sender?.rank} />
+                  <RankLine rank={selectedMessage.sender?.rank} groupRole={selectedMessage.senderGroupRole} />
                   <View style={styles.menuMessageBubble}>
                     <Text
                       numberOfLines={4}
@@ -5752,8 +5771,7 @@ export default function ChatScreen() {
               <Text style={styles.menuFootnote}>Your message · only you can edit this text</Text>
             ) : null}
           </Pressable>
-        </Pressable>
-      </Modal>
+      </MessageActionsSheet>
 
       {/* ================================== */}
       {/* DELETE SHEET */}
@@ -6701,10 +6719,36 @@ const STYLE_PAIR = themedStyles({
     elevation: 1,
   },
 
-  bubbleTheirs: { backgroundColor: "#FFFFFF" },
+  // Figma M02-M05: translucent glass message surfaces.
+  // Translucent glass incoming message bubbles.
+  bubbleTheirs: {
+    backgroundColor: "rgba(235, 248, 255, 0.38)",
+    borderWidth: 1,
+    borderTopColor: "rgba(35, 78, 128, 0.20)",
+    borderLeftColor: "rgba(255, 255, 255, 0.55)",
+    borderRightColor: "rgba(255, 255, 255, 0.55)",
+    borderBottomColor: "rgba(255, 255, 255, 0.78)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    elevation: 1,
+  },
 
-  // Figma M02-M05: your own messages sit on a soft mauve.
-  bubbleMine: { backgroundColor: "#E9CDE6" },
+  // Pink/lilac glass for messages sent by the current user.
+  bubbleMine: {
+    backgroundColor: "rgba(233, 205, 230, 0.72)",
+    borderWidth: 1,
+    borderTopColor: "rgba(104, 46, 100, 0.22)",
+    borderLeftColor: "rgba(255, 255, 255, 0.38)",
+    borderRightColor: "rgba(255, 255, 255, 0.38)",
+    borderBottomColor: "rgba(255, 255, 255, 0.62)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    elevation: 1,
+  },
 
 
   // On a photo wallpaper: solid, so the picture doesn't show through.
@@ -7347,13 +7391,17 @@ const STYLE_PAIR = themedStyles({
   // COMPOSER
 
   composer: {
-    // Figma: 402 x 64, padding 12, gap 10 (#0B0713, very light).
+    // Recessed glass tray: subtle inner edge over the chat wallpaper.
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingTop: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(116, 177, 207, 0.22)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(76, 127, 157, 0.28)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.42)",
   },
 
   inputPill: {
@@ -7361,7 +7409,10 @@ const STYLE_PAIR = themedStyles({
     minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F0F4F9",
+    // Slightly darker glass makes the input feel inset rather than raised.
+    backgroundColor: "rgba(27, 22, 34, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.52)",
     borderRadius: 22,
     paddingLeft: 4,
     paddingRight: 8,
@@ -7911,4 +7962,26 @@ const STYLE_PAIR = themedStyles({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}, {
+  // M14 + M15 dark-theme overrides. Preserve existing behaviour.
+  notifyRow: { backgroundColor: "#191B27" },
+  notifyText: { color: "#F0A6D7" },
+  editingBar: { backgroundColor: "#191B27" },
+  editingCard: { backgroundColor: "#252837" },
+  editingTitle: { color: "#F0A6D7" },
+  editingText: { color: "#F4F5FA" },
+  replyPreviewTitle: { color: "#B5BBCB" },
+  replyPreviewTitleMine: { color: "#D5D8E4" },
+  replyPreviewText: { color: "#D5D8E4" },
+  replyPreviewTextMine: { color: "#D5D8E4" },
+  editSection: { color: "#B5BBCB" },
+  editBox: { backgroundColor: "#252837", borderColor: "rgba(255,255,255,0.12)" },
+  editLabel: { color: "#F4F5FA" },
+  editSaved: { borderColor: "rgba(255,255,255,0.18)" },
+  editSavedText: { color: "#F4F5FA" },
+  editNote: { backgroundColor: "#30263B" },
+  editNoteTitle: { color: "#F0A6D7" },
+  editNoteText: { color: "#B5BBCB" },});
+
+
+

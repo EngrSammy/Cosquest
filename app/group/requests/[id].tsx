@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // JOIN REQUESTS (Figma M29 · Join request moderation)
 // ==========================================
 // "Admin only · 2 pending requests". Each request: name, when, how they
@@ -22,6 +22,7 @@ import { RankLine } from "@/components/chat/RankBadge";
 import { FONTS } from "@/constants/fonts";
 import { answerJoinRequest, getGroup, getJoinRequests, type Group, type JoinRequest } from "@/services/groups";
 import { useAppSelector } from "@/store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function whenLabel(value: string) {
   const date = new Date(value);
@@ -32,6 +33,7 @@ function whenLabel(value: string) {
 }
 
 export default function JoinRequests() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const { id } = useLocalSearchParams<{ id: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
   const token = useAppSelector((state) => state.auth.token);
@@ -148,7 +150,7 @@ export default function JoinRequests() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   flex: { flex: 1 },
 
   card: {

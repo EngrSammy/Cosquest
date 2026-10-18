@@ -24,6 +24,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { getAvatarSource } from "@/utils/callHelpers";
 
 import { INK, MILKY, MUTED, PINK } from "./GroupUi";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function keyOf(person: GroupPerson) {
   return (person.id || person.username).toLowerCase();
@@ -41,6 +42,8 @@ export default function PeoplePicker({
   excludeIds?: string[];
   max?: number;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const token = useAppSelector((state) => state.auth.token);
   const following = useAppSelector((state) => state.follow.following);
   const conversations = useAppSelector((state) => state.chat.conversations);
@@ -133,17 +136,17 @@ export default function PeoplePicker({
   return (
     <View>
       <View style={styles.search}>
-        <Ionicons name="search" size={18} color="#9C9CAA" />
+        <Ionicons name="search" size={18} color={ink.text("#9C9CAA")} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search by username"
-          placeholderTextColor="#9C9CAA"
+          placeholderTextColor={ink.text("#9C9CAA")}
           style={styles.searchInput}
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {searching ? <ActivityIndicator size="small" color={PINK} /> : null}
+        {searching ? <ActivityIndicator size="small" color={ink.text(PINK)} /> : null}
       </View>
 
       {list.length === 0 ? (
@@ -184,7 +187,7 @@ export default function PeoplePicker({
 
               <View style={[styles.check, checked && styles.checkOn]}>
                 {checked ? (
-                  <Ionicons name="checkmark" size={15} color="#FFFFFF" />
+                  <Ionicons name="checkmark" size={15} color={ink.text("#FFFFFF")} />
                 ) : null}
               </View>
             </Pressable>
@@ -197,7 +200,7 @@ export default function PeoplePicker({
 
 export { keyOf as personKey };
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   search: {
     ...MILKY,
     height: 46,

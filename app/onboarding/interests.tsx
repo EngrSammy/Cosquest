@@ -11,8 +11,10 @@ import { saveUserInterests } from "@/store/thunks/userThunks";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function Interests() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -131,7 +133,7 @@ export default function Interests() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 60,

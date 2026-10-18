@@ -1,4 +1,4 @@
-// ==========================================
+﻿// ==========================================
 // CHAT DARK MODE (Figma M06 · Option D · Dark mode)
 // ==========================================
 // The chat screens follow the phone's appearance (or the Appearance
@@ -35,7 +35,8 @@ export function useChatScheme(): ChatScheme {
     return mode;
   }
 
-  return system === "dark" ? "dark" : "light";
+  // System/default mode resolves to Light in CosQuest.
+  return "light";
 }
 
 // ---------- colour maths ----------
@@ -116,7 +117,8 @@ function fromHsl(h: number, s: number, l: number, a: number) {
   return `#${[r, g, b].map((x) => to(x).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
 }
 
-const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+const clamp = (x: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, x));
 
 // A text / icon colour on a dark background.
 export function darkText(color: string): string {
@@ -135,7 +137,8 @@ export function darkSurface(color: string): string {
   if (!c) return color;
   const { h, s, l } = toHsl(c);
   if (c.a < 1) {
-    if (l <= 0.3 && c.a < 0.3) return `rgba(255,255,255,${Math.round(c.a * 1.2 * 1000) / 1000})`; // hairlines
+    if (l <= 0.3 && c.a < 0.3)
+      return `rgba(255,255,255,${Math.round(c.a * 1.2 * 1000) / 1000})`; // hairlines
     if (l <= 0.3) return color; // backdrops stay dark
     if (l >= 0.85) return fromHsl(0.64, 0.2, 0.17, c.a); // frosted white -> frosted navy
     return fromHsl(h, s, clamp(l + 0.1, 0, 0.75), clamp(c.a * 1.6, 0, 1)); // pink washes
@@ -143,7 +146,12 @@ export function darkSurface(color: string): string {
   if (l >= 0.8) {
     // White -> card navy; pale tints keep their hue (pink stays pinkish).
     const tinted = s > 0.12 && l < 0.985;
-    return fromHsl(tinted ? h : 0.64, tinted ? clamp(s * 0.35, 0.12, 0.4) : 0.2, tinted ? 0.22 : 0.17, 1);
+    return fromHsl(
+      tinted ? h : 0.64,
+      tinted ? clamp(s * 0.35, 0.12, 0.4) : 0.2,
+      tinted ? 0.22 : 0.17,
+      1,
+    );
   }
   if (l <= 0.35) return color;
   if (s > 0.35) return color; // pink buttons and the like stay
@@ -155,10 +163,16 @@ const TEXT_KEYS = new Set(["color", "tintColor", "textDecorationColor"]);
 function mapStyle(style: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {};
   for (const [key, value] of Object.entries(style)) {
-    if (typeof value === "string" && /color$/i.test(key) && key !== "shadowColor") {
+    if (
+      typeof value === "string" &&
+      /color$/i.test(key) &&
+      key !== "shadowColor"
+    ) {
       out[key] = TEXT_KEYS.has(key) ? darkText(value) : darkSurface(value);
     } else if (Array.isArray(value)) {
-      out[key] = value.map((v) => (v && typeof v === "object" ? mapStyle(v) : v));
+      out[key] = value.map((v) =>
+        v && typeof v === "object" ? mapStyle(v) : v,
+      );
     } else if (value && typeof value === "object") {
       out[key] = mapStyle(value);
     } else {
@@ -176,7 +190,10 @@ export function themedStyles<T extends StyleSheet.NamedStyles<T>>(
 ): { light: T; dark: T } {
   const dark: Record<string, any> = {};
   for (const [name, style] of Object.entries(light)) {
-    dark[name] = { ...mapStyle(style as any), ...((overrides as any)[name] || {}) };
+    dark[name] = {
+      ...mapStyle(style as any),
+      ...((overrides as any)[name] || {}),
+    };
   }
   return {
     light: StyleSheet.create(light),
@@ -203,5 +220,9 @@ export function useInk() {
 
 // The pale sheet / screen gradient used by the chat's full-screen pickers,
 // and its dark twin.
-export const LIGHT_SCREEN_GRADIENT = ["#F6F9FE", "#E3F0FC"] as const;
+export const LIGHT_SCREEN_GRADIENT = ["#FFFFFF", "#D5F1FF"] as const;
 export const DARK_SCREEN_GRADIENT = [DARK_CHAT_BG_2, DARK_CHAT_BG] as const;
+
+// Where the gradient reaches its second colour (Figma reaches the blue about
+// 45% of the way down). Pass it as `locations` to any LinearGradient.
+export const SCREEN_GRADIENT_LOCATIONS = [0, 0.45] as const;

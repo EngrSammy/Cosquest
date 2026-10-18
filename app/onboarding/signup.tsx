@@ -11,8 +11,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function Signup() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -155,7 +157,7 @@ export default function Signup() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

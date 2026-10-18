@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const ACTIVE = "#DC179F";
 const INACTIVE = "#FFFFFF";
@@ -19,6 +20,7 @@ function TabIcon({
   focused: boolean;
   children: ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.iconWrap}>
       {focused ? <View style={styles.activeLine} /> : null}
@@ -28,6 +30,7 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Tabs
       screenOptions={{
@@ -114,7 +117,7 @@ export default function TabLayout() {
 
 const RADIUS = 34;
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   barShadow: {
     ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,

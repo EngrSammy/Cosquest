@@ -30,6 +30,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateAuthUser } from "@/store/slices/authSlice";
 import { updateUser } from "@/store/slices/userSlice";
 import { safeBack } from "@/utils/safeBack";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -45,6 +46,8 @@ function humanize(value?: string | null) {
 }
 
 export default function EditProfile() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -190,7 +193,7 @@ export default function EditProfile() {
           linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
                                   rgba(184,232,255,0.6) 67.7%) on white */}
       <LinearGradient
-        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
         locations={[0.0459, 0.677]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -208,7 +211,7 @@ export default function EditProfile() {
             style={styles.headerSide}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="chevron-back" size={24} color="#191922" />
+            <Ionicons name="chevron-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -221,7 +224,7 @@ export default function EditProfile() {
             accessibilityRole="button"
             accessibilityLabel="Save">
             {saving ? (
-              <ActivityIndicator size="small" color={PINK} />
+              <ActivityIndicator size="small" color={ink.text(PINK)} />
             ) : (
               <Text style={styles.save}>Save</Text>
             )}
@@ -266,7 +269,7 @@ export default function EditProfile() {
                 onChangeText={setDisplayName}
                 style={[styles.field, styles.input]}
                 placeholder="Your name"
-                placeholderTextColor="#9C9CAA"
+                placeholderTextColor={ink.text("#9C9CAA")}
                 autoCapitalize="words"
               />
             </View>
@@ -278,7 +281,7 @@ export default function EditProfile() {
                 onChangeText={setUsername}
                 style={[styles.field, styles.input]}
                 placeholder="username"
-                placeholderTextColor="#9C9CAA"
+                placeholderTextColor={ink.text("#9C9CAA")}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -291,7 +294,7 @@ export default function EditProfile() {
                 onChangeText={setBio}
                 style={[styles.field, styles.input, styles.bioInput]}
                 placeholder="Tell people about yourself"
-                placeholderTextColor="#9C9CAA"
+                placeholderTextColor={ink.text("#9C9CAA")}
                 multiline
                 maxLength={300}
                 textAlignVertical="top"
@@ -313,7 +316,7 @@ export default function EditProfile() {
                   <Text style={styles.rowValue} numberOfLines={1}>
                     {category || "Not selected"}
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+                  <Ionicons name="chevron-forward" size={16} color={ink.text("#8A8A93")} />
                 </View>
               </Pressable>
             </View>
@@ -329,7 +332,7 @@ export default function EditProfile() {
                 <Text style={styles.rowValue} numberOfLines={1}>
                   {contactSummary}
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+                <Ionicons name="chevron-forward" size={16} color={ink.text("#8A8A93")} />
               </View>
             </Pressable>
           </View>
@@ -357,7 +360,7 @@ const MILKY_FIELD = {
   elevation: 2,
 } as const;
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

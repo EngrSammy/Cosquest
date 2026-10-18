@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ImageSourcePropType, StyleProp, ViewStyle } from "react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function SelectableCard({
   label,
@@ -16,6 +17,7 @@ export function SelectableCard({
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       style={[styles.card, selected && styles.cardSelected, style]}
@@ -42,7 +44,7 @@ export function SelectableCard({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   card: {
     width: "47%",
     aspectRatio: 1,

@@ -29,12 +29,15 @@ import {
       readOAuthCode,
 } from "@/utils/googleAuth";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Lets a popup-style sign-in (if the browser used one) hand the result
 // back to the page that opened it and close itself.
 WebBrowser.maybeCompleteAuthSession();
 
 export default function GoogleOAuthReturn() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const dispatch = useAppDispatch();
   const { update } = useOnboarding();
 
@@ -99,7 +102,7 @@ export default function GoogleOAuthReturn() {
           </>
         ) : (
           <>
-            <ActivityIndicator size="large" color="#C5399A" />
+            <ActivityIndicator size="large" color={ink.text("#C5399A")} />
 
             <Text style={styles.text}>Signing you in with Google...</Text>
           </>
@@ -109,7 +112,7 @@ export default function GoogleOAuthReturn() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   center: {
     flex: 1,
     alignItems: "center",

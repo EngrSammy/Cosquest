@@ -10,7 +10,6 @@
 // once it supports notes). Built from the screenshot for testing.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -34,6 +33,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { cancelJoinRequest } from "@/services/chatPrefs";
 import { safeBack } from "@/utils/safeBack";
+import { ScreenGradient } from "@/components/chat/ui";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#B63D91";
 const INK = "#24283C";
@@ -61,6 +62,8 @@ function sentLabel(date: Date) {
 }
 
 export default function GroupInvite() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -142,28 +145,29 @@ export default function GroupInvite() {
   const shownIntro = sent ?? (myRequest?.message ? { text: myRequest.message, at: new Date(myRequest.createdAt || Date.now()) } : null);
 
   return (
-    <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
+    <View style={styles.screen}>
+      <ScreenGradient />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
-            <Ionicons name="chevron-back" size={26} color={INK} />
+            <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
           </Pressable>
           <View style={styles.flex}>
             <Text style={styles.title}>Group invitation</Text>
             <Text style={styles.subtitle}>Shared invite link</Text>
           </View>
           <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={MUTED} />
+            <Ionicons name="close" size={26} color={ink.text(MUTED)} />
           </Pressable>
         </View>
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator color={PINK} />
+            <ActivityIndicator color={ink.text(PINK)} />
           </View>
         ) : error || !preview ? (
           <View style={styles.center}>
-            <Ionicons name="link-outline" size={34} color={MUTED} />
+            <Ionicons name="link-outline" size={34} color={ink.text(MUTED)} />
             <Text style={styles.errorText}>{error || "This invite link isn't valid anymore."}</Text>
             <Pressable style={[styles.secondary, styles.errorButton]} onPress={() => safeBack()}>
               <Text style={styles.secondaryText}>Go back</Text>
@@ -179,7 +183,7 @@ export default function GroupInvite() {
                 <Image source={{ uri: preview.photoUrl }} style={styles.photo} contentFit="cover" />
               ) : (
                 <View style={styles.icon}>
-                  <Ionicons name={KIND_ICON[preview.kind]} size={44} color={PINK} />
+                  <Ionicons name={KIND_ICON[preview.kind]} size={44} color={ink.text(PINK)} />
                 </View>
               )}
             </View>
@@ -209,7 +213,7 @@ export default function GroupInvite() {
                 ) : null}
 
                 <View style={styles.pending}>
-                  <Ionicons name="time-outline" size={30} color={PINK} />
+                  <Ionicons name="time-outline" size={30} color={ink.text(PINK)} />
                   <Text style={styles.pendingTitle}>Request pending</Text>
                   <Text style={styles.pendingText}>
                     The group&apos;s admins will review your request. We&apos;ll notify you when you&apos;re approved.
@@ -229,7 +233,7 @@ export default function GroupInvite() {
                       value={intro}
                       onChangeText={setIntro}
                       placeholder="Say hi and why you'd like to join (optional)"
-                      placeholderTextColor="#9AA3B5"
+                      placeholderTextColor={ink.text("#9AA3B5")}
                       multiline
                       maxLength={200}
                       style={styles.introInput}
@@ -255,11 +259,11 @@ export default function GroupInvite() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
 
   flex: { flex: 1, minWidth: 0 },

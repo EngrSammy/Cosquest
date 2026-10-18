@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // MANAGE SPARKS (Figma M31 · Proposed Sparks admin panel)
 // ==========================================
 // "Concept - requirements pending" (Mark Jones to specify the full panel).
@@ -25,6 +25,7 @@ import { FONTS } from "@/constants/fonts";
 import { getGroup, type Group } from "@/services/groups";
 import { deleteSpark, listSparks, mergeSpark, pinSpark, type Spark } from "@/services/sparks";
 import { useAppSelector } from "@/store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function stateLabel(spark: Spark) {
   if (spark.active) return `Active · ${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`;
@@ -32,6 +33,8 @@ function stateLabel(spark: Spark) {
 }
 
 export default function ManageSparks() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const { id } = useLocalSearchParams<{ id: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
   const token = useAppSelector((state) => state.auth.token);
@@ -168,12 +171,12 @@ export default function ManageSparks() {
               <Text style={styles.actionTitle}>{spark.pinned ? "Unpin Spark" : "Pin Spark"}</Text>
               <Text style={styles.actionHint}>Keep visible through quiet periods</Text>
             </View>
-            <Ionicons name={spark.pinned ? "pin" : "pin-outline"} size={22} color={spark.pinned ? A.pink : A.muted} />
+            <Ionicons name={spark.pinned ? "pin" : "pin-outline"} size={22} color={ink.text(spark.pinned ? A.pink : A.muted)} />
           </Pressable>
 
           <Pressable style={[styles.actionRow, styles.actionLast]} onPress={() => remove(spark)}>
             <Text style={[styles.actionTitle, styles.danger, styles.flex]}>Delete Spark</Text>
-            <Ionicons name="trash-outline" size={22} color={A.pink} />
+            <Ionicons name="trash-outline" size={22} color={ink.text(A.pink)} />
           </Pressable>
         </View>
       ))}
@@ -228,7 +231,7 @@ export default function ManageSparks() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   flex: { flex: 1, minWidth: 0 },
 
   sparkCard: {

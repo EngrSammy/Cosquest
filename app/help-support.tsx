@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -27,6 +28,8 @@ function SupportRow({
   description?: string;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <Pressable
       onPress={onPress}
@@ -34,7 +37,7 @@ function SupportRow({
       accessibilityRole="button"
       accessibilityLabel={title}>
       <View style={styles.rowIcon}>
-        <Ionicons name={icon} size={15} color={PINK} />
+        <Ionicons name={icon} size={15} color={ink.text(PINK)} />
       </View>
 
       <View style={styles.rowText}>
@@ -49,6 +52,8 @@ function SupportRow({
 }
 
 export default function HelpSupport() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   function handleComingSoon(feature: string) {
@@ -62,7 +67,7 @@ export default function HelpSupport() {
     <View style={styles.screen}>
       {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -86,12 +91,12 @@ export default function HelpSupport() {
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="help-circle-outline" size={17} color={PINK} />
+              <Ionicons name="help-circle-outline" size={17} color={ink.text(PINK)} />
             </View>
 
             <Text style={styles.headerTitle}>Help & Support</Text>
@@ -154,7 +159,7 @@ export default function HelpSupport() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

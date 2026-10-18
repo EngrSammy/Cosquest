@@ -13,10 +13,12 @@ import { saveUserFaction } from "@/store/thunks/userThunks";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const POPUP_DELAY = 2000;
 
 export default function Faction() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -319,7 +321,7 @@ export default function Faction() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 60,

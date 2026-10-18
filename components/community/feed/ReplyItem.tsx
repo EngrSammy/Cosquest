@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AVATARS } from "@/constants/avatars";
 import { CommentAudio } from "./CommentAudio";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatar(author: any) {
   // Real uploaded profile photo
@@ -105,6 +106,8 @@ export function ReplyItem({
   liked: boolean;
   likeCount: number;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const username = reply?.author?.username || reply?.username || "User";
 
   const mine =
@@ -148,7 +151,7 @@ export function ReplyItem({
             <Ionicons
               name={liked ? "heart" : "heart-outline"}
               size={16}
-              color={liked ? "#C5399A" : "#8B8B93"}
+              color={ink.text(liked ? "#C5399A" : "#8B8B93")}
             />
 
             <Text style={[styles.likeCount, liked && styles.likedCount]}>
@@ -161,14 +164,14 @@ export function ReplyItem({
       {/* DELETE */}
       {mine ? (
         <Pressable onPress={onDelete} hitSlop={8}>
-          <Ionicons name="trash-outline" size={17} color="#9999A1" />
+          <Ionicons name="trash-outline" size={17} color={ink.text("#9999A1")} />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   row: {
     flexDirection: "row",
     alignItems: "flex-start",

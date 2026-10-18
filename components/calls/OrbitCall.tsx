@@ -1,5 +1,5 @@
-﻿// ==========================================
-// ORBITAL GROUP CALL (Group Calls doc · board "A · Light Orbit")
+// ==========================================
+// ORBITAL GROUP CALL (Group Calls doc · "A · Light Orbit" / "B · Night Orbit")
 // ==========================================
 // Everyone is a circle; there are no squares anywhere.
 //  - Center: whoever is speaking now. When nobody is, the pinned person
@@ -10,7 +10,8 @@
 //  - Pulse: a glowing ring around everyone speaking.
 //  - Ring color: rank (from the person's rank level), grey far out.
 //  - Video on: the live picture inside the circle instead of the avatar.
-// Used by CallSession (phones) and CallSession.web (browser) for group calls.
+// Used by CallSession (phones) and CallSession.web (browser) for group calls,
+// and by the voice chats. In dark mode it switches to Night Orbit by itself.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,6 +20,7 @@ import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "reac
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const INK = "#24283C";
 const MUTED = "#66738A";
@@ -109,6 +111,8 @@ function OrbitCircle({
   video: ReactNode;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const pos = useRef(new Animated.ValueXY({ x, y })).current;
   const dim = useRef(new Animated.Value(size)).current;
   const pulse = useRef(new Animated.Value(0)).current;
@@ -188,7 +192,7 @@ function OrbitCircle({
         </View>
       ) : person.micOff ? (
         <View style={[styles.badge, styles.badgeMuted]}>
-          <Ionicons name="mic-off" size={10} color={MUTED} />
+          <Ionicons name="mic-off" size={10} color={ink.text(MUTED)} />
         </View>
       ) : null}
 
@@ -214,6 +218,7 @@ function OrbitView({
   pinnedId: string | null;
   renderVideo: (id: string) => ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const scores = useEngagement(people);
 
@@ -319,8 +324,10 @@ function ControlButton({
   kind?: "sparks" | "leave";
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const filled = kind === "leave" ? styles.btnLeave : kind === "sparks" ? styles.btnSparks : active ? styles.btnActive : null;
-  const iconColor = kind || active ? "#FFFFFF" : INK;
+  const iconColor = kind || active ? "#FFFFFF" : ink.text(INK);
   return (
     <View style={styles.control}>
       <Pressable
@@ -371,16 +378,18 @@ export default function OrbitCallScreen({
   onPeople: () => void;
   extra?: ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const speaker = people.find((p) => p.speaking && !p.isMe) || people.find((p) => p.speaking);
   const comingSoon = (what: string) => Alert.alert(what, `${what} is coming soon.`);
 
   return (
-    <LinearGradient colors={["#F4F8FD", "#E3F0FC"]} style={styles.screen}>
+    <LinearGradient colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#F4F8FD", "#E3F0FC"]} style={styles.screen}>
       {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable style={styles.roundBtn} onPress={onMinimize} accessibilityLabel="Minimize call">
-          <Ionicons name="chevron-back" size={22} color={INK} />
+          <Ionicons name="chevron-back" size={22} color={ink.text(INK)} />
         </Pressable>
         <View style={styles.headerText}>
           <View style={styles.titleRow}>
@@ -394,7 +403,7 @@ export default function OrbitCallScreen({
           </Text>
         </View>
         <Pressable style={[styles.roundBtn, styles.roundBtnPink]} onPress={onPeople} accessibilityLabel="Add people">
-          <Ionicons name="people-outline" size={20} color={PINK} />
+          <Ionicons name="people-outline" size={20} color={ink.text(PINK)} />
         </Pressable>
       </View>
 
@@ -406,7 +415,7 @@ export default function OrbitCallScreen({
       {/* FOCUS / WHO'S TALKING */}
       {focusOn ? (
         <View style={styles.focusBar}>
-          <Ionicons name="headset-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="headset-outline" size={20} color={ink.text("#FFFFFF")} />
           <View style={styles.flex}>
             <Text style={styles.focusTitle}>Focus mode on</Text>
             <Text style={styles.focusText}>Faction voices are off</Text>
@@ -445,7 +454,7 @@ export default function OrbitCallScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1 },
   flex: { flex: 1, minWidth: 0 },
 
@@ -580,4 +589,33 @@ const styles = StyleSheet.create({
   btnLeave: { backgroundColor: "#E5384B", borderColor: "#E5384B" },
   btnOff: { opacity: 0.5 },
   controlLabel: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
+},
+// B · Night Orbit (Group Calls doc): deep navy, dark circles with their rank
+// rings and glow, white names, dark round buttons, purple Sparks.
+{
+  roundBtn: { backgroundColor: "#262838", borderColor: "rgba(255,255,255,0.08)" },
+  roundBtnPink: { borderColor: "rgba(195,77,156,0.45)" },
+  title: { color: "#F4F5FA" },
+  subtitle: { color: "#B5BBCB" },
+  guide: { borderColor: "rgba(255,255,255,0.10)" },
+  circle: { backgroundColor: "#262838" },
+  initials: { color: "#F4F5FA" },
+  badge: { borderColor: "#1D1F2C" },
+  badgeMuted: { backgroundColor: "#343746" },
+  label: { color: "#B5BBCB" },
+  more: { backgroundColor: "rgba(38,40,56,0.92)" },
+  moreText: { color: "#C9CEDA" },
+  lastLine: { backgroundColor: "#262838", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" },
+  miniCircle: { backgroundColor: "#1D1F2C" },
+  miniText: { color: "#F4F5FA" },
+  lastText: { color: "#F4F5FA" },
+  lastTextMuted: { color: "#B5BBCB" },
+  focusBar: { backgroundColor: "#343044" },
+  focusBtn: { backgroundColor: "#F4F5FA" },
+  focusBtnText: { color: "#24283C" },
+  btn: { backgroundColor: "#2A2C3B", borderColor: "rgba(255,255,255,0.06)" },
+  btnActive: { backgroundColor: "#B63D91", borderColor: "#B63D91" },
+  btnSparks: { backgroundColor: "#7C5CFF", borderColor: "#7C5CFF" },
+  btnLeave: { backgroundColor: "#E5384B", borderColor: "#E5384B" },
+  controlLabel: { color: "#B5BBCB" },
 });

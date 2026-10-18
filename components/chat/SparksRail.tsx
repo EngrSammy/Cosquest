@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // SPARKS RAIL (Figma M03 · Option A: side rail) + DORMANT CARD (M08)
 // ==========================================
 // Circles down the right side of the chat for active (pulsing) and pinned
@@ -7,6 +7,7 @@
 // DormantSparkCard is the card shown in the main chat under a quiet Spark's
 // last message. Built from the screenshots for testing.
 import { Ionicons } from "@expo/vector-icons";
+import * as React from "react";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -183,6 +184,10 @@ export function SparksListSheet({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
+  const [filter, setFilter] = React.useState<"all" | "history">("all");
+  const filteredSparks = filter === "history"
+    ? sparks.filter((spark) => spark.revived)
+    : sparks;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -195,11 +200,33 @@ export function SparksListSheet({
             <Ionicons name="close" size={22} color={INK} />
           </Pressable>
         </View>
-        <Text style={styles.sheetHint}>Sparks appear when the conversation needs them. Start one from any message.</Text>
+        <Text style={styles.sheetHint}>Browse Sparks in this conversation or revisit revived Spark history.</Text>
+
+        <View style={styles.filterRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === "all" }}
+            onPress={() => setFilter("all")}
+            style={[styles.filterTab, filter === "all" && styles.filterTabSelected]}>
+            <Text style={[styles.filterText, filter === "all" && styles.filterTextSelected]}>All Sparks</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === "history" }}
+            onPress={() => setFilter("history")}
+            style={[styles.filterTab, filter === "history" && styles.filterTabSelected]}>
+            <Ionicons name="time-outline" size={15} color={filter === "history" ? TEAL : MUTED} />
+            <Text style={[styles.filterText, filter === "history" && styles.filterTextSelected]}>History</Text>
+          </Pressable>
+        </View>
 
         <ScrollView style={styles.list}>
-          {sparks.length === 0 ? <Text style={styles.empty}>No Sparks yet.</Text> : null}
-          {sparks.map((spark) => (
+          {filteredSparks.length === 0 ? (
+            <Text style={styles.empty}>
+              {filter === "history" ? "No revived Spark history yet." : "No Sparks yet."}
+            </Text>
+          ) : null}
+          {filteredSparks.map((spark) => (
             <Pressable key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
               <View style={[styles.cardIcon, spark.revived && styles.circleRevived]}>
                 <Ionicons
@@ -346,6 +373,16 @@ const STYLE_PAIR = themedStyles({
   sheetTitle: { fontFamily: FONTS.semibold, fontSize: 20, color: INK },
 
   sheetHint: { marginTop: 4, marginBottom: 12, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: MUTED },
+
+  filterRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+
+  filterTab: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 14, height: 36, borderRadius: 18, borderWidth: 1, borderColor: "rgba(36,40,60,0.10)", backgroundColor: "#FFFFFF" },
+
+  filterTabSelected: { backgroundColor: "#F3DDED", borderColor: "rgba(182,61,145,0.24)" },
+
+  filterText: { fontFamily: FONTS.medium, fontSize: 13, color: MUTED },
+
+  filterTextSelected: { color: PINK },
 
   list: { maxHeight: 520 },
 

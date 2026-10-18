@@ -6,8 +6,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function ForgotPassword() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
     email: "",
@@ -95,7 +97,7 @@ export default function ForgotPassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function CodeInput({
   value,
@@ -10,6 +11,7 @@ export function CodeInput({
   onChangeText: (t: string) => void;
   length?: number;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
 
@@ -44,7 +46,7 @@ export function CodeInput({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   row: { flexDirection: "row", justifyContent: "center", gap: 10 },
   box: {
     width: 48,

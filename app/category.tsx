@@ -22,10 +22,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
 export default function Category() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -153,7 +156,7 @@ export default function Category() {
     <View style={styles.screen}>
       {/* Same background as the Figma screens */}
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -168,7 +171,7 @@ export default function Category() {
           style={styles.headerSide}
           accessibilityRole="button"
           accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={24} color="#191922" />
+          <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
         </Pressable>
 
         <Text style={styles.headerTitle}>Category</Text>
@@ -181,7 +184,7 @@ export default function Category() {
           accessibilityRole="button"
           accessibilityLabel="Done">
           {saving ? (
-            <ActivityIndicator size="small" color={PINK} />
+            <ActivityIndicator size="small" color={ink.text(PINK)} />
           ) : (
             <Text style={[styles.done, busy && styles.doneOff]}>Done</Text>
           )}
@@ -205,7 +208,7 @@ export default function Category() {
         {/* Display on profile */}
         <View style={styles.row}>
           <View style={styles.rowIcon}>
-            <Ionicons name="eye-outline" size={15} color={PINK} />
+            <Ionicons name="eye-outline" size={15} color={ink.text(PINK)} />
           </View>
 
           <Text style={[styles.rowLabel, styles.flex]}>Display on profile</Text>
@@ -215,21 +218,21 @@ export default function Category() {
 
         {/* Search */}
         <View style={[styles.row, styles.searchRow]}>
-          <Ionicons name="search" size={18} color={PINK} />
+          <Ionicons name="search" size={18} color={ink.text(PINK)} />
 
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search categories"
-            placeholderTextColor="#9C9CAA"
+            placeholderTextColor={ink.text("#9C9CAA")}
             autoCapitalize="none"
             autoCorrect={false}
           />
 
           {query ? (
             <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9C9CAA" />
+              <Ionicons name="close-circle" size={18} color={ink.text("#9C9CAA")} />
             </Pressable>
           ) : null}
         </View>
@@ -238,12 +241,12 @@ export default function Category() {
 
         {loadingCategories ? (
           <View style={styles.stateBox}>
-            <ActivityIndicator color={PINK} />
+            <ActivityIndicator color={ink.text(PINK)} />
             <Text style={styles.stateText}>Loading categories...</Text>
           </View>
         ) : loadError ? (
           <View style={styles.stateBox}>
-            <Ionicons name="cloud-offline-outline" size={30} color="#9C9CAA" />
+            <Ionicons name="cloud-offline-outline" size={30} color={ink.text("#9C9CAA")} />
             <Text style={styles.stateText}>{loadError}</Text>
 
             <Pressable style={styles.retry} onPress={loadCategories}>
@@ -281,7 +284,7 @@ export default function Category() {
                   <Ionicons
                     name={active ? "radio-button-on" : "radio-button-off"}
                     size={22}
-                    color={active ? PINK : "#9C9CAA"}
+                    color={ink.text(active ? PINK : "#9C9CAA")}
                   />
                 </Pressable>
               );
@@ -293,7 +296,7 @@ export default function Category() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

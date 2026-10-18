@@ -7,6 +7,7 @@ import {
   useSparkLayout,
 } from "@/constants/sparkLayout";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setAppearanceLocal } from "@/store/slices/settingsSlice";
 import {
   fetchAppearanceSettings,
   updateAppearanceSettingsThunk,
@@ -24,6 +25,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -72,6 +74,7 @@ function ThemeSelector({
   onChange: (value: ThemeMode) => void;
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const options: ThemeMode[] = ["Light", "Dark", "System"];
 
   return (
@@ -111,6 +114,7 @@ function AccentColorSelector({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.card}>
       <View style={styles.accentColors}>
@@ -154,6 +158,7 @@ function FontSizeSelector({
   onChange: (value: FontSize) => void;
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const sizes: FontSize[] = ["Small", "Medium", "Large"];
 
   const position = ["4%", "62%", "96%"][sizes.indexOf(value)] as `${number}%`;
@@ -189,6 +194,8 @@ function FontSizeSelector({
 }
 
 export default function Appearance() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const sparkLayout = useSparkLayout();
 
@@ -303,14 +310,31 @@ export default function Appearance() {
     }
   };
 
+
   const handleThemeChange = (value: ThemeMode) => {
+    if (!token) {
+      console.warn("Cannot update theme: no authentication token.");
+      return;
+    }
+
     const previous = theme;
+    const newMode = uiThemeToBackend(value);
+    const previousMode = uiThemeToBackend(previous);
+
+    // Update the global theme immediately.
+    dispatch(setAppearanceLocal({ themeMode: newMode }));
+    setTheme(value);
 
     saveAppearanceSetting(
       "themeMode",
-      uiThemeToBackend(value),
+      newMode,
       () => setTheme(value),
-      () => setTheme(previous),
+      () => {
+        setTheme(previous);
+
+        // Restore the previous global theme if the API save fails.
+        dispatch(setAppearanceLocal({ themeMode: previousMode }));
+      },
     );
   };
 
@@ -319,12 +343,11 @@ export default function Appearance() {
 
     saveAppearanceSetting(
       "accentColor",
-      value.toLowerCase(),
+      value,
       () => setAccentColor(value),
       () => setAccentColor(previous),
     );
   };
-
   const handleFontSizeChange = (value: FontSize) => {
     const previous = fontSize;
 
@@ -353,7 +376,7 @@ export default function Appearance() {
     <View style={styles.screen}>
       {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -377,12 +400,12 @@ export default function Appearance() {
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="eye-outline" size={16} color={PINK} />
+              <Ionicons name="eye-outline" size={16} color={ink.text(PINK)} />
             </View>
 
             <Text style={styles.headerTitle}>Appearance</Text>
@@ -426,7 +449,7 @@ export default function Appearance() {
 
           <View style={styles.row}>
             <View style={styles.rowIcon}>
-              <Ionicons name="ellipse" size={13} color={PINK} />
+              <Ionicons name="ellipse" size={13} color={ink.text(PINK)} />
             </View>
 
             <Text style={styles.rowLabel}>Reduce Motion</Text>
@@ -458,7 +481,7 @@ export default function Appearance() {
                   <Ionicons
                     name={selected ? "radio-button-on" : "radio-button-off"}
                     size={20}
-                    color={PINK}
+                    color={ink.text(PINK)}
                   />
                 </View>
 
@@ -480,7 +503,7 @@ export default function Appearance() {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={PINK} />
+            <ActivityIndicator size="small" color={ink.text(PINK)} />
           </View>
         ) : null}
       </ScrollView>
@@ -488,7 +511,7 @@ export default function Appearance() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   layoutDetail: {
     marginTop: 2,
     fontFamily: FONTS.regular,

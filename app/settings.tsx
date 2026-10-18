@@ -9,6 +9,7 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -27,24 +28,28 @@ function SettingRow({
   value?: string;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}>
-      <Ionicons name={icon} size={20} color={PINK} />
+      <Ionicons name={icon} size={20} color={ink.text(PINK)} />
 
       <Text style={styles.rowLabel}>{label}</Text>
 
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
 
-      <Ionicons name="chevron-forward" size={16} color="#3B3B42" />
+      <Ionicons name="chevron-forward" size={16} color={ink.text("#3B3B42")} />
     </Pressable>
   );
 }
 
 export default function Settings() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -83,7 +88,7 @@ export default function Settings() {
           linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
                                   rgba(184,232,255,0.6) 67.7%) */}
       <LinearGradient
-        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
         locations={[0.0459, 0.677]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -107,7 +112,7 @@ export default function Settings() {
             style={styles.headerSide}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Settings</Text>
@@ -180,7 +185,7 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

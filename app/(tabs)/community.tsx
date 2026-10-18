@@ -1,9 +1,10 @@
-import { AppBackground } from "@/components/AppBackground";
+﻿import { AppBackground } from "@/components/AppBackground";
 import { Chats } from "@/components/community/Chats";
 import { Feeds } from "@/components/community/Feeds";
 import { Spotlight } from "@/components/community/Spotlight";
 import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
+import { useChatScheme } from "@/constants/chatTheme";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +28,9 @@ const TABS: Tab[] = ["Feeds", "Chats", "Spotlight"];
 
 export default function Community() {
   const insets = useSafeAreaInsets();
+  const chatScheme = useChatScheme();
+  const isDark = chatScheme === "dark";
+  const styles = useMemo(() => createCommunityStyles(isDark), [isDark]);
   const dispatch = useAppDispatch();
 
   const [tab, setTab] = useState<Tab>("Feeds");
@@ -153,7 +157,7 @@ export default function Community() {
 
 const PINK = "#C34D9C";
 
-const styles = StyleSheet.create({
+function createCommunityStyles(isDark: boolean) { return StyleSheet.create({
   scroll: {
     paddingBottom: 140,
   },
@@ -179,7 +183,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 22,
-    color: "#000000",
+    color: isDark ? "#F5F5FA" : "#000000",
   },
 
   headerTitleWrap: { alignItems: "center" },
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#66738A",
+    color: isDark ? "#B6B8C8" : "#66738A",
   },
 
   // Figma: a bigger avatar on a soft pink circle.
@@ -252,9 +256,9 @@ const styles = StyleSheet.create({
 
   // Raised white pill.
   tabInactive: {
-    backgroundColor: "rgba(255,255,255,0.92)",
+    backgroundColor: isDark ? "#292B3A" : "rgba(255,255,255,0.92)",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
+    borderColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
 
     shadowColor: "#000000",
     shadowOpacity: 0.2,
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
   tabText: {
     fontFamily: FONTS.medium,
     fontSize: 15,
-    color: "#4B4B53",
+    color: isDark ? "#E5E6EF" : "#4B4B53",
     // Poppins sits a little high in its box; this centres it.
     lineHeight: 20,
   },
@@ -275,4 +279,4 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.semibold,
     color: "#FFFFFF",
   },
-});
+}); }

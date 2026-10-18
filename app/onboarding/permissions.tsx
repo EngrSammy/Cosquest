@@ -26,6 +26,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const SCREEN_H = Dimensions.get("window").height;
 
@@ -50,6 +51,7 @@ function Toggle({
   disabled?: boolean;
   onToggle: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       style={[
@@ -114,6 +116,8 @@ function getWebPosition(): Promise<{ lat: number; lng: number }> {
 }
 
 export default function Permissions() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -529,7 +533,7 @@ export default function Permissions() {
         <View style={styles.rows}>
           <View style={styles.row}>
             <View style={styles.iconWrap}>
-              <Ionicons name="location" size={22} color="#C5399A" />
+              <Ionicons name="location" size={22} color={ink.text("#C5399A")} />
             </View>
 
             <View style={styles.rowText}>
@@ -585,7 +589,7 @@ export default function Permissions() {
 
           <View style={[styles.row, IS_WEB && styles.rowMuted]}>
             <View style={styles.iconWrap}>
-              <Ionicons name="notifications" size={22} color="#C5399A" />
+              <Ionicons name="notifications" size={22} color={ink.text("#C5399A")} />
             </View>
 
             <View style={styles.rowText}>
@@ -631,7 +635,7 @@ export default function Permissions() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 40,

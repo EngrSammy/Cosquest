@@ -5,10 +5,8 @@
 // "Allow multiple answers", then "Send poll to group". Exactly as designed
 // (the CEO's doc + Figma): no anonymous or end-time options.
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -16,21 +14,27 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  BigTitle,
+  Card,
+  Description,
+  FieldLabel,
+  PrimaryButton,
+  ScreenGradient,
+  SecondaryButton,
+  SheetHeader,
+  TextField,
+  UI,
+} from "@/components/chat/ui";
 import { PinkSwitch } from "@/components/ui/PinkSwitch";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { createPoll } from "@/services/polls";
-import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
-const LINE = "rgba(36,40,60,0.08)";
 const MAX_OPTIONS = 12;
 
 export default function PollCreator({
@@ -50,6 +54,7 @@ export default function PollCreator({
   onCreated: (message: any) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const [question, setQuestion] = useState("");
@@ -67,15 +72,20 @@ export default function PollCreator({
   }, [visible]);
 
   const filled = options.map((option) => option.trim()).filter(Boolean);
-  const duplicates = new Set(filled.map((text) => text.toLowerCase())).size !== filled.length;
+  const duplicates =
+    new Set(filled.map((text) => text.toLowerCase())).size !== filled.length;
   const ready = question.trim().length > 0 && filled.length >= 2 && !duplicates;
 
   const setOption = (index: number, text: string) => {
-    setOptions((current) => current.map((value, i) => (i === index ? text : value)));
+    setOptions((current) =>
+      current.map((value, i) => (i === index ? text : value)),
+    );
   };
 
   const addOption = () => {
-    setOptions((current) => (current.length >= MAX_OPTIONS ? current : [...current, ""]));
+    setOptions((current) =>
+      current.length >= MAX_OPTIONS ? current : [...current, ""],
+    );
   };
 
   const removeOption = (index: number) => {
@@ -92,13 +102,22 @@ export default function PollCreator({
       setSending(true);
       const message = await createPoll(
         conversationId,
-        { question: question.trim(), options: filled, multiple, anonymous: false, closesIn: null },
+        {
+          question: question.trim(),
+          options: filled,
+          multiple,
+          anonymous: false,
+          closesIn: null,
+        },
         token,
       );
       onCreated(message);
       onClose();
     } catch (error) {
-      Alert.alert("Create poll", error instanceof Error ? error.message : "Couldn't send the poll.");
+      Alert.alert(
+        "Create poll",
+        error instanceof Error ? error.message : "Couldn't send the poll.",
+      );
     } finally {
       setSending(false);
     }
@@ -106,64 +125,66 @@ export default function PollCreator({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <LinearGradient colors={["#F6F9FE", "#E3F0FC"]} style={styles.screen}>
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          {/* HEADER */}
-          <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Back">
-              <Ionicons name="chevron-back" size={26} color={INK} />
-            </Pressable>
-            <View style={styles.flex}>
-              <Text style={styles.title}>Create poll</Text>
-              {conversationTitle ? (
-                <Text style={styles.subtitle} numberOfLines={1}>
-                  {conversationTitle}
-                </Text>
-              ) : null}
-            </View>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
-              <Ionicons name="close" size={26} color={MUTED} />
-            </Pressable>
+      <View style={styles.screen}>
+        <ScreenGradient />
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.headerWrap, { paddingTop: insets.top + 12 }]}>
+            <SheetHeader
+              title="Create poll"
+              subtitle={conversationTitle}
+              onBack={onClose}
+              onClose={onClose}
+            />
           </View>
 
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: insets.bottom + 30 },
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            <Text style={styles.bigTitle}>Let's decide together.</Text>
-            <Text style={styles.lead}>Ask the group and keep the results in your conversation.</Text>
+            <BigTitle>Let&apos;s decide together.</BigTitle>
+            <Description>
+              Ask the group and keep the results in your conversation.
+            </Description>
 
-            <Text style={styles.label}>Question</Text>
-            <TextInput
+            <FieldLabel>Question</FieldLabel>
+            <TextField
               value={question}
               onChangeText={setQuestion}
               placeholder="e.g. Where should we meet for the next CosQuest?"
-              placeholderTextColor="#9AA3B5"
               maxLength={300}
               multiline
-              style={styles.input}
             />
 
             <Text style={styles.section}>ANSWER OPTIONS</Text>
-            <View style={styles.card}>
+            <Card>
               {options.map((option, index) => (
                 <View key={index} style={styles.optionBlock}>
                   <View style={styles.optionHead}>
                     <Text style={styles.optionLabel}>Option</Text>
                     {options.length > 2 ? (
-                      <Pressable onPress={() => removeOption(index)} hitSlop={8} accessibilityLabel="Remove option">
-                        <Ionicons name="close" size={16} color={MUTED} />
+                      <Pressable
+                        onPress={() => removeOption(index)}
+                        hitSlop={8}
+                        accessibilityLabel="Remove option">
+                        <Ionicons
+                          name="close"
+                          size={16}
+                          color={ink.text(UI.MUTED)}
+                        />
                       </Pressable>
                     ) : null}
                   </View>
-                  <TextInput
+                  <TextField
                     value={option}
                     onChangeText={(text) => setOption(index, text)}
                     placeholder={`Option ${index + 1}`}
-                    placeholderTextColor="#9AA3B5"
                     maxLength={100}
-                    style={styles.input}
                   />
                 </View>
               ))}
@@ -171,116 +192,103 @@ export default function PollCreator({
               {options.length < MAX_OPTIONS ? (
                 <Pressable style={styles.addRow} onPress={addOption}>
                   <Text style={styles.addText}>Add another option</Text>
-                  <Ionicons name="add" size={22} color={MUTED} />
+                  <Ionicons name="add" size={22} color={ink.text(UI.MUTED)} />
                 </Pressable>
               ) : null}
-            </View>
-            {duplicates ? <Text style={styles.warning}>Each option must be different.</Text> : null}
+            </Card>
+            {duplicates ? (
+              <Text style={styles.warning}>Each option must be different.</Text>
+            ) : null}
 
             <View style={styles.switchRow}>
               <View style={styles.flex}>
                 <Text style={styles.switchTitle}>Allow multiple answers</Text>
-                <Text style={styles.switchHint}>{multiple ? "On · people can pick more than one" : "Off · people pick one"}</Text>
+                <Text style={styles.switchHint}>
+                  {multiple
+                    ? "On · people can pick more than one"
+                    : "Off · people pick one"}
+                </Text>
               </View>
               <PinkSwitch value={multiple} onChange={setMultiple} />
             </View>
 
-            <Pressable style={[styles.primary, (!ready || sending) && styles.off]} disabled={!ready || sending} onPress={send}>
-              {sending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Send poll to group</Text>}
-            </Pressable>
-            <Pressable style={styles.secondary} onPress={onClose}>
-              <Text style={styles.secondaryText}>Cancel</Text>
-            </Pressable>
+            <PrimaryButton
+              label="Send poll to group"
+              onPress={send}
+              disabled={!ready}
+              loading={sending}
+            />
+            <SecondaryButton label="Cancel" onPress={onClose} />
           </ScrollView>
         </KeyboardAvoidingView>
-      </LinearGradient>
+      </View>
     </Modal>
   );
 }
 
-const STYLE_PAIR = themedStyles({
-  screen: { flex: 1 },
+const STYLE_PAIR = themedStyles(
+  {
+    screen: { flex: 1, backgroundColor: "#FFFFFF" },
+    flex: { flex: 1, minWidth: 0 },
 
-  flex: { flex: 1, minWidth: 0 },
+    headerWrap: { paddingHorizontal: 18, paddingBottom: 8 },
+    content: { paddingHorizontal: 18, paddingTop: 4 },
 
-  off: { opacity: 0.5 },
+    section: {
+      marginTop: UI.GAP,
+      marginBottom: 8,
+      fontFamily: FONTS.semibold,
+      fontSize: 12,
+      letterSpacing: 0.4,
+      color: UI.MUTED,
+    },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingBottom: 8 },
+    optionBlock: { marginBottom: 12 },
+    optionHead: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6,
+    },
+    optionLabel: { fontFamily: FONTS.semibold, fontSize: 13, color: UI.INK },
 
-  title: { fontFamily: FONTS.semibold, fontSize: 22, lineHeight: 28, color: INK },
+    addRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "rgba(36,40,60,0.08)",
+    },
+    addText: { fontFamily: FONTS.semibold, fontSize: 15, color: UI.INK },
 
-  subtitle: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
+    warning: {
+      marginTop: 8,
+      fontFamily: FONTS.regular,
+      fontSize: 12,
+      color: "#C0394B",
+    },
 
-  content: { paddingHorizontal: 18, paddingTop: 12 },
-
-  bigTitle: { fontFamily: FONTS.semibold, fontSize: 21, lineHeight: 28, color: INK },
-
-  lead: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 14, lineHeight: 21, color: MUTED },
-
-  label: { marginTop: 16, marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 13, color: INK },
-
-  section: { marginTop: 18, marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 12, letterSpacing: 0.4, color: MUTED },
-
-  input: {
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(102,115,138,0.25)",
-    fontFamily: FONTS.regular,
-    fontSize: 15,
-    color: INK,
-    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginTop: UI.GAP,
+    },
+    switchTitle: { fontFamily: FONTS.semibold, fontSize: 15, color: UI.INK },
+    switchHint: {
+      marginTop: 2,
+      fontFamily: FONTS.regular,
+      fontSize: 12,
+      color: UI.MUTED,
+    },
   },
-
-  card: { padding: 14, borderRadius: 18, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: LINE },
-
-  optionBlock: { marginBottom: 12 },
-
-  optionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
-
-  optionLabel: { fontFamily: FONTS.semibold, fontSize: 13, color: INK },
-
-  addRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
+  {
+    screen: { backgroundColor: "#171823" },
+    section: { color: "#B5BBCB" },
+    optionLabel: { color: "#F0F1F7" },
+    addText: { color: "#F4F5FA" },
+    switchTitle: { color: "#F4F5FA" },
+    switchHint: { color: "#B5BBCB" },
   },
-
-  addText: { fontFamily: FONTS.semibold, fontSize: 15, color: INK },
-
-  warning: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 12, color: "#C0394B" },
-
-  switchRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 18 },
-
-  switchTitle: { fontFamily: FONTS.semibold, fontSize: 15, color: INK },
-
-  switchHint: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12, color: MUTED },
-
-  primary: {
-    marginTop: 22,
-    height: 52,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: PINK,
-  },
-
-  primaryText: { fontFamily: FONTS.semibold, fontSize: 16, color: "#FFFFFF" },
-
-  secondary: {
-    marginTop: 10,
-    height: 50,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: LILAC,
-  },
-
-  secondaryText: { fontFamily: FONTS.semibold, fontSize: 15, color: PINK },
-});
+);

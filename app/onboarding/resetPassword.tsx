@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Backend errors that need a special button (exact texts from the API doc).
 const INVALID_CODE_ERROR = "That code is invalid or has expired.";
@@ -15,6 +16,7 @@ const TOO_MANY_ATTEMPTS_ERROR =
   "Too many incorrect attempts. Request a new code.";
 
 export default function ResetPassword() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -170,7 +172,7 @@ export default function ResetPassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,

@@ -14,7 +14,9 @@ let socket: Socket | null = null;
 // back to a query param, which this doesn't need since auth is always
 // available here).
 export function connectSocket(token: string): Socket {
-  if (socket?.connected) {
+  // Reuse the same socket while it is connecting, connected, or reconnecting.
+  // Replacing an in-flight socket can interrupt the initial connection.
+  if (socket && (socket.connected || socket.active)) {
     return socket;
   }
 

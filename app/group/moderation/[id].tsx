@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // MODERATION (Figma M30 · Member moderation & slow mode)
 // ==========================================
 // Group posting: slow mode. Selected member: Remove / Ban / Mute (each with
@@ -8,7 +8,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
   A,
@@ -25,6 +25,7 @@ import {
   firstName,
 } from "@/components/groups/AdminUi";
 import { FONTS } from "@/constants/fonts";
+import { apiRequest } from "@/services/api";
 import { userIdFromToken } from "@/services/calls";
 import {
   SLOW_MODE_OPTIONS,
@@ -45,6 +46,7 @@ import {
   type MemberMuteDuration,
 } from "@/services/groups";
 import { useAppSelector } from "@/store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type Action = "remove" | "ban" | "mute" | null;
 
@@ -63,13 +65,19 @@ const MUTE_WORDS: Record<MemberMuteDuration, string> = {
 };
 
 export default function Moderation() {
-  const { id, userId } = useLocalSearchParams<{ id: string; userId?: string }>();
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
+  const { id, userId, messageId } = useLocalSearchParams<{ id: string; userId?: string; messageId?: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
   const preselect = Array.isArray(userId) ? userId[0] : userId;
+  // Opened from a message's long-press "Moderate" (M30 "SELECTED MESSAGE").
+  const messageParam = Array.isArray(messageId) ? messageId[0] : messageId;
   const token = useAppSelector((state) => state.auth.token);
   const myUserId = useAppSelector((state) => state.call.myUserId) || userIdFromToken(token);
 
   const [group, setGroup] = useState<Group | null>(null);
+  const [message, setMessage] = useState<any | null>(null);
+  const [showSlowChoices, setShowSlowChoices] = useState(false);
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [bans, setBans] = useState<GroupBanEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,6 +112,64 @@ export default function Moderation() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // The message this screen was opened for (and its sender, selected).
+  useEffect(() => {
+    if (!token || !groupId || !messageParam) return;
+    apiRequest<any>(`/api/chats/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageParam)}`, { token })
+      .then((response) => setMessage(response?.message || null))
+      .catch(() => setMessage(null));
+  }, [token, groupId, messageParam]);
+
+  const pinMessage = () => {
+    if (!token || !groupId || !message) return;
+    Alert.alert("Pin this message?", "It shows at the top of the chat for everyone, for 7 days.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Pin message",
+        onPress: async () => {
+          try {
+            setBusy("message");
+            await apiRequest(`/api/chats/${encodeURIComponent(groupId)}/pinned-message`, {
+              method: "PATCH",
+              body: { messageId: message.id, duration: "7d" },
+              token,
+            });
+            Alert.alert("Pinned", "The message is pinned at the top of the chat.");
+          } catch (error) {
+            Alert.alert("Pin message", error instanceof Error ? error.message : "Couldn't pin it.");
+          } finally {
+            setBusy(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const deleteMessage = () => {
+    if (!token || !groupId || !message) return;
+    Alert.alert("Delete this message for everyone?", "Admins may delete any message. This can't be undone.", [
+      { text: "Keep message", style: "cancel" },
+      {
+        text: "Delete message",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setBusy("message");
+            await apiRequest(
+              `/api/chats/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(message.id)}?scope=everyone`,
+              { method: "DELETE", token },
+            );
+            setMessage({ ...message, deleted: true, content: "This message was deleted by an admin." });
+          } catch (error) {
+            Alert.alert("Delete message", error instanceof Error ? error.message : "Couldn't delete it.");
+          } finally {
+            setBusy(null);
+          }
+        },
+      },
+    ]);
+  };
 
   const candidates = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -165,6 +231,15 @@ export default function Moderation() {
   const name = selected ? firstName(selected) : "";
   const slowValue = String(group?.slowModeSeconds || 0) as (typeof SLOW_MODE_OPTIONS)[number]["value"];
   const slowLabel = SLOW_MODE_OPTIONS.find((option) => option.value === slowValue)?.label || "Off";
+  // "1 message every 30 seconds" (Figma wording).
+  const SLOW_WORDS: Record<string, string> = {
+    "10": "10 seconds",
+    "30": "30 seconds",
+    "60": "minute",
+    "300": "5 minutes",
+    "3600": "hour",
+  };
+  const slowWords = SLOW_WORDS[slowValue] || slowLabel;
 
   return (
     <AdminScreen title="Moderation" subtitle={group?.name} loading={loading}>
@@ -177,17 +252,25 @@ export default function Moderation() {
           <View style={styles.flex}>
             <Text style={styles.cardTitle}>Slow mode</Text>
             <Text style={styles.cardHint}>
-              {group?.slowModeSeconds ? `1 message every ${slowLabel}` : "Off · members can post freely"}
+              {group?.slowModeSeconds ? `1 message every ${slowWords}` : "Off · members can post freely"}
             </Text>
           </View>
-          <Ionicons name="timer-outline" size={24} color={A.muted} />
+          <Ionicons name="timer-outline" size={24} color={ink.text(A.muted)} />
         </View>
-        <Pills
-          options={SLOW_MODE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-          value={slowValue}
-          onChange={setSlowMode}
-        />
-        <Note>Admins aren't limited by slow mode.</Note>
+        <Pressable style={styles.slowChange} onPress={() => setShowSlowChoices((value) => !value)}>
+          <Text style={[styles.cardHint, styles.flex]}>Current setting · change posting frequency</Text>
+          <Ionicons name={showSlowChoices ? "chevron-up" : "chevron-down"} size={18} color={ink.text(A.muted)} />
+        </Pressable>
+        {showSlowChoices ? (
+          <>
+            <Pills
+              options={SLOW_MODE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              value={slowValue}
+              onChange={setSlowMode}
+            />
+            <Note>Admins aren&apos;t limited by slow mode.</Note>
+          </>
+        ) : null}
       </Card>
 
       {/* SELECTED MEMBER */}
@@ -200,7 +283,7 @@ export default function Moderation() {
               setSelected(null);
               setAction(null);
             }}
-            detail={selected.mutedUntil ? `Muted ${mutedUntilText(selected.mutedUntil)}` : `@${selected.username}`}
+            detail={selected.mutedUntil ? `Muted ${mutedUntilText(selected.mutedUntil)}` : undefined}
             last
           />
           <View style={adminStyles.threeButtons}>
@@ -224,7 +307,7 @@ export default function Moderation() {
             value={search}
             onChangeText={setSearch}
             placeholder="Find a member"
-            placeholderTextColor="#9AA3B5"
+            placeholderTextColor={ink.text("#9AA3B5")}
             autoCapitalize="none"
             style={styles.search}
           />
@@ -280,7 +363,33 @@ export default function Moderation() {
         />
       ) : null}
 
-      {/* MESSAGES */}
+      {/* SELECTED MESSAGE (opened from a message) / how to moderate messages */}
+      {message ? (
+        <>
+          <Section>SELECTED MESSAGE</Section>
+          <Card padded>
+            {message.sender ? <PersonRow person={{ ...message.sender, username: message.sender.username || "" }} role={null} last /> : null}
+            <View style={styles.bubble}>
+              <Text style={[styles.bubbleText, message.deleted && styles.bubbleDeleted]}>
+                {message.content || (message.kind === "audio" ? "Voice note" : message.kind === "image" ? "Photo" : "Message")}
+              </Text>
+              <Text style={styles.bubbleTime}>
+                {new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </Text>
+            </View>
+            {!message.deleted ? (
+              <View style={adminStyles.twoButtons}>
+                <SoftButton label="Pin message" onPress={pinMessage} flex disabled={busy === "message"} />
+                <SoftButton label="Delete message" onPress={deleteMessage} danger flex disabled={busy === "message"} />
+              </View>
+            ) : null}
+            <Note>Admins may delete any message. Members may delete only their own. Deletion asks for confirmation.</Note>
+          </Card>
+        </>
+      ) : null}
+
+      {!message ? (
+      <>
       <Section>MESSAGES</Section>
       <Card padded>
         <Text style={styles.cardTitle}>Pin or delete messages</Text>
@@ -289,6 +398,8 @@ export default function Moderation() {
           Deletion asks for confirmation.
         </Text>
       </Card>
+      </>
+      ) : null}
 
       {/* BANNED */}
       <Section>BANNED PEOPLE · {bans.length}</Section>
@@ -315,10 +426,28 @@ export default function Moderation() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   flex: { flex: 1 },
 
   slowHead: { flexDirection: "row", alignItems: "center", gap: 12 },
+
+  slowChange: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(36,40,60,0.08)",
+  },
+
+  bubble: { marginTop: 10, padding: 12, borderRadius: 14, backgroundColor: "#F2F4F8" },
+
+  bubbleText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: A.ink },
+
+  bubbleDeleted: { fontStyle: "italic", color: A.muted },
+
+  bubbleTime: { marginTop: 6, alignSelf: "flex-end", fontFamily: FONTS.regular, fontSize: 11, color: A.muted },
 
   cardTitle: { fontFamily: FONTS.semibold, fontSize: 16, color: A.ink },
 

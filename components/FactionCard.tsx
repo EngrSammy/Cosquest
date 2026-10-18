@@ -1,6 +1,7 @@
 import { Faction } from "@/constants/factions";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type FactionCardProps = {
   faction: Faction;
@@ -13,6 +14,7 @@ export function FactionCard({
   selected,
   onPress,
 }: FactionCardProps) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       style={[
@@ -74,7 +76,7 @@ export function FactionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   wrapper: {
     height: 90,
     borderRadius: 12,

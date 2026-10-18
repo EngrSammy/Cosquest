@@ -22,6 +22,7 @@ import Animated, {
       useSharedValue,
       withSpring,
 } from "react-native-reanimated";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type Props = {
   visible: boolean;
@@ -143,6 +144,8 @@ export function FactionDescriptionModal({
   onClose,
   onContinue,
 }: Props) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
   const details = FACTION_DETAILS[faction.id] ?? FACTION_DETAILS.ascendants;
@@ -210,7 +213,7 @@ export function FactionDescriptionModal({
                   onPress={onClose}
                   style={styles.backButton}
                   hitSlop={10}>
-                  <Ionicons name="arrow-back" size={19} color="#191922" />
+                  <Ionicons name="arrow-back" size={19} color={ink.text("#191922")} />
                 </Pressable>
 
                 <Text style={styles.headerTitle}>Factions</Text>
@@ -219,7 +222,7 @@ export function FactionDescriptionModal({
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={18}
-                    color="#191922"
+                    color={ink.text("#191922")}
                   />
                 </View>
               </View>
@@ -336,7 +339,7 @@ export function FactionDescriptionModal({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   root: {
     flex: 1,
   },

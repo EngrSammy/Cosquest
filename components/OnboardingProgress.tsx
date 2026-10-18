@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function OnboardingProgress({
   step,
@@ -8,6 +9,7 @@ export function OnboardingProgress({
   step: number;
   total: number;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   return (
@@ -22,7 +24,7 @@ export function OnboardingProgress({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   row: { flexDirection: "row", gap: 4, paddingHorizontal: 24 },
   segment: { flex: 1, height: 6, borderRadius: 5 },
   filled: { backgroundColor: "#C5399A" },

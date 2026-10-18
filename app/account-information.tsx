@@ -24,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -46,10 +47,12 @@ function AccountInfoRow({
   onChangeText,
   keyboardType = "default",
 }: AccountInfoRowProps) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <View style={styles.infoCard}>
       <View style={styles.infoIcon}>
-        <Ionicons name={icon} size={15} color={PINK} />
+        <Ionicons name={icon} size={15} color={ink.text(PINK)} />
       </View>
 
       <View style={styles.infoContent}>
@@ -65,7 +68,7 @@ function AccountInfoRow({
               keyboardType === "email-address" ? "none" : "sentences"
             }
             placeholder={`Enter ${label.toLowerCase()}`}
-            placeholderTextColor="#A0A0AA"
+            placeholderTextColor={ink.text("#A0A0AA")}
           />
         ) : (
           <Text style={styles.infoValue}>{value || "Not provided"}</Text>
@@ -76,6 +79,8 @@ function AccountInfoRow({
 }
 
 export default function AccountInformation() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -331,7 +336,7 @@ export default function AccountInformation() {
     <View style={styles.screen}>
       {/* Figma: linear-gradient(180deg, #FFFFFF 0%, #E1F3FF 64.42%) */}
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -356,7 +361,7 @@ export default function AccountInformation() {
             style={styles.headerIcon}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="person-outline" size={16} color={PINK} />
+            <Ionicons name="person-outline" size={16} color={ink.text(PINK)} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Account Information</Text>
@@ -375,7 +380,7 @@ export default function AccountInformation() {
                   contentFit="cover"
                 />
               ) : (
-                <Ionicons name="person" size={38} color="#A5A5AF" />
+                <Ionicons name="person" size={38} color={ink.text("#A5A5AF")} />
               )}
             </View>
           </View>
@@ -440,7 +445,7 @@ export default function AccountInformation() {
             pressed && !saving && styles.pressed,
           ]}>
           {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={ink.text("#FFFFFF")} />
           ) : (
             <Text style={styles.saveButtonText}>Save Changes</Text>
           )}
@@ -450,7 +455,7 @@ export default function AccountInformation() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

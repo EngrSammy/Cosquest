@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // SPARK PANEL (Figma M07 active · M09 revived)
 // ==========================================
 // A rounded panel over the chat from the right (the main chat stays visible
@@ -315,8 +315,8 @@ export default function SparkPanel({
         <Pressable style={styles.dim} onPress={onClose} />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={[styles.panel, { marginTop: insets.top + 64, marginBottom: insets.bottom + 12 }]}>
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[styles.panel, { marginTop: insets.top + 16, marginBottom: Math.max(insets.bottom, 12) + 8 }]}>
           {/* HEADER */}
           <View style={styles.header}>
             <Ionicons name={revived ? "time-outline" : "sparkles-outline"} size={24} color={accent} />
@@ -413,16 +413,16 @@ export default function SparkPanel({
               {revived ? (
                 <View style={styles.legend}>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: eraColor(0, totalEras) }]} />
-                    <Text style={styles.legendText}>{monthYear(firstEra)}</Text>
+                    <View style={[styles.legendDot, { backgroundColor: "#C747A0" }]} />
+                    <Text style={[styles.legendText, { color: "#C747A0" }]}>{monthYear(firstEra)}</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: "#7E95D8" }]} />
-                    <Text style={styles.legendText}>History</Text>
+                    <View style={[styles.legendDot, { backgroundColor: "#648BD1" }]} />
+                    <Text style={[styles.legendText, { color: "#648BD1" }]}>History</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: eraColor(totalEras - 1, totalEras) }]} />
-                    <Text style={styles.legendText}>{monthYear(lastEra)}</Text>
+                    <View style={[styles.legendDot, { backgroundColor: "#218A98" }]} />
+                    <Text style={[styles.legendText, { color: "#218A98" }]}>{monthYear(lastEra)}</Text>
                   </View>
                 </View>
               ) : null}
@@ -463,7 +463,7 @@ export default function SparkPanel({
                               <Text style={styles.role}>{message.senderGroupRole === "owner" ? "Owner" : "Admin"}</Text>
                             ) : null}
                           </View>
-                          <RankLine rank={message.sender?.rank} />
+                          <RankLine rank={message.sender?.rank} groupRole={message.senderGroupRole} />
                         </View>
                       </View>
 
@@ -540,11 +540,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    shadowColor: "#24283C",
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    shadowOffset: { width: -4, height: 4 },
-    elevation: 10,
+
   },
 
   // HEADER
@@ -593,7 +589,7 @@ const STYLE_PAIR = themedStyles({
   listContent: { paddingBottom: 12 },
 
   // SUMMARY
-  summary: { padding: 14, borderRadius: 16, backgroundColor: LILAC, marginBottom: 14 },
+  summary: { padding: 14, borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 14, shadowColor: "#24283C", shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
 
   summaryLabel: { fontFamily: FONTS.semibold, fontSize: 12, color: PINK, marginBottom: 6 },
 
@@ -691,3 +687,6 @@ const STYLE_PAIR = themedStyles({
 
   footerLink: { marginTop: 12, fontFamily: FONTS.medium, fontSize: 12.5, color: PINK },
 });
+
+
+

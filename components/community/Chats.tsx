@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // CHATS HUB (Figma M01)
 // ==========================================
 // Search, filter chips (All chats / Groups / DMs), "Your groups" (Community,
@@ -20,6 +20,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import { GroupAvatar } from "@/components/groups/GroupUi";
@@ -30,6 +31,7 @@ import { FollowUser } from "@/services/follow";
 import { getSocket } from "@/services/socket";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useSparksBoot } from "@/hooks/useSparks";
+import { themedStyles, useThemedStyles, useInk } from "@/constants/chatTheme";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
 import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
 
@@ -180,6 +182,8 @@ function groupLook(chat: ChatItem): { icon: keyof typeof Ionicons.glyphMap; labe
 // ==========================================
 
 function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; onPress: () => void }) {
+  const styles = useThemedStyles(chatHubStylePair);
+  const ink = useInk();
   const look = groupLook(chat);
   const unread = chat.unreadCount || 0;
   const muted = !!chat.group?.muted;
@@ -211,7 +215,7 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
           <Text style={styles.groupName} numberOfLines={1}>
             {title}
           </Text>
-          {muted ? <Ionicons name="notifications-off-outline" size={13} color={COLORS.soft} /> : null}
+          {muted ? <Ionicons name="notifications-off-outline" size={13} color={ink.text(COLORS.soft)} /> : null}
         </View>
         <Text style={styles.groupLast} numberOfLines={1}>
           {last}
@@ -239,7 +243,10 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
 // ==========================================
 
 export function Chats() {
+  const styles = useThemedStyles(chatHubStylePair);
+  const ink = useInk();
   const dispatch = useAppDispatch();
+  const { width: windowWidth } = useWindowDimensions();
 
   // Subomi's on-phone AI (phones only, when switched on).
   useSparksBoot();
@@ -461,22 +468,32 @@ export function Chats() {
   const showDms = filter !== "groups";
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={[
+        styles.wrap,
+        {
+          width: "100%",
+          maxWidth: windowWidth >= 1200 ? 960 : windowWidth >= 768 ? 840 : undefined,
+          alignSelf: "center",
+          paddingHorizontal: windowWidth >= 768 ? 20 : 0,
+        },
+      ]}
+    >
       {/* SEARCH */}
       <View style={styles.search}>
-        <Ionicons name="search-outline" size={18} color={COLORS.soft} />
+        <Ionicons name="search-outline" size={18} color={ink.text(COLORS.soft)} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           style={styles.searchInput}
           placeholder="Search groups, people and messages"
-          placeholderTextColor={COLORS.soft}
+          placeholderTextColor={ink.text(COLORS.soft)}
           autoCapitalize="none"
           autoCorrect={false}
         />
         {query ? (
           <Pressable onPress={() => setQuery("")} hitSlop={8}>
-            <Ionicons name="close-circle" size={17} color={COLORS.soft} />
+            <Ionicons name="close-circle" size={17} color={ink.text(COLORS.soft)} />
           </Pressable>
         ) : null}
       </View>
@@ -506,9 +523,6 @@ export function Chats() {
         <>
           <View style={styles.sectionRow}>
             <Text style={styles.section}>YOUR GROUPS</Text>
-            <Pressable onPress={() => router.push("/group/discover")} hitSlop={8}>
-              <Text style={styles.sectionLink}>Discover</Text>
-            </Pressable>
           </View>
 
           {loading && !conversations.length ? (
@@ -626,24 +640,24 @@ export function Chats() {
                 <Text style={styles.modalSubtitle}>Follow people and start connecting</Text>
               </View>
               <Pressable onPress={closePeople} hitSlop={10} style={styles.closeButton}>
-                <Ionicons name="close" size={21} color={COLORS.ink} />
+                <Ionicons name="close" size={21} color={ink.text(COLORS.ink)} />
               </Pressable>
             </View>
 
             <View style={styles.modalSearch}>
-              <Ionicons name="search" size={18} color={COLORS.soft} />
+              <Ionicons name="search" size={18} color={ink.text(COLORS.soft)} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 style={styles.modalSearchInput}
                 placeholder="Search by username..."
-                placeholderTextColor={COLORS.soft}
+                placeholderTextColor={ink.text(COLORS.soft)}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
               {search.length > 0 ? (
                 <Pressable onPress={() => setSearch("")}>
-                  <Ionicons name="close-circle" size={17} color={COLORS.soft} />
+                  <Ionicons name="close-circle" size={17} color={ink.text(COLORS.soft)} />
                 </Pressable>
               ) : null}
             </View>
@@ -704,9 +718,9 @@ export function Chats() {
                       {isFollowing ? (
                         <Pressable disabled={busy} style={[styles.messageButton, busy && styles.off]} onPress={() => handleMessage(person)}>
                           {startingChatWith === person.username ? (
-                            <ActivityIndicator size="small" color={COLORS.ink} />
+                            <ActivityIndicator size="small" color={ink.text(COLORS.ink)} />
                           ) : (
-                            <Ionicons name="chatbubble-outline" size={16} color={COLORS.ink} />
+                            <Ionicons name="chatbubble-outline" size={16} color={ink.text(COLORS.ink)} />
                           )}
                         </Pressable>
                       ) : null}
@@ -722,8 +736,8 @@ export function Chats() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { marginTop: 8, paddingBottom: 12 },
+const chatHubStylePair = themedStyles({
+  wrap: { marginTop: 8, paddingBottom: 120 },
 
   pressed: { opacity: 0.75 },
 

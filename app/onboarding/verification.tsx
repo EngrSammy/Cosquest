@@ -7,12 +7,14 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // There is no separate "check this code" endpoint on the backend: the code
 // is checked in the LAST step (reset-password), together with the new
 // password. So this screen only makes sure 6 digits were typed, then
 // carries the email + code on to the Reset Password screen.
 export default function Verification() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   // Sent here by the Forgot Password screen.
@@ -128,7 +130,7 @@ export default function Verification() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
