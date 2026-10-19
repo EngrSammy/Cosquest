@@ -11,6 +11,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type { ReactNode } from "react";
+import { createContext, useContext } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -47,6 +48,16 @@ function initialsOf(name?: string) {
   return letters.toUpperCase();
 }
 
+// True inside a desktop workspace column (Figma D6/D7): the screen drops
+// its own background and back / close header.
+// "inline": shown inside another screen (an opened Group settings section).
+export const AdminEmbedded = createContext<boolean | "inline">(false);
+
+// Wrap a screen to show it inside a Group settings section.
+export function InlineSection({ children }: { children: ReactNode }) {
+  return <AdminEmbedded.Provider value="inline">{children}</AdminEmbedded.Provider>;
+}
+
 export function firstName(person?: GroupPerson | null) {
   return String(person?.name || person?.username || "them").split(" ")[0];
 }
@@ -68,12 +79,26 @@ export function AdminScreen({
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  const embedded = useContext(AdminEmbedded);
+  if (embedded === "inline") {
+    return (
+      <View style={styles.inline}>
+        {loading ? <ActivityIndicator color={ink.text(A.pink)} style={styles.loading} /> : children}
+      </View>
+    );
+  }
   return (
     <View style={styles.screen}>
-      <ScreenGradient />
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <SheetHeader title={title} subtitle={subtitle} onBack={() => safeBack()} onClose={() => safeBack()} />
-      </View>
+      {embedded ? (
+        <Text style={styles.embeddedTitle}>{title}</Text>
+      ) : (
+        <>
+          <ScreenGradient />
+          <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+            <SheetHeader title={title} subtitle={subtitle} onBack={() => safeBack()} onClose={() => safeBack()} />
+          </View>
+        </>
+      )}
 
       {loading ? (
         <ActivityIndicator color={ink.text(A.pink)} style={styles.loading} />
@@ -126,6 +151,7 @@ export function SettingsRow({
   right,
   last,
   danger,
+  children,
 }: {
   title: string;
   hint?: string;
@@ -134,17 +160,26 @@ export function SettingsRow({
   right?: ReactNode;
   last?: boolean;
   danger?: boolean;
+  // An opened section's content, shown under the row.
+  children?: ReactNode;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
-  return (
-    <Pressable onPress={onPress} disabled={!onPress} style={[styles.settingsRow, last && styles.rowLast]}>
+  const row = (
+    <Pressable onPress={onPress} disabled={!onPress} style={[styles.settingsRow, last && !children && styles.rowLast]}>
       <View style={styles.flex}>
         <Text style={[styles.settingsTitle, danger && styles.dangerText]}>{title}</Text>
         {hint ? <Text style={styles.settingsHint}>{hint}</Text> : null}
       </View>
       {right ?? (icon ? <Ionicons name={icon} size={20} color={ink.text(danger ? A.danger : A.muted)} /> : null)}
     </Pressable>
+  );
+  if (!children) return row;
+  return (
+    <View>
+      {row}
+      <View style={[styles.expanded, last && styles.expandedLast]}>{children}</View>
+    </View>
   );
 }
 
@@ -373,6 +408,10 @@ const STYLE_PAIR = themedStyles(
 
     header: { paddingHorizontal: 18, paddingBottom: 8 },
     loading: { marginTop: 40 },
+    inline: { paddingBottom: 6 },
+    expanded: { paddingTop: 4, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: A.line },
+    expandedLast: { borderBottomWidth: 0 },
+    embeddedTitle: { paddingHorizontal: 18, paddingTop: 10, fontFamily: FONTS.regular, fontSize: 17, color: A.ink },
     content: { paddingHorizontal: 18, paddingTop: 12 },
 
     chip: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: A.pinkSoft },

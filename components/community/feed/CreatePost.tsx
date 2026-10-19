@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -74,7 +74,12 @@ function prepareImageForUpload(
   })();
 }
 
-export function CreatePost() {
+export function CreatePost({
+  renderTrigger,
+}: {
+  // Computer: draw your own post box; it opens this same window.
+  renderTrigger?: (actions: { open: () => void; photo: () => void; video: () => void; avatar: any }) => ReactNode;
+} = {}) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const dispatch = useAppDispatch();
@@ -343,6 +348,20 @@ export function CreatePost() {
           COMPOSER - the raised pill from the Figma
       ========================================== */}
 
+      {renderTrigger ? (
+        renderTrigger({
+          open: () => setVisible(true),
+          photo: () => {
+            setVisible(true);
+            pickGallery();
+          },
+          video: () => {
+            setVisible(true);
+            pickVideo();
+          },
+          avatar: barAvatar,
+        })
+      ) : (
       <Pressable
         style={styles.composer}
         onPress={() => setVisible(true)}
@@ -363,6 +382,7 @@ export function CreatePost() {
           <Ionicons name="add" size={16} color={ink.text("#C5399A")} />
         </View>
       </Pressable>
+      )}
 
       {/* ==========================================
           CREATE POST MODAL

@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
@@ -650,6 +651,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     color: "#191922",
@@ -658,6 +660,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -704,12 +707,14 @@ const STYLE_PAIR = themedStyles({
   },
 
   rowTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 15,
     fontWeight: "700",
     color: "#191922",
   },
 
   rowDetail: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: "#6b6b72",
     marginTop: 2,
@@ -730,6 +735,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   radiusValue: {
+    fontFamily: FONTS.bold,
     fontSize: 14,
     fontWeight: "700",
     color: "#C5399A",

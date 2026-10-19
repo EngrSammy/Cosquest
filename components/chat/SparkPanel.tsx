@@ -95,6 +95,7 @@ export default function SparkPanel({
   onClose,
   onSent,
   onRemoved,
+  docked = false,
 }: {
   visible: boolean;
   conversationId: string;
@@ -109,6 +110,8 @@ export default function SparkPanel({
   onSent: (message: any) => void;
   // Deleted / merged away.
   onRemoved: (sparkId: string) => void;
+  // Computer (Figma D2/D3): a column beside the chat instead of a pop-over.
+  docked?: boolean;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
@@ -308,15 +311,14 @@ export default function SparkPanel({
         ? `Active · ${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`
         : `Quiet · last reply ${timeOf(spark.lastActivityAt)}`;
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        {/* The main chat stays visible on the left; tap it to close. */}
-        <Pressable style={styles.dim} onPress={onClose} />
-
+  const body = (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[styles.panel, { marginTop: insets.top + 16, marginBottom: Math.max(insets.bottom, 12) + 8 }]}>
+          style={
+            docked
+              ? [styles.panel, styles.panelDocked]
+              : [styles.panel, { marginTop: insets.top + 16, marginBottom: Math.max(insets.bottom, 12) + 8 }]
+          }>
           {/* HEADER */}
           <View style={styles.header}>
             <Ionicons name={revived ? "time-outline" : "sparkles-outline"} size={24} color={accent} />
@@ -520,6 +522,17 @@ export default function SparkPanel({
             </Pressable>
           )}
         </KeyboardAvoidingView>
+  );
+
+  // Computer: docked as a column beside the chat (Figma D2/D3).
+  if (docked) return visible ? body : null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        {/* The main chat stays visible on the left; tap it to close. */}
+        <Pressable style={styles.dim} onPress={onClose} />
+        {body}
       </View>
     </Modal>
   );
@@ -529,6 +542,17 @@ const STYLE_PAIR = themedStyles({
   overlay: { flex: 1, flexDirection: "row" },
 
   dim: { flex: 1, backgroundColor: "rgba(36,40,60,0.18)" },
+
+  // Computer: fills its column, flush, with a hairline on the left.
+  panelDocked: {
+    flex: 1,
+    width: "100%",
+    maxWidth: "100%",
+    borderRadius: 0,
+    marginRight: 0,
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(36,40,60,0.08)",
+  },
 
   panel: {
     width: "81%",

@@ -101,6 +101,9 @@ import RolePingCard from "@/components/chat/RolePingCard";
 import AlbumGrid from "@/components/chat/AlbumGrid";
 import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
 import { useSparkLayout } from "@/constants/sparkLayout";
+import DesktopSparksPanel, { DesktopChatRow } from "@/components/desktop/DesktopSparksPanel";
+import SearchInChat from "@/app/chat/search/[id]";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useSparksFeed } from "@/hooks/useSparks";
 import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
@@ -2111,7 +2114,6 @@ function CallLogContent({
             onPress={() => setNotesOpen(true)}
             hitSlop={8}
             style={styles.callLogNotes}
-            accessibilityRole="button"
             accessibilityLabel="Sparks from this call">
             <Ionicons name="sparkles" size={12} color="#C5399A" />
             <Text style={styles.callLogNotesText}>Sparks</Text>
@@ -2651,6 +2653,10 @@ export default function ChatScreen() {
   useSparksFeed(conversationId, visibleMessages);
 
   const sparkLayout = useSparkLayout();
+  // Computer: the Sparks move into the panel beside the chat (Figma D1).
+  const desktop = useIsDesktop();
+  // Computer: search opens in the right column (Figma D8).
+  const [searchPanel, setSearchPanel] = useState(false);
   // Figma M32 (concept): the Sparks bot's automatic role pings, shown after
   // the latest Spark message sent before each ping.
   const rolePingsAfter = useMemo(() => {
@@ -4796,9 +4802,59 @@ export default function ChatScreen() {
     !!selectedMessage && isMyMessage(selectedMessage);
 
   return (
+    <DesktopChatRow
+      panel={
+        desktop && showMentionPicker ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <MentionPicker
+              docked
+              visible
+              conversationId={conversationId}
+              token={token}
+              onClose={closeMentionPicker}
+              onDone={insertMentions}
+            />
+          </View>
+        ) : desktop && searchPanel ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <SearchInChat chatId={conversationId} onClose={() => setSearchPanel(false)} />
+          </View>
+        ) : desktop && sparksChat && openSparkId ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <SparkPanel
+              docked
+              visible
+              conversationId={conversationId}
+              sparkId={openSparkId}
+              token={token}
+              otherSparks={sparks}
+              refreshKey={sparkRefresh}
+              onClose={() => setOpenSparkId(null)}
+              onSent={(message) => dispatch(socketMessageReceived({ conversationId, message }))}
+              onRemoved={(sparkId) => setSparks((current) => current.filter((item) => item.id !== sparkId))}
+            />
+          </View>
+        ) : desktop && sparksChat ? (
+          <DesktopSparksPanel
+            sparks={sparks}
+            pinnedText={
+              pinnedMessage
+                ? pinnedMessage.deleted
+                  ? null
+                  : pinnedMessage.content || null
+                : pinnedInfo?.preview || pinnedInfo?.content || null
+            }
+            pinnedBy={pinnedByName ? `Pinned by ${pinnedByName}` : null}
+            onOpen={(spark) => setOpenSparkId(spark.id)}
+          />
+        ) : null
+      }>
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      // iPhone and Android: lift the message box above the keyboard, like
+      // WhatsApp. (Android apps are edge-to-edge now, so the system no longer
+      // shrinks the screen for the keyboard by itself.)
+      behavior={Platform.OS === "web" ? undefined : "padding"}
       // Was insets.top: that's meant to offset content sitting ABOVE this
       // view outside of it, not the safe-area inside it — since the header
       // lives inside this same KeyboardAvoidingView, adding insets.top here
@@ -4953,13 +5009,7 @@ export default function ChatScreen() {
               ) : null}
 
               {/* Figma's tag icon -> the chat menu (profile, wallpaper, block) */}
-              <Pressable
-                hitSlop={10}
-                style={{ marginLeft: 20 }}
-                onPress={() => setShowChatMenu(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Chat options">
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+              <View style={{ marginLeft: 20, flexDirection: "row", alignItems: "center", gap: 18 }}>
                 {voiceChatAllowed(conversation?.type) ? (
                   <VoiceStartButton
                     conversationId={conversationId}
@@ -4969,12 +5019,21 @@ export default function ChatScreen() {
                 <Pressable
                   hitSlop={8}
                   accessibilityLabel="Search in chat"
-                  onPress={() => router.push({ pathname: "/chat/search/[id]", params: { id: conversationId } })}>
+                  onPress={() =>
+                    desktop
+                      ? setSearchPanel(true)
+                      : router.push({ pathname: "/chat/search/[id]", params: { id: conversationId } })
+                  }>
                   <Ionicons name="search-outline" size={22} color={ink.text("#24283C")} />
                 </Pressable>
-                <Ionicons name="ellipsis-horizontal" size={24} color={ink.text("#24283C")} />
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => setShowChatMenu(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chat options">
+                  <Ionicons name="ellipsis-horizontal" size={24} color={ink.text("#24283C")} />
+                </Pressable>
               </View>
-              </Pressable>
             </>
           )}
         </View>
@@ -5016,7 +5075,7 @@ export default function ChatScreen() {
       ) : null}
 
       {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}
-      {sparksChat && !selectionMode && sparkLayout === "orbit" ? (
+      {sparksChat && !selectionMode && !desktop && sparkLayout === "orbit" ? (
         <SparksOrbit
           sparks={sparks}
           onOpen={(spark) => setOpenSparkId(spark.id)}
@@ -5195,7 +5254,7 @@ export default function ChatScreen() {
             // Option A: the list itself stops short of the side rail (M03),
             // so bubbles never run under it (a content padding wasn't enough
             // on Android).
-            style={sparksChat && sparkLayout === "rail" && sparks.length ? styles.listWithRail : undefined}
+            style={sparksChat && !desktop && sparkLayout === "rail" && sparks.length ? styles.listWithRail : undefined}
             contentContainerStyle={styles.list}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -5204,7 +5263,7 @@ export default function ChatScreen() {
       )}
 
       {/* SPARKS RAIL (layout option A: side rail) */}
-      {sparksChat && !selectionMode && sparkLayout === "rail" ? (
+      {sparksChat && !selectionMode && !desktop && sparkLayout === "rail" ? (
         <SparksRail
           sparks={sparks}
           top={insets.top + (pinnedMessageId ? 136 : 76)}
@@ -6281,7 +6340,7 @@ export default function ChatScreen() {
       />
 
       <SparkPanel
-        visible={!!openSparkId}
+        visible={!!openSparkId && !desktop}
         conversationId={conversationId}
         sparkId={openSparkId}
         token={token}
@@ -6347,7 +6406,7 @@ export default function ChatScreen() {
 
       {/* @ MENTION PICKER */}
       <MentionPicker
-        visible={showMentionPicker}
+        visible={showMentionPicker && !desktop}
         conversationId={conversationId}
         token={token}
         onClose={closeMentionPicker}
@@ -6366,6 +6425,7 @@ export default function ChatScreen() {
       </MyUserIdContext.Provider>
       </PhotoWallpaperContext.Provider>
     </KeyboardAvoidingView>
+    </DesktopChatRow>
   );
 }
 
@@ -6963,9 +7023,10 @@ const STYLE_PAIR = themedStyles({
 
   bubbleText: {
     fontFamily: FONTS.regular,
-    fontSize: 15,
+    // A touch smaller on the website (computers already show text larger).
+    fontSize: Platform.OS === "web" ? 14 : 15,
     color: "#24283C",
-    lineHeight: 22,
+    lineHeight: Platform.OS === "web" ? 20 : 22,
     // Long links / words without spaces wrap INSIDE the bubble instead of
     // running out of it (browsers don't do this by themselves).
     ...(Platform.OS === "web"
@@ -8037,7 +8098,25 @@ const STYLE_PAIR = themedStyles({
   editSavedText: { color: "#F4F5FA" },
   editNote: { backgroundColor: "#30263B" },
   editNoteTitle: { color: "#F0A6D7" },
-  editNoteText: { color: "#B5BBCB" },});
+  editNoteText: { color: "#B5BBCB" },
+  // Your messages stand out from everyone else's (plum-pink vs navy).
+  bubbleTheirs: {
+    backgroundColor: "#252837",
+    borderTopColor: "rgba(255,255,255,0.08)",
+    borderLeftColor: "rgba(255,255,255,0.05)",
+    borderRightColor: "rgba(255,255,255,0.05)",
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  bubbleMine: {
+    backgroundColor: "#4A2643",
+    borderTopColor: "rgba(240,166,215,0.28)",
+    borderLeftColor: "rgba(240,166,215,0.14)",
+    borderRightColor: "rgba(240,166,215,0.14)",
+    borderBottomColor: "rgba(240,166,215,0.14)",
+  },
+  bubbleTheirsOnPhoto: { backgroundColor: "#252837" },
+  bubbleMineOnPhoto: { backgroundColor: "#4A2643" },
+  bubbleTextMine: { color: "#F4F5FA" },});
 
 
 

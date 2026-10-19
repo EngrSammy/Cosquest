@@ -9,7 +9,7 @@
 // 1,000 people stay smooth.
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,7 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
-import { PersonAvatar } from "@/components/groups/AdminUi";
+import { AdminEmbedded, PersonAvatar } from "@/components/groups/AdminUi";
 import { FONTS } from "@/constants/fonts";
 import { userIdFromToken } from "@/services/calls";
 import { canActOn, getGroup, getGroupMembers, type Group, type GroupMember } from "@/services/groups";
@@ -100,6 +100,8 @@ function Separator() {
 }
 
 export default function GroupMembers() {
+  // Inside a desktop workspace column (Figma D6): no own header.
+  const embedded = useContext(AdminEmbedded);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -260,7 +262,8 @@ export default function GroupMembers() {
 
   return (
     <View style={styles.screen}>
-      <ScreenGradient />
+      {!embedded ? <ScreenGradient /> : null}
+      {!embedded ? (
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
           <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
@@ -276,6 +279,9 @@ export default function GroupMembers() {
           <Ionicons name="close" size={26} color={ink.text(MUTED)} />
         </Pressable>
       </View>
+      ) : (
+        <Text style={styles.title}>Members · {group?.memberCount || total || members.length}</Text>
+      )}
 
       <View style={styles.top}>
         <View style={styles.search}>
@@ -294,6 +300,7 @@ export default function GroupMembers() {
       </View>
 
       <FlatList
+        scrollEnabled={embedded !== "inline"}
         ref={listRef}
         style={styles.flex}
         contentContainerStyle={[styles.content, { paddingBottom: detailInList ? insets.bottom + 30 : 16 }]}

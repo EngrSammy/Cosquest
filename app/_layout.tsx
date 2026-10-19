@@ -1,8 +1,11 @@
+import "@/utils/hideScrollbars";
 import AvatarCatalogLoader from "@/components/AvatarCatalogLoader";
 import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";
 import VoiceRoomOverlay from "@/components/voice/VoiceRoomOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
+import DesktopShell from "@/components/desktop/DesktopShell";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
+import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
 import SessionGate from "@/components/SessionGate";
 import { UserProvider } from "@/context/UserContext";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
@@ -68,6 +71,8 @@ export default function RootLayout() {
           <UserProvider>
             {/* Green "Tap to return to call" bar while a call is minimized */}
             <CallBannerFrame>
+              {/* Computer: top bar + left rail around every screen (D1-D8) */}
+              <DesktopShell>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="onboarding" />
@@ -86,6 +91,7 @@ export default function RootLayout() {
                   options={{ gestureEnabled: false, animation: "fade" }}
                 />
               </Stack>
+              </DesktopShell>
             </CallBannerFrame>
 
             {/* The ongoing call - stays mounted, so minimizing never ends it */}
@@ -94,6 +100,9 @@ export default function RootLayout() {
 
             {/* Ringing screen — shows on top of any screen when someone calls */}
             <IncomingCallListener />
+
+            {/* Private call on top: its ringing card and sheet */}
+            <PrivateCallLayer />
 
             {/* Dark icons: most screens are light even when the phone is dark (the chat sets its own). */}
             <StatusBar style="dark" />

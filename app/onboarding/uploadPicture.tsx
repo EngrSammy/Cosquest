@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
@@ -271,6 +272,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -279,6 +281,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   profileLabel: {
+    fontFamily: FONTS.bold,
     textAlign: "center",
     fontSize: 15,
     color: "#000",
@@ -288,6 +291,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   hint: {
+    fontFamily: FONTS.medium,
     fontWeight: "500",
     color: "#4c4c4d",
     fontSize: 14,
@@ -327,6 +331,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   takePhotoText: {
+    fontFamily: FONTS.semibold,
     color: "#191922",
     fontSize: 15,
     fontWeight: "600",
@@ -349,6 +354,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   rollText: {
+    fontFamily: FONTS.semibold,
     color: "#191922",
     fontSize: 15,
     fontWeight: "600",

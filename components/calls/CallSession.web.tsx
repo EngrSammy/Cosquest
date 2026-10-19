@@ -49,6 +49,7 @@ import GroupCallMembers, {
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
 import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
 import { setCallMinimized } from "@/components/calls/callUi";
 import { otherActiveMembers } from "@/services/calls";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -537,6 +538,25 @@ export default function CallSession() {
     });
   }, [focusOn]);
 
+  // PRIVATE CALL ON TOP: quieter here (25%) and your mic off, while you're
+  // in a private call from this call.
+  const inPrivate = useInPrivateFrom(active?.call.id);
+  const micBeforePrivate = useRef<boolean | null>(null);
+  useEffect(() => {
+    const room = roomRef.current;
+    if (!room) return;
+    room.remoteParticipants.forEach((participant) => participant.setVolume(inPrivate ? 0.25 : 1));
+    if (inPrivate) {
+      micBeforePrivate.current = micOn;
+      room.localParticipant.setMicrophoneEnabled(false).then(() => setMicOn(false)).catch(() => {});
+    } else if (micBeforePrivate.current !== null) {
+      const back = micBeforePrivate.current;
+      micBeforePrivate.current = null;
+      room.localParticipant.setMicrophoneEnabled(back).then(() => setMicOn(back)).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPrivate]);
+
   // ---------- controls ----------
 
   const toggleMic = async () => {
@@ -712,8 +732,32 @@ export default function CallSession() {
   );
 
   // ==========================================
-// GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
-// ==========================================
+  // BIG CALL (more than 8 people): speaker stage + list, audio or video.
+  // Only the tiles on screen receive video. See StageLayout.
+  // ==========================================
+
+  if (stageMode && stageRoom) {
+    return (
+      <StageLayout
+        room={stageRoom}
+        call={active.call}
+        title={displayName}
+        status={statusText}
+        live={answered && !endMessage}
+        waiting={waiting}
+        mirrorSelf={facing === "user"}
+        renderVideo={renderStageVideo}
+        controls={videoBar}
+        overlay={addPeopleSheet}
+        topExtra={audioTapButton}
+      />
+    );
+  }
+
+  // ==========================================
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
+  // Up to 8 people (bigger calls use the speaker stage above).
+  // ==========================================
 
   if (isGroup) {
     const people: OrbitPerson[] = active.call.members
@@ -730,6 +774,9 @@ export default function CallSession() {
           ringing: member.status === "ringing" && !remote && !isMe,
           isMe,
           rankLevel: (member.user as any).rank?.level ?? null,
+          rankName: (member.user as any).rank?.name ?? null,
+          username: member.user.username || null,
+          away: !!member.away,
           hasVideo: isMe ? !!localVideo : !!remote?.video,
         };
       });
@@ -762,32 +809,11 @@ export default function CallSession() {
           onLeave={hangUp}
           onMinimize={() => setCallMinimized(true)}
           onPeople={() => setAddPeopleOpen(true)}
+          onPrivateCall={(person) => startPrivate({ kind: "call", id: active.call.id }, person.id)}
           extra={audioTapButton}
         />
         {addPeopleSheet}
       </>
-    );
-  }
-
-  // BIG CALL (more than 8 people): speaker stage + list, audio or video.
-  // Only the tiles on screen receive video. See StageLayout.
-  // ==========================================
-
-  if (stageMode && stageRoom) {
-    return (
-      <StageLayout
-        room={stageRoom}
-        call={active.call}
-        title={displayName}
-        status={statusText}
-        live={answered && !endMessage}
-        waiting={waiting}
-        mirrorSelf={facing === "user"}
-        renderVideo={renderStageVideo}
-        controls={videoBar}
-        overlay={addPeopleSheet}
-        topExtra={audioTapButton}
-      />
     );
   }
 

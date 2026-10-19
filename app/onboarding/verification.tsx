@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { CodeInput } from "@/components/CodeInputs";
 import { ErrorText } from "@/components/ErrorText";
@@ -137,12 +138,14 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 70,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -152,9 +155,10 @@ const STYLE_PAIR = themedStyles({
   },
   email: { fontWeight: "700", color: "#191922" },
   resendWrap: { alignItems: "center", gap: 6, marginTop: 20, marginBottom: 20 },
-  resendPrompt: { fontSize: 15, color: "#2b2b2c" },
-  resend: { color: "#C5399A", fontWeight: "700", fontSize: 16 },
+  resendPrompt: { fontFamily: FONTS.regular, fontSize: 15, color: "#2b2b2c" },
+  resend: { fontFamily: FONTS.bold, color: "#C5399A", fontWeight: "700", fontSize: 16 },
   resendOk: {
+    fontFamily: FONTS.regular,
     color: "#2E9E5B",
     fontSize: 12,
     textAlign: "center",

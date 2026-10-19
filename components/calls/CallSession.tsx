@@ -39,6 +39,7 @@ import SparksCallPanel from "@/components/calls/SparksCallPanel";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
 import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
 import { setCallMinimized } from "@/components/calls/callUi";
 import type { Call } from "@/services/calls";
 import { otherActiveMembers } from "@/services/calls";
@@ -442,6 +443,24 @@ function CallStage({
     micOn: isMicrophoneEnabled,
   });
 
+  // PRIVATE CALL ON TOP: while you're in one from this call, the call keeps
+  // going quieter (25%) and your mic is off here, so nobody hears you.
+  const inPrivate = useInPrivateFrom(call.id);
+  const micBeforePrivate = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (inPrivate) {
+      micBeforePrivate.current = isMicrophoneEnabled;
+      localParticipant.setMicrophoneEnabled(false);
+    } else if (micBeforePrivate.current !== null) {
+      localParticipant.setMicrophoneEnabled(micBeforePrivate.current);
+      micBeforePrivate.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPrivate]);
+  useEffect(() => {
+    remoteParticipants.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
+  }, [inPrivate, remoteParticipants]);
+
   // Two pages: the call, and its Sparks (swipe across, or "Sparks ›").
   const { width: pageWidth } = useWindowDimensions();
   const pages = useRef<ScrollView>(null);
@@ -681,11 +700,16 @@ function CallStage({
         ? "Requesting"
         : "Connecting";
 
+  // Hooks before any early return (React needs the same order every render).
+  const room = useRoomContext();
+  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
+  const stageMode = useStageMode(remoteCount + 1);
+
   // ==========================================
-  // GROUP CALL: ORBITAL VIEW (Group Calls doc, board A · Light Orbit)
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
   // ==========================================
 
-  if (isGroup) {
+  if (isGroup && !stageMode) {
     const people: OrbitPerson[] = call.members
       .filter((member) => member.status === "joined" || member.status === "ringing")
       .map((member) => {
@@ -701,6 +725,9 @@ function CallStage({
           ringing: member.status === "ringing" && !remote && !isMe,
           isMe,
           rankLevel: (member.user as any).rank?.level ?? null,
+          rankName: (member.user as any).rank?.name ?? null,
+          username: member.user.username || null,
+          away: !!member.away,
           hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
         };
       });
@@ -741,6 +768,7 @@ function CallStage({
           onMinimize={() => setCallMinimized(true)}
           onPeople={openAddPeople}
           onSparks={openSparks}
+          onPrivateCall={(person) => startPrivate({ kind: "call", id: call.id }, person.id)}
           extra={
             <SparksCallNotes
               notes={notes}
@@ -818,11 +846,10 @@ function CallStage({
   // Only the tiles on screen receive video. See StageLayout.
   // ==========================================
 
-  const room = useRoomContext();
-  const stageMode = useStageMode(remoteCount + 1);
-
   if (stageMode) {
-    return (
+    // Sparks works here too: the pill and newest line at the top, and the
+    // Sparks panel one swipe away (like every other call layout).
+    return pager(
       <StageLayout
         room={room}
         call={call}
@@ -834,7 +861,16 @@ function CallStage({
         renderVideo={renderStageVideo}
         controls={videoBar}
         overlay={addPeopleSheet}
-      />
+        topExtra={
+          <SparksCallNotes
+            notes={notes}
+            call={call}
+            myUserId={myUserId}
+            style={styles.orbitNotes}
+            onOpenSparks={openSparks}
+          />
+        }
+      />,
     );
   }
 

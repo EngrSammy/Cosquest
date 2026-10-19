@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -46,6 +47,7 @@ const STYLE_PAIR = themedStyles({
     justifyContent: "center",
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -62,5 +64,5 @@ const STYLE_PAIR = themedStyles({
     backgroundColor: "#C5399A",
     marginTop: 15,
   },
-  buttonLabel: { fontSize: 17, fontWeight: "600", color: "#FFFFFF" },
+  buttonLabel: { fontFamily: FONTS.semibold, fontSize: 17, fontWeight: "600", color: "#FFFFFF" },
 });

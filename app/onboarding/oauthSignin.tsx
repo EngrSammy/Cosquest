@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
@@ -94,12 +95,14 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 70,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -114,7 +117,7 @@ const STYLE_PAIR = themedStyles({
     marginVertical: 5,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
-  dividerText: { color: "#675656", fontSize: 15 },
+  dividerText: { fontFamily: FONTS.regular, color: "#675656", fontSize: 15 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -123,6 +126,7 @@ const STYLE_PAIR = themedStyles({
     gap: 8,
   },
   loadingText: {
+    fontFamily: FONTS.regular,
     color: "#777985",
     fontSize: 12,
   },

@@ -22,6 +22,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { FONTS } from "@/constants/fonts";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 // ==========================================
 // TYPES
@@ -56,6 +58,8 @@ export function FactionModal({
   onClose,
 }: Props) {
   const styles = useThemedStyles(STYLE_PAIR);
+  // Computers: a centred dialog instead of a bottom sheet.
+  const desktop = useIsDesktop();
   const ink = useInk();
   // ==========================================
   // ANIMATION STATE
@@ -213,15 +217,15 @@ export function FactionModal({
         style={{
           flex: 1,
         }}>
-        <Pressable style={styles.backdrop} onPress={handleClose}>
+        <Pressable style={[styles.backdrop, desktop && styles.backdropDesktop]} onPress={handleClose}>
           <GestureDetector gesture={pan}>
-            <Animated.View style={cardStyle}>
-              <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Animated.View style={[cardStyle, desktop && styles.cardWrapDesktop]}>
+              <Pressable style={[styles.modalCard, desktop && styles.modalCardDesktop]} onPress={() => {}}>
                 {/* ==================================
                     HANDLE
                 ================================== */}
 
-                <View style={styles.handle} />
+                {desktop ? null : <View style={styles.handle} />}
 
                 {/* ==================================
                     TITLE
@@ -457,6 +461,11 @@ export function FactionModal({
 // ==========================================
 
 const STYLE_PAIR = themedStyles({
+  // Computers: centred dialog.
+  backdropDesktop: { justifyContent: "center", alignItems: "center", padding: 24 },
+  cardWrapDesktop: { width: "100%", maxWidth: 620 },
+  modalCardDesktop: { borderRadius: 28, paddingTop: 28, paddingBottom: 28, paddingHorizontal: 28 },
+
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -484,7 +493,7 @@ const STYLE_PAIR = themedStyles({
 
   title: {
     fontSize: 24,
-    fontWeight: "800",
+    fontFamily: FONTS.extrabold,
     color: "#191922",
     marginBottom: 10,
   },
@@ -493,7 +502,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 13,
     color: "rgba(107, 73, 90, 1)",
     lineHeight: 20,
-    fontWeight: "400",
+    fontFamily: FONTS.regular,
   },
 
   box: {
@@ -515,13 +524,13 @@ const STYLE_PAIR = themedStyles({
 
   boxTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     marginBottom: 5,
   },
 
   boxBody: {
     fontSize: 12,
-    fontWeight: "500",
+    fontFamily: FONTS.medium,
     lineHeight: 19,
   },
 
@@ -546,7 +555,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   cardTagText: {
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     fontSize: 12,
   },
 
@@ -562,6 +571,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   agreeText: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: "#191922",
   },
@@ -569,14 +579,14 @@ const STYLE_PAIR = themedStyles({
   agreedLabel: {
     marginTop: 5,
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: FONTS.bold,
     color: "#C5399A",
   },
 
   errorText: {
     color: "#B42318",
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: FONTS.semibold,
     textAlign: "center",
     marginTop: 12,
   },

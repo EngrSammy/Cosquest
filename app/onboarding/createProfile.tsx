@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
@@ -456,6 +457,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -464,6 +466,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -478,6 +481,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   label: {
+    fontFamily: FONTS.semibold,
     fontSize: 13,
     fontWeight: "600",
     color: "#191922",
@@ -512,6 +516,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   segText: {
+    fontFamily: FONTS.bold,
     fontSize: 14,
     fontWeight: "700",
     color: "#191922",
@@ -522,6 +527,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   usernameChecking: {
+    fontFamily: FONTS.regular,
     color: "#666",
     fontSize: 12,
     marginTop: -10,
@@ -530,6 +536,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   usernameAvailable: {
+    fontFamily: FONTS.semibold,
     color: "#1FA85A",
     fontSize: 12,
     fontWeight: "600",

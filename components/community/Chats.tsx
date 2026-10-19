@@ -31,6 +31,7 @@ import { FollowUser } from "@/services/follow";
 import { getSocket } from "@/services/socket";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useSparksBoot } from "@/hooks/useSparks";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useThemedStyles, useInk } from "@/constants/chatTheme";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
 import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
@@ -250,6 +251,9 @@ export function Chats() {
 
   // Subomi's on-phone AI (phones only, when switched on).
   useSparksBoot();
+  // Computer: the list sits beside the open chat (D1), so picking a chat
+  // swaps it in place instead of stacking screens.
+  const desktop = useIsDesktop();
 
   const token = useAppSelector((state) => state.auth.token);
   const authUser = useAppSelector((state) => state.auth.user);
@@ -361,7 +365,9 @@ export function Chats() {
   const visibleNotYet = notYetMessaged.filter((person) => matches(person.name, person.username));
 
   const openChat = (chatId: string) => {
-    router.push({ pathname: "/chat/[id]", params: { id: chatId } });
+    const target = { pathname: "/chat/[id]" as const, params: { id: chatId } };
+    if (desktop) router.replace(target);
+    else router.push(target);
   };
 
   async function openOrCreateChat(person: FollowUser) {

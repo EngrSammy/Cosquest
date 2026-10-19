@@ -25,6 +25,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import DesktopNotifications from "@/components/desktop/DesktopNotifications";
+import { ScreenGradient } from "@/components/chat/ui";
+import { FONTS } from "@/constants/fonts";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 function getAvatarSource(actor: AppNotificationItem["actor"]) {
   if (actor?.avatarPhotoUrl) {
@@ -138,6 +142,8 @@ function NotificationRow({
 
 export default function Notifications() {
   const styles = useThemedStyles(STYLE_PAIR);
+  // Computers: a centred column.
+  const desktop = useIsDesktop();
   const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
@@ -205,8 +211,24 @@ export default function Notifications() {
     }
   }
 
+  if (desktop) {
+    return (
+      <DesktopNotifications
+        notifications={notifications}
+        loading={loading}
+        error={error}
+        onRetry={() => token && dispatch(fetchNotifications(token))}
+        isFollowing={(username) => !!username && followingUsernames.has(username.toLowerCase())}
+        isBusy={(username) => !!username && !!busyUsernames[username]}
+        onToggleFollow={(username) => handleToggleFollow(username)}
+      />
+    );
+  }
+
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.screen, { paddingTop: desktop ? 20 : insets.top + 8 }]}>
+      <ScreenGradient />
+      <View style={[styles.column, desktop && styles.columnDesktop]}>
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
@@ -272,96 +294,84 @@ export default function Notifications() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 10 }}
         showsVerticalScrollIndicator={false}
       />
+      </View>
     </View>
   );
 }
 
-const STYLE_PAIR = themedStyles({
-  screen: { flex: 1, paddingHorizontal: 16 },
+const STYLE_PAIR = themedStyles(
+  {
+    screen: { flex: 1 },
+    column: { flex: 1, width: "100%", paddingHorizontal: 16 },
+    // Computers: a readable column in the middle.
+    columnDesktop: { maxWidth: 720, alignSelf: "center", paddingHorizontal: 24 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+    headerTitle: { flex: 1, textAlign: "center", fontFamily: FONTS.semibold, fontSize: 18, color: "#191922" },
+
+    center: { alignItems: "center", justifyContent: "center", paddingVertical: 60, gap: 8 },
+    centerText: { fontFamily: FONTS.regular, fontSize: 12, color: "#79797E" },
+    errorText: { fontFamily: FONTS.regular, fontSize: 13, color: "#B42318", textAlign: "center" },
+    retryText: { marginTop: 4, fontFamily: FONTS.semibold, fontSize: 13, color: "#C5399A" },
+    emptyTitle: { marginTop: 8, fontFamily: FONTS.medium, fontSize: 14, color: "#5F606B" },
+
+    // Solid cards, so the text reads in light and dark mode.
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: "#FFFFFF",
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(36,40,60,0.08)",
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      shadowColor: "#000000",
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    rowUnread: { borderColor: "rgba(197,57,154,0.45)", backgroundColor: "#FDF3FA" },
+
+    avatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: "#EEE",
+      borderWidth: 2,
+      borderColor: "rgba(197,57,154,0.5)",
+    },
+    rowText: { flex: 1, minWidth: 0 },
+    body: { fontFamily: FONTS.regular, fontSize: 13.5, color: "#3A3A40", lineHeight: 20 },
+    handle: { fontFamily: FONTS.semibold, color: "#191922" },
+    time: { fontFamily: FONTS.regular, fontSize: 12, color: "#8A8A96", marginTop: 3 },
+
+    followBtn: {
+      minWidth: 92,
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 18,
+      backgroundColor: "#C5399A",
+    },
+    followingBtn: { backgroundColor: "#F1E4EE" },
+    followBtnDisabled: { opacity: 0.6 },
+    followText: { fontFamily: FONTS.semibold, fontSize: 13, color: "#FFFFFF" },
+    followingText: { fontFamily: FONTS.semibold, fontSize: 13, color: "#C5399A" },
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#191922",
+  // Dark mode
+  {
+    headerTitle: { color: "#F4F5FA" },
+    centerText: { color: "#B5BBCB" },
+    emptyTitle: { color: "#C9CEDA" },
+    row: { backgroundColor: "#262838", borderColor: "rgba(255,255,255,0.08)" },
+    rowUnread: { backgroundColor: "#33233A", borderColor: "rgba(197,57,154,0.55)" },
+    avatar: { backgroundColor: "#343746" },
+    body: { color: "#D9DCE6" },
+    handle: { color: "#FFFFFF" },
+    time: { color: "#9AA1B4" },
+    followingBtn: { backgroundColor: "#3A2A3C" },
+    followingText: { color: "#F29BD3" },
   },
-
-  center: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 8,
-  },
-
-  centerText: { fontSize: 12, color: "#79797E" },
-
-  errorText: { fontSize: 13, color: "#B42318", textAlign: "center" },
-
-  retryText: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#C5399A",
-  },
-
-  emptyTitle: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#5F606B",
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-
-  rowUnread: {
-    borderColor: "rgba(197,57,154,0.45)",
-    backgroundColor: "rgba(197,57,154,0.06)",
-  },
-
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#EEE",
-    borderWidth: 2,
-    borderColor: "rgba(197,57,154,0.5)",
-  },
-  rowText: { flex: 1 },
-  body: { fontSize: 13.5, color: "#3a3a40", lineHeight: 19 },
-  handle: { fontWeight: "700", color: "#191922" },
-  time: { fontSize: 12, color: "#9C9CAA", marginTop: 3 },
-
-  followBtn: {
-    minWidth: 78,
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: "#C5399A",
-  },
-  followingBtn: { backgroundColor: "#191922" },
-  followBtnDisabled: { opacity: 0.6 },
-  followText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
-  followingText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
-});
+);

@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
@@ -196,6 +197,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -203,6 +205,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -226,6 +229,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   dividerText: {
+    fontFamily: FONTS.regular,
     color: "#675656",
     fontSize: 13,
   },
@@ -248,11 +252,13 @@ const STYLE_PAIR = themedStyles({
   },
 
   signupText: {
+    fontFamily: FONTS.regular,
     color: "#5e5e5e",
     fontSize: 14,
   },
 
   signupLink: {
+    fontFamily: FONTS.bold,
     color: "#C5399A",
     fontSize: 14,
     fontWeight: "700",

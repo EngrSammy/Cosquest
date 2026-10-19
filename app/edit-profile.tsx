@@ -23,6 +23,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import DesktopEditProfile from "@/components/desktop/DesktopEditProfile";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import Category from "@/app/category";
+import ContactOptions from "@/app/contact-options";
 import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import { updateProfile } from "@/services/user";
@@ -67,6 +71,9 @@ export default function EditProfile() {
   const [username, setUsername] = useState(startUsername);
   const [bio, setBio] = useState(startBio);
   const [saving, setSaving] = useState(false);
+  // Computer: Category / Contact options open in the right pane.
+  const desktop = useIsDesktop();
+  const [pane, setPane] = useState<null | "category" | "contact">(null);
 
   // Fill the fields once the profile arrives (e.g. after a refresh).
   const loadedKey = `${startName}|${startUsername}|${startBio}`;
@@ -187,7 +194,7 @@ export default function EditProfile() {
     }
   };
 
-  return (
+  const editForm = (
     <View style={styles.screen}>
       {/* Figma background:
           linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
@@ -308,7 +315,7 @@ export default function EditProfile() {
               {/* Category: a plain row (no box), like the Figma */}
               <Pressable
                 style={styles.plainRow}
-                onPress={() => router.push("/category")}
+                onPress={() => (desktop ? setPane("category") : router.push("/category"))}
                 accessibilityRole="button">
                 <Text style={styles.rowTitle}>Category</Text>
 
@@ -324,7 +331,7 @@ export default function EditProfile() {
             {/* Contact options: milky box */}
             <Pressable
               style={[styles.field, styles.boxRow]}
-              onPress={() => router.push("/contact-options")}
+              onPress={() => (desktop ? setPane("contact") : router.push("/contact-options"))}
               accessibilityRole="button">
               <Text style={styles.rowTitle}>Contact options</Text>
 
@@ -339,6 +346,24 @@ export default function EditProfile() {
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
+  );
+
+  if (!desktop) return editForm;
+
+  return (
+    <DesktopEditProfile
+      form={editForm}
+      pane={pane === "category" ? <Category /> : pane === "contact" ? <ContactOptions /> : null}
+      onClosePane={() => setPane(null)}
+      preview={{
+        name: displayName.trim(),
+        username: username.trim(),
+        bio: bio.trim(),
+        category: category || undefined,
+        contact: contactSummary || undefined,
+        avatar: avatarSource as any,
+      }}
+    />
   );
 }
 

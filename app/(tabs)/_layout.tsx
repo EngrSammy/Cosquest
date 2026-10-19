@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
@@ -30,6 +31,8 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  // Computer: the left rail replaces the bottom tab bar.
+  const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Tabs
@@ -39,7 +42,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarLabelStyle: styles.label,
-        tabBarStyle: {
+        tabBarStyle: desktop ? { display: "none" } : {
           position: "absolute",
           marginHorizontal: 16,
           bottom: 24,

@@ -167,6 +167,7 @@ export default function MentionPicker({
   onClose,
   onDone,
   groupTitle,
+  docked = false,
 }: {
   visible: boolean;
   conversationId: string;
@@ -175,6 +176,8 @@ export default function MentionPicker({
   onDone: (people: MentionPerson[], everyone: boolean) => void;
   // Shown under the title (defaults to the chat's own title).
   groupTitle?: string;
+  // Computer (Figma D4): a column beside the chat instead of a full screen.
+  docked?: boolean;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const screenGradient = useInk().dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
@@ -319,8 +322,7 @@ export default function MentionPicker({
 
   const memberCount = total || members.length;
 
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+  const body = (
       <LinearGradient colors={screenGradient} style={styles.screen}>
         {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -427,6 +429,14 @@ export default function MentionPicker({
           </Pressable>
         </View>
       </LinearGradient>
+  );
+
+  // Computer: docked as a column beside the chat (Figma D4).
+  if (docked) return visible ? body : null;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      {body}
     </Modal>
   );
 }

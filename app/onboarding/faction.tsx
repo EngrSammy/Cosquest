@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { FactionDescriptionModal } from "@/components/faction/FactionDescriptionModal";
@@ -328,6 +329,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     color: "#191922",
@@ -336,6 +338,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",

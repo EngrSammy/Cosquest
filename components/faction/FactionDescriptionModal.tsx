@@ -23,6 +23,8 @@ import Animated, {
       withSpring,
 } from "react-native-reanimated";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { FONTS } from "@/constants/fonts";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 type Props = {
   visible: boolean;
@@ -145,6 +147,8 @@ export function FactionDescriptionModal({
   onContinue,
 }: Props) {
   const styles = useThemedStyles(STYLE_PAIR);
+  // Computers: a centred dialog instead of a bottom sheet.
+  const desktop = useIsDesktop();
   const ink = useInk();
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
@@ -191,7 +195,7 @@ export function FactionDescriptionModal({
       animationType="none"
       onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.root}>
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, desktop && styles.backdropDesktop]}>
           {/* Area above the popup */}
           <Pressable style={styles.backdropTouch} onPress={onClose} />
 
@@ -199,13 +203,14 @@ export function FactionDescriptionModal({
             <Animated.View
               style={[
                 styles.sheet,
+                desktop && styles.sheetDesktop,
                 {
                   backgroundColor: details.background,
                 },
                 animatedStyle,
               ]}>
               {/* Drag handle */}
-              <View style={styles.handle} />
+              {desktop ? null : <View style={styles.handle} />}
 
               {/* HEADER */}
               <View style={styles.header}>
@@ -344,6 +349,10 @@ const STYLE_PAIR = themedStyles({
     flex: 1,
   },
 
+  // Computers: centred dialog.
+  backdropDesktop: { justifyContent: "center", alignItems: "center", padding: 24 },
+  sheetDesktop: { maxWidth: 720, height: "86%", borderRadius: 28 },
+
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -392,7 +401,7 @@ const STYLE_PAIR = themedStyles({
     right: 0,
     textAlign: "center",
     fontSize: 15,
-    fontWeight: "800",
+    fontFamily: FONTS.extrabold,
     color: "#191922",
   },
 
@@ -435,7 +444,7 @@ const STYLE_PAIR = themedStyles({
 
   factionName: {
     fontSize: 25,
-    fontWeight: "900",
+    fontFamily: FONTS.extrabold,
     color: "#191922",
     marginTop: 9,
     letterSpacing: -0.4,
@@ -445,7 +454,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 11,
     color: "#66666A",
     marginTop: 1,
-    fontWeight: "500",
+    fontFamily: FONTS.medium,
   },
 
   statsRow: {
@@ -467,12 +476,13 @@ const STYLE_PAIR = themedStyles({
 
   statNumber: {
     fontSize: 16,
-    fontWeight: "900",
+    fontFamily: FONTS.extrabold,
     color: "#191922",
     marginTop: 1,
   },
 
   statLabel: {
+    fontFamily: FONTS.regular,
     fontSize: 8,
     color: "#85858A",
     marginTop: 1,
@@ -480,7 +490,7 @@ const STYLE_PAIR = themedStyles({
 
   sectionTitle: {
     fontSize: 11,
-    fontWeight: "900",
+    fontFamily: FONTS.extrabold,
     color: "#191922",
     marginTop: 15,
     marginBottom: 6,
@@ -490,7 +500,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 11,
     lineHeight: 17,
     color: "#55555A",
-    fontWeight: "400",
+    fontFamily: FONTS.regular,
   },
 
   perksHeading: {
@@ -527,7 +537,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 10,
     lineHeight: 14,
     color: "#55555A",
-    fontWeight: "500",
+    fontFamily: FONTS.medium,
   },
 
   bottomSpace: {
@@ -559,7 +569,7 @@ const STYLE_PAIR = themedStyles({
   joinButtonText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: FONTS.extrabold,
   },
 
   buttonPressed: {

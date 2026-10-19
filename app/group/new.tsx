@@ -33,6 +33,7 @@ import {
   Card,
   FieldLabel,
   PrimaryButton,
+  SecondaryButton,
   ScreenGradient,
   SheetHeader,
   TextField,
@@ -40,6 +41,8 @@ import {
 } from "@/components/chat/ui";
 import PeoplePicker, { personKey } from "@/components/groups/PeoplePicker";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import DesktopCreateGroup from "@/components/desktop/DesktopCreateGroup";
 import { FONTS } from "@/constants/fonts";
 import { setSparksMuted } from "@/services/chatPrefs";
 import {
@@ -279,6 +282,8 @@ export default function NewGroup() {
     }) || myUsername;
 
   const [step, setStep] = useState<Step>(1);
+  // Computer (Figma D5): all four steps side by side, one Create button.
+  const desktop = useIsDesktop();
 
   // Step 1-2
   const [kind, setKind] = useState<GroupKind>("faction");
@@ -482,6 +487,55 @@ export default function NewGroup() {
             : "Next · skip for now"
           : `Create ${name.trim() || "group"}`;
 
+
+  // ---------- computer (Figma D5) ----------
+  // Same checks as the phone's Next button, then the same create request.
+  const desktopCreate = () => {
+    if (kind === "faction" && !myFaction) {
+      Alert.alert("Faction group", "Join a faction first to create a faction group.");
+      return;
+    }
+    if (!name.trim()) {
+      Alert.alert("Group name", "Give your group a name.");
+      return;
+    }
+    create();
+  };
+
+  if (desktop && !created) {
+    return (
+      <View style={styles.screen}>
+        <ScreenGradient />
+        <DesktopCreateGroup
+          kinds={KINDS}
+          kind={kind}
+          onKind={changeKind}
+          photoUri={photo?.uri || null}
+          onPickPhoto={pickPhoto}
+          name={name}
+          onName={setName}
+          description={description}
+          onDescription={setDescription}
+          selected={selected}
+          onTogglePerson={togglePerson}
+          pickedCount={picked.length}
+          joinMode={joinMode}
+          onJoinMode={setJoinMode}
+          sizeLimit={sizeLimit}
+          onSizeLimit={setSizeLimit}
+          memberList={memberList}
+          onMemberList={setMemberList}
+          whoCanAdd={whoCanAdd}
+          onWhoCanAdd={setWhoCanAdd}
+          notify={notify}
+          onNotify={setNotify}
+          creating={creating}
+          onCreate={desktopCreate}
+          onBack={safeBack}
+        />
+      </View>
+    );
+  }
   return (
     <View style={styles.screen}>
       <ScreenGradient />
@@ -502,11 +556,11 @@ export default function NewGroup() {
           style={styles.flex}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: insets.bottom + 110 },
+            { paddingBottom: desktop && !created ? 24 : insets.bottom + 110 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {!created ? (
+          {!created && !desktop ? (
             <>
               {/* PROGRESS */}
               <Text style={styles.stepLabel}>STEP {step} OF 4</Text>
@@ -524,13 +578,37 @@ export default function NewGroup() {
             </>
           ) : null}
 
+          {desktop && !created ? (
+            <View style={styles.deskTabs}>
+              {[
+                { label: "1 · Type", done: true },
+                { label: "2 · Basics", done: !!name.trim() },
+                { label: "3 · Members", done: picked.length > 0 },
+                { label: "4 · Joining & privacy", done: false, on: true },
+              ].map((tab) => (
+                <View key={tab.label} style={[styles.deskTab, tab.on && styles.deskTabOn]}>
+                  <Text style={[styles.deskTabText, (tab.on || tab.done) && styles.deskTabTextOn]}>
+                    {tab.label}
+                    {tab.done ? " ✓" : ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <View style={desktop && !created ? styles.deskRow : undefined}>
           {/* ---------- STEP 1 (M20) ---------- */}
-          {!created && step === 1 ? (
-            <>
-              <Text style={styles.bigTitle}>A space for your people.</Text>
-              <Text style={styles.lead}>
-                Choose how your group comes together.
-              </Text>
+          {!created && (step === 1 || desktop) ? (
+            <View style={desktop ? styles.deskCol : undefined}>
+              {desktop ? (
+                <Text style={styles.deskHead}>Group type</Text>
+              ) : (
+                <>
+                  <Text style={styles.bigTitle}>A space for your people.</Text>
+                  <Text style={styles.lead}>
+                    Choose how your group comes together.
+                  </Text>
+                </>
+              )}
 
               {KINDS.map((item) => {
                 const on = kind === item.value;
@@ -569,12 +647,13 @@ export default function NewGroup() {
                 Groups you create are local. Regional groups such as SoCal
                 Ascendants are created by orchestrators.
               </InfoBox>
-            </>
+            </View>
           ) : null}
 
           {/* ---------- STEP 2 (M21) ---------- */}
-          {!created && step === 2 ? (
-            <>
+          {!created && (step === 2 || desktop) ? (
+            <View style={desktop ? styles.deskCol : undefined}>
+              {desktop ? <Text style={styles.deskHead}>Basics</Text> : null}
               <Pressable
                 onPress={pickPhoto}
                 style={styles.photoWrap}
@@ -629,12 +708,17 @@ export default function NewGroup() {
                 Your name and icon appear in chats and invitations. Admins can
                 update these later.
               </Text>
-            </>
+            </View>
           ) : null}
 
           {/* ---------- STEP 3 (M22) ---------- */}
-          {!created && step === 3 ? (
-            <>
+          {!created && (step === 3 || desktop) ? (
+            <View style={desktop ? styles.deskCol : undefined}>
+              {desktop ? (
+                <Text style={styles.deskHead}>
+                  Contacts{picked.length ? ` · ${picked.length} selected` : ""}
+                </Text>
+              ) : null}
               <InfoBox
                 title={
                   kind === "faction"
@@ -646,7 +730,7 @@ export default function NewGroup() {
                   : "Selected contacts are added to the group. They don't get admin powers."}
               </InfoBox>
 
-              <View style={styles.pickerWrap}>
+              <View style={[styles.pickerWrap, desktop && styles.pickerDesk]}>
                 <PeoplePicker
                   selected={selected}
                   onToggle={togglePerson}
@@ -675,12 +759,13 @@ export default function NewGroup() {
                   color={ink.text(UI.MUTED)}
                 />
               </Pressable>
-            </>
+            </View>
           ) : null}
 
           {/* ---------- STEP 4 (M23) ---------- */}
-          {!created && step === 4 ? (
-            <>
+          {!created && (step === 4 || desktop) ? (
+            <View style={desktop ? styles.deskCol : undefined}>
+              {desktop ? <Text style={styles.deskHead}>Joining & privacy</Text> : null}
               <Text style={[styles.section, styles.sectionFirst]}>
                 INVITE-LINK JOINING
               </Text>
@@ -766,8 +851,9 @@ export default function NewGroup() {
                   last
                 />
               </Card>
-            </>
+            </View>
           ) : null}
+          </View>
 
           {/* ---------- DONE (M24) ---------- */}
           {created ? (
@@ -872,7 +958,25 @@ export default function NewGroup() {
         </ScrollView>
 
         {/* FOOTER BUTTON */}
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <View
+          style={[
+            styles.footer,
+            desktop && !created && styles.footerDesk,
+            { paddingBottom: insets.bottom + 14 },
+          ]}>
+          {desktop && !created ? (
+            <>
+              <Text style={styles.deskSummary} numberOfLines={2}>
+                {kind === "faction"
+                  ? "Your faction's members join automatically"
+                  : "You'll be the owner"}
+                {picked.length
+                  ? `, plus ${picked.length} contact ${picked.length === 1 ? "invitation" : "invitations"}.`
+                  : "."}
+              </Text>
+              <SecondaryButton label="Back" onPress={safeBack} style={styles.deskBack} />
+            </>
+          ) : null}
           {created ? (
             <PrimaryButton
               label="Open group chat"
@@ -881,11 +985,11 @@ export default function NewGroup() {
             />
           ) : (
             <PrimaryButton
-              label={nextLabel}
-              onPress={step === 4 ? create : next}
-              disabled={step === 2 && !name.trim()}
+              label={desktop ? `Create ${name.trim() || "group"}` : nextLabel}
+              onPress={step === 4 || desktop ? create : next}
+              disabled={(desktop || step === 2) && !name.trim()}
               loading={creating}
-              style={styles.footerButton}
+              style={[styles.footerButton, desktop && !created && styles.deskCreate]}
             />
           )}
         </View>
@@ -906,6 +1010,33 @@ const STYLE_PAIR = themedStyles(
 
     headerWrap: { paddingHorizontal: 18, paddingBottom: 8 },
     content: { paddingHorizontal: 18, paddingTop: 8 },
+    // Computer: the four steps as columns (Figma D5).
+    deskRow: { flexDirection: "row", alignItems: "flex-start", gap: 18 },
+    deskCol: { flex: 1, minWidth: 0 },
+    deskHead: { marginBottom: 12, fontFamily: FONTS.semibold, fontSize: 17, color: UI.INK },
+    deskTabs: { flexDirection: "row", gap: 14, marginTop: 4, marginBottom: 18 },
+    deskTab: {
+      flex: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderRadius: 12,
+      backgroundColor: "rgba(255,255,255,0.85)",
+    },
+    deskTabOn: { backgroundColor: "#F3DDED" },
+    deskTabText: { fontFamily: FONTS.medium, fontSize: 13, color: UI.MUTED },
+    deskTabTextOn: { color: UI.PINK },
+    pickerDesk: { maxHeight: 520, overflow: "hidden" },
+    footerDesk: {
+      position: "relative",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingHorizontal: 18,
+      paddingTop: 12,
+    },
+    deskSummary: { flex: 1, fontFamily: FONTS.regular, fontSize: 13, color: UI.MUTED },
+    deskBack: { marginTop: 0, width: 200 },
+    deskCreate: { width: 220 },
 
     // PROGRESS
     stepLabel: {
@@ -1180,5 +1311,11 @@ const STYLE_PAIR = themedStyles(
     memberAvatar: {},
     progressBar: { backgroundColor: "#343746" },
     progressOn: { backgroundColor: UI.PINK },
+    deskHead: { color: "#F4F5FA" },
+    deskTab: { backgroundColor: "#252837" },
+    deskTabOn: { backgroundColor: "#40283B" },
+    deskTabText: { color: "#B5BBCB" },
+    deskTabTextOn: { color: "#F0A6D7" },
+    deskSummary: { color: "#B5BBCB" },
   },
 );

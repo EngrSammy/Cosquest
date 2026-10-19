@@ -47,12 +47,17 @@ export type CallMember = {
   invitedAt?: string | null;
   joinedAt?: string | null;
   leftAt?: string | null;
+  // In a private call from this call right now (Emmanuel's backend).
+  away?: boolean;
 };
 
 export type Call = {
   id: string;
   conversationId: string;
-  conversationType?: "dm";
+  conversationType?: "dm" | "community" | "faction" | "group";
+  // Private call on top: the call or voice chat it was started from.
+  privateOf?: string | null;
+  privateOfType?: "call" | "voice" | null;
   type: CallType;
   status: CallStatus;
   caller: CallPerson;

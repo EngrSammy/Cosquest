@@ -7,11 +7,15 @@
 // menu (admins can delete any message). Opened with ?userId= to preselect.
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import DesktopGroupWorkspace, { GROUP_WORKSPACES } from "@/components/desktop/DesktopGroupWorkspace";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import ManageSparks from "@/app/group/sparks/[id]";
 import {
   A,
+  AdminEmbedded,
   AdminScreen,
   Card,
   Chip,
@@ -65,6 +69,9 @@ const MUTE_WORDS: Record<MemberMuteDuration, string> = {
 };
 
 export default function Moderation() {
+  // Computer (Figma D7): moderation | Sparks side by side.
+  const desktop = useIsDesktop();
+  const embedded = useContext(AdminEmbedded);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const { id, userId, messageId } = useLocalSearchParams<{ id: string; userId?: string; messageId?: string }>();
@@ -240,6 +247,16 @@ export default function Moderation() {
     "3600": "hour",
   };
   const slowWords = SLOW_WORDS[slowValue] || slowLabel;
+
+  if (GROUP_WORKSPACES && desktop && !embedded) {
+    return (
+      <DesktopGroupWorkspace
+        title="Moderation & Sparks"
+        chip={group ? `Admin view · ${group.name}` : undefined}
+        columns={[<Moderation key="moderation" />, <ManageSparks key="sparks" />]}
+      />
+    );
+  }
 
   return (
     <AdminScreen title="Moderation" subtitle={group?.name} loading={loading}>

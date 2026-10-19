@@ -15,12 +15,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { Alert, Text, View } from "react-native";
 
 import { UI } from "@/components/chat/ui";
-import { AdminScreen, Card, Section, SettingsRow } from "@/components/groups/AdminUi";
+import { AdminEmbedded, AdminScreen, InlineSection, Card, Section, SettingsRow } from "@/components/groups/AdminUi";
+import DesktopGroupWorkspace, { GROUP_WORKSPACES } from "@/components/desktop/DesktopGroupWorkspace";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import GroupMembers from "@/app/group/members/[id]";
+import JoinRequests from "@/app/group/requests/[id]";
 import ExpertisePicker from "@/components/groups/ExpertisePicker";
+import JoiningPrivacy from "@/app/group/privacy/[id]";
+import Moderation from "@/app/group/moderation/[id]";
+import ManageSparks from "@/app/group/sparks/[id]";
+import Administrators from "@/app/group/admins/[id]";
+import SettingsSections from "@/components/groups/SettingsSections";
 import { PinkSwitch } from "@/components/ui/PinkSwitch";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
@@ -49,7 +58,37 @@ function joiningHint(group: Group) {
   return `${joining} · limit ${group.sizeLimit} · ${list}`;
 }
 
+const SETTINGS_IN_COLUMNS = false;
+
 export default function GroupSettings() {
+  // Tapping a section opens it right here; tapping again closes it.
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const toggleSection = (key: string) => setOpenSection((current) => (current === key ? null : key));
+  const SECTION_TITLES: Record<string, string> = {
+    privacy: "Joining & privacy",
+    members: "Members & administrators",
+    requests: "Join requests",
+    moderation: "Moderation & slow mode",
+    sparks: "Manage Sparks",
+    admins: "Administrators",
+  };
+  const sectionBody = (key: string | null) =>
+    key === "privacy" ? (
+      <JoiningPrivacy />
+    ) : key === "members" ? (
+      <GroupMembers />
+    ) : key === "requests" ? (
+      <JoinRequests />
+    ) : key === "moderation" ? (
+      <Moderation />
+    ) : key === "sparks" ? (
+      <ManageSparks />
+    ) : key === "admins" ? (
+      <Administrators />
+    ) : null;
+  // Computer (Figma D6): settings | members | join requests side by side.
+  const desktop = useIsDesktop();
+  const embedded = useContext(AdminEmbedded);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const dispatch = useAppDispatch();
@@ -210,7 +249,23 @@ export default function GroupSettings() {
   const admin = isAdmin;
   const roleLabel = group?.myRole === "owner" ? "Owner" : group?.myRole === "admin" ? "Admin" : "Member";
 
-  return (
+  // Its own list | section panes replace the side-by-side columns here.
+  if (SETTINGS_IN_COLUMNS && desktop && !embedded) {
+    return (
+      <DesktopGroupWorkspace
+        title={group?.name || "Group settings"}
+        subtitle="Settings / Members · faction rank is not chat authority"
+        chip={group ? `${myName} · ${roleLabel}` : undefined}
+        columns={[
+          <GroupSettings key="settings" />,
+          ...(group?.canSeeMembers !== false || admin ? [<GroupMembers key="members" />] : []),
+          ...(admin ? [<JoinRequests key="requests" />] : []),
+        ]}
+      />
+    );
+  }
+
+  const settingsList = (
     <AdminScreen title="Group settings" subtitle={group?.name} loading={loading && !group}>
       {group ? (
         <>
@@ -245,9 +300,10 @@ export default function GroupSettings() {
                     title="Joining & privacy"
                     hint={joiningHint(group)}
                     icon="chevron-forward"
-                    onPress={() => router.push({ pathname: "/group/privacy/[id]", params: { id: groupId } })}
+                    onPress={() => toggleSection("privacy")}
                     last
-                  />
+                  
+                />
                 </Card>
               </>
             ) : null}
@@ -292,21 +348,24 @@ export default function GroupSettings() {
                     title="Members & administrators"
                     hint={`${plural(group.memberCount, "member")}${adminCount !== null ? ` · ${plural(adminCount, "administrator")}` : ""}`}
                     icon="chevron-forward"
-                    onPress={() => router.push({ pathname: "/group/members/[id]", params: { id: groupId } })}
-                  />
+                    onPress={() => toggleSection("members")}
+                  
+                />
                   <SettingsRow
                     title="Join requests"
                     hint={`${group.pendingRequestCount} awaiting review`}
                     icon="chevron-forward"
-                    onPress={() => router.push({ pathname: "/group/requests/[id]", params: { id: groupId } })}
-                  />
+                    onPress={() => toggleSection("requests")}
+                  
+                />
                   <SettingsRow
                     title="Moderation & slow mode"
                     hint="Manage members and posting frequency"
                     icon="chevron-forward"
-                    onPress={() => router.push({ pathname: "/group/moderation/[id]", params: { id: groupId } })}
+                    onPress={() => toggleSection("moderation")}
                     last
-                  />
+                  
+                />
                 </Card>
               </>
             ) : group.canSeeMembers !== false ? (
@@ -317,9 +376,10 @@ export default function GroupSettings() {
                     title="Members"
                     hint={plural(group.memberCount, "member")}
                     icon="chevron-forward"
-                    onPress={() => router.push({ pathname: "/group/members/[id]", params: { id: groupId } })}
+                    onPress={() => toggleSection("members")}
                     last
-                  />
+                  
+                />
                 </Card>
               </>
             ) : null}
@@ -332,7 +392,8 @@ export default function GroupSettings() {
                   title="Manage Sparks"
                   hint="Pin, delete or merge Sparks"
                   icon="chevron-forward"
-                  onPress={() => router.push({ pathname: "/group/sparks/[id]", params: { id: groupId } })}
+                  onPress={() => toggleSection("sparks")}
+                
                 />
               ) : null}
               <SettingsRow
@@ -352,7 +413,8 @@ export default function GroupSettings() {
                   title="Administrators"
                   hint="Promote a member to admin"
                   icon="chevron-forward"
-                  onPress={() => router.push({ pathname: "/group/admins/[id]", params: { id: groupId } })}
+                  onPress={() => toggleSection("admins")}
+                
                 />
               ) : null}
               <SettingsRow
@@ -377,6 +439,16 @@ export default function GroupSettings() {
         onSaved={setExpertise}
       />
     </AdminScreen>
+  );
+
+  return (
+    <SettingsSections
+      split={desktop && !embedded}
+      section={sectionBody(openSection)}
+      sectionTitle={openSection ? SECTION_TITLES[openSection] : undefined}
+      onClose={() => setOpenSection(null)}>
+      {settingsList}
+    </SettingsSections>
   );
 }
 

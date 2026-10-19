@@ -47,7 +47,7 @@ export function MentionText({ text, mine }: { text: string; mine: boolean }) {
 
 const STYLE_PAIR = themedStyles({
   mention: {
-    fontFamily: FONTS.semibold,
+    fontFamily: FONTS.medium,
     color: "#C34D9C",
   },
 });

@@ -40,6 +40,7 @@ import { CommentItem } from "./CommentItem";
 
 import { getSocket, joinPost, leavePost } from "@/services/socket";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 type LikeState = {
   liked: boolean;
@@ -86,6 +87,7 @@ function RecordingIndicator({
   cancelArmed: boolean;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const desktop = useIsDesktop();
   const ink = useInk();
   const [blink] = useState(() => new Animated.Value(1));
 
@@ -186,6 +188,7 @@ export function CommentsModal({
   onCountChange: (count: number) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const desktop = useIsDesktop();
   const ink = useInk();
   const dispatch = useAppDispatch();
 
@@ -1269,15 +1272,15 @@ export function CommentsModal({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={desktop ? "fade" : "slide"}
       onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={styles.root}
+        style={[styles.root, desktop && styles.rootDesk]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <Pressable style={styles.overlay} onPress={onClose} />
 
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <View style={[styles.sheet, desktop && styles.sheetDesk]}>
+          {!desktop ? <View style={styles.handle} /> : null}
 
           {/* HEADER */}
 
@@ -1498,6 +1501,10 @@ const STYLE_PAIR = themedStyles({
     flex: 1,
     justifyContent: "flex-end",
   },
+
+  // Computer: a centred dialog instead of a bottom sheet.
+  rootDesk: { justifyContent: "center", alignItems: "center", padding: 24 },
+  sheetDesk: { width: "100%", maxWidth: 640, height: "82%", borderRadius: 16 },
 
   overlay: {
     ...StyleSheet.absoluteFill,

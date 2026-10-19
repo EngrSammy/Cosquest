@@ -12,6 +12,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
+import { useContext } from "react";
+
+import { AdminEmbedded } from "@/components/groups/AdminUi";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -55,9 +59,13 @@ export function GroupScreen({
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  // Inside a desktop workspace column (Figma D6): no background, no back arrow.
+  const embedded = useContext(AdminEmbedded);
+  const wide = useIsDesktop();
 
   return (
     <View style={styles.screen}>
+      {!embedded ? (
       <LinearGradient
         colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
@@ -65,15 +73,16 @@ export function GroupScreen({
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      ) : null}
 
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, wide && { maxWidth: 1180, paddingHorizontal: 32 }, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={onBack}
           hitSlop={10}
           style={styles.headerSide}
           accessibilityRole="button"
           accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={24} color={ink.text(INK)} />
+          {!embedded ? <Ionicons name="arrow-back" size={24} color={ink.text(INK)} /> : null}
         </Pressable>
 
         <Text style={styles.headerTitle} numberOfLines={1}>

@@ -7,11 +7,11 @@
 // Faction groups: everyone in the faction is in automatically, so the
 // joining choice is replaced by a note. Light and dark via AdminUi.
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Alert, Text } from "react-native";
 
 import { UI } from "@/components/chat/ui";
-import { AdminScreen, Card, Chip, Note, Pills, PrimaryButton, Section } from "@/components/groups/AdminUi";
+import { AdminEmbedded, AdminScreen, Card, Chip, Note, Pills, PrimaryButton, Section } from "@/components/groups/AdminUi";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import {
@@ -37,6 +37,7 @@ const AUDIENCE_OPTIONS: { value: GroupAudience; label: string }[] = [
 const SIZE_CHOICES = [25, 50, 100, 250, 500];
 
 export default function JoiningPrivacy() {
+  const inline = !!useContext(AdminEmbedded);
   const styles = useThemedStyles(STYLE_PAIR);
   const { id } = useLocalSearchParams<{ id: string }>();
   const groupId = Array.isArray(id) ? id[0] : id;
@@ -101,7 +102,7 @@ export default function JoiningPrivacy() {
         token,
       );
       setGroup(updated);
-      safeBack();
+      if (!inline) safeBack();
     } catch (error) {
       Alert.alert("Joining & privacy", error instanceof Error ? error.message : "Couldn't save the changes.");
     } finally {

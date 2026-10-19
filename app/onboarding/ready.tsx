@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { useOnboarding } from "@/context/OnboardingContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -361,6 +362,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   small: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     color: "#191922",
@@ -368,6 +370,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   big: {
+    fontFamily: FONTS.bold,
     fontSize: 44,
     fontWeight: "900",
     color: "#191922",

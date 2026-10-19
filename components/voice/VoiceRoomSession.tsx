@@ -16,10 +16,18 @@ import {
   useTracks,
 } from "@livekit/react-native";
 import { RoomOptions, Track } from "livekit-client";
-import { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
+import { CallBackground } from "@/components/calls/CallVisuals";
+import SparksCallNotes from "@/components/calls/SparksCallNotes";
+import SparksCallPanel from "@/components/calls/SparksCallPanel";
+import { useSparksBoot } from "@/hooks/useSparks";
+import type { Call } from "@/services/calls";
+import { useSparksCallNotes } from "@/services/sparksCallNotes";
 import { endVoiceSession, setVoiceMinimized, updateVoiceRoom, type VoiceSession } from "@/components/voice/voiceUi";
 import { leaveVoiceRoom, pingVoiceRoom, VOICE_PING_MS } from "@/services/voiceRooms";
 import { useAppSelector } from "@/store/hooks";
@@ -126,6 +134,62 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
 
   const [focusOn, setFocusOn] = useState(false);
   const [startedAt] = useState(nowMs);
+  const insets = useSafeAreaInsets();
+
+  // ---------- Sparks (like group calls) ----------
+  // Sparks may not be running yet when a voice chat is joined from the card.
+  useSparksBoot();
+
+  // Sparks' screens read names from a call; the voice chat's members are it.
+  const callLike = useMemo(
+    () =>
+      ({
+        id: session.voiceRoom.id,
+        conversationId: session.voiceRoom.conversationId,
+        type: "audio",
+        status: "accepted",
+        caller: session.voiceRoom.startedBy,
+        isGroup: true,
+        members: session.voiceRoom.members.map((member) => ({ user: member.user, status: "joined", invitedBy: null })),
+        maxParticipants: session.voiceRoom.maxMembers,
+        maxInvitesPerRequest: 0,
+      }) as unknown as Call,
+    [session.voiceRoom],
+  );
+
+  // This user's speech becomes text on their own phone; Sparks names the
+  // topics by itself, nobody has to press anything.
+  const notes = useSparksCallNotes({
+    callId: session.voiceRoom.id,
+    chatId: session.voiceRoom.conversationId,
+    startedAt: session.voiceRoom.startedAt || new Date(startedAt).toISOString(),
+    active: true,
+    micOn: isMicrophoneEnabled,
+  });
+
+  // PRIVATE CALL ON TOP: quieter here (25%) and your mic off, while you're
+  // in a private call from this voice chat.
+  const inPrivate = useInPrivateFrom(session.voiceRoom.id);
+  const micBeforePrivate = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (inPrivate) {
+      micBeforePrivate.current = isMicrophoneEnabled;
+      localParticipant.setMicrophoneEnabled(false);
+    } else if (micBeforePrivate.current !== null) {
+      localParticipant.setMicrophoneEnabled(micBeforePrivate.current);
+      micBeforePrivate.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPrivate]);
+  useEffect(() => {
+    remoteParticipants.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
+  }, [inPrivate, remoteParticipants]);
+
+  // Two pages: the voice chat, and its Sparks (swipe across, or "Sparks").
+  const { width: pageWidth } = useWindowDimensions();
+  const pages = useRef<ScrollView>(null);
+  const openSparks = useCallback(() => pages.current?.scrollTo({ x: pageWidth, animated: true }), [pageWidth]);
+  const backToCall = useCallback(() => pages.current?.scrollTo({ x: 0, animated: true }), []);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -168,6 +232,9 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       micOff: isMe ? !isMicrophoneEnabled : remote ? !remote.isMicrophoneEnabled : false,
       isMe,
       rankLevel: (user as any)?.rank?.level ?? null,
+      rankName: (user as any)?.rank?.name ?? null,
+      username: user?.username || null,
+      away: !!session.voiceRoom.members.find((member) => member.user.id === id)?.away,
       hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
     };
   });
@@ -193,6 +260,15 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
   };
 
   return (
+    <ScrollView
+      ref={pages}
+      horizontal
+      pagingEnabled
+      bounces={false}
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.root}>
+    <View style={{ width: pageWidth }}>
     <OrbitCallScreen
       title={session.title}
       subtitle={`Voice chat · ${people.length} on call · ${formatDuration(elapsed)}`}
@@ -209,10 +285,37 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       onLeave={onLeave}
       onMinimize={() => setVoiceMinimized(true)}
       onPeople={() => Alert.alert("Voice chat", "Everyone in this chat can join from the Call live card.")}
+      onSparks={openSparks}
+      onPrivateCall={(person) => startPrivate({ kind: "voice", id: session.voiceRoom.id }, person.id)}
+      extra={
+        <SparksCallNotes
+          notes={notes}
+          call={callLike}
+          myUserId={meId}
+          style={styles.notes}
+          onOpenSparks={openSparks}
+        />
+      }
     />
+    </View>
+    <View style={{ width: pageWidth }}>
+      <CallBackground>
+        <SparksCallPanel
+          notes={notes}
+          call={callLike}
+          myUserId={meId}
+          topInset={insets.top}
+          bottomInset={insets.bottom}
+          onBack={backToCall}
+        />
+      </CallBackground>
+    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  // Sparks pill and newest line, under the header.
+  notes: { marginHorizontal: 16, marginBottom: 6 },
 });

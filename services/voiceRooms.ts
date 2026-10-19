@@ -21,12 +21,13 @@ export type VoicePerson = {
 export type VoiceRoom = {
   id: string;
   conversationId: string;
-  conversationType: "community" | "faction";
+  conversationType: "community" | "faction" | "group";
   factionKey: string | null;
   active: boolean;
   startedBy: VoicePerson;
   startedAt?: string;
-  members: { user: VoicePerson; joinedAt?: string }[];
+  // away: in a private call from this voice chat right now.
+  members: { user: VoicePerson; joinedAt?: string; away?: boolean }[];
   memberCount: number;
   maxMembers: number;
 };
@@ -41,7 +42,8 @@ export type VoiceJoinInfo = {
 export const VOICE_PING_MS = 30_000;
 
 export function voiceChatAllowed(type?: string | null) {
-  return type === "community" || type === "faction";
+  // Community, faction and the groups people create.
+  return type === "community" || type === "faction" || type === "group";
 }
 
 function person(raw: any): VoicePerson {

@@ -321,7 +321,12 @@ function ThoughtItem({ post }: { post: Post }) {
   );
 }
 
+import { useIsDesktop } from "@/hooks/useDesktop";
+import DesktopProfile from "@/components/desktop/DesktopProfile";
+
 export default function Profile() {
+  // Computer: your card | your posts, side by side.
+  const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -568,17 +573,70 @@ export default function Profile() {
 
   const profileError = userError || postsError;
 
+  // ---------- computer ----------
+  if (desktop) {
+    return (
+      <DesktopProfile
+        displayName={displayName}
+        username={username}
+        category={category || undefined}
+        about={about || undefined}
+        photoUri={cloudinaryPhoto}
+        avatar={selectedAvatar}
+        followers={followersTotal || 0}
+        following={followingTotal || 0}
+        postCount={postCount}
+        quests={quests}
+        wins={wins}
+        points={points}
+        rankName={(myRank as any)?.name || null}
+        factionName={selectedFaction ? humanize(selectedFaction.id) : null}
+        factionLogo={selectedFaction?.label || null}
+        factionCard={
+          selectedFaction ? (
+            <FactionProfileCard
+              faction={selectedFaction}
+              memberCount={factionMembersState?.pagination.total}
+              memberCountLoading={factionMembersLoading && !factionMembersState}
+              previewMembers={factionMembersState?.users || []}
+              rankInfo={factionRankInfo}
+            />
+          ) : null
+        }
+        tab={tab}
+        onTab={setTab}
+        imagePosts={imagePosts as any}
+        reels={reelPosts.map((post) => <ReelItem key={post.id} post={post} />)}
+        thoughts={thoughtPosts.map((post) => <ThoughtItem key={post.id} post={post} />)}
+        loading={profileLoading}
+        error={profileError || null}
+        onRetry={() => {
+          if (email) dispatch(fetchCurrentUser(email));
+          if (token) dispatch(fetchPosts(token));
+        }}
+        onNewPost={() => router.push("/community")}
+        onEdit={() => router.push("/edit-profile")}
+        onShare={handleShareProfile}
+        onFollowers={() => router.push("/followers")}
+        onFollowing={() => router.push("/following")}
+        onOpenPost={(id) => router.push({ pathname: "/post/[id]", params: { id } })}
+      />
+    );
+  }
+
   return (
     <AppBackground variant="blueGradient">
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
+          desktop && styles.scrollWide,
           {
             paddingTop: insets.top + 8,
           },
         ]}
         showsVerticalScrollIndicator={false}>
         {/* HEADER (Figma: "+" left, pink menu right, no title) */}
+        {!desktop ? (
         <View style={styles.header}>
           <Pressable
             onPress={() => router.push("/community")}
@@ -596,6 +654,7 @@ export default function Profile() {
             <Ionicons name="menu" size={26} color={ink.text(PINK)} />
           </Pressable>
         </View>
+        ) : null}
 
         {profileLoading ? (
           <View style={styles.loading}>
@@ -624,6 +683,305 @@ export default function Profile() {
           </View>
         ) : null}
 
+        {/* Computer: profile header card */}
+        {desktop ? (
+          <>
+            <View
+              style={[
+                styles.deskHero,
+                { backgroundColor: ink.dark ? "#1D1F2C" : "rgba(255,255,255,0.78)" },
+              ]}>
+              <View style={styles.deskPhoto}>
+        {/* PHOTO (Figma): a square photo, with a big pink CIRCLE fading in
+            at the bottom, and the avatar sitting in that circle. */}
+        <View style={styles.heroWrap}>
+          <View style={styles.hero}>
+            {cloudinaryPhoto ? (
+              <Image
+                source={{ uri: cloudinaryPhoto }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.heroEmpty}>
+                <Ionicons
+                  name="person-outline"
+                  size={56}
+                  color="rgba(255,255,255,0.7)"
+                />
+              </View>
+            )}
+
+            <View style={styles.heroCircle} pointerEvents="none">
+              {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 47.87%, #C34D9C 100%) */}
+              <LinearGradient
+                colors={["rgba(0,0,0,0)", PINK]}
+                locations={[0.4787, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+          </View>
+
+          {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
+              shadow, so it looks like it's coming out of the photo. It sits
+              outside the photo's clipping, so the shadow isn't cut off. */}
+          <View style={styles.avatarShadow} pointerEvents="none">
+            <LinearGradient
+              colors={["#E28BC8", PINK]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.avatarRing}>
+              <Image
+                source={selectedAvatar}
+                style={styles.avatarImg}
+                contentFit="cover"
+              />
+            </LinearGradient>
+          </View>
+        </View>
+
+              </View>
+              <View style={styles.deskInfo}>
+        {/* NAME + "@username • Category" */}
+        <Text style={styles.name}>{displayName}</Text>
+
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
+
+        {/* Followers (left) · Following (middle) · Posts (right) */}
+        <View style={styles.statsRow}>
+          <Stat
+            value={compactNumber(followersTotal || 0)}
+            label="Followers"
+            align="flex-start"
+            onPress={() => router.push("/followers")}
+          />
+
+          <Stat
+            value={compactNumber(followingTotal || 0)}
+            label="Following"
+            onPress={() => router.push("/following")}
+          />
+
+          <Stat
+            value={compactNumber(postCount)}
+            label="Posts"
+            align="flex-end"
+          />
+        </View>
+
+        {/* Slim pink pills */}
+        <View style={styles.gameStatsRow}>
+          <GameStat value={quests} label="Quest" />
+          <GameStat value={wins} label="Wins" />
+          <GameStat value={points} label="Points" />
+        </View>
+
+                <View style={styles.deskActions}>
+                  <View style={styles.deskEditShare}>
+        {/* Slim Edit / Share pills */}
+        <View style={styles.actions}>
+          <View style={{ flex: 1 }}>
+            <ActionButton
+              label="Edit Profile"
+              onPress={() => router.push("/edit-profile")}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <ActionButton label="Share Profile" onPress={handleShareProfile} />
+          </View>
+        </View>
+
+                  </View>
+                  <Pressable
+                    style={styles.deskNewPost}
+                    onPress={() => router.push("/community")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create a post">
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                    <Text style={styles.deskNewPostText}>New post</Text>
+                  </Pressable>
+                </View>
+        {/* NEW / FACTION highlights */}
+        <View style={styles.highlights}>
+          <View style={styles.highlight}>
+            <View style={styles.highlightNew}>
+              <Ionicons name="add" size={24} color={ink.text("#9899A4")} />
+            </View>
+
+            <Text style={styles.highlightLabel}>New</Text>
+          </View>
+
+          {selectedFaction ? (
+            <View style={styles.highlight}>
+              <View style={styles.highlightRing}>
+                <Image
+                  source={selectedFaction.image}
+                  style={styles.highlightImg}
+                  contentFit="contain"
+                />
+              </View>
+
+              <Text style={styles.highlightLabel}>Faction</Text>
+            </View>
+          ) : null}
+        </View>
+
+              </View>
+            </View>
+
+            {/* About + Faction | Posts / Reels / Thoughts */}
+            <View style={styles.wideRow}>
+              <View style={styles.wideLeft}>
+        {/* ABOUT */}
+        {about.trim() ? (
+          <>
+            <Text style={styles.sectionLabel}>About</Text>
+
+            <Text style={styles.about}>{about}</Text>
+          </>
+        ) : null}
+
+        {/* FACTION */}
+        {selectedFaction ? (
+          <View style={styles.factionSection}>
+            <Text style={styles.sectionLabel}>Faction</Text>
+
+            <FactionProfileCard
+              faction={selectedFaction}
+              memberCount={factionMembersState?.pagination.total}
+              memberCountLoading={factionMembersLoading && !factionMembersState}
+              previewMembers={factionMembersState?.users || []}
+              rankInfo={factionRankInfo}
+            />
+          </View>
+        ) : null}
+
+              </View>
+              <View style={styles.wideRight}>
+        {/* TABS (the open one is dark and bold) */}
+        <View style={styles.tabs}>
+          {(["Posts", "Reels", "Thoughts"] as Tab[]).map((key) => {
+            const active = tab === key;
+
+            return (
+              <Pressable
+                key={key}
+                style={styles.tab}
+                onPress={() => setTab(key)}>
+                <Ionicons
+                  name={
+                    key === "Posts"
+                      ? "grid-outline"
+                      : key === "Reels"
+                        ? "play-circle-outline"
+                        : "person-outline"
+                  }
+                  size={18}
+                  color={ink.text(active ? "#191922" : "#9C9CAA")}
+                />
+
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                  {key}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* POSTS */}
+        {tab === "Posts" ? (
+          imagePosts.length > 0 ? (
+            <View style={styles.grid}>
+              {imagePosts.map((post) => (
+                <Pressable
+                  key={post.id}
+                  style={styles.postThumbWrap}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/post/[id]",
+                      params: {
+                        id: post.id,
+                      },
+                    });
+                  }}>
+                  <Image
+                    source={{
+                      uri: post.image!,
+                    }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons name="images-outline" size={36} color={ink.text("#9C9CAA")} />
+
+              <Text style={styles.emptyTitle}>No posts yet</Text>
+
+              <Text style={styles.empty}>
+                Your uploaded image posts will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
+
+        {/* REELS */}
+        {tab === "Reels" ? (
+          reelPosts.length > 0 ? (
+            <View style={styles.reelsList}>
+              {reelPosts.map((post) => (
+                <ReelItem key={post.id} post={post} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons name="videocam-outline" size={36} color={ink.text("#9C9CAA")} />
+
+              <Text style={styles.emptyTitle}>No reels yet</Text>
+
+              <Text style={styles.empty}>
+                Your uploaded videos will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
+
+        {/* THOUGHTS */}
+        {tab === "Thoughts" ? (
+          thoughtPosts.length > 0 ? (
+            <View style={styles.thoughtsList}>
+              {thoughtPosts.map((post) => (
+                <ThoughtItem key={post.id} post={post} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContent}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={36}
+                color={ink.text("#9C9CAA")}
+              />
+
+              <Text style={styles.emptyTitle}>No thoughts yet</Text>
+
+              <Text style={styles.empty}>
+                Your text-only thoughts will appear here.
+              </Text>
+            </View>
+          )
+        ) : null}
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
         {/* PHOTO (Figma): a square photo, with a big pink CIRCLE fading in
             at the bottom, and the avatar sitting in that circle. */}
         <View style={styles.heroWrap}>
@@ -887,6 +1245,8 @@ export default function Profile() {
             </View>
           )
         ) : null}
+          </>
+        )}
       </ScrollView>
     </AppBackground>
   );
@@ -917,6 +1277,34 @@ const MILKY = {
 } as const;
 
 const STYLE_PAIR = themedStyles({
+  // Computer: wider page, two columns.
+  scrollWide: { maxWidth: 1180, paddingHorizontal: 32 },
+  wideRow: { flexDirection: "row", alignItems: "flex-start", gap: 40 },
+  wideLeft: { width: 380 },
+  deskHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 40,
+    padding: 24,
+    marginBottom: 26,
+    borderRadius: 28,
+  },
+  deskPhoto: { width: 330, alignItems: "center" },
+  deskInfo: { flex: 1, minWidth: 0 },
+  deskActions: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 },
+  deskEditShare: { flex: 1, minWidth: 0 },
+  deskNewPost: {
+    height: 38,
+    paddingHorizontal: 18,
+    borderRadius: 19,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: PINK,
+  },
+  deskNewPostText: { fontFamily: FONTS.semibold, fontSize: 13.5, color: "#FFFFFF" },
+  wideRight: { flex: 1, minWidth: 0, paddingTop: 12 },
+
   scroll: {
     paddingHorizontal: H_PAD,
     paddingBottom: 140,

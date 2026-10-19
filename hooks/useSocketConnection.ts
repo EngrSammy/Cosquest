@@ -1,3 +1,4 @@
+import { applyPrivateUpdate, receivePrivateIncoming } from "@/components/calls/privateCall";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
@@ -219,13 +220,22 @@ export function useSocketConnection() {
     // Both are sent by callController.js with emitToUsers, to the
     // user:<id> room this socket joins on connect.
 
-    const handleCallIncoming = (payload: { call: any }) => {
+    const handleCallIncoming = (payload: { call: any; privateOf?: string }) => {
+      // A private call: its own small card, the main call keeps going.
+      if (payload?.call && (payload.call.privateOf || payload.privateOf)) {
+        receivePrivateIncoming(normalizeCall({ ...payload.call, privateOf: payload.call.privateOf || payload.privateOf }));
+        return;
+      }
       if (payload?.call) {
         dispatch(socketCallIncoming({ call: normalizeCall(payload.call) }));
       }
     };
 
     const handleCallUpdated = (payload: { call: any }) => {
+      if (payload?.call?.privateOf) {
+        applyPrivateUpdate(normalizeCall(payload.call));
+        return;
+      }
       if (payload?.call) {
         dispatch(socketCallUpdated({ call: normalizeCall(payload.call) }));
       }

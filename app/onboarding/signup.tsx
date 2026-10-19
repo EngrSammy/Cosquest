@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
@@ -164,6 +165,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -185,11 +187,13 @@ const STYLE_PAIR = themedStyles({
   },
 
   signinText: {
+    fontFamily: FONTS.regular,
     color: "#5e5e5e",
     fontSize: 14,
   },
 
   signinLink: {
+    fontFamily: FONTS.bold,
     color: "#C5399A",
     fontSize: 14,
     fontWeight: "700",

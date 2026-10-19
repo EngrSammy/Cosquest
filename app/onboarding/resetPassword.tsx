@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { useAppDispatch } from "@/store/hooks";
@@ -179,12 +180,14 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 110,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -202,16 +205,19 @@ const STYLE_PAIR = themedStyles({
     gap: 8,
   },
   serverErrorText: {
+    fontFamily: FONTS.regular,
     color: "#B42318",
     fontSize: 13,
     textAlign: "center",
   },
   link: {
+    fontFamily: FONTS.bold,
     color: "#C5399A",
     fontSize: 13,
     fontWeight: "700",
   },
   hint: {
+    fontFamily: FONTS.regular,
     color: "#5e5e5e",
     fontSize: 12,
     textAlign: "center",

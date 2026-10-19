@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { FONTS } from "@/constants/fonts";
 import { StyleSheet, Text } from "react-native";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
@@ -26,5 +27,5 @@ export function Terms() {
 }
 
 const STYLE_PAIR = themedStyles({
-  terms: { fontSize: 12, color: "#707072", textAlign: "center", marginTop: 80 },
+  terms: { fontFamily: FONTS.regular, fontSize: 12, color: "#707072", textAlign: "center", marginTop: 80 },
 });

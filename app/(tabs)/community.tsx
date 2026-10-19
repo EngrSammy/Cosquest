@@ -1,5 +1,7 @@
 ﻿import { AppBackground } from "@/components/AppBackground";
 import { Chats } from "@/components/community/Chats";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import DesktopFeed from "@/components/desktop/DesktopFeed";
 import { Feeds } from "@/components/community/Feeds";
 import { Spotlight } from "@/components/community/Spotlight";
 import { AVATARS } from "@/constants/avatars";
@@ -34,6 +36,9 @@ export default function Community() {
   const dispatch = useAppDispatch();
 
   const [tab, setTab] = useState<Tab>("Feeds");
+  // Computer: the top bar has the avatar and bell, and Chats has its own
+  // workspace (D1: list | chat | Sparks).
+  const desktop = useIsDesktop();
 
   const authUser = useAppSelector((state) => state.auth.user);
 
@@ -62,7 +67,7 @@ export default function Community() {
     [avatarFromList],
   );
 
-  return (
+  const feedScreen = (
     <AppBackground variant="blueGradient">
       <ScrollView
         contentContainerStyle={[
@@ -78,7 +83,8 @@ export default function Community() {
         {/* Keeps everything a comfortable width on big computer screens.
             Full width on phones. */}
         <View style={styles.column}>
-          {/* HEADER - avatar in a soft pink circle, title, pink bell */}
+          {/* HEADER - avatar in a soft pink circle, title, pink bell (phones) */}
+          {!desktop ? (
           <View style={[styles.header, styles.padded]}>
             <Pressable onPress={() => router.push("/profile")} hitSlop={10}>
               <View style={styles.avatarWrap}>
@@ -104,6 +110,7 @@ export default function Community() {
               <Ionicons name="notifications" size={28} color="#C5399A" />
             </Pressable>
           </View>
+          ) : null}{/* end of the phone header */}
 
           {/* LOADING */}
           {loading && !user ? (
@@ -126,7 +133,7 @@ export default function Community() {
                     active ? styles.tabActive : styles.tabInactive,
                   ]}
                   hitSlop={6}
-                  onPress={() => setTab(key)}>
+                  onPress={() => (desktop && key === "Chats" ? router.navigate("/chat" as any) : setTab(key))}>
                   <Text
                     style={[styles.tabText, active && styles.tabTextActive]}>
                     {key}
@@ -153,6 +160,11 @@ export default function Community() {
       </ScrollView>
     </AppBackground>
   );
+
+  if (!desktop) return feedScreen;
+
+  // Computer: the desktop feed (posts in the middle, your chats on the right).
+  return <DesktopFeed />;
 }
 
 const PINK = "#C34D9C";

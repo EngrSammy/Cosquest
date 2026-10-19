@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
 import { endVoiceSession, setVoiceMinimized, updateVoiceRoom, type VoiceSession } from "@/components/voice/voiceUi";
 import { leaveVoiceRoom, pingVoiceRoom, VOICE_PING_MS } from "@/services/voiceRooms";
 import { useAppSelector } from "@/store/hooks";
@@ -57,6 +58,25 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
   const [remotes, setRemotes] = useState<Remote[]>([]);
   const [speakingIds, setSpeakingIds] = useState<string[]>([]);
   const [micOn, setMicOn] = useState(true);
+
+  // PRIVATE CALL ON TOP: quieter here (25%) and your mic off, while you're
+  // in a private call from this voice chat.
+  const inPrivate = useInPrivateFrom(session.voiceRoom.id);
+  const micBeforePrivate = useRef<boolean | null>(null);
+  useEffect(() => {
+    const room = roomRef.current;
+    if (!room) return;
+    room.remoteParticipants.forEach((participant) => participant.setVolume(inPrivate ? 0.25 : 1));
+    if (inPrivate) {
+      micBeforePrivate.current = micOn;
+      room.localParticipant.setMicrophoneEnabled(false).then(() => setMicOn(false)).catch(() => {});
+    } else if (micBeforePrivate.current !== null) {
+      const back = micBeforePrivate.current;
+      micBeforePrivate.current = null;
+      room.localParticipant.setMicrophoneEnabled(back).then(() => setMicOn(back)).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPrivate]);
   const [cameraOn, setCameraOn] = useState(false);
   const [localVideo, setLocalVideo] = useState<LocalVideoTrack | null>(null);
   const [focusOn, setFocusOn] = useState(false);
@@ -217,6 +237,9 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
       micOff: isMe ? !micOn : remote ? !remote.micOn : false,
       isMe,
       rankLevel: (user as any)?.rank?.level ?? null,
+      rankName: (user as any)?.rank?.name ?? null,
+      username: user?.username || null,
+      away: !!session.voiceRoom.members.find((member) => member.user.id === id)?.away,
       hasVideo: isMe ? !!localVideo : !!remote?.video,
     };
   });
@@ -239,6 +262,7 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
       focusOn={focusOn}
       ended={false}
       onToggleMic={toggleMic}
+      onPrivateCall={(person) => startPrivate({ kind: "voice", id: session.voiceRoom.id }, person.id)}
       onToggleCamera={toggleCamera}
       onToggleFocus={() => setFocusOn((value) => !value)}
       onLeave={leave}

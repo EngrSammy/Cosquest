@@ -1,3 +1,4 @@
+import { useSegments } from "expo-router";
 ﻿// ==========================================
 // CHAT DARK MODE (Figma M06 · Option D · Dark mode)
 // ==========================================
@@ -25,11 +26,18 @@ export const DARK_CHAT_BG_2 = "#1D1F2C";
 
 export function useChatScheme(): ChatScheme {
   const system = useColorScheme();
+  // Onboarding (sign in, sign up and every step) is designed in light only:
+  // it stays light even when the app is set to dark.
+  const segments = useSegments() as string[];
   const mode = useAppSelector(
     (state) =>
       (state.settings as any)?.appearance?.themeMode ??
       (state.auth.user as any)?.appearance?.themeMode,
   ) as string | undefined;
+
+  if (segments[0] === "onboarding") {
+    return "light";
+  }
 
   if (mode === "light" || mode === "dark") {
     return mode;

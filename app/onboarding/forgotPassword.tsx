@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { requestPasswordReset } from "@/services/auth";
@@ -104,12 +105,14 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 70,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",

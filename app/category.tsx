@@ -26,7 +26,12 @@ import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/c
 
 const PINK = "#C34D9C";
 
+import { useContext as usePaneContext } from "react";
+import { PaneClose } from "@/components/desktop/DesktopEditProfile";
+
 export default function Category() {
+  // Shown in the Edit profile pane (computer): close it instead of going back.
+  const paneClose = usePaneContext(PaneClose);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -137,7 +142,7 @@ export default function Category() {
         }),
       );
 
-      safeBack("/edit-profile");
+      (paneClose ? paneClose() : safeBack("/edit-profile"));
     } catch (error) {
       Alert.alert(
         "Category update failed",
@@ -166,7 +171,7 @@ export default function Category() {
       {/* HEADER: back, title, Done */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable
-          onPress={() => safeBack("/edit-profile")}
+          onPress={() => (paneClose ? paneClose() : safeBack("/edit-profile"))}
           hitSlop={10}
           style={styles.headerSide}
           accessibilityRole="button"

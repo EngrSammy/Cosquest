@@ -46,7 +46,12 @@ import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/c
 
 const PINK = "#C34D9C";
 
+import { useContext as usePaneContext } from "react";
+import { PaneClose } from "@/components/desktop/DesktopEditProfile";
+
 export default function ContactOptions() {
+  // Shown in the Edit profile pane (computer): close it instead of going back.
+  const paneClose = usePaneContext(PaneClose);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -476,7 +481,7 @@ export default function ContactOptions() {
         [
           {
             text: "OK",
-            onPress: () => safeBack(),
+            onPress: () => (paneClose ? paneClose() : safeBack()),
           },
         ],
       );
@@ -495,6 +500,7 @@ export default function ContactOptions() {
   const formattedPhone = displayedPhone ? phonePreview : "";
 
   const goBack = () => {
+    if (paneClose) return paneClose();
     if (router.canGoBack()) {
       safeBack();
     } else {

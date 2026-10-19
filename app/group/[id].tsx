@@ -12,7 +12,7 @@ import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,11 @@ import {
   SectionLabel,
   useGroupStyles,
 } from "@/components/groups/GroupUi";
+import { AdminEmbedded } from "@/components/groups/AdminUi";
+import DesktopGroupWorkspace, { GROUP_WORKSPACES } from "@/components/desktop/DesktopGroupWorkspace";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import GroupSettings from "@/app/group/settings/[id]";
+import JoinRequests from "@/app/group/requests/[id]";
 import PeoplePicker, { personKey } from "@/components/groups/PeoplePicker";
 import { FONTS } from "@/constants/fonts";
 import { userIdFromToken } from "@/services/calls";
@@ -94,7 +99,14 @@ function errorText(error: unknown, fallback: string) {
   return fallback;
 }
 
+// Group info shows the group's details only; its settings are in Group
+// settings (the ⚙). Set to true to show them here again.
+const SHOW_SETTINGS_IN_INFO = false;
+
 export default function GroupInfo() {
+  // Computer (Figma D6): group info | settings | join requests side by side.
+  const desktop = useIsDesktop();
+  const embedded = useContext(AdminEmbedded);
   const gs = useGroupStyles();
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
@@ -636,6 +648,23 @@ export default function GroupInfo() {
 
   const g = group!;
 
+  if (GROUP_WORKSPACES && desktop && !embedded) {
+    const admin = g.myRole === "owner" || g.myRole === "admin";
+    const role = g.myRole === "owner" ? "Owner" : g.myRole === "admin" ? "Admin" : "Member";
+    return (
+      <DesktopGroupWorkspace
+        title={g.name}
+        subtitle={`${g.memberCount} ${g.memberCount === 1 ? "member" : "members"} · faction rank is not chat authority`}
+        chip={role}
+        columns={[
+          <GroupInfo key="info" />,
+          <GroupSettings key="settings" />,
+          ...(admin ? [<JoinRequests key="requests" />] : []),
+        ]}
+      />
+    );
+  }
+
   return (
     <GroupScreen
       title="Group info"
@@ -658,9 +687,13 @@ export default function GroupInfo() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
+          desktop && styles.scrollWide,
           { paddingBottom: insets.bottom + 40 },
         ]}
         showsVerticalScrollIndicator={false}>
+        {/* Computer: the group | the members, side by side */}
+        <View style={desktop ? styles.wideRow : undefined}>
+        <View style={desktop ? styles.wideLeft : undefined}>
         {/* HERO */}
         <View style={styles.hero}>
           <Pressable
@@ -714,6 +747,9 @@ export default function GroupInfo() {
           </Pressable>
         </View>
 
+        {/* Settings, join requests, mute and leave live in Group settings (⚙). */}
+        {SHOW_SETTINGS_IN_INFO ? (
+        <>
         {/* JOIN REQUESTS (admins) */}
         {g.canEdit && requests.length > 0 ? (
           <>
@@ -726,6 +762,9 @@ export default function GroupInfo() {
             />
           </>
         ) : null}
+
+        </>
+        ) : null}{/* end: join requests moved to settings */}
 
         {/* INVITE LINK */}
         {link ? (
@@ -761,6 +800,8 @@ export default function GroupInfo() {
           </>
         ) : null}
 
+        </View>
+        <View style={desktop ? styles.wideRight : undefined}>
         {/* MEMBERS */}
         <SectionLabel>
           {g.memberCount} {g.memberCount === 1 ? "MEMBER" : "MEMBERS"}
@@ -849,6 +890,11 @@ export default function GroupInfo() {
           </Text>
         )}
 
+        </View>
+        </View>{/* end of the two columns */}
+
+        {SHOW_SETTINGS_IN_INFO ? (
+        <>
         {/* SETTINGS (admins) */}
         {g.canEdit ? (
           <>
@@ -954,6 +1000,8 @@ export default function GroupInfo() {
             onPress={confirmLeave}
           />
         </View>
+        </>
+        ) : null}{/* end: settings moved to settings */}
       </ScrollView>
 
       {/* ADD PEOPLE */}
@@ -1345,6 +1393,12 @@ export default function GroupInfo() {
 }
 
 const STYLE_PAIR = themedStyles({
+  // Computer: wider page, two columns.
+  scrollWide: { maxWidth: 1180, paddingHorizontal: 32 },
+  wideRow: { flexDirection: "row", alignItems: "flex-start", gap: 36 },
+  wideLeft: { flex: 1, minWidth: 0 },
+  wideRight: { flex: 1.15, minWidth: 0 },
+
   scroll: {
     paddingHorizontal: 20,
     paddingTop: 4,

@@ -104,8 +104,8 @@ export function LinkText({ text, mine }: { text: string; mine: boolean }) {
 
 const STYLE_PAIR = themedStyles({
   link: {
+    // Same font, size and weight as the message; just coloured and underlined.
     textDecorationLine: "underline",
-    fontWeight: "600",
     // Long links wrap inside the bubble instead of running out of it.
     ...(Platform.OS === "web"
       ? ({ wordBreak: "break-all", overflowWrap: "anywhere" } as object)

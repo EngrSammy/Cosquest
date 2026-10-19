@@ -138,13 +138,15 @@ const ResultCard = memo(function ResultCard({
   );
 });
 
-export default function SearchInChat() {
+// Computer (Figma D8): also shown in the right column of the chat, with
+// the chat passed in and onClose instead of going back.
+export default function SearchInChat({ chatId, onClose }: { chatId?: string; onClose?: () => void } = {}) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const screenGradient = ink.dark ? DARK_SCREEN_GRADIENT : LIGHT_SCREEN_GRADIENT;
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const conversationId = Array.isArray(id) ? id[0] : id;
+  const conversationId = chatId || (Array.isArray(id) ? id[0] : id);
 
   const token = useAppSelector((state) => state.auth.token);
   const chat = useAppSelector(
@@ -324,7 +326,7 @@ export default function SearchInChat() {
     <LinearGradient colors={screenGradient} style={styles.screen}>
       {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
+        <Pressable onPress={() => (onClose ? onClose() : safeBack())} hitSlop={10} accessibilityLabel="Back">
           <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
         </Pressable>
         <View style={styles.flex}>
@@ -335,7 +337,7 @@ export default function SearchInChat() {
             </Text>
           ) : null}
         </View>
-        <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Close">
+        <Pressable onPress={() => (onClose ? onClose() : safeBack())} hitSlop={10} accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={ink.text(MUTED)} />
         </Pressable>
       </View>
@@ -497,7 +499,8 @@ export default function SearchInChat() {
               style={styles.primary}
               onPress={() => {
                 setContext(null);
-                router.push({ pathname: "/chat/[id]", params: { id: conversationId } });
+                if (onClose) onClose();
+                else router.push({ pathname: "/chat/[id]", params: { id: conversationId } });
               }}>
               <Text style={styles.primaryText}>Open the chat</Text>
             </Pressable>

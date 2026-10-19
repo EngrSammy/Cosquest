@@ -131,7 +131,7 @@ export function VoiceStartButton({ conversationId, title }: { conversationId: st
   const { join, joining } = useJoinVoice(conversationId, title);
   return (
     <Pressable hitSlop={8} onPress={join} disabled={joining} accessibilityLabel="Start or join a voice chat">
-      {joining ? <ActivityIndicator size="small" color={PINK} /> : <Ionicons name="call-outline" size={21} color={INK} />}
+      {joining ? <ActivityIndicator size="small" color={PINK} /> : <Ionicons name="call-outline" size={21} color="#C5399A" />}
     </Pressable>
   );
 }

@@ -30,6 +30,7 @@ import { getPostShareLink } from "@/utils/shareLinks";
 import { ShareAction } from "./ShareAction";
 import { SharePerson } from "./SharePerson";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 // How many friends to show before searching.
 const MAX_SUGGESTIONS = 9;
@@ -92,6 +93,7 @@ export function ShareSheet({
   onShared?: (newTotal: number | null) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
+  const desktop = useIsDesktop();
   const ink = useInk();
   const authUser = useAppSelector((state) => state.auth.user);
   const user = useAppSelector((state) => state.user.user);
@@ -371,15 +373,15 @@ export function ShareSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={desktop ? "fade" : "slide"}
       onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={styles.root}
+        style={[styles.root, desktop && styles.rootDesk]}
         behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <Pressable style={styles.overlay} onPress={onClose} />
 
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <View style={[styles.sheet, desktop && styles.sheetDesk]}>
+          {!desktop ? <View style={styles.handle} /> : null}
 
           {/* HEADER */}
           <View style={styles.header}>
@@ -632,6 +634,10 @@ const STYLE_PAIR = themedStyles({
     flex: 1,
     justifyContent: "flex-end",
   },
+
+  // Computer: a centred dialog instead of a bottom sheet.
+  rootDesk: { justifyContent: "center", alignItems: "center", padding: 24 },
+  sheetDesk: { width: "100%", maxWidth: 580, borderRadius: 16 },
 
   overlay: {
     // Was StyleSheet.absoluteFill, which no longer exists in this

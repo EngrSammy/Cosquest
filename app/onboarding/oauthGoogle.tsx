@@ -10,6 +10,7 @@
 // code isn't used twice.
 
 import { router, useLocalSearchParams } from "expo-router";
+import { FONTS } from "@/constants/fonts";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -121,6 +122,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   title: {
+    fontFamily: FONTS.bold,
     fontSize: 20,
     fontWeight: "800",
     color: "#191922",
@@ -128,6 +130,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   text: {
+    fontFamily: FONTS.regular,
     marginTop: 12,
     fontSize: 14,
     lineHeight: 20,
@@ -144,6 +147,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   buttonText: {
+    fontFamily: FONTS.bold,
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",

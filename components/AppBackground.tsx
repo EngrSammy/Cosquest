@@ -1,5 +1,6 @@
 ﻿import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { createContext, useContext } from "react";
 import { StyleSheet, View } from "react-native";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -12,6 +13,10 @@ const MAP_SOURCES = {
   blueGradient: null,
 } as const;
 
+// True inside the desktop onboarding card: plain background, no map
+// (the map is drawn around the card instead).
+export const InAuthFrame = createContext(false);
+
 export function AppBackground({
   children,
   variant = "plain",
@@ -21,6 +26,15 @@ export function AppBackground({
 }) {
   const map = MAP_SOURCES[variant];
   const isDark = useColorScheme() === "dark";
+  const inFrame = useContext(InAuthFrame);
+
+  if (inFrame) {
+    return (
+      <View style={[styles.root, { backgroundColor: "transparent" }]}>
+        {children}
+      </View>
+    );
+  }
 
   return (
     <View
