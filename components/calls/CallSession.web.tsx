@@ -809,6 +809,7 @@ export default function CallSession() {
           onLeave={hangUp}
           onMinimize={() => setCallMinimized(true)}
           onPeople={() => setAddPeopleOpen(true)}
+          onSparks={() => Alert.alert("Sparks in calls", "Sparks listens in the CosQuest phone app: it turns what people say into text on their own phones and picks out the topics. Open this call in the app to see Sparks live. After the call, its Sparks notes show in the chat here too.")}
           onPrivateCall={(person) => startPrivate({ kind: "call", id: active.call.id }, person.id)}
           extra={audioTapButton}
         />
