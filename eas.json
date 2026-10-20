@@ -15,14 +15,16 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
-        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app"
+        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app",
+        "EXPO_PUBLIC_SPARKS_ENGINE": "module"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
-        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app"
+        "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app",
+        "EXPO_PUBLIC_SPARKS_ENGINE": "module"
       }
     }
   },
