@@ -33,9 +33,12 @@ import {
 
 export const fetchCurrentUser = createAsyncThunk(
   "user/fetchCurrentUser",
-  async (email: string, { rejectWithValue }) => {
+  async (email: string, { getState, rejectWithValue }) => {
     try {
-      return await getCurrentUser(email);
+      // With the login token: without it the backend answers this lookup
+      // for anyone who knows the email (see the report on /api/users/me).
+      const token = (getState() as { auth?: { token?: string | null } }).auth?.token || undefined;
+      return await getCurrentUser(email, token);
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to get user",
