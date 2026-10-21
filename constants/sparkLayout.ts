@@ -35,7 +35,7 @@ function isLayout(value: unknown): value is SparkLayout {
 
 const ENV_LAYOUT = process.env.EXPO_PUBLIC_SPARK_LAYOUT;
 
-export const DEFAULT_SPARK_LAYOUT: SparkLayout = isLayout(ENV_LAYOUT) ? ENV_LAYOUT : "orbit";
+export const DEFAULT_SPARK_LAYOUT: SparkLayout = "rail";
 
 const PREF_KEY = "sparks.layout";
 
@@ -66,8 +66,10 @@ function subscribe(listener: () => void) {
   };
 }
 
+// Decided: the side rail for everyone. A saved choice from the old preview
+// switch, or EXPO_PUBLIC_SPARK_LAYOUT, no longer changes it.
 export function getSparkLayout(): SparkLayout {
-  return current;
+  return "rail";
 }
 
 export function setSparkLayout(layout: SparkLayout) {

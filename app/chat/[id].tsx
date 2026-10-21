@@ -2691,7 +2691,8 @@ export default function ChatScreen() {
       }
       seen.add(sparkId);
       const spark = sparks.find((item) => item.id === sparkId);
-      if (spark && (!spark.active || sparkLayout === "inline")) {
+      // Quiet Sparks show in the side rail, not as cards in the conversation.
+      if (spark && sparkLayout === "inline") {
         map.set(message.id, spark);
       }
     }
