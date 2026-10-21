@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
+import { SparksSetupPrompt } from "@/components/sparks/SparksSetupPrompt";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
@@ -35,6 +36,8 @@ export default function TabLayout() {
   const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
   return (
+    <>
+    <SparksSetupPrompt />
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: ACTIVE,
@@ -115,6 +118,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }
 
