@@ -202,6 +202,21 @@ export function PostCard({ post, token }: { post: any; token: string }) {
 
   const [shareVisible, setShareVisible] = useState(false);
 
+  // The comments and share sheets mount the first time they're opened (and
+  // stay, so closing still animates). Mounted for every card, each comments
+  // sheet kept its own audio recorder polled every 500 ms and a blink loop,
+  // so a feed of 20 posts ran 20 of each while nobody was commenting.
+  const [commentsMounted, setCommentsMounted] = useState(false);
+  const [shareMounted, setShareMounted] = useState(false);
+
+  if (commentsVisible && !commentsMounted) {
+    setCommentsMounted(true);
+  }
+
+  if (shareVisible && !shareMounted) {
+    setShareMounted(true);
+  }
+
   const [menuVisible, setMenuVisible] = useState(false);
 
   const [editing, setEditing] = useState(false);
@@ -711,6 +726,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
       </Modal>
 
       {/* COMMENTS */}
+      {commentsMounted ? (
       <CommentsModal
         visible={commentsVisible}
         onClose={() => setCommentsVisible(false)}
@@ -723,8 +739,10 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         initialCount={commentsCount}
         onCountChange={setCommentsCount}
       />
+      ) : null}
 
       {/* SHARE */}
+      {shareMounted ? (
       <ShareSheet
         visible={shareVisible}
         post={post}
@@ -736,6 +754,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
           )
         }
       />
+      ) : null}
     </View>
   );
 }
