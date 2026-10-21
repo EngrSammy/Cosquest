@@ -12,6 +12,7 @@ import {
 } from "@/store/thunks/postThunks";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -535,8 +536,19 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     .join(" · ");
 
   // The name pill: on the photo (see-through) or on a text card (white).
+  // Tapping the author opens their profile (your own posts open your tab).
+  const openAuthor = () => {
+    if (isMine) router.push("/profile");
+    else if (postUsername)
+      router.push({ pathname: "/user/[username]", params: { username: postUsername } });
+  };
+
   const authorPill = (onPhoto: boolean) => (
-    <View
+    <Pressable
+      onPress={openAuthor}
+      disabled={!isMine && !postUsername}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${authorName}'s profile`}
       style={[styles.pill, onPhoto ? styles.pillOnPhoto : styles.pillOnCard]}>
       <View style={[styles.ring, { borderColor: factionColor(authorFaction) }]}>
         <Image
@@ -558,7 +570,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 
   // ⋯ only on your own posts (edit / delete).
