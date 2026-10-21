@@ -2571,7 +2571,11 @@ export default function ChatScreen() {
             })),
           );
         }
-        setSparks(result.sparks);
+        // Same Sparks as before (the usual case for the 60 s refresh): keep
+        // the old array, so the Spark context and every bubble don't re-render.
+        setSparks((current) =>
+          JSON.stringify(current) === JSON.stringify(result.sparks) ? current : result.sparks,
+        );
       })
       .catch((error) => {
         if (__DEV__) {
