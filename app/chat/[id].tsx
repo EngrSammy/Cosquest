@@ -127,6 +127,7 @@ import {
   nextSpeed,
 } from "@/components/chat/VoiceSpeed";
 import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
+import { smallAvatarUrl } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import type { Wallpaper } from "@/constants/wallpapers";
 import {
@@ -633,13 +634,16 @@ function getAvatar(person?: {
   avatarUrl?: string | null;
   avatarPhotoUrl?: string | null;
 }) {
-  return (
+  const url =
     person?.profilePicture ||
     person?.avatarPhotoUrl ||
     person?.avatarUrl ||
     person?.avatar ||
-    null
-  );
+    null;
+
+  // Shown at 32-40 pt: a 240 px Cloudinary copy (~5-18 KB) instead of the
+  // full upload (~140-400 KB) for every sender in the list.
+  return url ? smallAvatarUrl(url) : null;
 }
 
 // ==========================================

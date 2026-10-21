@@ -2,7 +2,7 @@ import { AudioModule } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
 
-import { AVATARS } from "@/constants/avatars";
+import { AVATARS, smallAvatarUrl } from "@/constants/avatars";
 
 import type { CallType } from "@/services/calls";
 
@@ -62,7 +62,9 @@ export function getAvatarSource(person?: AvatarPerson) {
     person?.avatar;
 
   if (photo) {
-    return { uri: photo };
+    // A resized copy (Cloudinary): full-size uploads are 140-400 KB each,
+    // 480 px is ~10x smaller and still sharp on the largest call tile.
+    return { uri: smallAvatarUrl(photo, 480) };
   }
 
   const preset = AVATARS.find((avatar) => avatar.id === person?.avatarKey);

@@ -24,7 +24,7 @@ import {
 } from "react-native";
 
 import { GroupAvatar } from "@/components/groups/GroupUi";
-import { AVATARS } from "@/constants/avatars";
+import { AVATARS, smallAvatarUrl } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import { apiRequest } from "@/services/api";
 import { FollowUser } from "@/services/follow";
@@ -98,7 +98,7 @@ type UserSearchResponse = {
 
 function getAvatarSource(user: { avatarPhotoUrl?: string | null; avatarKey?: string | null }) {
   if (user.avatarPhotoUrl) {
-    return { uri: user.avatarPhotoUrl };
+    return { uri: smallAvatarUrl(user.avatarPhotoUrl) };
   }
   const preset = AVATARS.find((avatar) => avatar.id === user.avatarKey);
   return preset?.source || require("@/assets/images/dp-avatar.png");
@@ -572,7 +572,7 @@ export function Chats() {
                 <Pressable key={chat.id} style={styles.dmItem} onPress={() => openChat(chat.id)}>
                   <View style={[styles.dmCircle, { backgroundColor: avatarTint(name) }]}>
                     {photo ? (
-                      <Image source={{ uri: photo }} style={styles.dmPhoto} contentFit="cover" />
+                      <Image source={{ uri: smallAvatarUrl(photo) }} style={styles.dmPhoto} contentFit="cover" />
                     ) : (
                       <Text style={styles.dmInitials}>{initialsOf(name)}</Text>
                     )}
