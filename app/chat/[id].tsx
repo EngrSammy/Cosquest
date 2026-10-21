@@ -3197,6 +3197,7 @@ export default function ChatScreen() {
     };
 
     let joinedBefore = false;
+    let joinCount = 0;
 
     const doJoin = () => {
       roomJoinedRef.current = false;
@@ -3229,8 +3230,14 @@ export default function ChatScreen() {
         joinedBefore = true;
       });
 
-      // Covers coming back to the app with this chat still open.
-      markReadSoon();
+      // Covers coming back to the app with this chat still open. Not on the
+      // first join: opening the chat already marked it read (focus effect),
+      // so this was a second PATCH /read 400 ms later.
+      if (joinCount > 0) {
+        markReadSoon();
+      }
+
+      joinCount += 1;
     };
 
     // Avoid a premature "Socket not connected" error during startup.
