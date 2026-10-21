@@ -367,6 +367,7 @@ export default function OrbitCallScreen({
   ended,
   onToggleMic,
   onToggleCamera,
+  onFlipCamera,
   onToggleFocus,
   onLeave,
   onMinimize,
@@ -386,6 +387,8 @@ export default function OrbitCallScreen({
   ended: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  // Front / back camera. Without it the bar keeps the Share slot.
+  onFlipCamera?: () => void;
   onToggleFocus: () => void;
   onLeave: () => void;
   onMinimize: () => void;
@@ -469,7 +472,11 @@ export default function OrbitCallScreen({
       <View style={[styles.controls, { paddingBottom: insets.bottom + 14 }]}>
         <ControlButton icon={micOn ? "mic-outline" : "mic-off-outline"} label="Mic" active={!micOn} onPress={onToggleMic} disabled={ended} />
         <ControlButton icon={cameraOn ? "videocam" : "videocam-outline"} label="Video" active={cameraOn} onPress={onToggleCamera} disabled={ended} />
-        <ControlButton icon="share-outline" label="Share" onPress={() => comingSoon("Screen sharing")} disabled={ended} />
+        {onFlipCamera && cameraOn ? (
+          <ControlButton icon="camera-reverse-outline" label="Flip" onPress={onFlipCamera} disabled={ended} />
+        ) : (
+          <ControlButton icon="share-outline" label="Share" onPress={() => comingSoon("Screen sharing")} disabled={ended} />
+        )}
         <ControlButton icon="headset-outline" label="Focus" active={focusOn} onPress={onToggleFocus} disabled={ended} />
         <ControlButton icon="sparkles" label="Sparks" kind="sparks" onPress={onSparks || (() => comingSoon("Sparks in calls"))} disabled={ended} />
         <ControlButton icon="close" label="Leave" kind="leave" onPress={onLeave} disabled={ended} />
