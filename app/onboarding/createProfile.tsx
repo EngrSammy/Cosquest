@@ -36,6 +36,7 @@ export default function CreateProfile() {
    * through Sign In instead of Sign Up.
    */
   const authUser = useAppSelector((state) => state.auth.user);
+  const authToken = useAppSelector((state) => state.auth.token);
 
   const authEmail = authUser?.email?.trim() || "";
 
@@ -172,7 +173,11 @@ export default function CreateProfile() {
 
       console.log("CHECKING USERNAME:", username);
 
-      const usernameResult = await checkUsername(username, email);
+      const usernameResult = await checkUsername(
+        username,
+        email,
+        authToken || undefined,
+      );
 
       console.log("USERNAME CHECK RESPONSE:", usernameResult);
 
