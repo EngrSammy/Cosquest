@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
 
 import { apiRequest } from "@/services/api";
 import { userIdFromToken } from "@/services/calls";
-import { feedMembers, feedMessages, sparksEnabled, startSparks } from "@/services/sparksSdk";
+import { feedMembers, feedMessages, getSparksSdk, sparksEnabled, startSparks } from "@/services/sparksSdk";
 import { useAppSelector } from "@/store/hooks";
 
 function useMyUserId() {
@@ -51,10 +51,23 @@ export function useSparksFeed(chatId: string | undefined, messages: any[]) {
   }, [chatId, token, userId]);
 
   // Every message on screen (history, live, my own sends once numbered).
+  // Only messages the SDK hasn't been given yet (new, or a changed object
+  // after an edit / reaction / seq): re-feeding the whole list on every new
+  // message made the SDK rewrite and re-encrypt the chat's store each time.
+  const fed = useRef<{ chatId?: string; seen: WeakSet<object> }>({ seen: new WeakSet() });
   useEffect(() => {
     if (!sparksEnabled() || !chatId || !messages?.length) return;
     const timer = setTimeout(() => {
-      feedMessages(chatId, messages).catch(() => {});
+      if (fed.current.chatId !== chatId) fed.current = { chatId, seen: new WeakSet() };
+      const seen = fed.current.seen;
+      const fresh = messages.filter((m) => m && typeof m === "object" && !seen.has(m));
+      if (!fresh.length) return;
+      feedMessages(chatId, fresh)
+        .then(() => {
+          // Mark only once fed: if the SDK wasn't running yet, retry next time.
+          if (getSparksSdk() && fed.current.seen === seen) fresh.forEach((m) => seen.add(m));
+        })
+        .catch(() => {});
     }, 400);
     return () => clearTimeout(timer);
   }, [chatId, messages]);
