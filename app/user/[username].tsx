@@ -129,6 +129,15 @@ export default function UserProfileScreen() {
     let cancelled = false;
 
     (async () => {
+      // All three requests start together (they used to wait for the block
+      // list first: one extra round trip, ~0.5 s from Lagos, behind the
+      // full-screen spinner). The profile and posts are dropped if blocked.
+      const profileRequest = getPublicProfile(username, token).then(
+        (value) => ({ ok: true as const, value }),
+        (error) => ({ ok: false as const, error }),
+      );
+      const postsRequest = getUserPosts(username, token).catch(() => []);
+
       // Did I block them? (Then the backend hides their profile from me.)
       const blockedNames = await (token && !isMe
         ? getBlockedUsernames(token).catch(() => new Set<string>())
@@ -151,10 +160,16 @@ export default function UserProfileScreen() {
       }
 
       try {
-        const [loadedProfile, loadedPosts] = await Promise.all([
-          getPublicProfile(username, token),
-          getUserPosts(username, token).catch(() => []),
+        const [profileResult, loadedPosts] = await Promise.all([
+          profileRequest,
+          postsRequest,
         ]);
+
+        if (!profileResult.ok) {
+          throw profileResult.error;
+        }
+
+        const loadedProfile = profileResult.value;
 
         if (cancelled) {
           return;
