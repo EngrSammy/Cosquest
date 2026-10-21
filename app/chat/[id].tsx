@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, type ReactElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -2722,6 +2722,165 @@ export default function ChatScreen() {
     ],
   );
 
+  // The message list's rows. renderItem is a stable function that calls the
+  // latest render (kept in a ref), so the FlatList re-renders its rows only
+  // when messageListExtraData or the data change, not on every render of
+  // this screen (every keystroke in the composer, the slow-mode clock, the
+  // recorder, keyboard and scroll state). Everything a row reads that can
+  // change must be listed in messageListExtraData.
+  const renderMessageItemRef = useRef<(info: { item: Message; index: number }) => ReactElement | null>(
+    () => null,
+  );
+  renderMessageItemRef.current = ({ item, index }) => {
+    const mine = isMyMessage(item);
+
+    // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
+    const older = visibleMessages[index + 1];
+
+    const newer = visibleMessages[index - 1];
+
+    const showDate =
+      !older ||
+      getDateKey(older.createdAt) !== getDateKey(item.createdAt);
+
+    const firstInGroup =
+      showDate ||
+      !older ||
+      getSenderKey(older) !== getSenderKey(item);
+
+    const lastInGroup =
+      !newer ||
+      getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
+      getSenderKey(newer) !== getSenderKey(item);
+
+    const selected =
+      selectedIds.includes(item.id) || highlightedId === item.id;
+
+    const pinned = pinnedIds.includes(item.id);
+
+    return (
+      <View>
+        {showDate ? <DateSeparator message={item} /> : null}
+
+        <SwipeToReply
+          enabled={
+            !selectionMode &&
+            !item.pending &&
+            !item.deleted &&
+            item.kind !== "call"
+          }
+          onReply={() => startReply(item)}>
+          <Bubble
+            msg={item}
+            mine={mine}
+            groupChat={!!groupChat}
+            firstInGroup={firstInGroup}
+            lastInGroup={lastInGroup}
+            selected={selected}
+            pinned={pinned}
+            myReactionEmoji={findMyReaction(item)?.emoji}
+            onPress={handleMessagePress}
+            onLongPress={openMessageActions}
+            onReaction={(message, emoji) => {
+              if (selectionMode) {
+                toggleMessageSelection(message);
+
+                return;
+              }
+
+              reactToMessage(message, emoji);
+            }}
+            onMediaPress={handleMediaPress}
+            onReplyPress={scrollToMessage}
+            onCallBack={handleCallBack}
+            otherParticipant={conversation?.otherParticipant}
+          />
+        </SwipeToReply>
+
+        {quietSparkCardAfter.get(item.id) ? (
+          <SparkCard
+            spark={quietSparkCardAfter.get(item.id)!}
+            onOpen={(spark) => setOpenSparkId(spark.id)}
+          />
+        ) : null}
+
+        {rolePingsAfter.get(item.id) && token ? (
+          <RolePingCard
+            conversationId={conversationId}
+            token={token}
+            pings={rolePingsAfter.get(item.id)!}
+            onOpenMember={
+              groupChat
+                ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
+                : undefined
+            }
+          />
+        ) : null}
+
+        {/* Figma M15: your edited message - edit again or undo */}
+        {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
+          <View style={styles.editCard}>
+            <Text style={styles.editSection}>YOUR MESSAGE</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editLabel}>Saved text</Text>
+              <View style={styles.editSaved}>
+                <Text style={styles.editSavedText}>{item.content}</Text>
+              </View>
+              <View style={styles.editNote}>
+                <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
+                <Text style={styles.editNoteText}>Your message has been updated.</Text>
+              </View>
+              <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
+                <Text style={styles.editButtonText}>Edit again</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editHint}>Before your change</Text>
+              {item.previousContent ? (
+                <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
+              ) : null}
+              <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
+                <Text style={styles.editButtonText}>Undo · restore previous message</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+  const renderMessageItem = useCallback(
+    (info: { item: Message; index: number }) => renderMessageItemRef.current(info),
+    [],
+  );
+  // "Edited" cards hide after 10 minutes: the minute is part of the key.
+  const editMinute = Math.floor(Date.now() / 60000);
+  const messageListExtraData = useMemo(
+    () => ({
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      otherParticipant: conversation?.otherParticipant,
+      editMinute,
+    }),
+    [
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      conversation?.otherParticipant,
+      editMinute,
+    ],
+  );
+
   const addPendingMessage = (message: Omit<Message, "id" | "pending">) => {
     const id = generateLocalId("pending");
     setPendingMessages((current) => [
@@ -5102,7 +5261,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            extraData={[listExtraData, quietSparkCardAfter, rolePingsAfter]}
+            extraData={messageListExtraData}
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -5132,125 +5291,7 @@ export default function ChatScreen() {
                 </Text>
               </View>
             }
-            renderItem={({ item, index }) => {
-              const mine = isMyMessage(item);
-
-              // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
-              const older = visibleMessages[index + 1];
-
-              const newer = visibleMessages[index - 1];
-
-              const showDate =
-                !older ||
-                getDateKey(older.createdAt) !== getDateKey(item.createdAt);
-
-              const firstInGroup =
-                showDate ||
-                !older ||
-                getSenderKey(older) !== getSenderKey(item);
-
-              const lastInGroup =
-                !newer ||
-                getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
-                getSenderKey(newer) !== getSenderKey(item);
-
-              const selected =
-                selectedIds.includes(item.id) || highlightedId === item.id;
-
-              const pinned = pinnedIds.includes(item.id);
-
-              return (
-                <View>
-                  {showDate ? <DateSeparator message={item} /> : null}
-
-                  <SwipeToReply
-                    enabled={
-                      !selectionMode &&
-                      !item.pending &&
-                      !item.deleted &&
-                      item.kind !== "call"
-                    }
-                    onReply={() => startReply(item)}>
-                    <Bubble
-                      msg={item}
-                      mine={mine}
-                      groupChat={!!groupChat}
-                      firstInGroup={firstInGroup}
-                      lastInGroup={lastInGroup}
-                      selected={selected}
-                      pinned={pinned}
-                      myReactionEmoji={findMyReaction(item)?.emoji}
-                      onPress={handleMessagePress}
-                      onLongPress={openMessageActions}
-                      onReaction={(message, emoji) => {
-                        if (selectionMode) {
-                          toggleMessageSelection(message);
-
-                          return;
-                        }
-
-                        reactToMessage(message, emoji);
-                      }}
-                      onMediaPress={handleMediaPress}
-                      onReplyPress={scrollToMessage}
-                      onCallBack={handleCallBack}
-                      otherParticipant={conversation?.otherParticipant}
-                    />
-                  </SwipeToReply>
-
-                  {quietSparkCardAfter.get(item.id) ? (
-                    <SparkCard
-                      spark={quietSparkCardAfter.get(item.id)!}
-                      onOpen={(spark) => setOpenSparkId(spark.id)}
-                    />
-                  ) : null}
-
-                  {rolePingsAfter.get(item.id) && token ? (
-                    <RolePingCard
-                      conversationId={conversationId}
-                      token={token}
-                      pings={rolePingsAfter.get(item.id)!}
-                      onOpenMember={
-                        groupChat
-                          ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
-                          : undefined
-                      }
-                    />
-                  ) : null}
-
-                  {/* Figma M15: your edited message - edit again or undo */}
-                  {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
-                    <View style={styles.editCard}>
-                      <Text style={styles.editSection}>YOUR MESSAGE</Text>
-                      <View style={styles.editBox}>
-                        <Text style={styles.editLabel}>Saved text</Text>
-                        <View style={styles.editSaved}>
-                          <Text style={styles.editSavedText}>{item.content}</Text>
-                        </View>
-                        <View style={styles.editNote}>
-                          <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
-                          <Text style={styles.editNoteText}>Your message has been updated.</Text>
-                        </View>
-                        <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
-                          <Text style={styles.editButtonText}>Edit again</Text>
-                        </Pressable>
-                      </View>
-
-                      <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
-                      <View style={styles.editBox}>
-                        <Text style={styles.editHint}>Before your change</Text>
-                        {item.previousContent ? (
-                          <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
-                        ) : null}
-                        <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
-                          <Text style={styles.editButtonText}>Undo · restore previous message</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            }}
+            renderItem={renderMessageItem}
             // Option A: the list itself stops short of the side rail (M03),
             // so bubbles never run under it (a content padding wasn't enough
             // on Android).
