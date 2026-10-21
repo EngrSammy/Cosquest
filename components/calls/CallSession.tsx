@@ -486,6 +486,7 @@ function CallStage({
             topInset={insets.top}
             bottomInset={insets.bottom}
             onBack={backToCall}
+            clearMinimize={!call.isGroup}
           />
         </CallBackground>
       </View>

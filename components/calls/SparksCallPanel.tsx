@@ -78,6 +78,7 @@ export default function SparksCallPanel({
   topInset,
   bottomInset,
   onBack,
+  clearMinimize = false,
 }: {
   notes: CallNotes;
   call: Call;
@@ -85,6 +86,9 @@ export default function SparksCallPanel({
   topInset: number;
   bottomInset: number;
   onBack: () => void;
+  // 1:1 calls: ActiveCallOverlay's round minimize button sits in the top
+  // left over every page, so "< Call" moves to its right instead of under it.
+  clearMinimize?: boolean;
 }) {
   const scroll = useRef<ScrollView>(null);
   const named = notes.sparks.filter((s) => s.title).length;
@@ -109,7 +113,7 @@ export default function SparksCallPanel({
 
   return (
     <View style={[styles.root, { paddingTop: topInset + 12, paddingBottom: bottomInset + 12 }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, clearMinimize && styles.headerClearMinimize]}>
         <Pressable onPress={onBack} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to the call">
           <Ionicons name="chevron-back" size={20} color={CALL_COLORS.text} />
           <Text style={styles.backText}>Call</Text>
@@ -153,6 +157,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 20 },
 
   header: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  // Minimize button: left 14, 40 wide; this row starts at 20 (root padding).
+  headerClearMinimize: { minHeight: 40, marginLeft: 44 },
   back: { flexDirection: "row", alignItems: "center", gap: 2 },
   backText: { color: CALL_COLORS.text, fontSize: 15, fontWeight: "600" },
 
