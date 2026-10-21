@@ -3098,12 +3098,26 @@ export default function ChatScreen() {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  // True while this screen's socket is connected AND joined to the room
+  // (set by the socket effect below). Then message:new / edited / deleted
+  // arrive live and the catch-up fetch below is skipped; a rejoin after a
+  // reconnect does one catch-up fetch instead.
+  const roomJoinedRef = useRef(false);
+
   useEffect(() => {
     if (!token || !conversationId) {
       return;
     }
 
     const interval = setInterval(() => {
+      if (roomJoinedRef.current && getSocket()?.connected) {
+        if (conversationRef.current?.unreadCount) {
+          dispatch(readConversation({ conversationId, token }));
+        }
+
+        return;
+      }
+
       dispatch(
         fetchMessages({
           conversationId,
@@ -3178,11 +3192,37 @@ export default function ChatScreen() {
       }, 400);
     };
 
+    let joinedBefore = false;
+
     const doJoin = () => {
+      roomJoinedRef.current = false;
+
       joinConversation(conversationId).then((ack) => {
-        if (!ack.ok && !cancelled) {
-          console.error("CONVERSATION JOIN FAILED:", ack.error);
+        if (cancelled) {
+          return;
         }
+
+        if (!ack.ok) {
+          console.error("CONVERSATION JOIN FAILED:", ack.error);
+          return;
+        }
+
+        roomJoinedRef.current = true;
+
+        // A rejoin (after a dropped connection): fetch what was missed
+        // while disconnected, once.
+        if (joinedBefore && token) {
+          dispatch(
+            fetchMessages({
+              conversationId,
+              token,
+              after: messagesRef.current[0]?.id,
+              mode: "append",
+            }),
+          );
+        }
+
+        joinedBefore = true;
       });
 
       // Covers coming back to the app with this chat still open.
@@ -3203,6 +3243,12 @@ export default function ChatScreen() {
     // for the rest of the time this screen stays open, with no visible
     // error — it'd just quietly fall back to the 30s safety poll.
     socket.on("connect", doJoin);
+
+    const handleDisconnect = () => {
+      roomJoinedRef.current = false;
+    };
+
+    socket.on("disconnect", handleDisconnect);
 
     const handleMessageNew = (payload: {
       conversationId: string;
@@ -3394,6 +3440,8 @@ export default function ChatScreen() {
       }
 
       socket.off("connect", doJoin);
+      socket.off("disconnect", handleDisconnect);
+      roomJoinedRef.current = false;
       socket.off("message:new", handleMessageNew);
       socket.off("message:edited", handleMessageEdited);
       socket.off("message:deleted", handleMessageDeleted);
