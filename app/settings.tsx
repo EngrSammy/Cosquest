@@ -169,6 +169,13 @@ export default function Settings() {
             href="/appearance"
           />
 
+          {/* Download the Sparks AI and see if it's ready on this phone. */}
+          <SettingRow
+            icon="sparkles-outline"
+            label="Sparks AI on this phone"
+            href="/sparks-model"
+          />
+
           {/* Figma: a database icon */}
           <SettingRow
             icon="server-outline"
