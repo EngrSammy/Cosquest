@@ -50,9 +50,11 @@ export type UserProfile = {
 // CURRENT USER
 // ============================================
 
-export async function getCurrentUser(email: string, token?: string) {
+// The backend identifies the caller by the session token only. `email` is
+// kept in the signature for existing callers but is not sent.
+export async function getCurrentUser(_email: string, token?: string) {
   return apiRequest<any>(
-    `/api/users/me?email=${encodeURIComponent(email)}`,
+    "/api/users/me",
     token ? { token } : {},
   ).then((response) => response?.user || response);
 }
@@ -61,11 +63,16 @@ export async function getCurrentUser(email: string, token?: string) {
 // USERNAME
 // ============================================
 
-export async function checkUsername(username: string, email: string) {
+// Public check. With the session token the backend treats your own current
+// username as available; `email` is no longer sent.
+export async function checkUsername(
+  username: string,
+  _email?: string,
+  token?: string,
+) {
   return apiRequest(
-    `/api/users/check-username?username=${encodeURIComponent(
-      username,
-    )}&email=${encodeURIComponent(email)}`,
+    `/api/users/check-username?username=${encodeURIComponent(username)}`,
+    token ? { token } : {},
   );
 }
 
@@ -309,17 +316,11 @@ export async function uploadAvatarPhoto(
     throw new Error("EXPO_PUBLIC_API_URL is not configured");
   }
 
-  if (!email.trim()) {
-    throw new Error("Email is required for photo upload.");
-  }
-
   if (!photoUri) {
     throw new Error("Photo URI is required.");
   }
 
   const formData = new FormData();
-
-  formData.append("email", email.trim());
 
   await appendFileToFormData(formData, "photo", {
     uri: photoUri,
