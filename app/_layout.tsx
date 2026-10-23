@@ -6,6 +6,7 @@ import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import DesktopShell from "@/components/desktop/DesktopShell";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
 import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
+import PushTapHandler from "@/components/PushTapHandler";
 import SessionGate from "@/components/SessionGate";
 import { UserProvider } from "@/context/UserContext";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
@@ -103,6 +104,9 @@ export default function RootLayout() {
 
             {/* Private call on top: its ringing card and sheet */}
             <PrivateCallLayer />
+
+            {/* Tapping a push notification opens what it's about */}
+            <PushTapHandler />
 
             {/* Dark icons: most screens are light even when the phone is dark (the chat sets its own). */}
             <StatusBar style="dark" />

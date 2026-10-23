@@ -139,6 +139,7 @@ import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
 import CallsTab from "@/components/calls/scheduled/CallsTab";
+import ScheduledCallMessage, { type ScheduledCallCardData } from "@/components/calls/scheduled/ScheduledCallMessage";
 import { ScreenGradient } from "@/components/chat/ui";
 
 type AttachmentDraft = {
@@ -256,6 +257,9 @@ type Message = {
     groupCall?: boolean;
     participantCount?: number | null;
   } | null;
+
+  // kind "scheduled_call": a call scheduled (or cancelled) in this group.
+  scheduledCall?: ScheduledCallCardData | null;
 };
 
 type Chat = {
@@ -709,6 +713,9 @@ function getMessageTypeLabel(message: Message) {
 
     case "call":
       return message.callLog?.type === "video" ? "Video call" : "Voice call";
+
+    case "scheduled_call":
+      return message.scheduledCall?.status === "cancelled" ? "Call cancelled" : "Call scheduled";
 
     default:
       return null;
@@ -1366,6 +1373,11 @@ const Bubble = memo(function Bubble({
               onCallBack={onCallBack}
               onLongPress={() => onLongPress(msg)}
             />
+          ) : null}
+
+          {/* SCHEDULED CALL CARD (scheduled or cancelled in this group) */}
+          {!msg.deleted && msg.kind === "scheduled_call" && msg.scheduledCall ? (
+            <ScheduledCallMessage card={msg.scheduledCall} onLongPress={() => onLongPress(msg)} />
           ) : null}
 
           {/* TEXT / CAPTION */}

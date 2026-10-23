@@ -281,7 +281,13 @@ export default function Notifications() {
             }
             onToggleFollow={() => handleToggleFollow(item.actor?.username)}
             onOpen={
-              item.conversationId
+              item.scheduledCallId
+                ? () =>
+                    router.push({
+                      pathname: "/group/scheduled-call/[callId]",
+                      params: { callId: item.scheduledCallId! },
+                    })
+                : item.conversationId
                 ? () =>
                     router.push({
                       pathname: "/chat/[id]",

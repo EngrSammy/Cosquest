@@ -16,12 +16,13 @@ import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import {
   isPastCall,
-  listScheduledCalls,
   sectionTitle,
   timeZoneLabel,
   type ScheduledCall,
 } from "@/services/scheduledCalls";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { makeSelectChatCalls } from "@/store/slices/scheduledCallSlice";
+import { fetchScheduledCalls } from "@/store/thunks/scheduledCallThunks";
 import { REMINDER_MINUTES } from "@/utils/callReminders";
 
 import { CallRow, FeaturedCallCard } from "./ScheduledCallCard";
@@ -54,32 +55,21 @@ export default function CallsTab({
   const token = useAppSelector((state) => state.auth.token);
   const { join, joining } = useJoinVoice(conversationId, title);
 
-  const [calls, setCalls] = useState<ScheduledCall[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const dispatch = useAppDispatch();
+  // The chat's calls from the store (shared with Call details and kept live
+  // by scheduled-call:updated).
+  const selectCalls = useMemo(() => makeSelectChatCalls(), []);
+  const calls = useAppSelector((state) => selectCalls(state, conversationId));
+  const loaded = useAppSelector((state) => !!state.scheduledCalls.loadedChats[conversationId]);
+  const loading = !loaded;
+  const error = useAppSelector((state) => (loaded ? "" : state.scheduledCalls.errorByChat[conversationId] || ""));
   const [view, setView] = useState<"upcoming" | "past">("upcoming");
 
   // Reload whenever the chat comes back into view (e.g. after scheduling).
   useFocusEffect(
     useCallback(() => {
-      if (!token) return;
-      let stale = false;
-      listScheduledCalls(conversationId, token)
-        .then((list) => {
-          if (stale) return;
-          setCalls(list);
-          setError("");
-        })
-        .catch((err) => {
-          if (!stale) setError(err instanceof Error ? err.message : "Couldn't load calls.");
-        })
-        .finally(() => {
-          if (!stale) setLoading(false);
-        });
-      return () => {
-        stale = true;
-      };
-    }, [conversationId, token]),
+      if (token) dispatch(fetchScheduledCalls({ conversationId, token }));
+    }, [conversationId, token, dispatch]),
   );
 
   const { upcoming, past } = useMemo(() => {
