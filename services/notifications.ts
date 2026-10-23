@@ -21,6 +21,8 @@ export type AppNotificationItem = {
   // @ mention notifications: the chat (and message) to open.
   conversationId?: string | null;
   messageId?: string | null;
+  // Scheduled-call invitations, changes, cancellations and reminders.
+  scheduledCallId?: string | null;
 };
 
 function normalizeActor(raw: any): NotificationActor | null {
@@ -53,6 +55,7 @@ function normalizeNotification(item: any): AppNotificationItem {
     actor: normalizeActor(item?.actor),
     conversationId: item?.conversationId ?? null,
     messageId: item?.messageId ?? null,
+    scheduledCallId: item?.scheduledCallId ?? null,
   };
 }
 

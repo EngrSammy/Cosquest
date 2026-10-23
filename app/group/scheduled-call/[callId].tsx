@@ -26,20 +26,24 @@ import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import {
   callEnd,
-  cancelScheduledCall,
   formatDuration,
   formatLongDate,
   formatTimeRange,
-  getScheduledCall,
   isLiveCall,
   isPastCall,
   REPEAT_LABELS,
-  respondToScheduledCall,
+  messageOf,
   timeZoneLabel,
   type RsvpStatus,
   type ScheduledCall,
 } from "@/services/scheduledCalls";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { selectScheduledCall } from "@/store/slices/scheduledCallSlice";
+import {
+  cancelScheduledCallThunk,
+  fetchScheduledCall,
+  respondScheduledCallThunk,
+} from "@/store/thunks/scheduledCallThunks";
 import { cancelCallReminder, scheduleCallReminder } from "@/utils/callReminders";
 import { safeBack } from "@/utils/safeBack";
 
@@ -84,7 +88,9 @@ export default function ScheduledCallDetails() {
   const token = useAppSelector((state) => state.auth.token);
   const me = useMyPerson();
 
-  const [call, setCall] = useState<ScheduledCall | null>(null);
+  const dispatch = useAppDispatch();
+  // From the store: the Calls tab and live updates share it.
+  const call: ScheduledCall | null = useAppSelector((state) => selectScheduledCall(state, callId));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"cancel" | "accepted" | "declined" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -95,17 +101,16 @@ export default function ScheduledCallDetails() {
   useEffect(() => {
     if (!token || !callId) return;
     let stale = false;
-    getScheduledCall(callId, token)
-      .then((result) => {
-        if (!stale) setCall(result);
-      })
+    // Always fetch: a live update has no passcode or invite link.
+    dispatch(fetchScheduledCall({ callId, token }))
+      .unwrap()
       .catch((err) => {
-        if (!stale) setError(err instanceof Error ? err.message : "Couldn't load this call.");
+        if (!stale) setError(messageOf(err) || "Couldn't load this call.");
       });
     return () => {
       stale = true;
     };
-  }, [token, callId]);
+  }, [token, callId, dispatch]);
 
   const back = useCallback(() => {
     if (call) safeBack({ pathname: "/chat/[id]", params: { id: call.conversationId } });
@@ -125,7 +130,7 @@ export default function ScheduledCallDetails() {
   }
 
   const start = new Date(call.startsAt);
-  const hosting = call.host.id === me.id;
+  const hosting = call.canManage ?? call.host.id === me.id;
   const cancelled = call.status === "cancelled";
   const live = isLiveCall(call);
   const over = isPastCall(call);
@@ -161,12 +166,11 @@ export default function ScheduledCallDetails() {
     if (!token) return;
     setBusy(status);
     try {
-      const updated = await respondToScheduledCall(call.id, status, me, token);
-      setCall(updated);
+      const updated = await dispatch(respondScheduledCallThunk({ callId: call.id, status, me, token })).unwrap();
       if (status === "accepted") await scheduleCallReminder(updated);
       else await cancelCallReminder(updated.id);
     } catch (err) {
-      Alert.alert("Call", err instanceof Error ? err.message : "Couldn't send your reply.");
+      Alert.alert("Call", messageOf(err) || "Couldn't send your reply.");
     } finally {
       setBusy(null);
     }
@@ -182,11 +186,10 @@ export default function ScheduledCallDetails() {
           if (!token) return;
           setBusy("cancel");
           try {
-            const updated = await cancelScheduledCall(call.id, token);
+            const updated = await dispatch(cancelScheduledCallThunk({ callId: call.id, token })).unwrap();
             await cancelCallReminder(updated.id);
-            setCall(updated);
           } catch (err) {
-            Alert.alert("Call", err instanceof Error ? err.message : "Couldn't cancel the call.");
+            Alert.alert("Call", messageOf(err) || "Couldn't cancel the call.");
           } finally {
             setBusy(null);
           }

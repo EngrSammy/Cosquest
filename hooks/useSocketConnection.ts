@@ -1,3 +1,4 @@
+import { scheduledCallUpdated } from "@/store/slices/scheduledCallSlice";
 import { applyPrivateUpdate, receivePrivateIncoming } from "@/components/calls/privateCall";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
@@ -254,6 +255,12 @@ export function useSocketConnection() {
       }
     };
 
+    // Scheduled group calls: created / edited / cancelled / RSVP (the call
+    // without passcode or invite link; the slice keeps the ones it has).
+    const handleScheduledCallUpdated = (payload: { call?: any }) => {
+      if (payload?.call) dispatch(scheduledCallUpdated(payload.call));
+    };
+
     const handleCallUpdated = (payload: { call: any }) => {
       if (payload?.call?.privateOf) {
         applyPrivateUpdate(normalizeCall(payload.call));
@@ -318,6 +325,7 @@ export function useSocketConnection() {
     socket.on("chat:preview", handleChatPreview);
     socket.on("call:incoming", handleCallIncoming);
     socket.on("call:updated", handleCallUpdated);
+    socket.on("scheduled-call:updated", handleScheduledCallUpdated);
     socket.on("connect", handleConnect);
 
     return () => {
@@ -329,6 +337,7 @@ export function useSocketConnection() {
       socket.off("chat:preview", handleChatPreview);
       socket.off("call:incoming", handleCallIncoming);
       socket.off("call:updated", handleCallUpdated);
+      socket.off("scheduled-call:updated", handleScheduledCallUpdated);
       socket.off("connect", handleConnect);
 
       appStateSubscription.remove();

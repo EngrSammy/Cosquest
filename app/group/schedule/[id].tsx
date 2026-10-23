@@ -28,7 +28,7 @@ import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import type { GroupPerson } from "@/services/groups";
 import {
-  createScheduledCall,
+  messageOf,
   deviceTimeZone,
   formatClock,
   formatDuration,
@@ -39,7 +39,8 @@ import {
   type CallRepeat,
 } from "@/services/scheduledCalls";
 import { listSparks } from "@/services/sparks";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { createScheduledCallThunk } from "@/store/thunks/scheduledCallThunks";
 import { scheduleCallReminder } from "@/utils/callReminders";
 import { safeBack } from "@/utils/safeBack";
 
@@ -159,6 +160,7 @@ export default function ScheduleCall() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const conversationId = Array.isArray(id) ? id[0] : id;
   const token = useAppSelector((state) => state.auth.token);
+  const dispatch = useAppDispatch();
   const chatTitle = useChatTitle(conversationId);
   const me = useMyPerson();
 
@@ -221,9 +223,12 @@ export default function ScheduleCall() {
     if (!valid || !token || saving) return;
     setSaving(true);
     try {
-      const call = await createScheduledCall(
+      const call = await dispatch(
+        createScheduledCallThunk({
         conversationId,
-        {
+        host: me,
+        token,
+        input: {
           topic: form.topic.trim(),
           description: form.description.trim(),
           spark: form.spark,
@@ -237,16 +242,15 @@ export default function ScheduleCall() {
           whoCanJoin: form.whoCanJoin,
           waitingRoom: form.waitingRoom,
         },
-        me,
-        token,
-      );
+        }),
+      ).unwrap();
       await scheduleCallReminder(call);
       router.replace({
         pathname: "/group/scheduled-call/[callId]",
         params: { callId: call.id, created: "1" },
       });
     } catch (error) {
-      Alert.alert("Schedule a call", error instanceof Error ? error.message : "Couldn't schedule the call.");
+      Alert.alert("Schedule a call", messageOf(error) || "Couldn't schedule the call.");
       setSaving(false);
     }
   };

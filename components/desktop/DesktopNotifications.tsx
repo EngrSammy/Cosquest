@@ -189,7 +189,9 @@ export default function DesktopNotifications({
                       const username = item.actor?.username;
                       const following = isFollowing(username);
                       const busy = isBusy(username);
-                      const openChat = item.conversationId
+                      const openChat = item.scheduledCallId
+                        ? () => router.push({ pathname: "/group/scheduled-call/[callId]", params: { callId: item.scheduledCallId! } })
+                        : item.conversationId
                         ? () => router.push({ pathname: "/chat/[id]", params: { id: item.conversationId! } })
                         : undefined;
                       const openProfile = username ? () => router.push(`/user/${username}` as any) : undefined;

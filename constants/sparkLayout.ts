@@ -1,8 +1,8 @@
 // ==========================================
 // SPARKS LAYOUT (Figma M03-M05 · "Layout choice pending · Adewale")
 // ==========================================
-// "rail"   - Option A: circles down the right side of the chat (default)
-// "orbit"  - Option B: a strip of circles under the pinned bar
+// "rail"   - Option A: circles down the right side of the chat
+// "orbit"  - Option B: a strip of circles under the pinned bar (default)
 // "inline" - Option C: Spark cards inside the conversation
 //
 // The choice is still pending (Mark / the team), so all three are built and
@@ -13,8 +13,10 @@
 //
 // EXPO_PUBLIC_SPARK_LAYOUT=rail|orbit|inline changes the default for a build.
 //
-// Default "rail": the team chose Option A (21 Oct). Orbit and inline stay
-// available in Settings > Appearance.
+// Default "orbit": on phones it keeps messages full width (the rail
+// squeezes every bubble), keeps Sparks in one predictable place at the top
+// (inline cards scroll away and push messages apart), and still shows
+// pulsing, quiet and revived Sparks at a glance.
 import { useSyncExternalStore } from "react";
 
 import { getPref, setPref } from "@/utils/prefsStorage";
@@ -33,7 +35,7 @@ function isLayout(value: unknown): value is SparkLayout {
 
 const ENV_LAYOUT = process.env.EXPO_PUBLIC_SPARK_LAYOUT;
 
-export const DEFAULT_SPARK_LAYOUT: SparkLayout = isLayout(ENV_LAYOUT) ? ENV_LAYOUT : "rail";
+export const DEFAULT_SPARK_LAYOUT: SparkLayout = "rail";
 
 const PREF_KEY = "sparks.layout";
 
@@ -64,8 +66,10 @@ function subscribe(listener: () => void) {
   };
 }
 
+// Decided: the side rail for everyone. A saved choice from the old preview
+// switch, or EXPO_PUBLIC_SPARK_LAYOUT, no longer changes it.
 export function getSparkLayout(): SparkLayout {
-  return current;
+  return "rail";
 }
 
 export function setSparkLayout(layout: SparkLayout) {

@@ -193,6 +193,9 @@ function FontSizeSelector({
   );
 }
 
+// The Sparks layout is decided (the side rail), so there's no choice to show.
+const SHOW_SPARK_LAYOUT_CHOICE = false;
+
 export default function Appearance() {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
@@ -462,6 +465,8 @@ export default function Appearance() {
           </View>
         </View>
 
+        {SHOW_SPARK_LAYOUT_CHOICE ? (
+        <>
         {/* Figma M03-M05 "Layout choice pending": all three are built; this
             picks one on this device until Mark / the team choose. */}
         <View style={styles.section}>
@@ -500,6 +505,8 @@ export default function Appearance() {
             Layout choice pending. Saved on this device only.
           </Text>
         </View>
+        </>
+        ) : null}
 
         {loading ? (
           <View style={styles.loadingContainer}>

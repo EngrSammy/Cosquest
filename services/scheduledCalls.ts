@@ -11,6 +11,7 @@
 // are all worked out from those two, in each person's own time zone.
 import type { GroupPerson } from "./groups";
 import { getWebBaseUrl } from "@/utils/shareLinks";
+import { apiRequest } from "./api";
 
 export type CallRepeat = "none" | "daily" | "weekly" | "monthly";
 
@@ -44,6 +45,12 @@ export type ScheduledCall = {
   inviteUrl: string;
   status: "scheduled" | "cancelled";
   createdAt: string;
+  // From the server (not in the mock): when it ends, upcoming / ongoing /
+  // past / cancelled, and what this viewer may do.
+  endsAt?: string;
+  timing?: "upcoming" | "ongoing" | "past" | "cancelled";
+  canManage?: boolean;
+  canJoin?: boolean;
 };
 
 // What the Schedule a call form sends.
@@ -191,7 +198,7 @@ function find(callId: string) {
    GET /api/chats/:conversationId/scheduled-calls
 ========================================================= */
 
-export async function listScheduledCalls(
+async function mockListScheduledCalls(
   conversationId: string,
   _token: string,
 ): Promise<ScheduledCall[]> {
@@ -207,7 +214,7 @@ export async function listScheduledCalls(
    GET /api/scheduled-calls/:callId
 ========================================================= */
 
-export async function getScheduledCall(
+async function mockGetScheduledCall(
   callId: string,
   _token: string,
 ): Promise<ScheduledCall> {
@@ -221,7 +228,7 @@ export async function getScheduledCall(
    (the real API takes the host from the token, so `host` is mock-only)
 ========================================================= */
 
-export async function createScheduledCall(
+async function mockCreateScheduledCall(
   conversationId: string,
   input: ScheduledCallInput,
   host: GroupPerson,
@@ -252,7 +259,7 @@ export async function createScheduledCall(
    POST /api/scheduled-calls/:callId/cancel
 ========================================================= */
 
-export async function cancelScheduledCall(
+async function mockCancelScheduledCall(
   callId: string,
   _token: string,
 ): Promise<ScheduledCall> {
@@ -268,7 +275,7 @@ export async function cancelScheduledCall(
    (the real API takes the person from the token)
 ========================================================= */
 
-export async function respondToScheduledCall(
+async function mockRespondToScheduledCall(
   callId: string,
   status: Exclude<RsvpStatus, "pending">,
   me: GroupPerson,
@@ -283,6 +290,137 @@ export async function respondToScheduledCall(
     call.participants.push({ ...me, status });
   }
   return copy(call);
+}
+
+// =========================================================
+// REAL API (Emmanuel's backend, commit 681cac7)
+// =========================================================
+// Same functions as the mock above, on the real routes. Until they're
+// deployed the server answers "Route not found": from then on this session
+// uses the mock, so the Calls tab keeps working either way.
+let mockOnly = false;
+
+export function usingScheduledCallsMock() {
+  return mockOnly;
+}
+
+export function messageOf(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) return String((error as any).message || "");
+  return "";
+}
+
+async function withFallback<T>(real: () => Promise<T>, mock: () => Promise<T>): Promise<T> {
+  if (mockOnly) return mock();
+  try {
+    return await real();
+  } catch (error) {
+    if (/^Route not found/i.test(messageOf(error))) {
+      mockOnly = true;
+      return mock();
+    }
+    throw error;
+  }
+}
+
+// The server's call JSON -> ScheduledCall (it also keeps older field names:
+// durationMinutes, participants[].response, cancelledAt).
+export function normalizeScheduledCall(raw: any): ScheduledCall {
+  const person = (p: any) => ({
+    id: String(p?.id ?? p?.userId ?? ""),
+    username: p?.username ?? "",
+    name: p?.name ?? null,
+    avatarKey: p?.avatarKey ?? null,
+    avatarPhotoUrl: p?.avatarPhotoUrl ?? null,
+  });
+  return {
+    ...raw,
+    id: String(raw?.id ?? ""),
+    conversationId: String(raw?.conversationId ?? ""),
+    topic: raw?.topic ?? "",
+    description: raw?.description ?? "",
+    spark: raw?.spark?.id ? { id: String(raw.spark.id), subject: raw.spark.subject ?? "" } : null,
+    durationMin: Number(raw?.durationMin ?? raw?.durationMinutes ?? 30),
+    host: person(raw?.host),
+    participants: (raw?.participants || []).map((p: any) => ({
+      ...person(p),
+      status: (p?.status || p?.response || "pending") as RsvpStatus,
+    })),
+    meetingCode: raw?.meetingCode ?? "",
+    passcode: raw?.passcode ?? "",
+    inviteUrl: raw?.inviteUrl ?? "",
+    status: raw?.status === "cancelled" || raw?.cancelledAt ? "cancelled" : "scheduled",
+    createdAt: raw?.createdAt ?? "",
+  } as ScheduledCall;
+}
+
+// GET /api/chats/:conversationId/scheduled-calls -> { calls }
+export async function listScheduledCalls(conversationId: string, token: string): Promise<ScheduledCall[]> {
+  return withFallback(
+    async () => {
+      const r = await apiRequest<any>(`/api/chats/${encodeURIComponent(conversationId)}/scheduled-calls`, { token });
+      return (r?.calls || []).map(normalizeScheduledCall);
+    },
+    () => mockListScheduledCalls(conversationId, token),
+  );
+}
+
+// GET /api/scheduled-calls/:callId -> { call, people }
+export async function getScheduledCall(callId: string, token: string): Promise<ScheduledCall> {
+  return withFallback(
+    async () => normalizeScheduledCall((await apiRequest<any>(`/api/scheduled-calls/${encodeURIComponent(callId)}`, { token }))?.call),
+    () => mockGetScheduledCall(callId, token),
+  );
+}
+
+// POST /api/chats/:conversationId/scheduled-calls -> 201 { call, occurrences }
+// (the host comes from the token; `host` is only for the mock)
+export async function createScheduledCall(
+  conversationId: string,
+  input: ScheduledCallInput,
+  host: GroupPerson,
+  token: string,
+): Promise<ScheduledCall> {
+  return withFallback(
+    async () => {
+      const { participants, ...rest } = input;
+      const r = await apiRequest<any>(`/api/chats/${encodeURIComponent(conversationId)}/scheduled-calls`, {
+        method: "POST",
+        token,
+        body: { ...rest, participantIds: participants.map((person) => person.id).filter(Boolean) },
+      });
+      return normalizeScheduledCall(r?.call);
+    },
+    () => mockCreateScheduledCall(conversationId, input, host, token),
+  );
+}
+
+// POST /api/scheduled-calls/:callId/cancel (host only) -> { call }
+export async function cancelScheduledCall(callId: string, token: string): Promise<ScheduledCall> {
+  return withFallback(
+    async () =>
+      normalizeScheduledCall(
+        (await apiRequest<any>(`/api/scheduled-calls/${encodeURIComponent(callId)}/cancel`, { method: "POST", token }))?.call,
+      ),
+    () => mockCancelScheduledCall(callId, token),
+  );
+}
+
+// POST /api/scheduled-calls/:callId/rsvp { status } -> { call }
+// (the person comes from the token; `me` is only for the mock)
+export async function respondToScheduledCall(
+  callId: string,
+  status: Exclude<RsvpStatus, "pending">,
+  me: GroupPerson,
+  token: string,
+): Promise<ScheduledCall> {
+  return withFallback(
+    async () =>
+      normalizeScheduledCall(
+        (await apiRequest<any>(`/api/scheduled-calls/${encodeURIComponent(callId)}/rsvp`, { method: "POST", token, body: { status } }))?.call,
+      ),
+    () => mockRespondToScheduledCall(callId, status, me, token),
+  );
 }
 
 // ---------------------------------------------------------------------
