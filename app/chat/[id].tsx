@@ -106,7 +106,7 @@ import SearchInChat from "@/app/chat/search/[id]";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useSparksFeed } from "@/hooks/useSparks";
-import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
+import { useJoinVoice, VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
 import { voiceChatAllowed } from "@/services/voiceRooms";
 import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
 import {
@@ -256,6 +256,8 @@ type Message = {
     // Group calls: someone was added, and how many people took part.
     groupCall?: boolean;
     participantCount?: number | null;
+    // A voice chat (group, Community or faction room), not a DM call.
+    voiceChat?: boolean;
   } | null;
 
   // kind "scheduled_call": a call scheduled (or cancelled) in this group.
@@ -712,6 +714,7 @@ function getMessageTypeLabel(message: Message) {
       return message.media?.name || message.media?.filename || "Document";
 
     case "call":
+      if (message.callLog?.voiceChat) return "Voice chat";
       return message.callLog?.type === "video" ? "Video call" : "Voice call";
 
     case "scheduled_call":
@@ -2036,18 +2039,22 @@ function CallLogContent({
   const status = log.status;
   const answered = status === "ended";
   const kindName = video ? "video call" : "voice call";
+  const voiceChat = Boolean(log.voiceChat);
 
   // Group calls: "12 people" (can be hundreds; formatted "1,234").
   const peopleCount =
-    log.groupCall && (log.participantCount || 0) > 2
+    voiceChat && (log.participantCount || 0) > 0
+      ? `${formatCount(log.participantCount || 0)} ${log.participantCount === 1 ? "person" : "people"}`
+      : log.groupCall && (log.participantCount || 0) > 2
       ? `${formatCount(log.participantCount || 0)} people`
       : null;
 
   // Red "missed" style: only for the person who was called and didn't pick up.
   const missedForMe = !mine && (status === "missed" || status === "cancelled");
 
-  const title =
-    answered || mine
+  const title = voiceChat
+    ? "Voice chat"
+    : answered || mine
       ? log.groupCall
         ? video
           ? "Group video call"
@@ -2082,6 +2089,8 @@ function CallLogContent({
   const conversation = useAppSelector((state) =>
     msg.conversationId ? state.chat.conversationDetails[msg.conversationId] : undefined,
   ) as Chat | undefined;
+  // Voice chat entries: tapping joins (or starts) this chat's voice chat.
+  const voice = useJoinVoice(msg.conversationId || "", (conversation as any)?.title || "Voice chat");
   const showNotes = callNotesEnabled && answered && Boolean(log.callId);
 
   const nameOf = (userId: string) => {
@@ -2095,12 +2104,12 @@ function CallLogContent({
   return (
     <>
     <Pressable
-      onPress={() => onCallBack(video ? "video" : "audio")}
+      onPress={() => (voiceChat ? voice.join() : onCallBack(video ? "video" : "audio"))}
       onLongPress={onLongPress}
       delayLongPress={300}
       style={styles.callLog}
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${detail}. Tap to call back.`}>
+      accessibilityLabel={`${title}. ${detail}. ${voiceChat ? "Tap to join the voice chat." : "Tap to call back."}`}>
       <View
         style={[
           styles.callLogIcon,
@@ -2108,7 +2117,7 @@ function CallLogContent({
           missedForMe && styles.callLogIconMissed,
         ]}>
         <Ionicons
-          name={video ? "videocam" : "call"}
+          name={voiceChat ? "mic" : video ? "videocam" : "call"}
           size={18}
           color={missedForMe ? "#E5484D" : "#C5399A"}
         />
