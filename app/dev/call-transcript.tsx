@@ -144,7 +144,7 @@ const OUTLINE: CallOutline = {
   generatedBy: { deviceIds: ["dev_1"], modelVersion: "mote-1.3" },
 };
 
-// Real server output for LINES, no live topics (regenerate: @cosquest/sparks-backend extractiveSpans + extractiveReduce).
+// Real output of @cosquest/sparks-backend 1.3.3 (sparks commit after 36256b7, branch call-transcript-notes) for LINES, no live topics.
 const QUICK_OUTLINE: CallOutline = {
   callId: OUTLINE.callId,
   chatId: OUTLINE.chatId,
@@ -153,12 +153,12 @@ const QUICK_OUTLINE: CallOutline = {
   segmentCount: OUTLINE.segmentCount,
   generatedAt: OUTLINE.generatedAt,
   generatedBy: { deviceIds: [], modelVersion: "server-extractive" },
-  title: "Quest and Board",
-  summary: "Amara and Ben talked about quest and board.",
+  title: "Quests and Saturday",
+  summary: "Amara and Ben talked about Quests and Saturday.",
   topics: [
     {
       topicId: "ot_1",
-      title: "Quest and Board",
+      title: "Quests",
       colorIndex: 0,
       order: 0,
       summary: "Ben: Three quests are still open from last week.",
@@ -166,14 +166,36 @@ const QUICK_OUTLINE: CallOutline = {
         "Amara: Move the photo quest to next month."
       ],
       decisions: [
-        "Amara: Let's close the map one, nobody has picked it up.",
-        "Amara: Are we still meeting at ten? Ben: Ten works."
+        "Amara: Let's close the map one, nobody has picked it up."
       ],
       actionItems: [
         {
           text: "I'll update the board tonight.",
           ownerUserId: "u_ben"
-        },
+        }
+      ],
+      spans: [
+        {
+          startMs: 2000,
+          endMs: 28500
+        }
+      ],
+      speakerIds: [
+        "u_amara",
+        "u_ben"
+      ]
+    },
+    {
+      topicId: "ot_2",
+      title: "Saturday",
+      colorIndex: 1,
+      order: 1,
+      summary: "Ben: Cy said they'd bring the speakers.",
+      points: [],
+      decisions: [
+        "Amara: Are we still meeting at ten? Ben: Ten works."
+      ],
+      actionItems: [
         {
           text: "I'll book the hall for three hours.",
           ownerUserId: "u_amara"
@@ -185,7 +207,7 @@ const QUICK_OUTLINE: CallOutline = {
       ],
       spans: [
         {
-          startMs: 2000,
+          startMs: 63000,
           endMs: 149500
         }
       ],

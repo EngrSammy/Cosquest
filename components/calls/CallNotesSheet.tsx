@@ -31,7 +31,15 @@ import {
   type CallOutlineReply,
   type TranscriptSpeakers,
 } from "@/services/callTranscript";
-import { firstName, joinNames, ownerLabel, personName, saidLabel, splitQuotes } from "@/services/callTranscriptCopy";
+import {
+  firstName,
+  joinNames,
+  ownerLabel,
+  personName,
+  saidLabel,
+  splitQuotes,
+  splitSaid,
+} from "@/services/callTranscriptCopy";
 import { getSparksSdk, modelStatus, onModelStatus, sparksEnabled } from "@/services/sparksSdk";
 
 import type { CallOutline } from "@cosquest/sparks-sdk";
@@ -291,17 +299,18 @@ export default function CallNotesSheet({
               {topics.map((topic) => {
                 const color = TOPIC_COLORS[topic.colorIndex % TOPIC_COLORS.length];
                 const people = withWhom(topic.speakerIds || []);
-                // Quick notes: the topic's summary is a quoted line too; it leads the
-                // points (once, if it is also one of them).
-                const points =
-                  quick && topic.summary
-                    ? [topic.summary, ...topic.points.filter((p) => p.trim() !== topic.summary.trim())]
-                    : topic.points;
+                // Quick notes: a topic's summary is usually a quoted line; it leads the
+                // points (once, if it is also one of them). A plain summary
+                // ("Amara and Ben talked about ...") stays a summary line.
+                const leadQuote = quick && Boolean(topic.summary) && splitSaid(topic.summary).who !== null;
+                const points = leadQuote
+                  ? [topic.summary, ...topic.points.filter((p) => p.trim() !== topic.summary.trim())]
+                  : topic.points;
                 return (
                   <View key={topic.topicId} style={[styles.topic, { borderLeftColor: color }]}>
                     <Text style={styles.topicTitle}>{topic.title}</Text>
                     {people ? <Text style={styles.people}>With {people}</Text> : null}
-                    {topic.summary && !quick ? <Text style={styles.text}>{topic.summary}</Text> : null}
+                    {topic.summary && !leadQuote ? <Text style={styles.text}>{topic.summary}</Text> : null}
                     {points.map((point, i) => bullet(`p${i}`, point))}
                     {topic.decisions.length ? <Text style={styles.label}>Decided</Text> : null}
                     {topic.decisions.map((decision, i) => bullet(`d${i}`, decision))}
