@@ -5,8 +5,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
+import { SparksSetupPrompt } from "@/components/sparks/SparksSetupPrompt";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const ACTIVE = "#DC179F";
 const INACTIVE = "#FFFFFF";
@@ -19,6 +22,7 @@ function TabIcon({
   focused: boolean;
   children: ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.iconWrap}>
       {focused ? <View style={styles.activeLine} /> : null}
@@ -28,7 +32,12 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  // Computer: the left rail replaces the bottom tab bar.
+  const desktop = useIsDesktop();
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
+    <>
+    <SparksSetupPrompt />
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: ACTIVE,
@@ -36,7 +45,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarLabelStyle: styles.label,
-        tabBarStyle: {
+        tabBarStyle: desktop ? { display: "none" } : {
           position: "absolute",
           marginHorizontal: 16,
           bottom: 24,
@@ -109,12 +118,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }
 
 const RADIUS = 34;
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   barShadow: {
     ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,

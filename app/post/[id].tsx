@@ -25,6 +25,7 @@ import { PostCard } from "@/components/community/feed/PostCard";
 import { getPost } from "@/services/posts";
 import { useAppSelector } from "@/store/hooks";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // The backend's single-post answer may be { post: {...} } or the post
 // itself, and may use slightly different names than the feed list
@@ -58,6 +59,8 @@ function goBack() {
 }
 
 export default function PostDetailScreen() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -122,7 +125,7 @@ export default function PostDetailScreen() {
     // Opened from a shared link without being logged in.
     content = (
       <View style={styles.center}>
-        <Ionicons name="lock-closed-outline" size={40} color="#C5399A" />
+        <Ionicons name="lock-closed-outline" size={40} color={ink.text("#C5399A")} />
 
         <Text style={styles.centerTitle}>Log in to see this post</Text>
 
@@ -142,7 +145,7 @@ export default function PostDetailScreen() {
   } else if (loading) {
     content = (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#C5399A" />
+        <ActivityIndicator size="large" color={ink.text("#C5399A")} />
 
         <Text style={styles.centerText}>Loading post...</Text>
       </View>
@@ -150,7 +153,7 @@ export default function PostDetailScreen() {
   } else {
     content = (
       <View style={styles.center}>
-        <Ionicons name="alert-circle-outline" size={40} color="#8A8A93" />
+        <Ionicons name="alert-circle-outline" size={40} color={ink.text("#8A8A93")} />
 
         <Text style={styles.centerTitle}>Post not available</Text>
 
@@ -171,7 +174,7 @@ export default function PostDetailScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={goBack} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={26} color="#191922" />
+          <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
         </Pressable>
 
         <Text style={styles.headerTitle}>Post</Text>
@@ -191,7 +194,7 @@ export default function PostDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",

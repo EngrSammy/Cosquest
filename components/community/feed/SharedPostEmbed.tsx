@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AVATARS } from "@/constants/avatars";
 import type { SharedPost } from "@/store/slices/postSlice";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function avatarFor(author?: {
   avatarPhotoUrl?: string | null;
@@ -27,10 +28,12 @@ function avatarFor(author?: {
 }
 
 export function SharedPostEmbed({ shared }: { shared?: SharedPost | null }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   if (!shared || shared.unavailable) {
     return (
       <View style={[styles.frame, styles.unavailable]}>
-        <Ionicons name="eye-off-outline" size={18} color="#8A8A93" />
+        <Ionicons name="eye-off-outline" size={18} color={ink.text("#8A8A93")} />
         <Text style={styles.unavailableText}>
           This post is no longer available.
         </Text>
@@ -100,13 +103,13 @@ export function SharedPostEmbed({ shared }: { shared?: SharedPost | null }) {
 
           {isReel ? (
             <View style={styles.play}>
-              <Ionicons name="play" size={22} color="#FFFFFF" />
+              <Ionicons name="play" size={22} color={ink.text("#FFFFFF")} />
             </View>
           ) : null}
 
           {(shared.media?.length || 0) > 1 ? (
             <View style={styles.count}>
-              <Ionicons name="copy-outline" size={12} color="#FFFFFF" />
+              <Ionicons name="copy-outline" size={12} color={ink.text("#FFFFFF")} />
               <Text style={styles.countText}>{shared.media!.length}</Text>
             </View>
           ) : null}
@@ -123,7 +126,7 @@ export function SharedPostEmbed({ shared }: { shared?: SharedPost | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   // Sits inside the post's text card (which has its own padding).
   frame: {
     marginTop: 12,

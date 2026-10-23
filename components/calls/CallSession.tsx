@@ -8,14 +8,21 @@ import {
   isTrackReference,
   useLocalParticipant,
   useRemoteParticipants,
+  useRoomContext,
   useTracks,
 } from "@livekit/react-native";
 import { LocalVideoTrack, RoomOptions, Track } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
+import CallSubscriptionManager from "@/components/calls/CallSubscriptionManager";
+import { useJoinConnectOptions } from "@/components/calls/callSubscriptions";
+import StageLayout, {
+  type RenderStageVideo,
+} from "@/components/calls/StageLayout";
+import { useStageMode } from "@/components/calls/stageModel";
 import {
   AnimatedDots,
   CALL_COLORS,
@@ -27,10 +34,17 @@ import {
 import GroupCallMembers, {
   groupCallTitle,
 } from "@/components/calls/GroupCallMembers";
+import SparksCallNotes from "@/components/calls/SparksCallNotes";
+import SparksCallPanel from "@/components/calls/SparksCallPanel";
 import { useCallTone } from "@/components/calls/useCallTone";
 import VideoGridTile from "@/components/calls/VideoGridTile";
+import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
+import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
+import { setCallMinimized } from "@/components/calls/callUi";
 import type { Call } from "@/services/calls";
 import { otherActiveMembers } from "@/services/calls";
+import { useSparksCallNotes } from "@/services/sparksCallNotes";
+import { useSparksBoot } from "@/hooks/useSparks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
@@ -42,6 +56,10 @@ const RING_TIMEOUT_MS = 47_000;
 
 // Backup check while ringing, in case a call:updated socket event is missed.
 const RINGING_SAFETY_POLL_MS = 5000;
+
+// Height of the audio layout's control card (buttons + End pill): Sparks
+// call notes float just above it.
+const AUDIO_CARD_HEIGHT = 200;
 
 // How long "Call declined" / "No answer" stays on screen before closing.
 const END_MESSAGE_MS = 1400;
@@ -148,6 +166,10 @@ async function routeAudio(speakerOn: boolean) {
 export default function CallSession() {
   const dispatch = useAppDispatch();
 
+  // Sparks may not be running yet (it starts when Chats opens): a call
+  // answered straight from the ringing screen needs it for call notes.
+  useSparksBoot();
+
   const callId = useAppSelector((state) => state.call.active?.call.id);
 
   const token = useAppSelector((state) => state.auth.token);
@@ -160,6 +182,10 @@ export default function CallSession() {
   );
 
   const myUserId = useAppSelector((state) => state.call.myUserId);
+
+  // Joining a call that's already big: cameras are subscribed by hand
+  // (only the ones on screen). See callSubscriptions.ts.
+  const connectOptions = useJoinConnectOptions(active?.call);
 
   const [endMessage, setEndMessage] = useState<string | null>(null);
 
@@ -281,6 +307,7 @@ export default function CallSession() {
         audio
         video={active.call.type === "video"}
         options={ROOM_OPTIONS}
+        connectOptions={connectOptions}
         onError={(error) => {
           // Show and log the REAL reason (e.g. invalid token, wrong
           // LIVEKIT_URL, no network) instead of only "Connection lost".
@@ -297,6 +324,9 @@ export default function CallSession() {
             ERROR_MESSAGE_MS,
           );
         }}>
+        <CallSubscriptionManager
+          autoSubscribe={connectOptions.autoSubscribe}
+        />
         <CallStage
           call={active.call}
           direction={active.direction}
@@ -312,6 +342,20 @@ export default function CallSession() {
     </View>
   );
 }
+
+// One camera on the big-call stage (module level, so it never changes).
+const renderStageVideo: RenderStageVideo = (
+  participant,
+  publication,
+  { mirror },
+) => (
+  <VideoTrack
+    trackRef={{ participant, publication, source: Track.Source.Camera }}
+    style={StyleSheet.absoluteFill}
+    objectFit="cover"
+    mirror={mirror}
+  />
+);
 
 // ==========================================
 // CALL STAGE (inside the LiveKit room)
@@ -381,9 +425,71 @@ function CallStage({
   const [facing, setFacing] = useState<"user" | "environment">("user");
 
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  // FOCUS MODE: hear nobody, stay in the call.
+  const [focusOn, setFocusOn] = useState(false);
 
   const answered = answeredAt !== null;
   const remoteCount = remoteParticipants.length;
+
+  // Sparks call notes (phones with Sparks on): this user's speech becomes
+  // text on their own phone while the call is answered and they're unmuted.
+  const notes = useSparksCallNotes({
+    callId: call.id,
+    chatId: call.conversationId,
+    startedAt:
+      call.answeredAt ||
+      (answeredAt !== null ? new Date(answeredAt).toISOString() : null),
+    active: answered && call.status === "accepted" && !endMessage,
+    micOn: isMicrophoneEnabled,
+  });
+
+  // PRIVATE CALL ON TOP: while you're in one from this call, the call keeps
+  // going quieter (25%) and your mic is off here, so nobody hears you.
+  const inPrivate = useInPrivateFrom(call.id);
+  const micBeforePrivate = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (inPrivate) {
+      micBeforePrivate.current = isMicrophoneEnabled;
+      localParticipant.setMicrophoneEnabled(false);
+    } else if (micBeforePrivate.current !== null) {
+      localParticipant.setMicrophoneEnabled(micBeforePrivate.current);
+      micBeforePrivate.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPrivate]);
+  useEffect(() => {
+    remoteParticipants.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
+  }, [inPrivate, remoteParticipants]);
+
+  // Two pages: the call, and its Sparks (swipe across, or "Sparks ›").
+  const { width: pageWidth } = useWindowDimensions();
+  const pages = useRef<ScrollView>(null);
+  const openSparks = useCallback(() => pages.current?.scrollTo({ x: pageWidth, animated: true }), [pageWidth]);
+  const backToCall = useCallback(() => pages.current?.scrollTo({ x: 0, animated: true }), []);
+  const pager = (callPage: React.ReactElement) => (
+    <ScrollView
+      ref={pages}
+      horizontal
+      pagingEnabled
+      bounces={false}
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.pages}>
+      <View style={{ width: pageWidth }}>{callPage}</View>
+      <View style={{ width: pageWidth }}>
+        <CallBackground>
+          <SparksCallPanel
+            notes={notes}
+            call={call}
+            myUserId={myUserId}
+            topInset={insets.top}
+            bottomInset={insets.bottom}
+            onBack={backToCall}
+          />
+        </CallBackground>
+      </View>
+    </ScrollView>
+  );
 
   // Who's talking right now (LiveKit identities are user ids).
   const speakingIds = [
@@ -431,6 +537,26 @@ function CallStage({
 
     return () => clearInterval(interval);
   }, [answeredAt]);
+
+  // FOCUS MODE: stop receiving everyone's voice (still in the call, circle stays).
+  useEffect(() => {
+    remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((publication: any) => {
+        try {
+          publication.setSubscribed?.(!focusOn);
+        } catch {
+          // Not subscribed yet: picked up on the next change.
+        }
+      });
+    });
+  }, [focusOn, remoteParticipants]);
+
+  // Group calls start on the loudspeaker (several people talking).
+  useEffect(() => {
+    if (isGroup) {
+      setSpeakerOn(true);
+    }
+  }, [isGroup]);
 
   // Caller, while ringing: backup check + backup timeout.
   useEffect(() => {
@@ -574,6 +700,91 @@ function CallStage({
         ? "Requesting"
         : "Connecting";
 
+  // Hooks before any early return (React needs the same order every render).
+  const room = useRoomContext();
+  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
+  const stageMode = useStageMode(remoteCount + 1);
+
+  // ==========================================
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
+  // ==========================================
+
+  if (isGroup && !stageMode) {
+    const people: OrbitPerson[] = call.members
+      .filter((member) => member.status === "joined" || member.status === "ringing")
+      .map((member) => {
+        const isMe = !!myUserId && member.user.id === myUserId;
+        const remote = remoteParticipants.find((p) => p.identity === member.user.id);
+        const slot = cameraSlots.find((s) => s.participant.identity === member.user.id);
+        return {
+          id: member.user.id,
+          name: member.user.name || member.user.username || "Someone",
+          avatar: getAvatarSource(member.user),
+          speaking: speakingIds.includes(member.user.id),
+          micOff: isMe ? !isMicrophoneEnabled : remote ? !remote.isMicrophoneEnabled : false,
+          ringing: member.status === "ringing" && !remote && !isMe,
+          isMe,
+          rankLevel: (member.user as any).rank?.level ?? null,
+          rankName: (member.user as any).rank?.name ?? null,
+          username: member.user.username || null,
+          away: !!member.away,
+          hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
+        };
+      });
+
+    const renderVideo = (id: string) => {
+      const slot = cameraSlots.find((s) => s.participant.identity === id);
+      if (!slot || !isTrackReference(slot) || slot.publication.isMuted) {
+        return null;
+      }
+      return (
+        <VideoTrack
+          trackRef={slot as TrackReference}
+          style={StyleSheet.absoluteFill}
+          objectFit="cover"
+          mirror={slot.participant.isLocal && facing === "user"}
+        />
+      );
+    };
+
+    const onCall = people.filter((person) => !person.ringing).length;
+
+    return pager(
+      <>
+        <OrbitCallScreen
+          title={displayName}
+          subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
+          people={people}
+          pinnedId={call.caller?.id || null}
+          renderVideo={renderVideo}
+          micOn={isMicrophoneEnabled}
+          cameraOn={isCameraEnabled}
+          focusOn={focusOn}
+          ended={!!endMessage}
+          onToggleMic={toggleMic}
+          onToggleCamera={toggleCamera}
+          onFlipCamera={flipCamera}
+          onToggleFocus={() => setFocusOn((value) => !value)}
+          onLeave={hangUp}
+          onMinimize={() => setCallMinimized(true)}
+          onPeople={openAddPeople}
+          onSparks={openSparks}
+          onPrivateCall={(person) => startPrivate({ kind: "call", id: call.id }, person.id)}
+          extra={
+            <SparksCallNotes
+              notes={notes}
+              call={call}
+              myUserId={myUserId}
+              style={styles.orbitNotes}
+              onOpenSparks={openSparks}
+            />
+          }
+        />
+        {addPeopleSheet}
+      </>,
+    );
+  }
+
   // ==========================================
   // VIDEO LAYOUT (Figma: video-call-screen)
   // ==========================================
@@ -632,6 +843,39 @@ function CallStage({
   );
 
   // ==========================================
+  // BIG CALL (more than 8 people): speaker stage + list, audio or video.
+  // Only the tiles on screen receive video. See StageLayout.
+  // ==========================================
+
+  if (stageMode) {
+    // Sparks works here too: the pill and newest line at the top, and the
+    // Sparks panel one swipe away (like every other call layout).
+    return pager(
+      <StageLayout
+        room={room}
+        call={call}
+        title={displayName}
+        status={statusText}
+        live={answered && !endMessage}
+        waiting={waiting}
+        mirrorSelf={facing === "user"}
+        renderVideo={renderStageVideo}
+        controls={videoBar}
+        overlay={addPeopleSheet}
+        topExtra={
+          <SparksCallNotes
+            notes={notes}
+            call={call}
+            myUserId={myUserId}
+            style={styles.orbitNotes}
+            onOpenSparks={openSparks}
+          />
+        }
+      />,
+    );
+  }
+
+  // ==========================================
   // GROUP VIDEO GRID: everyone at once (video, or avatar when camera off)
   // ==========================================
 
@@ -640,7 +884,7 @@ function CallStage({
       a.participant.isLocal ? -1 : b.participant.isLocal ? 1 : 0,
     );
 
-    return (
+    return pager(
       <View style={styles.videoRoot}>
         <View
           style={[
@@ -698,6 +942,14 @@ function CallStage({
           </View>
         </View>
 
+        <SparksCallNotes
+          notes={notes}
+          call={call}
+          myUserId={myUserId}
+          style={[styles.notesOverlay, { bottom: insets.bottom + 112 }]}
+          onOpenSparks={openSparks}
+        />
+
         {videoBar}
 
         {addPeopleSheet}
@@ -708,7 +960,7 @@ function CallStage({
   if (videoLayout) {
     const localFullScreen = myCameraOn && !remoteTrack;
 
-    return (
+    return pager(
       <View style={styles.videoRoot}>
         {remoteTrack ? (
           <VideoTrack
@@ -765,6 +1017,14 @@ function CallStage({
           </View>
         ) : null}
 
+        <SparksCallNotes
+          notes={notes}
+          call={call}
+          myUserId={myUserId}
+          style={[styles.notesOverlay, { bottom: insets.bottom + 112 }]}
+          onOpenSparks={openSparks}
+        />
+
         {videoBar}
 
         {addPeopleSheet}
@@ -776,7 +1036,7 @@ function CallStage({
   // AUDIO / REQUESTING LAYOUT (Figma: cosquest-call-request)
   // ==========================================
 
-  return (
+  return pager(
     <CallBackground>
       <View style={[styles.audioTop, { paddingTop: insets.top + 24 }]}>
         <CallLogo />
@@ -802,6 +1062,14 @@ function CallStage({
           {waiting ? <AnimatedDots /> : null}
         </View>
       </View>
+
+      <SparksCallNotes
+        notes={notes}
+        call={call}
+        myUserId={myUserId}
+        overlayBottom={insets.bottom + AUDIO_CARD_HEIGHT + 32}
+        onOpenSparks={openSparks}
+      />
 
       <View style={[styles.audioCard, { marginBottom: insets.bottom + 20 }]}>
         <View style={styles.audioControls}>
@@ -857,7 +1125,16 @@ function CallStage({
 // ==========================================
 
 const styles = StyleSheet.create({
+  // Sparks notes strip inside the orbit (under the header).
+  orbitNotes: { marginHorizontal: 16, marginBottom: 6 },
+
   blank: { flex: 1, backgroundColor: "#1B0714" },
+
+  // SPARKS CALL NOTES
+
+  notesOverlay: { position: "absolute", left: 0, right: 0 },
+
+  pages: { flex: 1 },
 
   // AUDIO / REQUESTING
 

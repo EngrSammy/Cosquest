@@ -4,13 +4,27 @@
 // Same style as Settings / Edit Profile: the Figma gradient background,
 // milky rows, pink accents and Poppins. When the designer's group screens
 // arrive, most of the look can be adjusted here in one place.
+//
+// Light and dark come from constants/chatTheme.ts (themedStyles), like the
+// chat. `groupStyles` stays for older code (light); new code uses
+// useGroupStyles(), which follows dark mode.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
+import { useContext } from "react";
+
+import { AdminEmbedded } from "@/components/groups/AdminUi";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  DARK_SCREEN_GRADIENT,
+  themedStyles,
+  useInk,
+  useThemedStyles,
+} from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 
 export const PINK = "#C34D9C";
@@ -43,25 +57,32 @@ export function GroupScreen({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
+  // Inside a desktop workspace column (Figma D6): no background, no back arrow.
+  const embedded = useContext(AdminEmbedded);
+  const wide = useIsDesktop();
 
   return (
     <View style={styles.screen}>
+      {!embedded ? (
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      ) : null}
 
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, wide && { maxWidth: 1180, paddingHorizontal: 32 }, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={onBack}
           hitSlop={10}
           style={styles.headerSide}
           accessibilityRole="button"
           accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={24} color={INK} />
+          {!embedded ? <Ionicons name="arrow-back" size={24} color={ink.text(INK)} /> : null}
         </Pressable>
 
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -134,6 +155,7 @@ export function GroupAvatar({
 
 // "Section title" in small caps.
 export function SectionLabel({ children }: { children: ReactNode }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
@@ -149,6 +171,7 @@ export function OptionSelector<T extends string>({
   onChange: (value: T) => void;
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.selector}>
       {options.map((option) => {
@@ -190,6 +213,8 @@ export function GroupRow({
   onPress?: () => void;
   right?: ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <Pressable
       onPress={onPress}
@@ -199,7 +224,7 @@ export function GroupRow({
         pressed && onPress ? styles.pressed : null,
       ]}>
       <View style={[styles.rowIcon, danger && styles.rowIconDanger]}>
-        <Ionicons name={icon} size={16} color={danger ? "#D64545" : PINK} />
+        <Ionicons name={icon} size={16} color={ink.text(danger ? "#D64545" : PINK)} />
       </View>
 
       <View style={styles.rowText}>
@@ -209,13 +234,13 @@ export function GroupRow({
 
       {right ??
         (onPress && !danger ? (
-          <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+          <Ionicons name="chevron-forward" size={16} color={ink.text("#8A8A93")} />
         ) : null)}
     </Pressable>
   );
 }
 
-export const groupStyles = StyleSheet.create({
+const GROUP_STYLES_LIGHT = StyleSheet.create({
   input: {
     ...MILKY,
     minHeight: 50,
@@ -257,7 +282,24 @@ export const groupStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+// Older code: always light.
+export const groupStyles = GROUP_STYLES_LIGHT;
+
+// Follows light / dark mode.
+const GROUP_STYLE_PAIR = themedStyles(GROUP_STYLES_LIGHT, {
+  input: {
+    backgroundColor: "#252837",
+    borderColor: "rgba(255,255,255,0.14)",
+    color: "#F4F5FA",
+  },
+  hint: { color: "#B5BBCB" },
+});
+
+export function useGroupStyles() {
+  return useThemedStyles(GROUP_STYLE_PAIR);
+}
+
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1, backgroundColor: "#FFFFFF" },
 
   header: {
@@ -349,4 +391,16 @@ const styles = StyleSheet.create({
   },
 
   danger: { color: "#D64545" },
+}, {
+  screen: { backgroundColor: "transparent" },
+  headerTitle: { color: "#F4F5FA" },
+  sectionLabel: { color: "#B5BBCB" },
+  selector: { backgroundColor: "#252837", borderColor: "rgba(255,255,255,0.12)" },
+  optionSelected: { backgroundColor: PINK },
+  optionText: { color: "#C9CEDA" },
+  optionTextSelected: { color: "#FFFFFF" },
+  row: { backgroundColor: "#252837", borderColor: "rgba(255,255,255,0.12)" },
+  rowLabel: { color: "#F4F5FA" },
+  rowDetail: { color: "#B5BBCB" },
+  danger: { color: "#F07A8A" },
 });

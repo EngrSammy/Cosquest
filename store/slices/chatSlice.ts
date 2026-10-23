@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, current, isDraft, PayloadAction } from "@reduxjs/toolkit";
 
 import {
   createChat,
@@ -128,6 +128,15 @@ function getPreview(message: ChatMessage): string {
 
   if (message.kind === "document") {
     return "📎 Document";
+  }
+
+  if (message.kind === "album") {
+    const count = Array.isArray((message as any).album) ? (message as any).album.length : 0;
+    return count > 1 ? `📷 ${count} photos` : "📷 Photo";
+  }
+
+  if (message.kind === "poll") {
+    return `📊 ${message.content || "Poll"}`;
   }
 
   // Call entry. A moment later the backend's chat:preview refresh replaces
@@ -463,6 +472,71 @@ const chatSlice = createSlice({
     },
 
     // ======================================
+    // SOCKET — POLL RESULTS (someone voted / the poll closed)
+    // Live updates leave out myVotes (each app keeps its own picks).
+    // ======================================
+
+    socketPollUpdated(
+      state,
+      action: PayloadAction<{
+        conversationId: string;
+        messageId: string;
+        poll: NonNullable<ChatMessage["poll"]>;
+      }>,
+    ) {
+      const { conversationId, messageId, poll } = action.payload;
+
+      const message = state.messages[conversationId]?.find(
+        (item) => item.id === messageId,
+      );
+
+      if (!message || !poll) {
+        return;
+      }
+
+      const previous = message.poll;
+
+      message.poll = {
+        ...previous,
+        ...poll,
+        myVotes: poll.myVotes ?? previous?.myVotes ?? [],
+      };
+    },
+
+    // ======================================
+    // SOCKET — SPARK TAGS
+    // messageIds given: tag them into the Spark. No messageIds: the Spark
+    // was deleted, so untag every message that was in it.
+    // ======================================
+
+    socketSparkMessages(
+      state,
+      action: PayloadAction<{
+        conversationId: string;
+        sparkId: string;
+        era?: number;
+        messageIds?: string[];
+      }>,
+    ) {
+      const { conversationId, sparkId, era, messageIds } = action.payload;
+      const messages = state.messages[conversationId];
+
+      if (!messages) {
+        return;
+      }
+
+      for (const message of messages) {
+        if (messageIds) {
+          if (messageIds.includes(message.id)) {
+            message.spark = { ...(message.spark || {}), id: sparkId, era: era ?? 0 };
+          }
+        } else if (message.spark?.id === sparkId) {
+          message.spark = null;
+        }
+      }
+    },
+
+    // ======================================
     // SOCKET — PINNED/UNPINNED
     // pinnedMessage is null on unpin, {id} on pin — covers both
     // pinMessageThunk.fulfilled and unpinMessageThunk.fulfilled's
@@ -695,6 +769,12 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.pending, (state, action) => {
         const conversationId = action.meta.arg.conversationId;
 
+        // The background catch-up poll (append) shows no spinner, so it
+        // doesn't flip the flag (that re-rendered the whole chat twice).
+        if (action.meta.arg.mode === "append") {
+          return;
+        }
+
         state.messagesLoading[conversationId] = true;
       })
 
@@ -735,14 +815,29 @@ const chatSlice = createSlice({
 
           // Existing messages may have changed (edited/deleted/reacted to)
           // even if nothing new arrived — keep those in sync too.
+          // Only messages that really changed are replaced, so the list (and
+          // every memoized bubble) keeps the same objects when the poll
+          // brings nothing new. The backend ignores `after` and returns the
+          // latest page every time, so this used to rebuild the array and
+          // give ~30 messages new identities every 30 s.
           if (existing.length > 0) {
             const incomingById = new Map(
               incoming.map((message) => [message.id, message]),
             );
 
-            state.messages[conversationId] = (
-              state.messages[conversationId] || existing
-            ).map((message) => incomingById.get(message.id) || message);
+            const list = state.messages[conversationId] || existing;
+
+            list.forEach((message, index) => {
+              const next = incomingById.get(message.id);
+
+              if (
+                next &&
+                JSON.stringify(next) !==
+                  JSON.stringify(isDraft(message) ? current(message) : message)
+              ) {
+                list[index] = next;
+              }
+            });
           }
         } else {
           state.messages[conversationId] = incoming;
@@ -1083,6 +1178,8 @@ export const {
   socketMessageReaction,
   socketChatPinned,
   socketChatRead,
+  socketPollUpdated,
+  socketSparkMessages,
   socketPresenceChanged,
   socketTypingStarted,
   socketTypingStopped,

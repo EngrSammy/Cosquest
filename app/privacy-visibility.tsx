@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const PINK = "#C34D9C";
 
@@ -59,10 +60,12 @@ function PrivacyToggleRow({
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   return (
     <View style={styles.row}>
       <View style={styles.rowIcon}>
-        <Ionicons name="person" size={15} color={PINK} />
+        <Ionicons name="person" size={15} color={ink.text(PINK)} />
       </View>
 
       <View style={styles.rowTextWrap}>
@@ -76,6 +79,8 @@ function PrivacyToggleRow({
 }
 
 export default function PrivacyVisibility() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const token = useAppSelector((state) => state.auth.token);
@@ -161,7 +166,7 @@ export default function PrivacyVisibility() {
   return (
     <View style={styles.screen}>
       <LinearGradient
-        colors={["#FFFFFF", "#E1F3FF"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#E1F3FF"]}
         locations={[0, 0.6442]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -182,19 +187,19 @@ export default function PrivacyVisibility() {
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="lock-closed-outline" size={16} color={PINK} />
+              <Ionicons name="lock-closed-outline" size={16} color={ink.text(PINK)} />
             </View>
 
             <Text style={styles.headerTitle}>Privacy & Visibility</Text>
           </View>
 
           <View style={styles.backButton}>
-            {loading ? <ActivityIndicator size="small" color={PINK} /> : null}
+            {loading ? <ActivityIndicator size="small" color={ink.text(PINK)} /> : null}
           </View>
         </View>
 
@@ -256,7 +261,7 @@ export default function PrivacyVisibility() {
               pressed && styles.pressed,
             ]}>
             <View style={styles.rowIcon}>
-              <Ionicons name="person" size={15} color={PINK} />
+              <Ionicons name="person" size={15} color={ink.text(PINK)} />
             </View>
 
             <View style={styles.rowTextWrap}>
@@ -268,7 +273,7 @@ export default function PrivacyVisibility() {
               </Text>
             </View>
 
-            <Ionicons name="chevron-forward" size={16} color="#8A8A93" />
+            <Ionicons name="chevron-forward" size={16} color={ink.text("#8A8A93")} />
           </Pressable>
         </View>
       </ScrollView>
@@ -288,7 +293,7 @@ const MILKY = {
   elevation: 2,
 } as const;
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1, backgroundColor: "#FFFFFF" },
 
   scroll: {

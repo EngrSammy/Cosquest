@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   AudioModule,
   RecordingPresets,
@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, type ReactElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -41,6 +41,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import CallNotesSheet, { callNotesEnabled } from "@/components/calls/CallNotesSheet";
 
 import {
   createMessage,
@@ -69,6 +70,8 @@ import {
   socketMessageEdited,
   socketMessageReaction,
   socketMessageReceived,
+  socketPollUpdated,
+  socketSparkMessages,
   toggleSelectedMessage,
 } from "@/store/slices/chatSlice";
 
@@ -80,11 +83,41 @@ import {
   stopTyping,
 } from "@/services/socket";
 
+import { StatusBar } from "expo-status-bar";
 import { ChatWallpaperBackground } from "@/components/chat/ChatWallpaperBackground";
 import MentionPicker, {
   type MentionPerson,
 } from "@/components/chat/MentionPicker";
 import { MentionText } from "@/components/chat/MentionText";
+import PollBubble from "@/components/chat/PollBubble";
+import PollCreator from "@/components/chat/PollCreator";
+import { RankBadge, RankLine, RoleBadge } from "@/components/chat/RankBadge";
+import type { Rank } from "@/services/ranks";
+import SparkPanel from "@/components/chat/SparkPanel";
+import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
+import StartSparkSheet from "@/components/chat/StartSparkSheet";
+import MessageActionsSheet from "@/components/chat/MessageActionsSheet";
+import RolePingCard from "@/components/chat/RolePingCard";
+import AlbumGrid from "@/components/chat/AlbumGrid";
+import SparksOrbit, { SparkCard } from "@/components/chat/SparksOrbit";
+import { useSparkLayout } from "@/constants/sparkLayout";
+import DesktopSparksPanel, { DesktopChatRow } from "@/components/desktop/DesktopSparksPanel";
+import SearchInChat from "@/app/chat/search/[id]";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { useSparksFeed } from "@/hooks/useSparks";
+import { VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
+import { voiceChatAllowed } from "@/services/voiceRooms";
+import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
+import {
+  eraColor,
+  listSparks,
+  type MessageSparkTag,
+  type Spark,
+  type SparkRolePing,
+} from "@/services/sparks";
+import type { PollSummary } from "@/services/polls";
+import { formatCount } from "@/services/calls";
 import { useChatWallpaper } from "@/components/chat/useChatWallpaper";
 import VideoFirstFrame from "@/components/chat/VideoFirstFrame";
 import {
@@ -94,6 +127,7 @@ import {
   nextSpeed,
 } from "@/components/chat/VoiceSpeed";
 import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
+import { smallAvatarUrl } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import type { Wallpaper } from "@/constants/wallpapers";
 import {
@@ -130,6 +164,8 @@ type Message = {
   content?: string;
 
   sender?: {
+    // Faction rank (badge beside the name).
+    rank?: Rank | null;
     id?: string;
     _id?: string;
     username?: string;
@@ -146,6 +182,19 @@ type Message = {
 
   // A group admin deleted it.
   deletedByAdmin?: boolean;
+
+  // kind "poll": the question, options and results.
+  poll?: PollSummary | null;
+
+  // Groups: "owner" / "admin" badge for the sender (null otherwise).
+  senderGroupRole?: "owner" | "admin" | null;
+
+  // Sparks: the sub-conversation this message is part of.
+  spark?: MessageSparkTag | null;
+
+  // Albums (M17) and the wording "Undo" restores (M15).
+  album?: { kind: "image" | "video"; url?: string; thumbnailUrl?: string | null; duration?: number | null }[] | null;
+  previousContent?: string | null;
 
   editedAt?: string | null;
 
@@ -201,6 +250,9 @@ type Message = {
     status?: "ended" | "declined" | "missed" | "cancelled";
     durationSeconds?: number | null;
     callerId?: string;
+    // Group calls: someone was added, and how many people took part.
+    groupCall?: boolean;
+    participantCount?: number | null;
   } | null;
 };
 
@@ -269,7 +321,16 @@ const MENU_TAP_GUARD_MS = 450;
 const DELETE_FOR_EVERYONE_WINDOW_MS = 5 * 60 * 1000;
 const EMPTY_MESSAGE_IDS: string[] = [];
 
+// Figma M10: the five quick reactions, then "+" opens the full set.
+const QUICK_REACTIONS = ["❤️", "🙌", "😂", "👍", "🔥"];
 const REACTION_EMOJIS = ["❤️", "😂", "😍", "😮", "😢", "😡", "👍", "👎"];
+const REACTION_EMOJIS_ALL = [...QUICK_REACTIONS, ...REACTION_EMOJIS.filter((e) => !QUICK_REACTIONS.includes(e))];
+
+// The display name on a message ("Maya Chen"), for the long-press card.
+function senderNameOf(message: Message) {
+  const sender = message.sender as any;
+  return sender?.name || sender?.displayName || sender?.username || "Someone";
+}
 
 const SWIPE_REPLY_THRESHOLD = 60;
 const VOICE_CANCEL_THRESHOLD = -80;
@@ -300,6 +361,13 @@ const PhotoWallpaperContext = createContext(false);
 // My own user id, so a bubble can tell when it mentions me.
 const MyUserIdContext = createContext("");
 
+// Sparks: open a Spark from a message's marker, its colour and subject.
+const SparkContext = createContext<{
+  open: (sparkId: string) => void;
+  colorFor: (sparkId: string, era: number) => string;
+  subjectFor: (sparkId: string) => string;
+} | null>(null);
+
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -325,6 +393,28 @@ function isInFuture(value?: string | null) {
   if (!value) return false;
   const time = new Date(value).getTime();
   return !Number.isNaN(time) && time > Date.now();
+}
+
+// Figma M02 avatars: initials on a soft colour picked from the name.
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+
+function initialsOf(name?: string) {
+  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : (parts[0] || "?").slice(0, 2);
+  return letters.toUpperCase();
+}
+
+function avatarTint(name?: string) {
+  let hash = 0;
+  for (const char of String(name || "")) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
+}
+
+// Figma M15: show the "Your message" card for 10 minutes after an edit.
+function editedRecently(value?: string | null) {
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return !Number.isNaN(time) && Date.now() - time < 10 * 60 * 1000;
 }
 
 function generateLocalId(prefix: string) {
@@ -456,9 +546,10 @@ function getDateLabel(value?: string) {
 
   return date
     .toLocaleDateString([], {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      ...(date.getFullYear() !== today.getFullYear() ? { year: "numeric" as const } : {}),
     })
     .toUpperCase();
 }
@@ -543,13 +634,16 @@ function getAvatar(person?: {
   avatarUrl?: string | null;
   avatarPhotoUrl?: string | null;
 }) {
-  return (
+  const url =
     person?.profilePicture ||
     person?.avatarPhotoUrl ||
     person?.avatarUrl ||
     person?.avatar ||
-    null
-  );
+    null;
+
+  // Shown at 32-40 pt: a 240 px Cloudinary copy (~5-18 KB) instead of the
+  // full upload (~140-400 KB) for every sender in the list.
+  return url ? smallAvatarUrl(url) : null;
 }
 
 // ==========================================
@@ -633,11 +727,17 @@ function getMessageTypeIcon(
   }
 }
 
+// "Sarthak Lopez" -> "Sarthak" (the pinned bar says "Pinned by Sarthak").
+function firstNameOf(name: string) {
+  return name.trim().split(/\s+/)[0] || "";
+}
+
 // ==========================================
 // DATE SEPARATOR
 // ==========================================
 
 function DateSeparator({ message }: { message: Message }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.dateSeparatorContainer}>
       <View style={styles.dateSeparator}>
@@ -662,6 +762,7 @@ function SwipeToReply({
   onReply: () => void;
   children: React.ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const translateX = useRef(new Animated.Value(0)).current;
 
   const enabledRef = useRef(enabled);
@@ -825,8 +926,10 @@ function MessageMeta({
   variant: "inline" | "overlay" | "flow";
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const color =
-    variant === "overlay" ? "#FFFFFF" : mine ? "#7A6F7D" : "#9C9CAA";
+    variant === "overlay" ? "#FFFFFF" : ink.text("#66738A");
 
   // No ticks on call entries (like WhatsApp).
   const tickState =
@@ -926,10 +1029,13 @@ const Bubble = memo(function Bubble({
 
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const onPhoto = useContext(PhotoWallpaperContext);
 
   // Someone mentioned me (or everyone): the bubble gets a pink edge.
   const myId = useContext(MyUserIdContext);
+  const sparkCtx = useContext(SparkContext);
   const mentionsMe =
     !mine &&
     !msg.deleted &&
@@ -943,7 +1049,9 @@ const Bubble = memo(function Bubble({
     ? msg.deletedByAdmin
       ? "🚫 This message was deleted by an admin."
       : "🚫 This message was deleted."
-    : msg.content || "";
+    : msg.kind === "poll"
+      ? ""
+      : msg.content || "";
 
   const mediaUrl = getMediaUrl(msg.media);
 
@@ -964,9 +1072,8 @@ const Bubble = memo(function Bubble({
       : "flow";
 
   // Invisible spacer so the last line of text never runs under the time.
-  const spacer = "\u00A0".repeat(
-    12 + (mine ? 5 : 0) + (msg.editedAt && !msg.deleted ? 7 : 0),
-  );
+  // Time sits on its own line under the text now (Figma M02).
+  const spacer = "";
 
   const replyIcon = msg.replyTo ? getMessageTypeIcon(msg.replyTo) : null;
 
@@ -976,15 +1083,15 @@ const Bubble = memo(function Bubble({
     <View
       style={[
         styles.bubbleRow,
-        mine ? styles.rowMine : styles.rowTheirs,
+        mine && !groupChat ? styles.rowMine : styles.rowTheirs,
         firstInGroup ? styles.rowGroupStart : styles.rowGroupContinue,
         hasReactions && styles.rowWithReactions,
         selected && styles.selectedRow,
       ]}>
-      {!mine && groupChat ? (
+      {groupChat ? (
         <View style={styles.avatarSlot}>
-          {lastInGroup ? (
-            <View style={styles.messageAvatar}>
+          {firstInGroup ? (
+            <View style={[styles.messageAvatar, { backgroundColor: ink.surface(avatarTint(senderName)) }]}>
               {avatar ? (
                 <ExpoImage
                   source={{
@@ -994,7 +1101,7 @@ const Bubble = memo(function Bubble({
                   cachePolicy="memory-disk"
                 />
               ) : (
-                <Ionicons name="person" size={15} color="#C5399A" />
+                <Text style={styles.avatarInitials}>{initialsOf((msg.sender as any)?.name || senderName)}</Text>
               )}
             </View>
           ) : null}
@@ -1004,8 +1111,25 @@ const Bubble = memo(function Bubble({
       <View
         style={[
           styles.bubbleColumn,
-          mine ? styles.columnMine : styles.columnTheirs,
+          mine && !groupChat ? styles.columnMine : styles.columnTheirs,
         ]}>
+        {/* Figma M02: name + Owner/Admin, and the rank line, above the bubble */}
+        {groupChat && firstInGroup ? (
+          <View style={styles.msgHeader}>
+            <View style={styles.msgNameRow}>
+              <Text style={styles.msgName} numberOfLines={1}>
+                {(msg.sender as any)?.name || senderName}
+              </Text>
+              {msg.senderGroupRole ? (
+                <Text style={styles.msgRole}>
+                  {msg.senderGroupRole === "owner" ? "Owner" : "Admin"}
+                </Text>
+              ) : null}
+            </View>
+            <RankLine rank={msg.sender?.rank} groupRole={msg.senderGroupRole} />
+          </View>
+        ) : null}
+
         <Pressable
           onPress={() => onPress(msg)}
           onLongPress={() => onLongPress(msg)}
@@ -1015,13 +1139,31 @@ const Bubble = memo(function Bubble({
             mine ? styles.bubbleMine : styles.bubbleTheirs,
             onPhoto && (mine ? styles.bubbleMineOnPhoto : styles.bubbleTheirsOnPhoto),
             mentionsMe && styles.bubbleMentionsMe,
-            firstInGroup && (mine ? styles.tailMine : styles.tailTheirs),
+            firstInGroup && (mine && !groupChat ? styles.tailMine : styles.tailTheirs),
             hasMedia && styles.mediaBubble,
           ]}>
-          {!mine && groupChat && firstInGroup ? (
-            <Text style={[styles.senderName, hasMedia && styles.mediaPad]}>
-              {senderName}
-            </Text>
+          {/* (name, role and rank now sit above the bubble - Figma M02) */}
+
+          {/* SPARK marker: this message is part of a Spark (tap to open) */}
+          {msg.spark && !msg.deleted && sparkCtx && metaVariant !== "inline" ? (
+            <Pressable
+              onPress={() => msg.spark && sparkCtx.open(msg.spark.id)}
+              hitSlop={6}
+              style={[styles.sparkMarker, hasMedia && styles.mediaPad]}>
+              <Ionicons
+                name="sparkles"
+                size={10}
+                color={sparkCtx.colorFor(msg.spark.id, msg.spark.era)}
+              />
+              <Text
+                style={[
+                  styles.sparkMarkerText,
+                  { color: sparkCtx.colorFor(msg.spark.id, msg.spark.era) },
+                ]}
+                numberOfLines={1}>
+                {sparkCtx.subjectFor(msg.spark.id)}
+              </Text>
+            </Pressable>
           ) : null}
 
           {msg.forwarded && !msg.deleted ? (
@@ -1194,6 +1336,19 @@ const Bubble = memo(function Bubble({
             </View>
           ) : null}
 
+          {/* ALBUM (several photos/videos) */}
+          {!msg.deleted && msg.kind === "album" && msg.album?.length ? <AlbumGrid items={msg.album} /> : null}
+
+          {/* POLL */}
+          {!msg.deleted && msg.kind === "poll" && msg.poll ? (
+            <PollBubble
+              messageId={msg.id}
+              conversationId={msg.conversationId || ""}
+              poll={msg.poll}
+              mine={mine}
+            />
+          ) : null}
+
           {/* CALL ENTRY (voice / video call history) */}
           {!msg.deleted && msg.kind === "call" ? (
             <CallLogContent
@@ -1221,8 +1376,31 @@ const Bubble = memo(function Bubble({
             </View>
           ) : null}
 
-          {/* TIME */}
-          {metaVariant === "inline" ? (
+          {/* TIME (Figma M03-M05: "✦ Next CosQuest" on the left of the time row) */}
+          {metaVariant === "inline" && msg.spark && !msg.deleted && sparkCtx ? (
+            <View style={styles.sparkFootRow}>
+              <Pressable
+                onPress={() => msg.spark && sparkCtx.open(msg.spark.id)}
+                hitSlop={6}
+                style={styles.sparkFoot}
+                accessibilityRole="button"
+                accessibilityLabel={`Open Spark ${sparkCtx.subjectFor(msg.spark.id)}`}>
+                <Ionicons name="sparkles" size={10} color={sparkCtx.colorFor(msg.spark.id, msg.spark.era)} />
+                <Text
+                  style={[styles.sparkFootText, { color: sparkCtx.colorFor(msg.spark.id, msg.spark.era) }]}
+                  numberOfLines={1}>
+                  {sparkCtx.subjectFor(msg.spark.id)}
+                </Text>
+              </Pressable>
+              <MessageMeta
+                msg={msg}
+                mine={mine}
+                pinned={pinned}
+                variant="flow"
+                otherParticipant={otherParticipant}
+              />
+            </View>
+          ) : metaVariant === "inline" ? (
             <MessageMeta
               msg={msg}
               mine={mine}
@@ -1286,6 +1464,7 @@ function RecordingIndicator({
   metering?: number;
   cancelArmed: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const blink = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -1394,6 +1573,7 @@ function ChatImage({
   uri: string;
   style: StyleProp<ImageStyle>;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const [loading, setLoading] = useState(true);
 
   return (
@@ -1438,6 +1618,7 @@ function getCloudinaryVideoPoster(url: string): string | null {
 }
 
 function VideoThumbnail({ uri }: { uri: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const posterUrl = useMemo(() => getCloudinaryVideoPoster(uri), [uri]);
 
   const [posterFailed, setPosterFailed] = useState(false);
@@ -1515,6 +1696,7 @@ function VideoThumbnail({ uri }: { uri: string }) {
 }
 
 function VideoViewer({ uri }: { uri: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const player = useVideoPlayer(uri, (videoPlayer) => {
     videoPlayer.loop = false;
   });
@@ -1562,6 +1744,7 @@ function AudioBubble({
   mine: boolean;
   msg: Message;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const player = useAudioPlayer(mediaUrl);
   const status = useAudioPlayerStatus(player);
 
@@ -1826,26 +2009,39 @@ function CallLogContent({
   onCallBack: (type: "audio" | "video") => void;
   onLongPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const log = msg.callLog || {};
   const video = log.type === "video";
   const status = log.status;
   const answered = status === "ended";
   const kindName = video ? "video call" : "voice call";
 
+  // Group calls: "12 people" (can be hundreds; formatted "1,234").
+  const peopleCount =
+    log.groupCall && (log.participantCount || 0) > 2
+      ? `${formatCount(log.participantCount || 0)} people`
+      : null;
+
   // Red "missed" style: only for the person who was called and didn't pick up.
   const missedForMe = !mine && (status === "missed" || status === "cancelled");
 
   const title =
     answered || mine
-      ? video
-        ? "Video call"
-        : "Voice call"
+      ? log.groupCall
+        ? video
+          ? "Group video call"
+          : "Group voice call"
+        : video
+          ? "Video call"
+          : "Voice call"
       : status === "declined"
         ? `You declined a ${kindName}`
         : `Missed ${kindName}`;
 
   const detail = answered
-    ? formatDuration(log.durationSeconds || 0)
+    ? [formatDuration(log.durationSeconds || 0), peopleCount]
+        .filter(Boolean)
+        .join(" · ")
     : mine
       ? status === "declined"
         ? "Declined"
@@ -1858,7 +2054,25 @@ function CallLogContent({
   const subColor = mine ? "#6B6B72" : "#8A8A90";
   const arrowColor = missedForMe ? "#E5484D" : mine ? "#C5399A" : "#2FB36B";
 
+  // The call's Sparks: answered calls only, opened from the "Sparks" link.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const token = useAppSelector((state) => state.auth.token);
+  const authUser = useAppSelector((state) => state.auth.user);
+  const conversation = useAppSelector((state) =>
+    msg.conversationId ? state.chat.conversationDetails[msg.conversationId] : undefined,
+  ) as Chat | undefined;
+  const showNotes = callNotesEnabled && answered && Boolean(log.callId);
+
+  const nameOf = (userId: string) => {
+    const meId = authUser?.id || (authUser as any)?._id;
+    if (userId === meId) return "you";
+    const other = conversation?.otherParticipant;
+    if (other && (other.id === userId || other._id === userId)) return other.username || "them";
+    return "someone on the call";
+  };
+
   return (
+    <>
     <Pressable
       onPress={() => onCallBack(video ? "video" : "audio")}
       onLongPress={onLongPress}
@@ -1898,8 +2112,30 @@ function CallLogContent({
             {detail}
           </Text>
         </View>
+
+        {showNotes ? (
+          <Pressable
+            onPress={() => setNotesOpen(true)}
+            hitSlop={8}
+            style={styles.callLogNotes}
+            accessibilityLabel="Sparks from this call">
+            <Ionicons name="sparkles" size={12} color="#C5399A" />
+            <Text style={styles.callLogNotesText}>Sparks</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
+
+    {showNotes ? (
+      <CallNotesSheet
+        callId={String(log.callId)}
+        token={token}
+        visible={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        nameOf={nameOf}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -1918,13 +2154,14 @@ function MenuItem({
   danger?: boolean;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
       <Text style={[styles.menuItemText, danger && styles.dangerText]}>
         {label}
       </Text>
 
-      <Ionicons name={icon} size={20} color={danger ? "#D64545" : "#C5399A"} />
+      <Ionicons name={icon} size={22} color={danger ? "#C0394B" : "#66738A"} />
     </Pressable>
   );
 }
@@ -1934,6 +2171,8 @@ function MenuItem({
 // ==========================================
 
 export default function ChatScreen() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const dispatch = useAppDispatch();
@@ -2070,6 +2309,8 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   const [showActions, setShowActions] = useState(false);
+  // Figma M10: "+" in the reaction row shows every reaction.
+  const [showAllReactions, setShowAllReactions] = useState(false);
 
   // When the long-press menu opened (see MENU_TAP_GUARD_MS) and a short
   // "Copied ✓" note shown inside it.
@@ -2083,6 +2324,15 @@ export default function ChatScreen() {
   } | null>(null);
 
   const [showAttachments, setShowAttachments] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showShareMedia, setShowShareMedia] = useState(false);
+
+  // SPARKS (Community, faction rooms, groups)
+  const [sparks, setSparks] = useState<Spark[]>([]);
+  const [openSparkId, setOpenSparkId] = useState<string | null>(null);
+  const [sparkRefresh, setSparkRefresh] = useState(0);
+  const [showAllSparks, setShowAllSparks] = useState(false);
+  const [sparkSeed, setSparkSeed] = useState<Message | null>(null);
   const [attachmentDraft, setAttachmentDraft] =
     useState<AttachmentDraft | null>(null);
   const [attachmentCaption, setAttachmentCaption] = useState("");
@@ -2300,6 +2550,68 @@ export default function ChatScreen() {
     conversation?.type === "group" &&
     isInFuture(conversation.group?.mutedByAdminUntil);
 
+  // SPARKS run in group chats and DMs (Subomi's engine supports both).
+  const sparksChat = groupChat || conversation?.type === "dm";
+
+  // SPARKS: this chat's Sparks (refreshed every minute so circles stop
+  // pulsing once a Spark goes quiet).
+  const reloadSparks = useCallback(() => {
+    if (!token || !conversationId || !sparksChat) {
+      return;
+    }
+
+    listSparks(conversationId, token)
+      .then((result) => {
+        if (__DEV__) {
+          console.info(
+            "[Sparks debug]",
+            result.sparks.map((spark) => ({
+              subject: spark.subject,
+              active: spark.active,
+              pinned: spark.pinned,
+              revived: spark.revived,
+              messageCount: spark.messageCount,
+              participantCount: spark.participantCount,
+            })),
+          );
+        }
+        // Same Sparks as before (the usual case for the 60 s refresh): keep
+        // the old array, so the Spark context and every bubble don't re-render.
+        setSparks((current) =>
+          JSON.stringify(current) === JSON.stringify(result.sparks) ? current : result.sparks,
+        );
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.warn("[Sparks debug] Fetch failed:", error);
+        }
+      });
+  }, [token, conversationId, sparksChat]);
+
+  useEffect(() => {
+    reloadSparks();
+
+    if (!sparksChat) {
+      return;
+    }
+
+    const timer = setInterval(reloadSparks, 60000);
+    return () => clearInterval(timer);
+  }, [reloadSparks, sparksChat]);
+
+  const sparkContextValue = useMemo(
+    () => ({
+      open: (sparkId: string) => setOpenSparkId(sparkId),
+      colorFor: (sparkId: string, era: number) => {
+        const spark = sparks.find((item) => item.id === sparkId);
+        return spark ? eraColor(era, spark.eras?.length || 1) : "#C34D9C";
+      },
+      subjectFor: (sparkId: string) =>
+        sparks.find((item) => item.id === sparkId)?.subject || "Spark",
+    }),
+    [sparks],
+  );
+
   // Calls are DM-only (the backend rejects calls in community/faction).
   const canCall = conversation?.type === "dm";
 
@@ -2343,6 +2655,58 @@ export default function ChatScreen() {
   // re-render every visible Bubble. Memoizing it, together with wrapping
   // Bubble in memo() above, means a bubble only re-renders when something
   // it actually depends on changes.
+  // Figma M08: a quiet Spark shows a card under its latest message.
+  // Subomi's on-phone AI: this phone helps work out Sparks for the chat.
+  // Does nothing on the website or while EXPO_PUBLIC_SPARKS_ENGINE isn't "qlm".
+  useSparksFeed(conversationId, visibleMessages);
+
+  const sparkLayout = useSparkLayout();
+  // Computer: the Sparks move into the panel beside the chat (Figma D1).
+  const desktop = useIsDesktop();
+  // Computer: search opens in the right column (Figma D8).
+  const [searchPanel, setSearchPanel] = useState(false);
+  // Figma M32 (concept): the Sparks bot's automatic role pings, shown after
+  // the latest Spark message sent before each ping.
+  const rolePingsAfter = useMemo(() => {
+    const map = new Map<string, SparkRolePing[]>();
+    for (const spark of sparks) {
+      for (const ping of spark.rolePings || []) {
+        const at = new Date(ping.at).getTime();
+        // visibleMessages is newest first.
+        const anchor = visibleMessages.find(
+          (message) =>
+            message.spark?.id === spark.id &&
+            !Number.isNaN(at) &&
+            new Date(message.createdAt || 0).getTime() <= at + 1000,
+        );
+        if (anchor && ping.userIds?.length) {
+          map.set(anchor.id, [...(map.get(anchor.id) || []), ping]);
+        }
+      }
+    }
+    return map;
+  }, [sparks, visibleMessages]);
+
+  const quietSparkCardAfter = useMemo(() => {
+    const map = new Map<string, Spark>();
+    const seen = new Set<string>();
+
+    // visibleMessages is newest first, so the first hit is the latest.
+    for (const message of visibleMessages) {
+      const sparkId = message.spark?.id;
+      if (!sparkId || seen.has(sparkId)) {
+        continue;
+      }
+      seen.add(sparkId);
+      const spark = sparks.find((item) => item.id === sparkId);
+      if (spark && (!spark.active || sparkLayout === "inline")) {
+        map.set(message.id, spark);
+      }
+    }
+
+    return map;
+  }, [visibleMessages, sparks, sparkLayout]);
+
   const listExtraData = useMemo(
     () => ({
       selectedIds,
@@ -2363,6 +2727,165 @@ export default function ChatScreen() {
       currentUsername,
       conversation?.otherParticipant?.isOnline,
       conversation?.otherParticipant?.lastReadAt,
+    ],
+  );
+
+  // The message list's rows. renderItem is a stable function that calls the
+  // latest render (kept in a ref), so the FlatList re-renders its rows only
+  // when messageListExtraData or the data change, not on every render of
+  // this screen (every keystroke in the composer, the slow-mode clock, the
+  // recorder, keyboard and scroll state). Everything a row reads that can
+  // change must be listed in messageListExtraData.
+  const renderMessageItemRef = useRef<(info: { item: Message; index: number }) => ReactElement | null>(
+    () => null,
+  );
+  renderMessageItemRef.current = ({ item, index }) => {
+    const mine = isMyMessage(item);
+
+    // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
+    const older = visibleMessages[index + 1];
+
+    const newer = visibleMessages[index - 1];
+
+    const showDate =
+      !older ||
+      getDateKey(older.createdAt) !== getDateKey(item.createdAt);
+
+    const firstInGroup =
+      showDate ||
+      !older ||
+      getSenderKey(older) !== getSenderKey(item);
+
+    const lastInGroup =
+      !newer ||
+      getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
+      getSenderKey(newer) !== getSenderKey(item);
+
+    const selected =
+      selectedIds.includes(item.id) || highlightedId === item.id;
+
+    const pinned = pinnedIds.includes(item.id);
+
+    return (
+      <View>
+        {showDate ? <DateSeparator message={item} /> : null}
+
+        <SwipeToReply
+          enabled={
+            !selectionMode &&
+            !item.pending &&
+            !item.deleted &&
+            item.kind !== "call"
+          }
+          onReply={() => startReply(item)}>
+          <Bubble
+            msg={item}
+            mine={mine}
+            groupChat={!!groupChat}
+            firstInGroup={firstInGroup}
+            lastInGroup={lastInGroup}
+            selected={selected}
+            pinned={pinned}
+            myReactionEmoji={findMyReaction(item)?.emoji}
+            onPress={handleMessagePress}
+            onLongPress={openMessageActions}
+            onReaction={(message, emoji) => {
+              if (selectionMode) {
+                toggleMessageSelection(message);
+
+                return;
+              }
+
+              reactToMessage(message, emoji);
+            }}
+            onMediaPress={handleMediaPress}
+            onReplyPress={scrollToMessage}
+            onCallBack={handleCallBack}
+            otherParticipant={conversation?.otherParticipant}
+          />
+        </SwipeToReply>
+
+        {quietSparkCardAfter.get(item.id) ? (
+          <SparkCard
+            spark={quietSparkCardAfter.get(item.id)!}
+            onOpen={(spark) => setOpenSparkId(spark.id)}
+          />
+        ) : null}
+
+        {rolePingsAfter.get(item.id) && token ? (
+          <RolePingCard
+            conversationId={conversationId}
+            token={token}
+            pings={rolePingsAfter.get(item.id)!}
+            onOpenMember={
+              groupChat
+                ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
+                : undefined
+            }
+          />
+        ) : null}
+
+        {/* Figma M15: your edited message - edit again or undo */}
+        {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
+          <View style={styles.editCard}>
+            <Text style={styles.editSection}>YOUR MESSAGE</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editLabel}>Saved text</Text>
+              <View style={styles.editSaved}>
+                <Text style={styles.editSavedText}>{item.content}</Text>
+              </View>
+              <View style={styles.editNote}>
+                <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
+                <Text style={styles.editNoteText}>Your message has been updated.</Text>
+              </View>
+              <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
+                <Text style={styles.editButtonText}>Edit again</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editHint}>Before your change</Text>
+              {item.previousContent ? (
+                <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
+              ) : null}
+              <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
+                <Text style={styles.editButtonText}>Undo · restore previous message</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+  const renderMessageItem = useCallback(
+    (info: { item: Message; index: number }) => renderMessageItemRef.current(info),
+    [],
+  );
+  // "Edited" cards hide after 10 minutes: the minute is part of the key.
+  const editMinute = Math.floor(Date.now() / 60000);
+  const messageListExtraData = useMemo(
+    () => ({
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      otherParticipant: conversation?.otherParticipant,
+      editMinute,
+    }),
+    [
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      conversation?.otherParticipant,
+      editMinute,
     ],
   );
 
@@ -2414,7 +2937,10 @@ export default function ChatScreen() {
     }
 
     if (conversation?.memberCount) {
-      return `${conversation.memberCount} members`;
+      // Figma M02: "24 members · 6 online"
+      const online = (conversation as any).onlineCount;
+      const members = `${conversation.memberCount} ${conversation.memberCount === 1 ? "member" : "members"}`;
+      return typeof online === "number" && online > 0 ? `${members} · ${online} online` : members;
     }
 
     return "Community";
@@ -2436,6 +2962,22 @@ export default function ChatScreen() {
   const pinnedMessage = pinnedMessageId
     ? messages.find((message) => message.id === pinnedMessageId)
     : undefined;
+
+  // Figma M02: "Pinned by Sarthak". The pin only carries the pinner's id, so
+  // the name comes from a message they sent that's already loaded.
+  const pinnedInfo = (conversation as any)?.pinnedMessage as
+    | { id?: string; pinnedBy?: string; content?: string; preview?: string }
+    | null
+    | undefined;
+  const pinnedByName = useMemo(() => {
+    const pinnedBy = pinnedInfo?.pinnedBy;
+    if (!pinnedBy) return "";
+    if (pinnedBy === currentUserId) return "you";
+    const fromMessage = messages.find(
+      (message) => (message.sender?.id || message.sender?._id) === pinnedBy,
+    )?.sender as any;
+    return firstNameOf(fromMessage?.name || fromMessage?.displayName || fromMessage?.username || "");
+  }, [pinnedInfo?.pinnedBy, currentUserId, messages]);
 
   // ========================================
   // OWNERSHIP
@@ -2560,12 +3102,26 @@ export default function ChatScreen() {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  // True while this screen's socket is connected AND joined to the room
+  // (set by the socket effect below). Then message:new / edited / deleted
+  // arrive live and the catch-up fetch below is skipped; a rejoin after a
+  // reconnect does one catch-up fetch instead.
+  const roomJoinedRef = useRef(false);
+
   useEffect(() => {
     if (!token || !conversationId) {
       return;
     }
 
     const interval = setInterval(() => {
+      if (roomJoinedRef.current && getSocket()?.connected) {
+        if (conversationRef.current?.unreadCount) {
+          dispatch(readConversation({ conversationId, token }));
+        }
+
+        return;
+      }
+
       dispatch(
         fetchMessages({
           conversationId,
@@ -2640,18 +3196,55 @@ export default function ChatScreen() {
       }, 400);
     };
 
+    let joinedBefore = false;
+    let joinCount = 0;
+
     const doJoin = () => {
+      roomJoinedRef.current = false;
+
       joinConversation(conversationId).then((ack) => {
-        if (!ack.ok && !cancelled) {
-          console.error("CONVERSATION JOIN FAILED:", ack.error);
+        if (cancelled) {
+          return;
         }
+
+        if (!ack.ok) {
+          console.error("CONVERSATION JOIN FAILED:", ack.error);
+          return;
+        }
+
+        roomJoinedRef.current = true;
+
+        // A rejoin (after a dropped connection): fetch what was missed
+        // while disconnected, once.
+        if (joinedBefore && token) {
+          dispatch(
+            fetchMessages({
+              conversationId,
+              token,
+              after: messagesRef.current[0]?.id,
+              mode: "append",
+            }),
+          );
+        }
+
+        joinedBefore = true;
       });
 
-      // Covers coming back to the app with this chat still open.
-      markReadSoon();
+      // Covers coming back to the app with this chat still open. Not on the
+      // first join: opening the chat already marked it read (focus effect),
+      // so this was a second PATCH /read 400 ms later.
+      if (joinCount > 0) {
+        markReadSoon();
+      }
+
+      joinCount += 1;
     };
 
-    doJoin();
+    // Avoid a premature "Socket not connected" error during startup.
+    // The connect listener below performs the join once connected.
+    if (socket.connected) {
+      doJoin();
+    }
 
     // Room membership lives in the socket server's memory tied to one
     // physical connection — a dropped connection (a subway tunnel, wifi
@@ -2661,6 +3254,12 @@ export default function ChatScreen() {
     // for the rest of the time this screen stays open, with no visible
     // error — it'd just quietly fall back to the 30s safety poll.
     socket.on("connect", doJoin);
+
+    const handleDisconnect = () => {
+      roomJoinedRef.current = false;
+    };
+
+    socket.on("disconnect", handleDisconnect);
 
     const handleMessageNew = (payload: {
       conversationId: string;
@@ -2775,6 +3374,68 @@ export default function ChatScreen() {
     socket.on("group:removed", handleGroupRemoved);
     socket.on("group:updated", handleGroupUpdated);
 
+    // Polls: someone voted, changed a vote, or the poll was closed.
+    const handlePollUpdated = (payload: {
+      conversationId: string;
+      messageId: string;
+      poll: PollSummary;
+    }) => {
+      if (payload.conversationId !== conversationId) {
+        return;
+      }
+
+      dispatch(socketPollUpdated(payload));
+    };
+
+    socket.on("poll:updated", handlePollUpdated);
+
+    // Sparks: created / updated / revived, messages tagged, deleted.
+    const handleSparkUpdated = (payload: {
+      conversationId: string;
+      spark: Spark;
+    }) => {
+      if (payload.conversationId !== conversationId || !payload.spark) {
+        return;
+      }
+
+      setSparks((current) =>
+        [payload.spark, ...current.filter((item) => item.id !== payload.spark.id)].sort(
+          (a, b) => Number(b.active) - Number(a.active),
+        ),
+      );
+      setSparkRefresh((count) => count + 1);
+    };
+
+    const handleSparkMessages = (payload: {
+      conversationId: string;
+      sparkId: string;
+      era: number;
+      messageIds: string[];
+    }) => {
+      if (payload.conversationId !== conversationId) {
+        return;
+      }
+
+      dispatch(socketSparkMessages(payload));
+    };
+
+    const handleSparkDeleted = (payload: {
+      conversationId: string;
+      sparkId: string;
+    }) => {
+      if (payload.conversationId !== conversationId) {
+        return;
+      }
+
+      setSparks((current) => current.filter((item) => item.id !== payload.sparkId));
+      dispatch(socketSparkMessages({ conversationId, sparkId: payload.sparkId }));
+      setOpenSparkId((current) => (current === payload.sparkId ? null : current));
+    };
+
+    socket.on("spark:updated", handleSparkUpdated);
+    socket.on("spark:messages", handleSparkMessages);
+    socket.on("spark:deleted", handleSparkDeleted);
+
     socket.on("message:new", handleMessageNew);
     socket.on("message:edited", handleMessageEdited);
     socket.on("message:deleted", handleMessageDeleted);
@@ -2790,12 +3451,18 @@ export default function ChatScreen() {
       }
 
       socket.off("connect", doJoin);
+      socket.off("disconnect", handleDisconnect);
+      roomJoinedRef.current = false;
       socket.off("message:new", handleMessageNew);
       socket.off("message:edited", handleMessageEdited);
       socket.off("message:deleted", handleMessageDeleted);
       socket.off("message:reaction", handleMessageReaction);
       socket.off("chat:pinned", handleChatPinned);
       socket.off("chat:read", handleChatRead);
+      socket.off("spark:updated", handleSparkUpdated);
+      socket.off("spark:messages", handleSparkMessages);
+      socket.off("spark:deleted", handleSparkDeleted);
+      socket.off("poll:updated", handlePollUpdated);
       socket.off("group:removed", handleGroupRemoved);
       socket.off("group:updated", handleGroupUpdated);
 
@@ -4128,6 +4795,13 @@ export default function ChatScreen() {
     });
   };
 
+  // 📎 -> Poll: close the sheet first, then open the poll creator.
+  const openPollCreator = async () => {
+    setShowAttachments(false);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    setShowPollCreator(true);
+  };
+
   const attachmentMessage = async (type: string) => {
     // Close the sheet FIRST and let its animation finish before opening a
     // picker or another modal. Opening one while this modal is still
@@ -4241,6 +4915,7 @@ export default function ChatScreen() {
   const closeMenu = () => {
     setShowActions(false);
     setSelectedMessage(null);
+    setShowAllReactions(false);
   };
 
   // Wraps a menu action: ignored right after the menu opens (the finger
@@ -4349,9 +5024,59 @@ export default function ChatScreen() {
     !!selectedMessage && isMyMessage(selectedMessage);
 
   return (
+    <DesktopChatRow
+      panel={
+        desktop && showMentionPicker ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <MentionPicker
+              docked
+              visible
+              conversationId={conversationId}
+              token={token}
+              onClose={closeMentionPicker}
+              onDone={insertMentions}
+            />
+          </View>
+        ) : desktop && searchPanel ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <SearchInChat chatId={conversationId} onClose={() => setSearchPanel(false)} />
+          </View>
+        ) : desktop && sparksChat && openSparkId ? (
+          <View style={{ width: 400, minHeight: 0 }}>
+            <SparkPanel
+              docked
+              visible
+              conversationId={conversationId}
+              sparkId={openSparkId}
+              token={token}
+              otherSparks={sparks}
+              refreshKey={sparkRefresh}
+              onClose={() => setOpenSparkId(null)}
+              onSent={(message) => dispatch(socketMessageReceived({ conversationId, message }))}
+              onRemoved={(sparkId) => setSparks((current) => current.filter((item) => item.id !== sparkId))}
+            />
+          </View>
+        ) : desktop && sparksChat ? (
+          <DesktopSparksPanel
+            sparks={sparks}
+            pinnedText={
+              pinnedMessage
+                ? pinnedMessage.deleted
+                  ? null
+                  : pinnedMessage.content || null
+                : pinnedInfo?.preview || pinnedInfo?.content || null
+            }
+            pinnedBy={pinnedByName ? `Pinned by ${pinnedByName}` : null}
+            onOpen={(spark) => setOpenSparkId(spark.id)}
+          />
+        ) : null
+      }>
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      // iPhone and Android: lift the message box above the keyboard, like
+      // WhatsApp. (Android apps are edge-to-edge now, so the system no longer
+      // shrinks the screen for the keyboard by itself.)
+      behavior={Platform.OS === "web" ? undefined : "padding"}
       // Was insets.top: that's meant to offset content sitting ABOVE this
       // view outside of it, not the safe-area inside it — since the header
       // lives inside this same KeyboardAvoidingView, adding insets.top here
@@ -4359,6 +5084,9 @@ export default function ChatScreen() {
       keyboardVerticalOffset={0}>
       <PhotoWallpaperContext.Provider value={shownWallpaper.kind === "photo"}>
       <MyUserIdContext.Provider value={String(currentUserId)}>
+      <SparkContext.Provider value={sparkContextValue}>
+      {/* Figma M06: the chat follows the phone's light / dark appearance */}
+      <StatusBar style={ink.dark ? "light" : "dark"} />
       {/* Chat wallpaper behind everything */}
       <ChatWallpaperBackground
         key={
@@ -4423,7 +5151,7 @@ export default function ChatScreen() {
                 onPress={() => safeBack()}
                 hitSlop={10}
                 style={styles.backButton}>
-                <Ionicons name="chevron-back" size={27} color="#191922" />
+                <Ionicons name="chevron-back" size={27} color={ink.text("#191922")} />
               </Pressable>
 
               {/* Tap their photo or name to see their profile (DMs) */}
@@ -4433,6 +5161,7 @@ export default function ChatScreen() {
                 disabled={!otherUsername && conversation?.type !== "group"}
                 accessibilityRole="button"
                 accessibilityLabel="View profile">
+                {groupChat && !headerAvatar ? null : (
                 <View style={styles.headerAvatarWrap}>
                   <View style={styles.headerAvatar}>
                     {headerAvatar ? (
@@ -4458,6 +5187,7 @@ export default function ChatScreen() {
                     <View style={styles.headerOnlineDot} />
                   ) : null}
                 </View>
+                )}
 
                 <View style={styles.headerText}>
                   <Text style={styles.headerName} numberOfLines={1}>
@@ -4501,14 +5231,31 @@ export default function ChatScreen() {
               ) : null}
 
               {/* Figma's tag icon -> the chat menu (profile, wallpaper, block) */}
-              <Pressable
-                hitSlop={10}
-                style={{ marginLeft: 20 }}
-                onPress={() => setShowChatMenu(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Chat options">
-                <Ionicons name="pricetag-outline" size={22} color="#C5399A" />
-              </Pressable>
+              <View style={{ marginLeft: 20, flexDirection: "row", alignItems: "center", gap: 18 }}>
+                {voiceChatAllowed(conversation?.type) ? (
+                  <VoiceStartButton
+                    conversationId={conversationId}
+                    title={(conversation as any)?.title || "Voice chat"}
+                  />
+                ) : null}
+                <Pressable
+                  hitSlop={8}
+                  accessibilityLabel="Search in chat"
+                  onPress={() =>
+                    desktop
+                      ? setSearchPanel(true)
+                      : router.push({ pathname: "/chat/search/[id]", params: { id: conversationId } })
+                  }>
+                  <Ionicons name="search-outline" size={22} color={ink.text("#24283C")} />
+                </Pressable>
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => setShowChatMenu(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chat options">
+                  <Ionicons name="ellipsis-horizontal" size={24} color={ink.text("#24283C")} />
+                </Pressable>
+              </View>
             </>
           )}
         </View>
@@ -4522,10 +5269,12 @@ export default function ChatScreen() {
         <Pressable
           style={styles.pinnedBanner}
           onPress={() => scrollToMessage(pinnedMessageId)}>
-          <Ionicons name="pin" size={16} color="#C5399A" />
+          <MaterialCommunityIcons name="pin-outline" size={21} color={ink.text("#B63D91")} />
 
           <View style={styles.pinnedBannerText}>
-            <Text style={styles.pinnedBannerTitle}>Pinned message</Text>
+            <Text style={styles.pinnedBannerTitle}>
+              {pinnedByName ? `Pinned by ${pinnedByName}` : "Pinned message"}
+            </Text>
 
             <Text numberOfLines={1} style={styles.pinnedBannerBody}>
               {pinnedMessage
@@ -4534,10 +5283,26 @@ export default function ChatScreen() {
                   : pinnedMessage.content ||
                     getMessageTypeLabel(pinnedMessage) ||
                     "Message"
-                : "Tap to view"}
+                : pinnedInfo?.content || pinnedInfo?.preview || "Tap to view"}
             </Text>
           </View>
+
+          <Ionicons name="chevron-forward" size={18} color={ink.text("#B63D91")} />
         </Pressable>
+      ) : null}
+
+      {/* VOICE CHAT: "Call live · Join call" (Group Calls doc) */}
+      {voiceChatAllowed(conversation?.type) ? (
+        <VoiceLiveCard conversationId={conversationId} title={(conversation as any)?.title || "Voice chat"} />
+      ) : null}
+
+      {/* SPARKS · Option B "top orbit" (constants/sparkLayout.ts) */}
+      {sparksChat && !selectionMode && !desktop && sparkLayout === "orbit" ? (
+        <SparksOrbit
+          sparks={sparks}
+          onOpen={(spark) => setOpenSparkId(spark.id)}
+          onShowAll={() => setShowAllSparks(true)}
+        />
       ) : null}
 
       {/* ================================== */}
@@ -4559,7 +5324,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            extraData={listExtraData}
+            extraData={messageListExtraData}
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -4574,6 +5339,14 @@ export default function ChatScreen() {
                 });
               }, 350);
             }}
+            ListHeaderComponent={
+              otherTyping && groupChat ? (
+                <View style={styles.typingRow}>
+                  <Text style={styles.typingDots}>•••</Text>
+                  <Text style={styles.typingText}>Someone is typing</Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyChat}>
                 <Text style={styles.emptyChatText}>
@@ -4581,80 +5354,27 @@ export default function ChatScreen() {
                 </Text>
               </View>
             }
-            renderItem={({ item, index }) => {
-              const mine = isMyMessage(item);
-
-              // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
-              const older = visibleMessages[index + 1];
-
-              const newer = visibleMessages[index - 1];
-
-              const showDate =
-                !older ||
-                getDateKey(older.createdAt) !== getDateKey(item.createdAt);
-
-              const firstInGroup =
-                showDate ||
-                !older ||
-                getSenderKey(older) !== getSenderKey(item);
-
-              const lastInGroup =
-                !newer ||
-                getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
-                getSenderKey(newer) !== getSenderKey(item);
-
-              const selected =
-                selectedIds.includes(item.id) || highlightedId === item.id;
-
-              const pinned = pinnedIds.includes(item.id);
-
-              return (
-                <View>
-                  {showDate ? <DateSeparator message={item} /> : null}
-
-                  <SwipeToReply
-                    enabled={
-                      !selectionMode &&
-                      !item.pending &&
-                      !item.deleted &&
-                      item.kind !== "call"
-                    }
-                    onReply={() => startReply(item)}>
-                    <Bubble
-                      msg={item}
-                      mine={mine}
-                      groupChat={!!groupChat}
-                      firstInGroup={firstInGroup}
-                      lastInGroup={lastInGroup}
-                      selected={selected}
-                      pinned={pinned}
-                      myReactionEmoji={findMyReaction(item)?.emoji}
-                      onPress={handleMessagePress}
-                      onLongPress={openMessageActions}
-                      onReaction={(message, emoji) => {
-                        if (selectionMode) {
-                          toggleMessageSelection(message);
-
-                          return;
-                        }
-
-                        reactToMessage(message, emoji);
-                      }}
-                      onMediaPress={handleMediaPress}
-                      onReplyPress={scrollToMessage}
-                      onCallBack={handleCallBack}
-                      otherParticipant={conversation?.otherParticipant}
-                    />
-                  </SwipeToReply>
-                </View>
-              );
-            }}
+            renderItem={renderMessageItem}
+            // Option A: the list itself stops short of the side rail (M03),
+            // so bubbles never run under it (a content padding wasn't enough
+            // on Android).
+            style={sparksChat && !desktop && sparkLayout === "rail" && sparks.length ? styles.listWithRail : undefined}
             contentContainerStyle={styles.list}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           />
         </View>
       )}
+
+      {/* SPARKS RAIL (layout option A: side rail) */}
+      {sparksChat && !selectionMode && !desktop && sparkLayout === "rail" ? (
+        <SparksRail
+          sparks={sparks}
+          top={insets.top + (pinnedMessageId ? 136 : 76)}
+          onOpen={(spark) => setOpenSparkId(spark.id)}
+          onShowAll={() => setShowAllSparks(true)}
+        />
+      ) : null}
 
       {/* ================================== */}
       {/* JUMP TO LATEST */}
@@ -4718,9 +5438,10 @@ export default function ChatScreen() {
 
             <View style={styles.editingContent}>
               <Text style={styles.editingTitle}>
+                {/* Figma M14: "Replying to Diego Ruiz" */}
                 {isMyMessage(replyingTo)
-                  ? "You"
-                  : replyingTo.sender?.username || "User"}
+                  ? "Replying to yourself"
+                  : `Replying to ${senderNameOf(replyingTo)}`}
               </Text>
 
               <Text numberOfLines={1} style={styles.editingText}>
@@ -4745,6 +5466,20 @@ export default function ChatScreen() {
       {/* ================================== */}
       {/* COMPOSER */}
       {/* ================================== */}
+
+      {/* Figma M14: who your @ mentions will notify */}
+      {!selectionMode && (mentionPicks.length > 0 || mentionEveryone) ? (
+        <View style={styles.notifyRow}>
+          <Ionicons name="checkmark" size={14} color="#B63D91" />
+          <Text style={styles.notifyText} numberOfLines={1}>
+            {mentionEveryone
+              ? "Everyone in this chat will be notified"
+              : `${mentionPicks
+                  .map((person) => person.name || person.username)
+                  .join(mentionPicks.length === 2 ? " and " : ", ")} will be notified`}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Muted by an admin: no message box, a note instead */}
       {!selectionMode && mutedByAdmin ? (
@@ -4814,7 +5549,7 @@ export default function ChatScreen() {
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Attach">
-              <Ionicons name="attach" size={20} color="#FFFFFF" />
+              <Ionicons name="add" size={28} color="#B63D91" />
             </Pressable>
           ) : null}
 
@@ -4832,8 +5567,10 @@ export default function ChatScreen() {
                   style={styles.input}
                   value={draft}
                   onChangeText={handleDraftChange}
-                  placeholder={editingMessage ? "Edit message" : "Message"}
-                  placeholderTextColor="#6B6B72"
+                  placeholder={
+                    editingMessage ? "Edit message" : groupChat ? "Message your group" : "Message"
+                  }
+                  placeholderTextColor={ink.text("#66738A")}
                   multiline
                   // Browsers make a multi-line box 2 rows tall by default,
                   // which made the input look too tall on the website.
@@ -4852,25 +5589,37 @@ export default function ChatScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Mention people">
-                    <Ionicons name="at" size={22} color="#8A8A90" />
+                    <Ionicons name="at" size={24} color="#B63D91" />
                   </Pressable>
                 ) : null}
 
-                {!editingMessage && !draft.trim() ? (
+                {!editingMessage && !draft.trim() && !groupChat ? (
                   <Pressable
                     hitSlop={6}
                     style={styles.pillIcon}
                     onPress={takePhoto}>
-                    <Ionicons name="camera-outline" size={23} color="#8A8A90" />
+                    <Ionicons name="camera-outline" size={23} color={ink.text("#8A8A90")} />
                   </Pressable>
                 ) : null}
               </>
             )}
           </View>
 
-          {showSendButton ? (
+          {/* Figma M02: groups always show the mic AND the pink send circle
+              (the camera lives in the + sheet). */}
+          {groupChat && !editingMessage && !recording ? (
+            <View
+              style={[styles.circleButton, styles.micBare]}
+              accessibilityRole="button"
+              accessibilityLabel="Hold to record voice message"
+              {...micPanResponder.panHandlers}>
+              <Ionicons name="mic-outline" size={24} color={ink.text("#B63D91")} />
+            </View>
+          ) : null}
+
+          {showSendButton || (groupChat && !recording) ? (
             <Pressable
-              style={styles.circleButton}
+              style={[styles.circleButton, styles.sendCircle]}
               onPress={editingMessage ? saveEdit : send}
               disabled={!draft.trim()}
               accessibilityRole="button"
@@ -4878,9 +5627,9 @@ export default function ChatScreen() {
                 editingMessage ? "Save edit" : "Send message"
               }>
               <Ionicons
-                name={editingMessage ? "checkmark" : "send"}
-                size={editingMessage ? 22 : 19}
-                color="#C5399A"
+                name={editingMessage ? "checkmark" : "arrow-up"}
+                size={22}
+                color="#FFFFFF"
               />
             </Pressable>
           ) : (
@@ -4889,7 +5638,7 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
-              <Ionicons name="mic-outline" size={22} color="#C34D9C" />
+              <Ionicons name="mic-outline" size={24} color="#B63D91" />
             </View>
           )}
         </View>
@@ -5014,18 +5763,20 @@ export default function ChatScreen() {
       {/* LONG-PRESS MENU (reactions + actions) */}
       {/* ================================== */}
 
-      <Modal
-        visible={showActions && !!selectedMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={closeMenu}>
-        <Pressable style={styles.menuBackdrop} onPress={menuTap(closeMenu)}>
+      <MessageActionsSheet visible={showActions && !!selectedMessage} onRequestClose={closeMenu} backdropStyle={[styles.menuBackdrop, styles.sheetBackdrop]} onBackdropPress={menuTap(closeMenu)}>
           <Pressable
-            style={styles.menuColumn}
+            style={[styles.menuColumn, styles.sheetColumn]}
             onPress={(event) => event.stopPropagation()}>
-            {/* QUICK REACTIONS */}
-            <View style={styles.quickReactions}>
-              {REACTION_EMOJIS.map((emoji) => (
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>Message actions</Text>
+              <Pressable onPress={closeMenu} hitSlop={10} accessibilityLabel="Close">
+                <Ionicons name="close" size={24} color="#66738A" />
+              </Pressable>
+            </View>
+
+            {/* QUICK REACTIONS (Figma M10: ❤️ 🙌 😂 👍 🔥 and + for more) */}
+            <View style={[styles.quickReactions, styles.sheetReactions]}>
+              {(showAllReactions ? REACTION_EMOJIS_ALL : QUICK_REACTIONS).map((emoji) => (
                 <Pressable
                   key={emoji}
                   style={[
@@ -5034,6 +5785,7 @@ export default function ChatScreen() {
                       findMyReaction(selectedMessage)?.emoji === emoji &&
                       styles.quickReactionActive,
                   ]}
+                  accessibilityLabel={`React ${emoji}`}
                   onPress={menuTap(() => {
                     if (selectedMessage) {
                       reactToMessage(selectedMessage, emoji);
@@ -5042,43 +5794,116 @@ export default function ChatScreen() {
                   <Text style={styles.quickReactionText}>{emoji}</Text>
                 </Pressable>
               ))}
+              {!showAllReactions ? (
+                <Pressable
+                  style={styles.quickReaction}
+                  onPress={() => setShowAllReactions(true)}
+                  accessibilityLabel="More reactions">
+                  <Ionicons name="add" size={24} color={ink.text("#24283C")} />
+                </Pressable>
+              ) : null}
             </View>
 
-            {/* ACTIONS */}
-            <View style={styles.menuCard}>
-              {selectedMessage ? (
-                <View style={styles.menuPreview}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.menuPreviewText,
-                      menuNotice ? styles.menuNoticeText : null,
-                    ]}>
-                    {menuNotice ||
-                      selectedMessage.content ||
-                      getMessageTypeLabel(selectedMessage) ||
-                      "Message"}
-                  </Text>
-
-                  {/* ✕ back to the chat */}
-                  <Pressable
-                    onPress={closeMenu}
-                    hitSlop={10}
-                    style={styles.menuClose}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close menu">
-                    <Ionicons name="close" size={18} color="#55555E" />
-                  </Pressable>
+            {/* THE MESSAGE (Figma M10: who sent it, their rank, the bubble) */}
+            {selectedMessage ? (
+              <View style={styles.menuMessage}>
+                <View style={[styles.menuMessageAvatar, { backgroundColor: ink.surface(avatarTint(senderNameOf(selectedMessage))) }]}>
+                  <Text style={styles.menuMessageInitials}>{initialsOf(senderNameOf(selectedMessage))}</Text>
                 </View>
-              ) : null}
+                <View style={styles.menuMessageBody}>
+                  <View style={styles.msgNameRow}>
+                    <Text style={styles.msgName} numberOfLines={1}>
+                      {senderNameOf(selectedMessage)}
+                    </Text>
+                    {selectedMessage.senderGroupRole ? (
+                      <Text style={styles.msgRole}>
+                        {selectedMessage.senderGroupRole === "owner" ? "Owner" : "Admin"}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <RankLine rank={selectedMessage.sender?.rank} groupRole={selectedMessage.senderGroupRole} />
+                  <View style={styles.menuMessageBubble}>
+                    <Text
+                      numberOfLines={4}
+                      style={[styles.menuMessageText, menuNotice ? styles.menuNoticeText : null]}>
+                      {menuNotice ||
+                        selectedMessage.content ||
+                        getMessageTypeLabel(selectedMessage) ||
+                        "Message"}
+                    </Text>
+                    <Text style={styles.menuMessageTime}>{formatMessageTime(selectedMessage.createdAt)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
 
+            {/* ACTIONS: the design's four first, then the rest */}
+            <ScrollView style={styles.menuScroll} bounces={false}>
+            <View style={[styles.menuCard, styles.sheetCard]}>
               <MenuItem
                 icon="arrow-undo-outline"
-                label="Reply"
+                label="Reply to quote"
                 onPress={menuTap(
                   () => selectedMessage && startReply(selectedMessage),
                 )}
               />
+
+              {sparksChat && selectedMessage && !selectedMessage.deleted ? (
+                selectedMessage.spark ? (
+                  <MenuItem
+                    icon="sparkles"
+                    label="Open Spark"
+                    onPress={menuTap(() => {
+                      const sparkId = selectedMessage?.spark?.id;
+                      closeMenu();
+                      if (sparkId) {
+                        setTimeout(() => setOpenSparkId(sparkId), 300);
+                      }
+                    })}
+                  />
+                ) : (
+                  <MenuItem
+                    icon="sparkles-outline"
+                    label="Start a Spark"
+                    onPress={menuTap(() => {
+                      const seed = selectedMessage;
+                      closeMenu();
+                      if (seed) {
+                        setTimeout(() => setSparkSeed(seed), 300);
+                      }
+                    })}
+                  />
+                )
+              ) : null}
+
+              {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
+                <MenuItem
+                  icon="pencil-outline"
+                  label="Edit your message"
+                  onPress={menuTap(
+                    () => selectedMessage && startEditing(selectedMessage),
+                  )}
+                />
+              ) : null}
+
+              <MenuItem
+                icon="trash-outline"
+                label={selectedMessageIsMine ? "Delete your message" : "Delete"}
+                danger
+                onPress={menuTap(
+                  () => selectedMessage && deletePrompt(selectedMessage),
+                )}
+              />
+
+              {selectedMessageIsMine && selectedMessage?.canRollback ? (
+                <MenuItem
+                  icon="arrow-undo-circle-outline"
+                  label="Undo edit"
+                  onPress={menuTap(
+                    () => selectedMessage && undoEdit(selectedMessage),
+                  )}
+                />
+              ) : null}
 
               {selectedMessage?.content?.trim() ? (
                 <MenuItem
@@ -5090,13 +5915,16 @@ export default function ChatScreen() {
                 />
               ) : null}
 
-              <MenuItem
-                icon="arrow-redo-outline"
-                label="Forward"
-                onPress={menuTap(
-                  () => selectedMessage && forwardMessage(selectedMessage),
-                )}
-              />
+              {selectedMessage?.kind !== "poll" &&
+              selectedMessage?.kind !== "call" ? (
+                <MenuItem
+                  icon="arrow-redo-outline"
+                  label="Forward"
+                  onPress={menuTap(
+                    () => selectedMessage && forwardMessage(selectedMessage),
+                  )}
+                />
+              ) : null}
 
               {canPin ? (
                 <MenuItem
@@ -5112,26 +5940,6 @@ export default function ChatScreen() {
                   }
                   onPress={menuTap(
                     () => selectedMessage && pinMessage(selectedMessage),
-                  )}
-                />
-              ) : null}
-
-              {selectedMessageIsMine && selectedMessage?.kind === "text" ? (
-                <MenuItem
-                  icon="create-outline"
-                  label="Edit"
-                  onPress={menuTap(
-                    () => selectedMessage && startEditing(selectedMessage),
-                  )}
-                />
-              ) : null}
-
-              {selectedMessageIsMine && selectedMessage?.canRollback ? (
-                <MenuItem
-                  icon="arrow-undo-circle-outline"
-                  label="Undo edit"
-                  onPress={menuTap(
-                    () => selectedMessage && undoEdit(selectedMessage),
                   )}
                 />
               ) : null}
@@ -5161,19 +5969,14 @@ export default function ChatScreen() {
                   () => selectedMessage && selectMessage(selectedMessage),
                 )}
               />
-
-              <MenuItem
-                icon="trash-outline"
-                label="Delete"
-                danger
-                onPress={menuTap(
-                  () => selectedMessage && deletePrompt(selectedMessage),
-                )}
-              />
             </View>
+            </ScrollView>
+
+            {selectedMessageIsMine ? (
+              <Text style={styles.menuFootnote}>Your message · only you can edit this text</Text>
+            ) : null}
           </Pressable>
-        </Pressable>
-      </Modal>
+      </MessageActionsSheet>
 
       {/* ================================== */}
       {/* DELETE SHEET */}
@@ -5544,6 +6347,22 @@ export default function ChatScreen() {
                 label="Audio"
                 onPress={() => attachmentMessage("Audio")}
               />
+
+              <AttachmentButton
+                icon="stats-chart-outline"
+                label="Poll"
+                onPress={openPollCreator}
+              />
+
+              <AttachmentButton
+                icon="images-outline"
+                label="Album"
+                onPress={async () => {
+                  setShowAttachments(false);
+                  await new Promise((resolve) => setTimeout(resolve, 450));
+                  setShowShareMedia(true);
+                }}
+              />
             </View>
           </View>
         </Pressable>
@@ -5613,9 +6432,85 @@ export default function ChatScreen() {
         </Pressable>
       </Modal>
 
+      {/* SPARKS */}
+      <SparksListSheet
+        visible={showAllSparks}
+        sparks={sparks}
+        onClose={() => setShowAllSparks(false)}
+        onOpen={(spark) => {
+          setShowAllSparks(false);
+          setTimeout(() => setOpenSparkId(spark.id), 300);
+        }}
+      />
+
+      <SparkPanel
+        visible={!!openSparkId && !desktop}
+        conversationId={conversationId}
+        sparkId={openSparkId}
+        token={token}
+        otherSparks={sparks}
+        refreshKey={sparkRefresh}
+        onClose={() => setOpenSparkId(null)}
+        onSent={(message) => dispatch(socketMessageReceived({ conversationId, message }))}
+        onRemoved={(sparkId) =>
+          setSparks((current) => current.filter((item) => item.id !== sparkId))
+        }
+      />
+
+      <StartSparkSheet
+        visible={!!sparkSeed}
+        conversationId={conversationId}
+        token={token}
+        conversationTitle={(conversation as any)?.title}
+        message={
+          sparkSeed
+            ? {
+                id: sparkSeed.id,
+                content: sparkSeed.content,
+                senderName: (sparkSeed.sender as any)?.name || sparkSeed.sender?.username,
+                rank: sparkSeed.sender?.rank,
+                createdAt: sparkSeed.createdAt,
+              }
+            : null
+        }
+        onClose={() => setSparkSeed(null)}
+        onDone={(spark) => {
+          setSparks((current) => [spark, ...current.filter((item) => item.id !== spark.id)]);
+          setTimeout(() => setOpenSparkId(spark.id), 350);
+        }}
+      />
+
+      {/* SHARE WITH YOUR GROUP (M17) */}
+      <ShareMediaSheet
+        visible={showShareMedia}
+        conversationId={conversationId}
+        token={token}
+        replyTo={replyingTo?.id || null}
+        onClose={() => setShowShareMedia(false)}
+        onSent={(message) => {
+          dispatch(socketMessageReceived({ conversationId, message }));
+          startSlowTimer();
+          scrollToLatestIfNeeded();
+        }}
+        onVoiceNote={() => showVoiceHint("Hold the mic button to record a voice note")}
+      />
+
+      {/* POLL CREATOR */}
+      <PollCreator
+        visible={showPollCreator}
+        conversationId={conversationId}
+        token={token}
+        onClose={() => setShowPollCreator(false)}
+        onCreated={(message) => {
+          dispatch(socketMessageReceived({ conversationId, message }));
+          startSlowTimer();
+          scrollToLatestIfNeeded();
+        }}
+      />
+
       {/* @ MENTION PICKER */}
       <MentionPicker
-        visible={showMentionPicker}
+        visible={showMentionPicker && !desktop}
         conversationId={conversationId}
         token={token}
         onClose={closeMentionPicker}
@@ -5630,9 +6525,11 @@ export default function ChatScreen() {
         onPreview={setWallpaperPreview}
         onClose={() => setShowWallpaperPicker(false)}
       />
+      </SparkContext.Provider>
       </MyUserIdContext.Provider>
       </PhotoWallpaperContext.Provider>
     </KeyboardAvoidingView>
+    </DesktopChatRow>
   );
 }
 
@@ -5651,6 +6548,7 @@ function AttachmentButton({
 
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable style={styles.attachmentButton} onPress={onPress}>
       <View style={styles.attachmentIcon}>
@@ -5666,7 +6564,7 @@ function AttachmentButton({
 // STYLES
 // ==========================================
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: { flex: 1, backgroundColor: "#D4ECF8" },
 
   center: {
@@ -5682,7 +6580,7 @@ const styles = StyleSheet.create({
 
   headerContainer: {
     // Figma: the header sits on the chat background (no white bar).
-    backgroundColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "transparent",
   },
 
   header: {
@@ -5760,6 +6658,49 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(150,150,160,0.18)",
   },
 
+  // Spark marker at the top of a message that's in a Spark.
+  sparkMarker: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 3,
+    marginBottom: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.65)",
+  },
+
+  sparkMarkerText: {
+    maxWidth: 170,
+    fontFamily: FONTS.semibold,
+    fontSize: 10.5,
+  },
+
+  // Text messages: the Spark sits on the time row instead (Figma M03-M05).
+  listWithRail: { marginRight: 84 },
+
+  sparkFootRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  sparkFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    flexShrink: 1,
+  },
+
+  sparkFootText: {
+    flexShrink: 1,
+    fontFamily: FONTS.medium,
+    fontSize: 10.5,
+  },
+
   slowModeBar: {
     alignSelf: "center",
     marginBottom: 6,
@@ -5812,13 +6753,14 @@ const styles = StyleSheet.create({
 
   headerText: { flex: 1, marginLeft: 10, marginRight: 12 },
 
-  headerName: { fontFamily: FONTS.semibold, fontSize: 15, color: "#000000" },
+  headerName: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 21, color: "#24283C" },
 
   headerStatus: {
     fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: "#7A7A84",
-    marginTop: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#66738A",
+    marginTop: 4,
   },
 
   selectionTitle: {
@@ -5834,42 +6776,31 @@ const styles = StyleSheet.create({
   // PINNED BANNER
 
   pinnedBanner: {
-    // Figma: 370 x 52, radius 14, padding 10 / 16, #C34D9C26,
-    // shadow 0 4 4 #00000017 - a floating card under the header.
+    // Figma M02: full width, 62 tall, padding 12 / 18, gap 10, #F0EDF9.
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 10,
-    minHeight: 52,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "#C34D9C26",
-    borderLeftWidth: 3,
-    borderLeftColor: "#C34D9C",
-
-    shadowColor: "#000000",
-    shadowOpacity: 0.09,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    minHeight: 62,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: "#F0EDF9",
   },
 
   pinnedBannerText: { flex: 1 },
 
   pinnedBannerTitle: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.semibold,
     fontSize: 11,
-    color: "#C34D9C",
+    lineHeight: 15,
+    color: "#B63D91",
   },
 
   pinnedBannerBody: {
     fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: "#2F2F36",
-    marginTop: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#24283C",
+    marginTop: 2,
   },
 
   // LOADING
@@ -5895,7 +6826,7 @@ const styles = StyleSheet.create({
 
   messageListWrapper: { flex: 1 },
 
-  list: { paddingVertical: 10 },
+  list: { padding: 14 },
 
   // DATE SEPARATOR
 
@@ -5906,16 +6837,15 @@ const styles = StyleSheet.create({
   },
 
   dateSeparator: {
-    backgroundColor: "rgba(255,255,255,0.6)",
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 10,
   },
 
   dateSeparatorText: {
     fontSize: 11,
-    fontFamily: FONTS.bold,
-    color: "#777783",
+    lineHeight: 13,
+    fontFamily: FONTS.medium,
+    color: "#66738A",
     letterSpacing: 0.3,
   },
 
@@ -5942,15 +6872,15 @@ const styles = StyleSheet.create({
 
   bubbleRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 10,
+    alignItems: "flex-start",
   },
 
-  rowGroupStart: { marginTop: 8 },
+  // Figma M02: 16 between people, a little less within one person's run.
+  rowGroupStart: { marginTop: 16 },
 
-  rowGroupContinue: { marginTop: 2 },
+  rowGroupContinue: { marginTop: 6 },
 
-  rowWithReactions: { marginBottom: 12 },
+  rowWithReactions: { marginBottom: 0 /* M14 */ },
 
   rowMine: { justifyContent: "flex-end" },
 
@@ -5960,7 +6890,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(197,57,154,0.16)",
   },
 
-  avatarSlot: { width: 34, marginRight: 4, justifyContent: "flex-end" },
+  avatarSlot: { width: 30, marginRight: 8, justifyContent: "flex-start" },
 
   messageAvatar: {
     width: 30,
@@ -5976,32 +6906,55 @@ const styles = StyleSheet.create({
 
   // BUBBLE
 
-  bubbleColumn: { maxWidth: "80%", flexShrink: 1 },
+  bubbleColumn: { maxWidth: "88%", flexShrink: 1 },
 
   columnMine: { alignItems: "flex-end" },
 
   columnTheirs: { alignItems: "flex-start" },
 
   bubble: {
-    // Figma: radius 14, soft shadow 0 4 4 #00000017, and a milky white rim.
+    // Figma M02: padding 12, radius 16 (4 at the top-left on the first one).
     minWidth: 62,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.65)",
+    borderRadius: 16,
+    padding: 12,
 
-    shadowColor: "#000000",
-    shadowOpacity: 0.09,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: "#24283C",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
 
-  bubbleTheirs: { backgroundColor: "rgba(11,7,19,0.07)" },
+  // Figma M02-M05: translucent glass message surfaces.
+  // Translucent glass incoming message bubbles.
+  bubbleTheirs: {
+    backgroundColor: "rgba(235, 248, 255, 0.38)",
+    borderWidth: 1,
+    borderTopColor: "rgba(35, 78, 128, 0.20)",
+    borderLeftColor: "rgba(255, 255, 255, 0.55)",
+    borderRightColor: "rgba(255, 255, 255, 0.55)",
+    borderBottomColor: "rgba(255, 255, 255, 0.78)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    elevation: 1,
+  },
 
-  bubbleMine: { backgroundColor: "#C34D9C59" },
+  // Pink/lilac glass for messages sent by the current user.
+  bubbleMine: {
+    backgroundColor: "rgba(233, 205, 230, 0.72)",
+    borderWidth: 1,
+    borderTopColor: "rgba(104, 46, 100, 0.22)",
+    borderLeftColor: "rgba(255, 255, 255, 0.38)",
+    borderRightColor: "rgba(255, 255, 255, 0.38)",
+    borderBottomColor: "rgba(255, 255, 255, 0.62)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 4,
+    elevation: 1,
+  },
 
 
   // On a photo wallpaper: solid, so the picture doesn't show through.
@@ -6024,6 +6977,147 @@ const styles = StyleSheet.create({
 
   captionWrap: { paddingHorizontal: 6, paddingTop: 4, paddingBottom: 2 },
 
+  // Figma M14: "✓ Maya Chen and Diego Ruiz will be notified".
+  notifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    backgroundColor: "#FFFFFF",
+  },
+
+  notifyText: { flexShrink: 1, fontFamily: FONTS.medium, fontSize: 12.5, color: "#B63D91" },
+
+  // Figma M15: "Your message" / "Restore previous wording" card.
+  editCard: { marginTop: 14 },
+
+  editSection: {
+    marginTop: 6,
+    marginBottom: 8,
+    fontFamily: FONTS.semibold,
+    fontSize: 12,
+    letterSpacing: 0.4,
+    color: "#66738A",
+  },
+
+  editBox: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(36,40,60,0.08)",
+  },
+
+  editLabel: { marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 13, color: "#24283C" },
+
+  editSaved: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(102,115,138,0.25)",
+  },
+
+  editSavedText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+
+  editNote: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "#F0EDF9" },
+
+  editNoteTitle: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" },
+
+  editNoteText: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 13, color: "#66738A" },
+
+  editHint: { fontFamily: FONTS.regular, fontSize: 14, color: "#66738A" },
+
+  editPrevious: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+
+  editButton: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0EDF9",
+  },
+
+  editButtonText: { fontFamily: FONTS.semibold, fontSize: 15, color: "#B63D91" },
+
+  // Figma M10: "Message actions" as a white bottom sheet.
+  sheetBackdrop: {
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+    backgroundColor: "rgba(36,40,60,0.35)",
+  },
+
+  sheetColumn: {
+    maxWidth: 640,
+    alignSelf: "center",
+    alignItems: "stretch",
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: "#FFFFFF",
+  },
+
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 22, lineHeight: 28, color: "#24283C" },
+
+  sheetReactions: {
+    alignSelf: "stretch",
+    justifyContent: "space-between",
+    backgroundColor: "#F0EDF9",
+    borderRadius: 28,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+
+  sheetCard: { backgroundColor: "transparent", borderRadius: 0, paddingVertical: 0 },
+
+  // Figma M02: name + Owner/Admin, rank line under it (gap 3), then the bubble.
+  msgHeader: { gap: 3, marginBottom: 6 },
+
+  msgNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  msgName: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 13, lineHeight: 17, color: "#24283C" },
+
+  msgRole: { fontFamily: FONTS.semibold, fontSize: 11, lineHeight: 15, color: "#B63D91" },
+
+  avatarInitials: { fontFamily: FONTS.bold, fontSize: 10, lineHeight: 12, color: "#7D356D" },
+
+  // "••• Someone is typing" (indent 38 = avatar 30 + gap 8).
+  typingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingLeft: 38,
+    paddingVertical: 4,
+    marginTop: 16,
+  },
+
+  typingDots: { fontSize: 15, lineHeight: 18, letterSpacing: 3, color: "#B63D91" },
+
+  typingText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" },
+
+  // Sender name + rank badge + admin badge (group chats).
+  senderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 5,
+    marginBottom: 3,
+  },
+
+  senderNameInRow: { marginBottom: 0, flexShrink: 1 },
+
   senderName: {
     fontSize: 12,
     fontFamily: FONTS.bold,
@@ -6032,9 +7126,11 @@ const styles = StyleSheet.create({
   },
 
   bubbleText: {
-    fontSize: 15,
-    color: "#191922",
-    lineHeight: 20,
+    fontFamily: FONTS.regular,
+    // A touch smaller on the website (computers already show text larger).
+    fontSize: Platform.OS === "web" ? 14 : 15,
+    color: "#24283C",
+    lineHeight: Platform.OS === "web" ? 20 : 22,
     // Long links / words without spaces wrap INSIDE the bubble instead of
     // running out of it (browsers don't do this by themselves).
     ...(Platform.OS === "web"
@@ -6074,7 +7170,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
 
-  metaInline: { position: "absolute", right: 9, bottom: 5 },
+  metaInline: { marginTop: 8, alignSelf: "flex-start" },
 
   metaFlow: { alignSelf: "flex-end", marginTop: 2, paddingRight: 3 },
 
@@ -6088,26 +7184,28 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
 
-  bubbleTime: { fontFamily: FONTS.regular, fontSize: 10.5, color: "#9C9CAA" },
+  bubbleTime: { fontFamily: FONTS.regular, fontSize: 11, lineHeight: 15, color: "#66738A" },
 
   editedText: { fontFamily: FONTS.regular, fontSize: 10, fontStyle: "italic" },
 
   // REPLY
 
   replyPreview: {
+    // Figma M14: quote inside the bubble, a pink line on the left.
     flexDirection: "row",
-    minWidth: 140,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "rgba(197,57,154,0.08)",
-    marginBottom: 5,
+    marginBottom: 8,
+    paddingLeft: 10,
+    paddingVertical: 2,
+    borderLeftWidth: 2,
+    borderLeftColor: "#B63D91",
+    backgroundColor: "transparent",
   },
 
-  replyPreviewMine: { backgroundColor: "rgba(255,255,255,0.35)" },
+  replyPreviewMine: { backgroundColor: "transparent" /* M14 */ },
 
-  replyBar: { width: 4, backgroundColor: "#C5399A" },
+  replyBar: { width: 0 /* M14: the pink line is the border now */ },
 
-  replyBarMine: { backgroundColor: "#C34D9C" },
+  replyBarMine: { width: 0 /* M14 */ },
 
   // flexShrink (not flex: 1) so the quote's natural width sizes the bubble.
   replyBody: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 5 },
@@ -6119,18 +7217,13 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  replyPreviewTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
+  replyPreviewTitle: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
 
-  replyPreviewTitleMine: { color: "#C34D9C" },
+  replyPreviewTitleMine: { color: "#66738A" /* M14 */ },
 
-  replyPreviewText: {
-    flexShrink: 1,
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: "#777783",
-  },
+  replyPreviewText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
 
-  replyPreviewTextMine: { color: "#55555E" },
+  replyPreviewTextMine: { color: "#66738A" /* M14 */ },
 
   // MEDIA
 
@@ -6360,6 +7453,20 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
 
+  callLogNotes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+
+  callLogNotesText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#C5399A",
+  },
+
   // DOCUMENT
 
   documentMessage: {
@@ -6400,41 +7507,34 @@ const styles = StyleSheet.create({
   // REACTIONS
 
   reactions: {
+    // Figma M14: reactions sit under the bubble, "🙌 3".
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
-    marginTop: -9,
+    gap: 10,
+    marginTop: 6,
+    marginLeft: 2,
   },
 
-  reactionsMine: { justifyContent: "flex-end", marginRight: 6 },
+  reactionsMine: { justifyContent: "flex-start" /* M14 */ },
 
-  reactionsTheirs: { justifyContent: "flex-start", marginLeft: 6 },
+  reactionsTheirs: { justifyContent: "flex-start" /* M14 */ },
 
   reactionBadge: {
+    // M14
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 6,
+    gap: 3,
+    paddingHorizontal: 2,
     paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: "rgba(150,150,160,0.25)",
-    elevation: 1,
+    backgroundColor: "transparent",
+    borderWidth: 0,
   },
 
-  reactionBadgeActive: {
-    borderColor: "#C5399A",
-    backgroundColor: "rgba(197,57,154,0.1)",
-  },
+  reactionBadgeActive: { backgroundColor: "transparent" /* M14 */ },
 
-  reactionEmoji: { fontFamily: FONTS.regular, fontSize: 13 },
+  reactionEmoji: { fontSize: 15 /* M14 */ },
 
-  reactionCount: {
-    fontSize: 11,
-    color: "#666672",
-    marginLeft: 3,
-    fontFamily: FONTS.bold,
-  },
+  reactionCount: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" /* M14 */ },
 
   // JUMP BUTTON
 
@@ -6490,60 +7590,54 @@ const styles = StyleSheet.create({
 
   // EDIT / REPLY BAR
 
-  editingBar: {
-    paddingHorizontal: 8,
-    paddingTop: 6,
-  },
+  editingBar: { paddingHorizontal: 14, paddingTop: 10, backgroundColor: "#FFFFFF" /* M14 */ },
 
   editingCard: {
+    // Figma M14: lilac "Replying to …" card.
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    paddingRight: 10,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#ECECF0",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#F0EDF9",
   },
 
-  editingAccent: {
-    alignSelf: "stretch",
-    width: 4,
-    backgroundColor: "#C5399A",
-  },
+  editingAccent: { width: 0 /* M14 */ },
 
   editingContent: { flex: 1, marginHorizontal: 10, paddingVertical: 8 },
 
-  editingTitle: { fontSize: 12, fontFamily: FONTS.bold, color: "#C5399A" },
+  editingTitle: { fontFamily: FONTS.semibold, fontSize: 12.5, color: "#B63D91" /* M14 */ },
 
-  editingText: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: "#777783",
-    marginTop: 2,
-  },
+  editingText: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 14, color: "#24283C" /* M14 */ },
 
   // COMPOSER
 
   composer: {
-    // Figma: 402 x 64, padding 12, gap 10 (#0B0713, very light).
+    // Recessed glass tray: subtle inner edge over the chat wallpaper.
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 12,
-    backgroundColor: "rgba(11,7,19,0.05)",
+    backgroundColor: "rgba(116, 177, 207, 0.22)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(76, 127, 157, 0.28)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.42)",
   },
 
   inputPill: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(11,7,19,0.1)",
-    borderRadius: 20,
-    paddingLeft: 6,
-    paddingRight: 6,
+    // Slightly darker glass makes the input feel inset rather than raised.
+    backgroundColor: "rgba(27, 22, 34, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.52)",
+    borderRadius: 22,
+    paddingLeft: 4,
+    paddingRight: 8,
   },
 
   input: {
@@ -6571,23 +7665,23 @@ const styles = StyleSheet.create({
   },
 
   circleButton: {
-    // Figma: milky see-through circle with a pink outline mic.
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.85)",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
 
+  // Figma M02: the pink send circle with an up arrow.
+  sendCircle: { backgroundColor: "#B63D91" },
+
+  // The plain mic beside the send circle (groups, Figma M02).
+  micBare: { width: 30, marginRight: 4 },
+
   // Figma: pink paperclip circle at the left of the message bar.
   attachCircle: {
-    width: 36,
+    width: 30,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: "#C34D9C",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -6703,6 +7797,47 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F3",
     marginBottom: 2,
+  },
+
+  // Figma M10: the pressed message, shown at the top of the sheet.
+  menuMessage: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  menuMessageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  menuMessageInitials: { fontFamily: FONTS.semibold, fontSize: 11, color: "#7D356D" },
+
+  menuMessageBody: { flex: 1, minWidth: 0 },
+
+  menuMessageBubble: {
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+    backgroundColor: "#F0F4F9",
+  },
+
+  menuMessageText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#24283C" },
+
+  menuMessageTime: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 11, color: "#66738A" },
+
+  menuScroll: { flexGrow: 0, maxHeight: 330 },
+
+  menuFootnote: {
+    marginTop: 10,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: "#66738A",
   },
 
   menuPreviewText: {
@@ -7049,4 +8184,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}, {
+  // M14 + M15 dark-theme overrides. Preserve existing behaviour.
+  notifyRow: { backgroundColor: "#191B27" },
+  notifyText: { color: "#F0A6D7" },
+  editingBar: { backgroundColor: "#191B27" },
+  editingCard: { backgroundColor: "#252837" },
+  editingTitle: { color: "#F0A6D7" },
+  editingText: { color: "#F4F5FA" },
+  replyPreviewTitle: { color: "#B5BBCB" },
+  replyPreviewTitleMine: { color: "#D5D8E4" },
+  replyPreviewText: { color: "#D5D8E4" },
+  replyPreviewTextMine: { color: "#D5D8E4" },
+  editSection: { color: "#B5BBCB" },
+  editBox: { backgroundColor: "#252837", borderColor: "rgba(255,255,255,0.12)" },
+  editLabel: { color: "#F4F5FA" },
+  editSaved: { borderColor: "rgba(255,255,255,0.18)" },
+  editSavedText: { color: "#F4F5FA" },
+  editNote: { backgroundColor: "#30263B" },
+  editNoteTitle: { color: "#F0A6D7" },
+  editNoteText: { color: "#B5BBCB" },
+  // Your messages stand out from everyone else's (plum-pink vs navy).
+  bubbleTheirs: {
+    backgroundColor: "#252837",
+    borderTopColor: "rgba(255,255,255,0.08)",
+    borderLeftColor: "rgba(255,255,255,0.05)",
+    borderRightColor: "rgba(255,255,255,0.05)",
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  bubbleMine: {
+    backgroundColor: "#4A2643",
+    borderTopColor: "rgba(240,166,215,0.28)",
+    borderLeftColor: "rgba(240,166,215,0.14)",
+    borderRightColor: "rgba(240,166,215,0.14)",
+    borderBottomColor: "rgba(240,166,215,0.14)",
+  },
+  bubbleTheirsOnPhoto: { backgroundColor: "#252837" },
+  bubbleMineOnPhoto: { backgroundColor: "#4A2643" },
+  bubbleTextMine: { color: "#F4F5FA" },});
+
+
+

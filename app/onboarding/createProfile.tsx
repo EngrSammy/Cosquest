@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
 import { Field } from "@/components/Field";
@@ -19,8 +20,10 @@ import {
   View,
 } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function CreateProfile() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -33,6 +36,7 @@ export default function CreateProfile() {
    * through Sign In instead of Sign Up.
    */
   const authUser = useAppSelector((state) => state.auth.user);
+  const authToken = useAppSelector((state) => state.auth.token);
 
   const authEmail = authUser?.email?.trim() || "";
 
@@ -169,7 +173,11 @@ export default function CreateProfile() {
 
       console.log("CHECKING USERNAME:", username);
 
-      const usernameResult = await checkUsername(username, email);
+      const usernameResult = await checkUsername(
+        username,
+        email,
+        authToken || undefined,
+      );
 
       console.log("USERNAME CHECK RESPONSE:", usernameResult);
 
@@ -447,13 +455,14 @@ export default function CreateProfile() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 80,
   },
 
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
@@ -462,6 +471,7 @@ const styles = StyleSheet.create({
   },
 
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -476,6 +486,7 @@ const styles = StyleSheet.create({
   },
 
   label: {
+    fontFamily: FONTS.semibold,
     fontSize: 13,
     fontWeight: "600",
     color: "#191922",
@@ -510,6 +521,7 @@ const styles = StyleSheet.create({
   },
 
   segText: {
+    fontFamily: FONTS.bold,
     fontSize: 14,
     fontWeight: "700",
     color: "#191922",
@@ -520,6 +532,7 @@ const styles = StyleSheet.create({
   },
 
   usernameChecking: {
+    fontFamily: FONTS.regular,
     color: "#666",
     fontSize: 12,
     marginTop: -10,
@@ -528,6 +541,7 @@ const styles = StyleSheet.create({
   },
 
   usernameAvailable: {
+    fontFamily: FONTS.semibold,
     color: "#1FA85A",
     fontSize: 12,
     fontWeight: "600",

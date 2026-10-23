@@ -1,6 +1,9 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
+import type { PollSummary } from "./polls";
+import type { Rank } from "./ranks";
+import type { MessageSparkTag } from "./sparks";
 
 export type ChatType = "community" | "faction" | "dm" | "group";
 
@@ -19,6 +22,8 @@ export type ChatParticipant = {
   // chat:read socket event — used to color a sent message's checkmark
   // pink once its createdAt falls at or before this timestamp.
   lastReadAt?: string | null;
+  // Faction rank (badge beside the name).
+  rank?: Rank | null;
 };
 
 export type MessageReaction = {
@@ -80,6 +85,21 @@ export type ChatMessage = {
 
   // A group admin deleted it.
   deletedByAdmin?: boolean;
+
+  // kind "poll": the question, options and results.
+  poll?: PollSummary | null;
+
+  // Groups: "owner" / "admin" badge for the sender (null otherwise).
+  senderGroupRole?: "owner" | "admin" | null;
+
+  // Sparks: the sub-conversation this message is part of.
+  spark?: MessageSparkTag | null;
+
+  // Albums: several photos/videos in one message (caption = content).
+  album?: { kind: "image" | "video"; url?: string; thumbnailUrl?: string | null; duration?: number | null }[] | null;
+
+  // Your own edited messages: the wording "Undo" would restore.
+  previousContent?: string | null;
 
   // @ mentions: the user ids tagged, or everyone in the chat.
   mentions?: string[];
@@ -709,6 +729,13 @@ export type ChatMember = {
   name?: string | null;
   avatarKey?: string | null;
   avatarPhotoUrl?: string | null;
+  faction?: string | null;
+  // "Front-end", "Design"... (their expertise role, if set).
+  expertise?: string | null;
+  // Faction rank (newer backends only).
+  rank?: Rank | null;
+  // Owner / admin (only if the backend sends it).
+  role?: "owner" | "admin" | "member" | null;
 };
 
 export async function getChatMembers(
@@ -742,6 +769,11 @@ export async function getChatMembers(
         name: member?.name || null,
         avatarKey: member?.avatarKey ?? null,
         avatarPhotoUrl: member?.avatarPhotoUrl ?? null,
+        faction: member?.faction ?? null,
+        expertise: typeof member?.expertise === "string" && member.expertise ? member.expertise : null,
+        rank: member?.rank && typeof member.rank === "object" && member.rank.name ? (member.rank as Rank) : null,
+        role:
+          member?.role === "owner" || member?.role === "admin" || member?.role === "member" ? member.role : null,
       }))
       .filter((member) => member.id && member.username),
     total: response?.pagination?.total ?? list.length,

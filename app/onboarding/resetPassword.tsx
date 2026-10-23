@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { useAppDispatch } from "@/store/hooks";
@@ -8,6 +9,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Backend errors that need a special button (exact texts from the API doc).
 const INVALID_CODE_ERROR = "That code is invalid or has expired.";
@@ -15,6 +17,7 @@ const TOO_MANY_ATTEMPTS_ERROR =
   "Too many incorrect attempts. Request a new code.";
 
 export default function ResetPassword() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -170,19 +173,21 @@ export default function ResetPassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
     paddingBottom: 110,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -200,16 +205,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   serverErrorText: {
+    fontFamily: FONTS.regular,
     color: "#B42318",
     fontSize: 13,
     textAlign: "center",
   },
   link: {
+    fontFamily: FONTS.bold,
     color: "#C5399A",
     fontSize: 13,
     fontWeight: "700",
   },
   hint: {
+    fontFamily: FONTS.regular,
     color: "#5e5e5e",
     fontSize: 12,
     textAlign: "center",

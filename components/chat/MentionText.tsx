@@ -10,11 +10,13 @@ import { StyleSheet, Text } from "react-native";
 import { FONTS } from "@/constants/fonts";
 
 import { LinkText } from "./LinkText";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // @everyone, or @username (letters, numbers, _ and .)
 const MENTION_PATTERN = /(@everyone\b|@[A-Za-z0-9_.]+)/g;
 
 export function MentionText({ text, mine }: { text: string; mine: boolean }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const parts = text.split(MENTION_PATTERN);
 
   return (
@@ -43,9 +45,9 @@ export function MentionText({ text, mine }: { text: string; mine: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   mention: {
-    fontFamily: FONTS.semibold,
+    fontFamily: FONTS.medium,
     color: "#C34D9C",
   },
 });

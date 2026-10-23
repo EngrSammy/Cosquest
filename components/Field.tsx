@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ErrorText } from "./ErrorText";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -43,6 +44,8 @@ export function Field({
   multiline?: boolean;
   error?: string;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const [hidden, setHidden] = useState(true);
   const [focused, setFocused] = useState(false);
 
@@ -57,7 +60,7 @@ export function Field({
         ]}
       >
         {leftIcon ? (
-          <Ionicons name={leftIcon} size={18} color="#C5399A" />
+          <Ionicons name={leftIcon} size={18} color={ink.text("#C5399A")} />
         ) : null}
         <TextInput
           style={styles.input}
@@ -66,7 +69,7 @@ export function Field({
           placeholder={placeholder}
           keyboardType={keyboardType}
           secureTextEntry={secureTextEntry ? hidden : false}
-          placeholderTextColor="#9C9CAA"
+          placeholderTextColor={ink.text("#9C9CAA")}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           textContentType={textContentType}
@@ -79,7 +82,7 @@ export function Field({
             <Ionicons
               name={hidden ? "eye-off-outline" : "eye-outline"}
               size={20}
-              color="#616161"
+              color={ink.text("#616161")}
             />
           </Pressable>
         ) : null}
@@ -89,7 +92,7 @@ export function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   field: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: "500", color: "#37373a", marginBottom: 6 },
   inputRow: {

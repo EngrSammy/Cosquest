@@ -13,10 +13,13 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 import { fetchPosts } from "@/store/thunks/postThunks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Facebook-style feed: every post is full width. (The Community screen no
 // longer adds side padding around the feed — see app/(tabs)/community.tsx.)
 export function Feeds() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const dispatch = useAppDispatch();
 
   const posts = useAppSelector((state) => state.post.posts);
@@ -65,7 +68,7 @@ export function Feeds() {
   if (loading && posts.length === 0) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#C5399A" />
+        <ActivityIndicator size="large" color={ink.text("#C5399A")} />
 
         <Text style={styles.stateText}>Loading community feed...</Text>
       </View>
@@ -90,7 +93,7 @@ export function Feeds() {
 
       {loading && posts.length > 0 ? (
         <View style={styles.refreshing}>
-          <ActivityIndicator size="small" color="#C5399A" />
+          <ActivityIndicator size="small" color={ink.text("#C5399A")} />
         </View>
       ) : null}
 
@@ -109,7 +112,7 @@ export function Feeds() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   feed: {
     width: "100%",
   },

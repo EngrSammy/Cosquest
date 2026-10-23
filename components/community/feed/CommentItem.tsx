@@ -6,6 +6,7 @@ import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import { CommentAudio } from "./CommentAudio";
 import { ReplyItem } from "./ReplyItem";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatar(author: any) {
   // Real uploaded profile photo
@@ -143,6 +144,8 @@ export function CommentItem({
 
   onLikeReply: (reply: any) => void;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const username = comment?.author?.username || comment?.username || "User";
 
   const hasVoice = Boolean(comment?.media?.url);
@@ -170,7 +173,7 @@ export function CommentItem({
 
             {isPostAuthor ? (
               <View style={styles.authorBadge}>
-                <Ionicons name="heart-outline" size={11} color="#C5399A" />
+                <Ionicons name="heart-outline" size={11} color={ink.text("#C5399A")} />
                 <Text style={styles.authorBadgeText}>by author</Text>
               </View>
             ) : null}
@@ -222,7 +225,7 @@ export function CommentItem({
           <Ionicons
             name={liked ? "heart" : "heart-outline"}
             size={18}
-            color={liked ? "#C5399A" : "#9C9CAA"}
+            color={ink.text(liked ? "#C5399A" : "#9C9CAA")}
           />
 
           {likeCount > 0 ? (
@@ -262,7 +265,7 @@ export function CommentItem({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   section: {
     paddingVertical: 10,
   },

@@ -1,14 +1,18 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthSignin() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   // Real Google sign-in (was a "Coming soon" placeholder). Same flow as
@@ -63,7 +67,7 @@ export default function AuthSignin() {
 
         {googleLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#C5399A" />
+            <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
             <Text style={styles.loadingText}>
               Connecting your Google account...
@@ -84,19 +88,21 @@ export default function AuthSignin() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
     paddingBottom: 70,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -111,7 +117,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#c0bebe" },
-  dividerText: { color: "#675656", fontSize: 15 },
+  dividerText: { fontFamily: FONTS.regular, color: "#675656", fontSize: 15 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -120,6 +126,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
+    fontFamily: FONTS.regular,
     color: "#777985",
     fontSize: 12,
   },

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, StyleSheet, Text } from "react-native";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type PostMenuProps = {
   visible: boolean;
@@ -22,6 +23,8 @@ export function PostMenu({
   onEdit,
   onDelete,
 }: PostMenuProps) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const handleEdit = () => {
     onClose();
     setTimeout(onEdit, MODAL_CLOSE_DELAY);
@@ -45,14 +48,14 @@ export function PostMenu({
             <>
               {/* EDIT */}
               <Pressable style={styles.item} onPress={handleEdit}>
-                <Ionicons name="create-outline" size={21} color="#191922" />
+                <Ionicons name="create-outline" size={21} color={ink.text("#191922")} />
 
                 <Text style={styles.itemText}>Edit post</Text>
               </Pressable>
 
               {/* DELETE */}
               <Pressable style={styles.item} onPress={handleDelete}>
-                <Ionicons name="trash-outline" size={21} color="#D9364F" />
+                <Ionicons name="trash-outline" size={21} color={ink.text("#D9364F")} />
 
                 <Text style={[styles.itemText, styles.deleteText]}>
                   Delete post
@@ -73,7 +76,7 @@ export function PostMenu({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   overlay: {
     flex: 1,
     alignItems: "center",

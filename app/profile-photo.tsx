@@ -29,8 +29,11 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function ProfilePhoto() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
 
   const dispatch = useAppDispatch();
@@ -227,14 +230,14 @@ export default function ProfilePhoto() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable onPress={() => safeBack()} hitSlop={10}>
-            <Ionicons name="chevron-back" size={26} color="#191922" />
+            <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Profile Photo</Text>
 
           <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
             {saving ? (
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={ink.text("#C5399A")} />
             ) : (
               <Text style={styles.save}>Save</Text>
             )}
@@ -265,7 +268,7 @@ export default function ProfilePhoto() {
             },
           ]}
           onPress={choosePhoto}>
-          <Ionicons name="image-outline" size={21} color="#C5399A" />
+          <Ionicons name="image-outline" size={21} color={ink.text("#C5399A")} />
 
           <Text style={styles.uploadButtonText}>Upload a new photo</Text>
         </Pressable>
@@ -293,7 +296,7 @@ export default function ProfilePhoto() {
 
                 {active ? (
                   <View style={styles.check}>
-                    <Ionicons name="checkmark" size={15} color="#FFFFFF" />
+                    <Ionicons name="checkmark" size={15} color={ink.text("#FFFFFF")} />
                   </View>
                 ) : null}
               </Pressable>
@@ -312,13 +315,13 @@ export default function ProfilePhoto() {
           onPress={handleSave}
           disabled={saving}>
           {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={ink.text("#FFFFFF")} />
           ) : (
             <>
               <Ionicons
                 name="checkmark-circle-outline"
                 size={20}
-                color="#FFFFFF"
+                color={ink.text("#FFFFFF")}
               />
 
               <Text style={styles.bottomSaveText}>Save Profile Photo</Text>
@@ -330,7 +333,7 @@ export default function ProfilePhoto() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 20,
     paddingBottom: 70,

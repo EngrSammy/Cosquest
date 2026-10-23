@@ -6,8 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function PostVideo({ uri }: { uri: string }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const [muted, setMuted] = useState(true);
 
   const player = useVideoPlayer(uri, (instance) => {
@@ -73,14 +76,14 @@ export function PostVideo({ uri }: { uri: string }) {
         <Ionicons
           name={muted ? "volume-mute" : "volume-high"}
           size={18}
-          color="#FFFFFF"
+          color={ink.text("#FFFFFF")}
         />
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   container: {
     flex: 1,
     backgroundColor: "#000000",

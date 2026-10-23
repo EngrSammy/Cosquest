@@ -5,7 +5,8 @@
 // voice stays at its normal pitch. The chosen speed is remembered for the
 // next voice notes (chats and voice comments).
 import type { AudioPlayer } from "expo-audio";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, Text } from "react-native";
+import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 
 export const VOICE_SPEEDS = [1, 1.5, 2] as const;
 
@@ -63,6 +64,7 @@ export function SpeedPill({
   // White pill (for your own pink bubbles).
   light?: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
       onPress={onPress}
@@ -75,7 +77,7 @@ export function SpeedPill({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   pill: {
     minWidth: 34,
     paddingHorizontal: 7,

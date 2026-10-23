@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import { Linking, Platform, StyleSheet, Text } from "react-native";
 
 import { getWebBaseUrl } from "@/utils/shareLinks";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // http(s):// or cosquest:// up to the next space.
 const LINK_PATTERN = /((?:https?|cosquest):\/\/[^\s]+)/gi;
@@ -72,6 +73,7 @@ function openLink(url: string) {
 }
 
 export function LinkText({ text, mine }: { text: string; mine: boolean }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const parts = text.split(LINK_PATTERN);
 
   return (
@@ -100,10 +102,10 @@ export function LinkText({ text, mine }: { text: string; mine: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   link: {
+    // Same font, size and weight as the message; just coloured and underlined.
     textDecorationLine: "underline",
-    fontWeight: "600",
     // Long links wrap inside the bubble instead of running out of it.
     ...(Platform.OS === "web"
       ? ({ wordBreak: "break-all", overflowWrap: "anywhere" } as object)

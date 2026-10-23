@@ -102,6 +102,11 @@ function applyIncoming(state: CallState, call: Call | null) {
     return;
   }
 
+  // Private calls ring on their own card (components/calls/privateCall.ts).
+  if ((call as any).privateOf) {
+    return;
+  }
+
   // Added again to a call I declined or left earlier → ring again, but
   // only for an invite NEWER than when I dismissed it (an old, late event
   // must not ring again).

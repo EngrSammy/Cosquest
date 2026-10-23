@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type User = {
   id: string;
@@ -59,6 +60,7 @@ function FollowerRow({
   onToggle: () => void;
   disabled: boolean;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   return (
     <View style={styles.row}>
       <Image
@@ -94,6 +96,8 @@ function FollowerRow({
 }
 
 export default function Followers() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -209,18 +213,18 @@ export default function Followers() {
       ]}>
       <View style={styles.header}>
         <Pressable onPress={() => safeBack()} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color="#191922" />
+          <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
         </Pressable>
 
         <Text style={styles.headerTitle}>Followers</Text>
 
         <Pressable onPress={() => searchRef.current?.focus()} hitSlop={10}>
-          <Ionicons name="search" size={22} color="#191922" />
+          <Ionicons name="search" size={22} color={ink.text("#191922")} />
         </Pressable>
       </View>
 
       <View style={styles.searchRow}>
-        <Ionicons name="search" size={18} color="#9C9CAA" />
+        <Ionicons name="search" size={18} color={ink.text("#9C9CAA")} />
 
         <TextInput
           ref={searchRef}
@@ -228,7 +232,7 @@ export default function Followers() {
           value={query}
           onChangeText={setQuery}
           placeholder="Search followers..."
-          placeholderTextColor="#9C9CAA"
+          placeholderTextColor={ink.text("#9C9CAA")}
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -236,7 +240,7 @@ export default function Followers() {
 
       {loading && followers.length === 0 ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="small" color="#C5399A" />
+          <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
           <Text style={styles.loadingText}>Loading followers...</Text>
         </View>
@@ -305,7 +309,7 @@ export default function Followers() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     backgroundColor: "transparent",

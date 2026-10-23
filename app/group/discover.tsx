@@ -38,6 +38,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { safeBack } from "@/utils/safeBack";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const KIND_LABEL = {
   private: "Private",
@@ -46,6 +47,8 @@ const KIND_LABEL = {
 } as const;
 
 export default function DiscoverGroups() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const token = useAppSelector((state) => state.auth.token);
@@ -129,12 +132,12 @@ export default function DiscoverGroups() {
         {/* INVITE LINK */}
         <SectionLabel>HAVE AN INVITE LINK?</SectionLabel>
         <View style={styles.linkRow}>
-          <Ionicons name="link" size={18} color={PINK} />
+          <Ionicons name="link" size={18} color={ink.text(PINK)} />
           <TextInput
             value={link}
             onChangeText={setLink}
             placeholder="Paste it here"
-            placeholderTextColor="#9C9CAA"
+            placeholderTextColor={ink.text("#9C9CAA")}
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.input}
@@ -144,29 +147,29 @@ export default function DiscoverGroups() {
             onPress={openLink}
             disabled={!link.trim()}
             style={[styles.goButton, !link.trim() && styles.off]}>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={18} color={ink.text("#FFFFFF")} />
           </Pressable>
         </View>
 
         {/* SEARCH */}
         <SectionLabel>OPEN GROUPS</SectionLabel>
         <View style={styles.linkRow}>
-          <Ionicons name="search" size={18} color="#9C9CAA" />
+          <Ionicons name="search" size={18} color={ink.text("#9C9CAA")} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search groups"
-            placeholderTextColor="#9C9CAA"
+            placeholderTextColor={ink.text("#9C9CAA")}
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.input}
           />
-          {loading ? <ActivityIndicator size="small" color={PINK} /> : null}
+          {loading ? <ActivityIndicator size="small" color={ink.text(PINK)} /> : null}
         </View>
 
         {!loading && groups.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="people-outline" size={34} color="#9C9CAA" />
+            <Ionicons name="people-outline" size={34} color={ink.text("#9C9CAA")} />
             <Text style={styles.emptyText}>
               {query.trim()
                 ? "No groups found."
@@ -216,7 +219,7 @@ export default function DiscoverGroups() {
                 disabled={group.requestPending || joiningId === group.id}
                 onPress={() => join(group)}>
                 {joiningId === group.id ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={ink.text("#FFFFFF")} />
                 ) : (
                   <Text style={styles.joinText}>
                     {group.requestPending
@@ -235,7 +238,7 @@ export default function DiscoverGroups() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   scroll: {
     paddingHorizontal: 20,
     width: "100%",

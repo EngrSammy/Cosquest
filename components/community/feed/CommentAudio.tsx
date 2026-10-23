@@ -15,6 +15,7 @@ import {
   nextSpeed,
   SpeedPill,
 } from "@/components/chat/VoiceSpeed";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export type CommentMedia = {
   url?: string;
@@ -53,6 +54,8 @@ function formatDuration(totalSeconds?: number) {
 }
 
 export function CommentAudio({ media }: { media?: CommentMedia | null }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const url = media?.url;
 
   const player = useAudioPlayer(url || "");
@@ -121,7 +124,7 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
           <Ionicons
             name={status.playing ? "pause" : "play"}
             size={18}
-            color="#FFFFFF"
+            color={ink.text("#FFFFFF")}
           />
         </Pressable>
 
@@ -167,7 +170,7 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
             <Ionicons
               name={showTranscript ? "chevron-up" : "text-outline"}
               size={16}
-              color="#8A8A90"
+              color={ink.text("#8A8A90")}
             />
           </Pressable>
         ) : null}
@@ -177,7 +180,7 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
         <View style={styles.transcriptBox}>
           {transcribing && !transcript ? (
             <View style={styles.transcriptLoadingRow}>
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={ink.text("#C5399A")} />
 
               <Text style={styles.transcriptLoadingText}>Transcribing…</Text>
             </View>
@@ -190,7 +193,7 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   audioWrap: {
     marginTop: 6,
     minWidth: 220,

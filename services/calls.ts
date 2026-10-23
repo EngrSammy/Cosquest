@@ -47,19 +47,29 @@ export type CallMember = {
   invitedAt?: string | null;
   joinedAt?: string | null;
   leftAt?: string | null;
+  // In a private call from this call right now (Emmanuel's backend).
+  away?: boolean;
 };
 
 export type Call = {
   id: string;
   conversationId: string;
-  conversationType?: "dm";
+  conversationType?: "dm" | "community" | "faction" | "group";
+  // Private call on top: the call or voice chat it was started from.
+  privateOf?: string | null;
+  privateOfType?: "call" | "voice" | null;
   type: CallType;
   status: CallStatus;
   caller: CallPerson;
   // True once someone has been added to the call.
   isGroup: boolean;
   members: CallMember[];
+  // Limits come from the server (call payload). The app never assumes a
+  // number of its own; the fallbacks below are only for an older server
+  // that doesn't send them, and the server still enforces its own caps.
   maxParticipants: number;
+  // How many people one "Add people" request may invite.
+  maxInvitesPerRequest: number;
   createdAt?: string;
   answeredAt?: string | null;
   endedAt?: string | null;
@@ -93,6 +103,17 @@ export type InviteResult = {
 
 const ACTIVE_STATUSES: CallStatus[] = ["ringing", "accepted"];
 
+// Only used when the server leaves the field out (older backend). The new
+// backend defaults are 1000 people in a call and 50 invites per request.
+export const FALLBACK_MAX_PARTICIPANTS = 1000;
+export const FALLBACK_MAX_INVITES_PER_REQUEST = 50;
+
+function positiveInt(value: unknown, fallback: number) {
+  const number = Number(value);
+
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : fallback;
+}
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -111,7 +132,14 @@ export function normalizeCall(raw: any): Call {
     conversationId: String(raw?.conversationId ?? ""),
     caller: normalizePerson(raw?.caller),
     isGroup: Boolean(raw?.isGroup),
-    maxParticipants: Number(raw?.maxParticipants) || 8,
+    maxParticipants: positiveInt(
+      raw?.maxParticipants,
+      FALLBACK_MAX_PARTICIPANTS,
+    ),
+    maxInvitesPerRequest: positiveInt(
+      raw?.maxInvitesPerRequest,
+      FALLBACK_MAX_INVITES_PER_REQUEST,
+    ),
     members: Array.isArray(raw?.members)
       ? raw.members.map((member: any) => ({
           ...member,
@@ -190,6 +218,14 @@ export function otherActiveMembers(call: Call, userId?: string | null) {
     (member) =>
       member.user.id !== userId &&
       (member.status === "joined" || member.status === "ringing"),
+  );
+}
+
+// 1234 → "1,234" (no Intl needed; works the same on every engine).
+export function formatCount(value: number) {
+  return String(Math.max(0, Math.floor(value))).replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    ",",
   );
 }
 

@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { CodeInput } from "@/components/CodeInputs";
 import { ErrorText } from "@/components/ErrorText";
@@ -7,12 +8,14 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // There is no separate "check this code" endpoint on the backend: the code
 // is checked in the LAST step (reset-password), together with the new
 // password. So this screen only makes sure 6 digits were typed, then
 // carries the email + code on to the Reset Password screen.
 export default function Verification() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   // Sent here by the Forgot Password screen.
@@ -128,19 +131,21 @@ export default function Verification() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 25,
     paddingBottom: 70,
   },
   headline: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
     color: "#191922",
   },
   sub: {
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: "#2b2b2c",
     textAlign: "center",
@@ -150,9 +155,10 @@ const styles = StyleSheet.create({
   },
   email: { fontWeight: "700", color: "#191922" },
   resendWrap: { alignItems: "center", gap: 6, marginTop: 20, marginBottom: 20 },
-  resendPrompt: { fontSize: 15, color: "#2b2b2c" },
-  resend: { color: "#C5399A", fontWeight: "700", fontSize: 16 },
+  resendPrompt: { fontFamily: FONTS.regular, fontSize: 15, color: "#2b2b2c" },
+  resend: { fontFamily: FONTS.bold, color: "#C5399A", fontWeight: "700", fontSize: 16 },
   resendOk: {
+    fontFamily: FONTS.regular,
     color: "#2E9E5B",
     fontSize: 12,
     textAlign: "center",

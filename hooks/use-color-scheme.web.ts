@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+﻿import { useAppSelector } from "@/store/hooks";
 
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
-export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
+export type AppColorScheme = "light" | "dark";
 
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
+export function useColorScheme(): AppColorScheme {
+  const savedMode = useAppSelector(
+    (state) =>
+      state.settings.appearance?.themeMode ??
+      (state.auth.user as any)?.appearance?.themeMode,
+  );
 
-  const colorScheme = useRNColorScheme();
+  if (typeof savedMode === "string") {
+    const normalizedMode = savedMode.toLowerCase();
 
-  if (hasHydrated) {
-    return colorScheme;
+    if (normalizedMode === "dark") return "dark";
+    if (normalizedMode === "light") return "light";
   }
 
-  return 'light';
+  // System mode defaults to Light.
+  return "light";
 }

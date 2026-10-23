@@ -5,10 +5,12 @@ import { logout as logoutLocal } from "@/store/slices/authSlice";
 import { clearUser } from "@/store/slices/userSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { useIsDesktop } from "@/hooks/useDesktop";
+import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -21,30 +23,48 @@ function SettingRow({
   label,
   value,
   onPress,
+  href,
 }: {
   icon: IconName;
   label: string;
   value?: string;
-  onPress: () => void;
+  onPress?: () => void;
+  // The page this row opens. Computer: it opens in the right pane, and the
+  // row is highlighted while it's open.
+  href?: string;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
+  const path = usePathname();
+  const desktop = useIsDesktop();
+  const active = desktop && !!href && path === href;
+  const open = () => {
+    if (onPress) return onPress();
+    if (!href) return;
+    // Computer: switching between pages swaps the right pane.
+    if (desktop && path !== "/settings") router.replace(href as any);
+    else router.push(href as any);
+  };
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-      onPress={onPress}
+      style={({ pressed }) => [styles.row, active && styles.rowActive, pressed && styles.pressed]}
+      onPress={open}
       accessibilityRole="button"
       accessibilityLabel={label}>
-      <Ionicons name={icon} size={20} color={PINK} />
+      <Ionicons name={icon} size={20} color={ink.text(PINK)} />
 
       <Text style={styles.rowLabel}>{label}</Text>
 
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
 
-      <Ionicons name="chevron-forward" size={16} color="#3B3B42" />
+      <Ionicons name="chevron-forward" size={16} color={ink.text("#3B3B42")} />
     </Pressable>
   );
 }
 
 export default function Settings() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -83,7 +103,7 @@ export default function Settings() {
           linear-gradient(180deg, rgba(255,255,255,0.6) 4.59%,
                                   rgba(184,232,255,0.6) 67.7%) */}
       <LinearGradient
-        colors={["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
+        colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["rgba(255,255,255,0.6)", "rgba(184,232,255,0.6)"]}
         locations={[0.0459, 0.677]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -107,7 +127,7 @@ export default function Settings() {
             style={styles.headerSide}
             accessibilityRole="button"
             accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={24} color="#191922" />
+            <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
           </Pressable>
 
           <Text style={styles.headerTitle}>Settings</Text>
@@ -122,19 +142,19 @@ export default function Settings() {
           <SettingRow
             icon="person-outline"
             label="Account Information"
-            onPress={() => router.push("/account-information")}
+            href="/account-information"
           />
 
           <SettingRow
             icon="lock-closed-outline"
             label="Privacy & Visibility"
-            onPress={() => router.push("/privacy-visibility")}
+            href="/privacy-visibility"
           />
 
           <SettingRow
             icon="notifications-outline"
             label="Notification Preferences"
-            onPress={() => router.push("/notification-preferences")}
+            href="/notification-preferences"
           />
         </View>
 
@@ -146,20 +166,20 @@ export default function Settings() {
             icon="eye-outline"
             label="Appearance"
             value="Light Mode"
-            onPress={() => router.push("/appearance")}
+            href="/appearance"
           />
 
           {/* Figma: a database icon */}
           <SettingRow
             icon="server-outline"
             label="Data Usage"
-            onPress={() => router.push("/data-usage")}
+            href="/data-usage"
           />
 
           <SettingRow
             icon="help-circle-outline"
             label="Help & Support"
-            onPress={() => router.push("/help-support")}
+            href="/help-support"
           />
         </View>
 
@@ -180,7 +200,9 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
+  // Computer: the row whose page is open on the right.
+  rowActive: { borderWidth: 1.5, borderColor: PINK },
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",

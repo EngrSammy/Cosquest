@@ -1,4 +1,5 @@
 import { AppBackground } from "@/components/AppBackground";
+import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { useOnboarding } from "@/context/OnboardingContext";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -14,12 +15,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function Ready() {
+  const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
 
   const { data } = useOnboarding();
@@ -347,7 +350,7 @@ export default function Ready() {
 // STYLES
 // ============================================
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   screen: {
     flex: 1,
     paddingHorizontal: 24,
@@ -359,6 +362,7 @@ const styles = StyleSheet.create({
   },
 
   small: {
+    fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
     color: "#191922",
@@ -366,6 +370,7 @@ const styles = StyleSheet.create({
   },
 
   big: {
+    fontFamily: FONTS.bold,
     fontSize: 44,
     fontWeight: "900",
     color: "#191922",

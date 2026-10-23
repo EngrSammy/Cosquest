@@ -12,6 +12,7 @@ import {
 import { FONTS } from "@/constants/fonts";
 
 import { PostVideo } from "./PostVideo";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // ==========================================
 // FIGMA CARD
@@ -63,6 +64,7 @@ export function PostMedia({
   post: any;
   children?: ReactNode;
 }) {
+  const styles = useThemedStyles(STYLE_PAIR);
   const urls = getMediaUrls(post);
   const isReel = post?.type === "reel";
 
@@ -151,7 +153,7 @@ export function PostMedia({
   );
 }
 
-const styles = StyleSheet.create({
+const STYLE_PAIR = themedStyles({
   // box-shadow: 0px 4px 4px 0px #00000040
   shadow: {
     marginHorizontal: CARD_MARGIN,

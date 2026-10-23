@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/cosquest-logo.png",
     "scheme": "cosquest",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dammy0227.cosquest",
@@ -35,7 +35,8 @@
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
       ],
-      "package": "com.dammy0227.cosquest"
+      "package": "com.dammy0227.cosquest",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "single",
@@ -70,7 +71,21 @@
       "expo-audio",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "ndkVersion": "27.1.12297006"
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "expo-asset",
+      "./plugins/withSceneLifecycle"
     ],
     "experiments": {
       "typedRoutes": true,
