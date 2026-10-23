@@ -777,12 +777,16 @@ function CallStage({
 
   // Hooks before any early return (React needs the same order every render).
   const room = useRoomContext();
+  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
+  const stageMode = useStageMode(remoteCount + 1);
+  const orbit = isGroup && !stageMode;
 
-  // GROUP CALL people for the orbit. The same object is kept for a person
-  // while nothing about them changed, so the orbit (memo) and its circles
-  // skip the re-render that the call timer and captions cause every second.
+  // GROUP CALL people for the orbit (built only when the orbit shows). The
+  // same object is kept for a person while nothing about them changed, so
+  // the orbit (memo) and its circles skip the re-render that the call timer
+  // and captions cause every second.
   const peopleCache = useRef(new Map<string, { key: string; person: OrbitPerson }>());
-  const peopleList: OrbitPerson[] = call.members
+  const peopleList: OrbitPerson[] = (orbit ? call.members : [])
     .filter((member) => member.status === "joined" || member.status === "ringing")
     .map((member) => {
       const isMe = !!myUserId && member.user.id === myUserId;
@@ -837,14 +841,12 @@ function CallStage({
     [cameraSlots, facing],
   );
   const toggleFocus = useCallback(() => setFocusOn((value) => !value), []);
-  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
-  const stageMode = useStageMode(remoteCount + 1);
 
   // ==========================================
   // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
   // ==========================================
 
-  if (isGroup && !stageMode) {
+  if (orbit) {
     const onCall = people.filter((person) => !person.ringing).length;
 
     return pager(
