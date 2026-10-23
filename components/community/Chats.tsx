@@ -678,23 +678,10 @@ export function Chats() {
             ) : null}
 
             {!peopleLoading && peopleError ? (
-              <View style={styles.modalError}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={32}
-                  color={COLORS.danger}
-                />
-
-                <Text style={styles.modalErrorTitle}>Couldn&apos;t load people</Text>
-
-                <Text style={styles.modalErrorText}>{peopleError}</Text>
-
-                <Pressable
-                  style={styles.retryPeople}
-                  onPress={() => {
-                    setSearch((value) => value.trim());
-                  }}>
-                  <Text style={styles.retryPeopleText}>Try Again</Text>
+              <View style={styles.center}>
+                <Text style={styles.errorText}>{peopleError}</Text>
+                <Pressable style={styles.retry} onPress={() => setSearch((value) => value.trim())}>
+                  <Text style={styles.retryText}>Try Again</Text>
                 </Pressable>
               </View>
             ) : null}

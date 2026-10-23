@@ -2615,6 +2615,10 @@ export default function ChatScreen() {
   // Calls are DM-only (the backend rejects calls in community/faction).
   const canCall = conversation?.type === "dm";
 
+  const replyCacheRef = useRef(
+    new WeakMap<Message, { original: Message; resolved: Message }>(),
+  );
+
   const visibleMessages = useMemo(() => {
     // Hide each pending bubble whose real copy has already arrived. Each
     // real message can only "use up" one pending bubble, so sending the
@@ -2638,15 +2642,48 @@ export default function ChatScreen() {
 
     const merged = [...stillPending, ...messages];
 
-    if (locallyDeletedIds.size === 0) {
-      return merged;
-    }
+    const withDeletes =
+      locallyDeletedIds.size === 0
+        ? merged
+        : merged.map((message) =>
+            locallyDeletedIds.has(message.id) && !message.deleted
+              ? { ...message, deleted: true }
+              : message,
+          );
 
-    return merged.map((message) =>
-      locallyDeletedIds.has(message.id) && !message.deleted
-        ? { ...message, deleted: true }
-        : message,
-    );
+    // The backend can send replyTo as just the original's id (or without
+    // its sender/text), which shows as "Reply / Message". Use the loaded
+    // original instead. Cached per message so memo(Bubble) still skips
+    // rows that didn't change.
+    const byId = new Map(withDeletes.map((message) => [message.id, message]));
+    const cache = replyCacheRef.current;
+
+    return withDeletes.map((message) => {
+      const raw = message.replyTo as Message | string | null | undefined;
+
+      if (!raw) {
+        return message;
+      }
+
+      const replyId =
+        typeof raw === "string" ? raw : raw.id || (raw as any)._id;
+      const original = replyId ? byId.get(String(replyId)) : undefined;
+
+      if (!original || original === raw) {
+        return message;
+      }
+
+      const cached = cache.get(message);
+
+      if (cached && cached.original === original) {
+        return cached.resolved;
+      }
+
+      const resolved = { ...message, replyTo: original };
+      cache.set(message, { original, resolved });
+
+      return resolved;
+    });
   }, [pendingMessages, messages, locallyDeletedIds, currentUserId]);
 
   // Stable extraData for the FlatList. Previously this was an inline object
@@ -6915,6 +6952,9 @@ const STYLE_PAIR = themedStyles({
   bubble: {
     // Figma M02: padding 12, radius 16 (4 at the top-left on the first one).
     minWidth: 62,
+    // Never wider than the column, or the Spark footer row pushes the
+    // bubble past the list edge (cut off beside the side rail).
+    maxWidth: "100%",
     borderRadius: 16,
     padding: 12,
 
