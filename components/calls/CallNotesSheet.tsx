@@ -36,6 +36,14 @@ export const callNotesEnabled = ["module", "qlm"].includes(String(process.env.EX
 
 const PENDING_POLL_MS = 15_000;
 
+// Quick notes quote people: "Ben: Three quests are still open." The name is
+// shown as a label, the sentence as said.
+const SAID = /^([^:\n]{1,40}):\s+([\s\S]+)$/;
+function splitSaid(text: string, quick: boolean): { who: string | null; text: string } {
+  const match = quick ? SAID.exec(text) : null;
+  return match ? { who: match[1].trim(), text: match[2] } : { who: null, text };
+}
+
 type Loaded =
   | { state: "loading" }
   | { state: "ready"; outline: CallOutline; speakers: TranscriptSpeakers }
@@ -196,7 +204,7 @@ export default function CallNotesSheet({
                     <Text style={styles.quickBadgeText}>Quick notes · from the transcript</Text>
                   </View>
                   <Text style={styles.quickText}>
-                    {"Written by CosQuest's server from what was said, without AI. Sparks on a phone writes fuller notes."}
+                    {"Written by CosQuest's server from the transcript, without AI. A phone with Sparks writes fuller notes."}
                   </Text>
                 </View>
               ) : null}
@@ -209,24 +217,43 @@ export default function CallNotesSheet({
                     <Text style={styles.topicTitle}>{topic.title}</Text>
                     {people ? <Text style={styles.people}>With {people}</Text> : null}
                     {topic.summary ? <Text style={styles.text}>{topic.summary}</Text> : null}
-                    {topic.points.map((point, i) => (
-                      <Text key={`p${i}`} style={styles.bullet}>
-                        • {point}
-                      </Text>
-                    ))}
+                    {topic.points.map((point, i) => {
+                      const said = splitSaid(point, quick);
+                      return (
+                        <Text key={`p${i}`} style={styles.bullet}>
+                          • {said.who ? <Text style={styles.said}>{said.who}: </Text> : null}
+                          {said.text}
+                        </Text>
+                      );
+                    })}
                     {topic.decisions.length ? <Text style={styles.label}>Decided</Text> : null}
-                    {topic.decisions.map((decision, i) => (
-                      <Text key={`d${i}`} style={styles.bullet}>
-                        • {decision}
-                      </Text>
-                    ))}
+                    {topic.decisions.map((decision, i) => {
+                      const said = splitSaid(decision, quick);
+                      return (
+                        <Text key={`d${i}`} style={styles.bullet}>
+                          • {said.who ? <Text style={styles.said}>{said.who}: </Text> : null}
+                          {said.text}
+                        </Text>
+                      );
+                    })}
                     {topic.actionItems.length ? <Text style={styles.label}>To do</Text> : null}
-                    {topic.actionItems.map((item, i) => (
-                      <Text key={`a${i}`} style={styles.bullet}>
-                        • {item.text}
-                        {item.ownerUserId ? <Text style={styles.owner}> ({nameFor(item.ownerUserId)})</Text> : null}
-                      </Text>
-                    ))}
+                    {topic.actionItems.map((item, i) => {
+                      const said = splitSaid(item.text, quick);
+                      const owner = item.ownerUserId ? nameFor(item.ownerUserId) : null;
+                      // Quick notes: a to-do with no name was said by its owner ("I'll update the board").
+                      // First name, like the quotes around it (the viewer too: the quotes name them).
+                      const id = item.ownerUserId;
+                      const ownerFull = id ? speakers[id]?.name || speakers[id]?.username || owner : null;
+                      const ownerLabel = ownerFull ? ownerFull.split(" ")[0].replace(/^./, (c) => c.toUpperCase()) : null;
+                      const who = said.who || (quick ? ownerLabel : null);
+                      return (
+                        <Text key={`a${i}`} style={styles.bullet}>
+                          • {who ? <Text style={styles.said}>{who}: </Text> : null}
+                          {said.text}
+                          {owner && !(quick && !said.who) ? <Text style={styles.owner}> ({owner})</Text> : null}
+                        </Text>
+                      );
+                    })}
                   </View>
                 );
               })}
@@ -274,6 +301,7 @@ const STYLE_PAIR = themedStyles(
     label: { fontFamily: FONTS.semibold, fontSize: 11.5, letterSpacing: 0.4, color: "#8A8A90", marginTop: 8, marginBottom: 2, textTransform: "uppercase" },
     bullet: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#3A3A44" },
     owner: { color: "#8A8A90" },
+    said: { fontFamily: FONTS.semibold, color: "#191922" },
     empty: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#6B6B72", marginVertical: 24 },
     setupLink: { fontFamily: FONTS.semibold, fontSize: 14, color: "#C5399A", marginTop: 14 },
     people: { fontFamily: FONTS.regular, fontSize: 12.5, color: "#8A8A90", marginBottom: 4 },
@@ -316,6 +344,7 @@ const STYLE_PAIR = themedStyles(
     label: { color: "#9AA1B4" },
     bullet: { color: "#D9DCE6" },
     owner: { color: "#9AA1B4" },
+    said: { color: "#F4F5FA" },
     empty: { color: "#B5BBCB" },
     people: { color: "#9AA1B4" },
     pendingTitle: { color: "#F4F5FA" },

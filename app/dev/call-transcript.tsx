@@ -144,20 +144,77 @@ const OUTLINE: CallOutline = {
   generatedBy: { deviceIds: ["dev_1"], modelVersion: "mote-1.3" },
 };
 
+// Real server output for LINES, no live topics (regenerate: @cosquest/sparks-backend 1.3.3 extractiveSpans + extractiveReduce).
 const QUICK_OUTLINE: CallOutline = {
-  ...OUTLINE,
-  title: "Quest board, Saturday raid",
-  summary: "Let's close the map one, nobody has picked it up. Great, I'll book the hall for three hours.",
-  topics: OUTLINE.topics.map((t) => ({
-    ...t,
-    summary: "",
-    points: SEGMENTS.filter((s) => s.topicId === t.topicId)
-      .slice(0, 3)
-      .map((s) => s.text),
-    decisions: [],
-    actionItems: t.topicId === "tp_1" ? [{ text: "I'll update the board tonight.", ownerUserId: "u_ben" }] : [],
-  })),
+  callId: OUTLINE.callId,
+  chatId: OUTLINE.chatId,
+  startedAt: OUTLINE.startedAt,
+  endedAt: OUTLINE.endedAt,
+  segmentCount: OUTLINE.segmentCount,
+  generatedAt: OUTLINE.generatedAt,
   generatedBy: { deviceIds: [], modelVersion: "server-extractive" },
+  title: "Quests and Saturday",
+  summary: "Amara and Ben covered 2 topics: quests; saturday and meeting. 1 decision and 2 action items.",
+  topics: [
+    {
+      topicId: "ot_1",
+      title: "Quests",
+      colorIndex: 0,
+      order: 0,
+      summary: "Amara and Ben talked about quests. One decision.",
+      points: [
+        "Ben: Three quests are still open from last week.",
+        "Amara: And move the photo quest to next month."
+      ],
+      decisions: [
+        "Amara: Let's close the map one, nobody has picked it up."
+      ],
+      actionItems: [
+        {
+          text: "I'll update the board tonight.",
+          ownerUserId: "u_ben"
+        }
+      ],
+      spans: [
+        {
+          startMs: 2000,
+          endMs: 28500
+        }
+      ],
+      speakerIds: [
+        "u_amara",
+        "u_ben"
+      ]
+    },
+    {
+      topicId: "ot_2",
+      title: "Saturday and Meeting",
+      colorIndex: 1,
+      order: 1,
+      summary: "Amara and Ben talked about saturday, meeting and speakers.",
+      points: [
+        "Amara: Are we still meeting at ten?",
+        "Ben: Cy said they'd bring the speakers."
+      ],
+      decisions: [],
+      actionItems: [
+        {
+          text: "Great, I'll book the hall for three hours.",
+          ownerUserId: "u_amara"
+        }
+      ],
+      spans: [
+        {
+          startMs: 63000,
+          endMs: 149500
+        }
+      ],
+      speakerIds: [
+        "u_amara",
+        "u_ben"
+      ]
+    }
+  ],
 };
 
 const MOCK_CALL: Call = {
