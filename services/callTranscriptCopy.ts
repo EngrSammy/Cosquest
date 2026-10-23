@@ -136,8 +136,10 @@ export type Coverage = {
   chips: CoverageChip[];
   /** The one line: "2 of 4 in the transcript · Cy needs Sparks · Eve opted out". */
   line: string;
-  /** Nobody is missing (people who didn't speak are covered). */
+  /** Everyone's lines are in. */
   allIn: boolean;
+  /** Nobody is missing because of their phone or their choice (some may just not have spoken). */
+  nobodyMissing: boolean;
   /** The viewer's own lines are missing: always shown, apart from the line. */
   mine: { text: string; href?: string } | null;
   /** Full sentences about the others who are missing (shown when expanded). */
@@ -150,12 +152,17 @@ export type Coverage = {
 
 const MISSING: TranscriptParticipantStatus[] = ["no_sparks", "not_accepted", "declined"];
 
-/** Who is (and isn't) in a call's transcript, in the app's words. */
+/**
+ * Who is (and isn't) in a call's transcript, in the app's words. Only people
+ * whose lines are there count as in. `live`: the call is still going.
+ */
 export function describeCoverage(
   participants: TranscriptParticipant[] | null | undefined,
   myUserId: string | null | undefined,
   speakers?: TranscriptSpeakers | null,
+  options: { live?: boolean } = {},
 ): Coverage {
+  const live = Boolean(options.live);
   const people = (participants || []).map((p) => {
     const status = statusOf(p);
     return {
@@ -209,15 +216,27 @@ export function describeCoverage(
     notes.push({ kind: "declined", text: `${joinNames(optedOut)} opted out of transcripts.` });
     short.push(`${firsts(optedOut)} opted out`);
   }
+  const quiet = named("silent");
+  if (quiet.length) {
+    const verb = !live ? "didn't speak" : many(quiet) ? "haven't spoken yet" : "hasn't spoken yet";
+    short.push(`${firsts(quiet)} ${verb}`);
+  }
 
   const total = people.length;
-  const missing = people.filter((c) => MISSING.includes(c.status)).length;
-  const inCount = total - missing;
-  const allIn = total > 0 && missing === 0;
-  const line = !total ? "" : allIn ? "Everyone is in the transcript" : [`${inCount} of ${total} in the transcript`, ...short].join(" · ");
-  const explainer = allIn ? null : "Each phone writes down only its owner's voice.";
+  const inCount = people.filter((c) => c.inTranscript).length;
+  const nobodyMissing = !people.some((c) => MISSING.includes(c.status));
+  const allIn = total > 0 && inCount === total;
+  const head = !inCount
+    ? live
+      ? "Nothing was picked up yet"
+      : "Nothing was picked up"
+    : allIn
+      ? "Everyone is in the transcript"
+      : `${inCount} of ${total} in the transcript`;
+  const line = total ? [head, ...short].join(" · ") : "";
+  const explainer = nobodyMissing ? null : "Each phone writes down only its owner's voice.";
 
-  return { chips, line, allIn, mine, notes, explainer, inCount, total };
+  return { chips, line, allIn, nobodyMissing, mine, notes, explainer, inCount, total };
 }
 
 // ---------- quick notes ----------
@@ -310,7 +329,7 @@ export function transcriptErrorCopy(status: number | null | undefined): { title:
     case 501:
       return {
         title: "Not available yet",
-        body: "Transcripts aren't switched on for this server yet.",
+        body: "Transcripts aren't available yet.",
         retry: false,
       };
     case 503:

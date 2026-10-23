@@ -262,7 +262,6 @@ const TURNED_OFF: TranscriptParticipant[] = [
 const EVERYONE_IN: TranscriptParticipant[] = [
   { userId: "u_amara", displayName: "Amara Obi", lines: 7, status: "transcribed" },
   { userId: "u_ben", displayName: "Ben Carter", lines: 9, status: "transcribed" },
-  { userId: "u_fay", displayName: "Fay Ndu", lines: 0, status: "silent" },
 ];
 
 const BANNERS: { label: string; participants: TranscriptParticipant[]; expanded?: boolean }[] = [

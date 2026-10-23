@@ -32,7 +32,7 @@ import {
   type TranscriptSpeakers,
 } from "@/services/callTranscript";
 import { firstName, joinNames, ownerLabel, personName, saidLabel, splitQuotes } from "@/services/callTranscriptCopy";
-import { getCapabilities, getSparksSdk, sparksEnabled } from "@/services/sparksSdk";
+import { getSparksSdk, modelStatus, onModelStatus, sparksEnabled } from "@/services/sparksSdk";
 
 import type { CallOutline } from "@cosquest/sparks-sdk";
 
@@ -48,18 +48,18 @@ function nextCheckMs(loaded: Loaded, quick: boolean, openForMs: number): number 
   return null;
 }
 
-/** Can this phone already transcribe (Sparks speech files here)? null: unknown. Website: true (nothing to set up here). */
-function usePhoneHasSparks(active: boolean) {
-  const [has, setHas] = useState<boolean | null>(Platform.OS === "web" ? true : null);
+/**
+ * Does this phone already have the Sparks AI (the model that writes full
+ * notes) downloaded? Speech files alone don't count. Website: true (nothing
+ * to set up there).
+ */
+const AI_READY = ["ready", "loading", "loaded"];
+function usePhoneHasSparksAI(active: boolean) {
+  const [has, setHas] = useState(() => Platform.OS === "web" || AI_READY.includes(modelStatus()?.phase || ""));
   useEffect(() => {
     if (!active || Platform.OS === "web" || !sparksEnabled()) return;
-    let cancelled = false;
-    getCapabilities()
-      .then((caps) => !cancelled && setHas(Boolean(caps?.transcription)))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    setHas(AI_READY.includes(modelStatus()?.phase || ""));
+    return onModelStatus((status) => setHas(AI_READY.includes(status?.phase || "")));
   }, [active]);
   return has;
 }
@@ -102,7 +102,9 @@ export default function CallNotesSheet({
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
   const [check, setCheck] = useState(0);
   const openedAt = useRef(Date.now());
-  const phoneHasSparks = usePhoneHasSparks(visible);
+  const phoneHasAI = usePhoneHasSparksAI(visible);
+  // An older server (no quickNotes in its answer) has no transcripts: don't offer one.
+  const [transcriptServer, setTranscriptServer] = useState(true);
 
   const fetchReply = useCallback(
     () => (load ? load() : token ? fetchCallOutline(callId, token) : Promise.reject(new Error("Log in to see this call's Sparks."))),
@@ -120,6 +122,7 @@ export default function CallNotesSheet({
     fetchReply()
       .then((reply) => {
         if (cancelled) return;
+        setTranscriptServer(typeof reply.quickNotes === "boolean");
         setLoaded((current) =>
           reply.outline
             ? { state: "ready", outline: reply.outline, speakers: reply.speakers || {} }
@@ -225,7 +228,7 @@ export default function CallNotesSheet({
     onClose();
     router.push(`/call-transcript/${encodeURIComponent(callId)}`);
   };
-  const showTranscript = loaded.state !== "none" && !transcriptsUnavailable();
+  const showTranscript = loaded.state !== "none" && transcriptServer && !transcriptsUnavailable();
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -250,11 +253,11 @@ export default function CallNotesSheet({
                 <Text style={styles.pendingTitle}>
                   {loaded.quickNotes
                     ? "Notes appear a couple of minutes after the call."
-                    : "Notes are written by the phone of someone on the call who has Sparks, next time they open CosQuest."}
+                    : "Notes are written by the phone of someone on the call who has the Sparks AI download, next time they open CosQuest."}
                 </Text>
               </View>
               <Text style={styles.pendingText}>This updates by itself.</Text>
-              {phoneHasSparks ? null : (
+              {phoneHasAI ? null : (
                 <Pressable
                   onPress={() => {
                     onClose();
@@ -281,7 +284,7 @@ export default function CallNotesSheet({
                     <Ionicons name="reader-outline" size={13} color={ink.text("#2A8A92")} />
                     <Text style={styles.quickBadgeText}>Quick notes</Text>
                   </View>
-                  <Text style={styles.quickText}>Key lines from the call. Full write-ups need someone on the call with Sparks.</Text>
+                  <Text style={styles.quickText}>Key lines from the call. Full notes need someone on the call with the Sparks AI download.</Text>
                 </View>
               ) : null}
               {outline?.summary ? <Text style={styles.summary}>{outline.summary}</Text> : null}

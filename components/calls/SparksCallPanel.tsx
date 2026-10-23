@@ -183,7 +183,7 @@ export default function SparksCallPanel({
       </View>
       <Text style={styles.sub}>
         {named
-          ? `${named} ${named === 1 ? "Spark" : "Sparks"} on this call so far`
+          ? `${named} ${named === 1 ? "topic" : "topics"} so far`
           : "Sparks picks out the topics as people talk."}
       </Text>
 
@@ -197,7 +197,8 @@ export default function SparksCallPanel({
       {transcriptOn && coverage ? (
         <TranscriptCoverage
           tone="call"
-          hideWhenAllIn
+          live
+          hideUnlessMissing
           participants={coverage.participants}
           speakers={coverage.speakers}
           myUserId={myUserId}

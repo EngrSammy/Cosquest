@@ -87,15 +87,39 @@ test("one vocabulary: chip marks", () => {
   assert.equal(statusMark("brand_new_status"), "Didn't speak");
 });
 
-test("everyone in (people who didn't speak count as in)", () => {
-  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "transcribed", 7), p("dee", "silent")], "me", speakers);
+test("everyone in: only when everyone's lines are there", () => {
+  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "transcribed", 7)], "me", speakers);
   assert.equal(c.allIn, true);
+  assert.equal(c.nobodyMissing, true);
   assert.equal(c.line, "Everyone is in the transcript");
   assert.deepEqual(c.notes, []);
   assert.equal(c.mine, null);
   assert.equal(c.explainer, null);
-  assert.equal(c.chips.find((x) => x.userId === "dee")?.mark, "Didn't speak");
   assert.equal(c.chips[0].isMe, true);
+});
+
+test("people who didn't speak are not counted as in", () => {
+  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "transcribed", 7), p("dee", "silent")], "me", speakers);
+  assert.equal(c.allIn, false);
+  assert.equal(c.nobodyMissing, true);
+  assert.equal(c.inCount, 2);
+  assert.equal(c.line, "2 of 3 in the transcript · Dee didn't speak");
+  assert.equal(c.explainer, null);
+  assert.equal(c.chips.find((x) => x.userId === "dee")?.mark, "Didn't speak");
+  const live = describeCoverage([p("me", "transcribed", 4), p("ben", "silent"), p("dee", "silent")], "me", speakers, { live: true });
+  assert.equal(live.line, "1 of 3 in the transcript · Ben and Dee haven't spoken yet");
+});
+
+test("nobody has lines: never 'Everyone is in'", () => {
+  assert.equal(describeCoverage([p("me", "silent"), p("ben", "silent")], "me", speakers).line, "Nothing was picked up · Ben didn't speak");
+  assert.equal(
+    describeCoverage([p("me", "silent"), p("ben", "silent")], "me", speakers, { live: true }).line,
+    "Nothing was picked up yet · Ben hasn't spoken yet",
+  );
+  const c = describeCoverage([p("me", "no_sparks"), p("ben", "no_sparks"), p("dee", "not_accepted")], "me", speakers);
+  assert.equal(c.line, "Nothing was picked up · Ben needs Sparks · Dee turned it off");
+  assert.equal(c.allIn, false);
+  assert.equal(c.inCount, 0);
 });
 
 test("others missing: the one line, the sentences and the chips use the same words", () => {
@@ -208,7 +232,7 @@ test("error copy by status", () => {
   assert.equal(transcriptErrorCopy(403).retry, false);
   assert.match(transcriptErrorCopy(403).body, /Only people who were on this call/);
   assert.equal(transcriptErrorCopy(404).title, "Call not found");
-  assert.equal(transcriptErrorCopy(501).body, "Transcripts aren't switched on for this server yet.");
+  assert.equal(transcriptErrorCopy(501).body, "Transcripts aren't available yet.");
   assert.equal(transcriptErrorCopy(503).title, "Sparks is off");
   assert.equal(transcriptErrorCopy(null).retry, true);
   assert.equal(transcriptErrorCopy(500).title, "Couldn't load the transcript");

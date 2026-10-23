@@ -45,8 +45,9 @@ export default function TranscriptCoverage({
   myUserId,
   speakers,
   tone = "screen",
+  live = false,
   defaultExpanded = false,
-  hideWhenAllIn = false,
+  hideUnlessMissing = false,
   style,
   onNavigate,
 }: {
@@ -54,9 +55,11 @@ export default function TranscriptCoverage({
   myUserId: string | null;
   speakers?: TranscriptSpeakers | null;
   tone?: "screen" | "call";
+  /** The call is still going ("hasn't spoken yet", "Nothing was picked up yet"). */
+  live?: boolean;
   defaultExpanded?: boolean;
-  /** Nothing at all when nobody is missing (the in-call panel). */
-  hideWhenAllIn?: boolean;
+  /** Nothing at all unless someone is missing because of their phone or their choice (the in-call panel). */
+  hideUnlessMissing?: boolean;
   style?: StyleProp<ViewStyle>;
   /** Opens a screen (the Sparks setup). Default: router.push. */
   onNavigate?: (href: string) => void;
@@ -64,8 +67,8 @@ export default function TranscriptCoverage({
   const themed = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const coverage = describeCoverage(participants, myUserId, speakers);
-  if (!coverage.total || (hideWhenAllIn && coverage.allIn)) return null;
+  const coverage = describeCoverage(participants, myUserId, speakers, { live });
+  if (!coverage.total || (hideUnlessMissing && coverage.nobodyMissing)) return null;
 
   const onCall = tone === "call";
   const styles = onCall ? CALL_STYLES : themed;

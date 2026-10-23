@@ -64,7 +64,10 @@ export type CallOutlineReply = {
   outline: CallOutline | null;
   /** Names for the outline's speakerIds and action-item owners. */
   speakers?: TranscriptSpeakers;
-  /** The server writes quick notes when no phone does (a couple of minutes after the call). */
+  /**
+   * The server writes quick notes when no phone does (a couple of minutes
+   * after the call). Undefined: an older server, which has no transcripts either.
+   */
   quickNotes?: boolean;
   reason?: "no_transcript" | string;
 };
@@ -120,7 +123,8 @@ export function fetchCallOutline(callId: string, token: string): Promise<CallOut
     status: reply?.outline ? "ready" : reply?.status === "none" ? "none" : "pending",
     outline: reply?.outline || null,
     speakers: reply?.speakers || {},
-    quickNotes: reply?.quickNotes === true,
+    // Missing on an older server (one without call transcripts).
+    quickNotes: typeof reply?.quickNotes === "boolean" ? reply.quickNotes : undefined,
     reason: reply?.reason,
   }));
 }
