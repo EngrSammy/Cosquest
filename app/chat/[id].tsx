@@ -138,6 +138,8 @@ import {
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
+import CallsTab from "@/components/calls/scheduled/CallsTab";
+import { ScreenGradient } from "@/components/chat/ui";
 
 type AttachmentDraft = {
   uri: string;
@@ -310,6 +312,13 @@ type SeenPerson = {
   avatarPhotoUrl?: string | null;
   seenAt?: string;
 };
+
+const GROUP_TABS = [
+  { key: "chat", label: "Chat" },
+  { key: "sparks", label: "Sparks" },
+  { key: "calls", label: "Calls" },
+  { key: "projects", label: "Projects" },
+] as const;
 
 const EMPTY_MESSAGES: Message[] = [];
 
@@ -2332,6 +2341,12 @@ export default function ChatScreen() {
   const [openSparkId, setOpenSparkId] = useState<string | null>(null);
   const [sparkRefresh, setSparkRefresh] = useState(0);
   const [showAllSparks, setShowAllSparks] = useState(false);
+
+  // Group chats: Chat / Sparks / Calls / Projects under the header. Sparks
+  // opens the Sparks list; Calls and Projects cover the chat (which stays
+  // mounted, so switching back keeps the scroll position and draft).
+  const [groupTab, setGroupTab] = useState<"chat" | "calls" | "projects">("chat");
+  const [tabsBottom, setTabsBottom] = useState(0);
   const [sparkSeed, setSparkSeed] = useState<Message | null>(null);
   const [attachmentDraft, setAttachmentDraft] =
     useState<AttachmentDraft | null>(null);
@@ -5299,6 +5314,36 @@ export default function ChatScreen() {
       </View>
 
       {/* ================================== */}
+      {/* GROUP TABS (Figma · Chat / Sparks / Calls / Projects) */}
+      {/* ================================== */}
+
+      {groupChat && !selectionMode ? (
+        <View
+          style={styles.groupTabs}
+          onLayout={(event) =>
+            setTabsBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
+          }>
+          {GROUP_TABS.map((tab) => {
+            const on = tab.key === groupTab;
+            return (
+              <Pressable
+                key={tab.key}
+                style={[styles.groupTab, on && styles.groupTabOn]}
+                onPress={() =>
+                  tab.key === "sparks" ? setShowAllSparks(true) : setGroupTab(tab.key)
+                }
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}>
+                <Text style={[styles.groupTabText, on && styles.groupTabTextOn]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {/* ================================== */}
       {/* PINNED BANNER */}
       {/* ================================== */}
 
@@ -5676,6 +5721,28 @@ export default function ChatScreen() {
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
               <Ionicons name="mic-outline" size={24} color="#B63D91" />
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {/* ================================== */}
+      {/* GROUP TAB PANELS (over the chat, under the tabs) */}
+      {/* ================================== */}
+
+      {groupChat && groupTab !== "chat" && !selectionMode ? (
+        <View style={[styles.groupTabPanel, { top: tabsBottom }]}>
+          {groupTab === "calls" ? (
+            <CallsTab
+              conversationId={conversationId}
+              title={(conversation as any)?.title || "Voice chat"}
+              myId={String(currentUserId)}
+            />
+          ) : (
+            <View style={styles.comingSoon}>
+              <ScreenGradient />
+              <Ionicons name="construct-outline" size={28} color={ink.text("#66738A")} />
+              <Text style={styles.comingSoonText}>Projects are coming soon.</Text>
             </View>
           )}
         </View>
@@ -6614,6 +6681,44 @@ const STYLE_PAIR = themedStyles({
   centerText: { fontFamily: FONTS.regular, fontSize: 14, color: "#8A8A90" },
 
   // HEADER
+
+  // GROUP TABS
+
+  groupTabs: {
+    flexDirection: "row",
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 3,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.55)",
+  },
+
+  groupTab: {
+    flex: 1,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 17,
+  },
+
+  groupTabOn: { backgroundColor: "#F7DDEE" },
+
+  groupTabText: { fontFamily: FONTS.medium, fontSize: 13, color: "#66738A" },
+
+  groupTabTextOn: { fontFamily: FONTS.semibold, color: "#B63D91" },
+
+  groupTabPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    elevation: 30,
+  },
+
+  comingSoon: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+
+  comingSoonText: { fontFamily: FONTS.regular, fontSize: 14, color: "#66738A" },
 
   headerContainer: {
     // Figma: the header sits on the chat background (no white bar).
