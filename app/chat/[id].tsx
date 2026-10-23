@@ -6096,6 +6096,7 @@ const styles = StyleSheet.create({
 
   replyPreview: {
     flexDirection: "row",
+    minWidth: 140,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "rgba(197,57,154,0.08)",
@@ -6108,7 +6109,8 @@ const styles = StyleSheet.create({
 
   replyBarMine: { backgroundColor: "#C34D9C" },
 
-  replyBody: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
+  // flexShrink (not flex: 1) so the quote's natural width sizes the bubble.
+  replyBody: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 5 },
 
   replyLine: {
     flexDirection: "row",
