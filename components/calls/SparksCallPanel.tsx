@@ -6,11 +6,11 @@
 // the Spark it belongs to. The Spark the call is on now is marked Live; one
 // the call comes back to picks up where it left off. After the call, the
 // same Sparks are written up (the call's entry in the chat opens them).
-// Above the Sparks: who is in the call's transcript and who isn't (each
-// phone writes down only its owner's voice), checked every 20 seconds, and
-// a way into the full transcript.
+// Above the Sparks: who is missing from the call's transcript (each phone
+// writes down only its owner's voice), checked every 20 seconds and hidden
+// when everyone is in; "Full transcript ›" sits in the header.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -18,51 +18,26 @@ import { callNotesEnabled } from "@/components/calls/CallNotesSheet";
 import { CALL_COLORS } from "@/components/calls/CallVisuals";
 import { setCallMinimized, useCallMinimized } from "@/components/calls/callUi";
 import { TOPIC_COLORS, nameOf } from "@/components/calls/SparksCallNotes";
-import { useCallCoverage } from "@/components/calls/TranscriptCoverage";
-import { describeCoverage, inCallMissing, type TranscriptParticipant, type TranscriptSpeakers } from "@/services/callTranscriptCopy";
+import TranscriptCoverage, { useCallCoverage } from "@/components/calls/TranscriptCoverage";
+import {
+  firstName,
+  speakerLabel,
+  type TranscriptParticipant,
+  type TranscriptSpeakers,
+} from "@/services/callTranscriptCopy";
 import type { Call } from "@/services/calls";
 import type { CallNotes, CallSpark } from "@/services/sparksCallNotes";
 import { useAppSelector } from "@/store/hooks";
 
 type Coverage = { participants: TranscriptParticipant[]; speakers: TranscriptSpeakers };
 
-/** Who's in the transcript: "2 of 4 people are in the transcript", then who's missing and why. */
-export function TranscriptCoverageRow({
-  coverage,
-  myUserId,
-  onOpenTranscript,
-}: {
-  coverage: Coverage | null;
-  myUserId: string | null;
-  onOpenTranscript: () => void;
-}) {
-  const summary = coverage ? describeCoverage(coverage.participants, myUserId, coverage.speakers, { live: true }) : null;
-  const missing = coverage ? inCallMissing(coverage.participants, myUserId, coverage.speakers) : [];
-  return (
-    <View style={styles.coverage}>
-      <View style={styles.coverageHead}>
-        <Ionicons name="people-outline" size={16} color={CALL_COLORS.muted} />
-        <Text style={styles.coverageTitle} numberOfLines={2}>
-          {summary?.total ? summary.summary : "The call's transcript"}
-        </Text>
-      </View>
-      {missing.map((m) => (
-        <Text key={m.userId} style={styles.coverageLine} numberOfLines={2}>
-          <Text style={styles.coverageMark}>• </Text>
-          {m.text}
-        </Text>
-      ))}
-      {summary?.explainer ? <Text style={styles.coverageNote}>{summary.explainer}</Text> : null}
-      <Pressable
-        onPress={onOpenTranscript}
-        hitSlop={10}
-        style={styles.coverageOpen}
-        accessibilityRole="button"
-        accessibilityLabel="Open the full transcript">
-        <Text style={styles.coverageLink}>Full transcript ›</Text>
-      </Pressable>
-    </View>
-  );
+/** "Ben", "Amara (you)": first names on the Spark cards. */
+function shortName(call: Call, userId: string, myUserId: string | null) {
+  const person =
+    call.members.find((m) => m.user.id === userId)?.user || (call.caller?.id === userId ? call.caller : null);
+  const label = speakerLabel(userId, myUserId, null, person?.name || person?.username);
+  const first = label.name === "You" ? "You" : firstName(label.name);
+  return label.isMe && first !== "You" ? `${first} (you)` : first;
 }
 
 function LiveDot({ color }: { color: string }) {
@@ -90,7 +65,8 @@ function LiveDot({ color }: { color: string }) {
 
 function SparkCard({ spark, call, myUserId }: { spark: CallSpark; call: Call; myUserId: string | null }) {
   const color = spark.title ? TOPIC_COLORS[spark.colorIndex % TOPIC_COLORS.length] : CALL_COLORS.muted;
-  const speakers = [...new Set(spark.lines.map((l) => nameOf(call, l.userId, myUserId)))];
+  const speakers = [...new Set(spark.lines.map((l) => shortName(call, l.userId, myUserId)))];
+  const said = spark.lines.filter((l) => l.final).length;
   return (
     <View style={[styles.card, spark.live && { borderColor: color }]}>
       <View style={styles.cardHead}>
@@ -108,7 +84,7 @@ function SparkCard({ spark, call, myUserId }: { spark: CallSpark; call: Call; my
       </View>
       {speakers.length ? (
         <Text style={styles.meta} numberOfLines={1}>
-          {speakers.join(", ")} · {spark.lines.filter((l) => l.final).length} said
+          {speakers.join(", ")} · {said === 1 ? "1 line" : `${said} lines`}
         </Text>
       ) : null}
       {spark.lines.map((line) => (
@@ -159,6 +135,7 @@ export default function SparksCallPanel({
       setCallMinimized(true);
       router.push(`/call-transcript/${encodeURIComponent(call.id)}`);
     });
+  const transcriptOn = callNotesEnabled || coverageOverride !== undefined;
   const named = notes.sparks.filter((s) => s.title).length;
 
   // Follow the conversation: keep the newest line in view.
@@ -186,6 +163,17 @@ export default function SparksCallPanel({
           <Ionicons name="chevron-back" size={20} color={CALL_COLORS.text} />
           <Text style={styles.backText}>Call</Text>
         </Pressable>
+        {transcriptOn ? (
+          <Pressable
+            onPress={openTranscript}
+            hitSlop={10}
+            style={styles.transcriptLink}
+            accessibilityRole="link"
+            accessibilityLabel="Open the full transcript">
+            <Ionicons name="document-text-outline" size={15} color={CALL_COLORS.teal} />
+            <Text style={styles.transcriptLinkText}>Full transcript ›</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.titleRow}>
@@ -205,8 +193,20 @@ export default function SparksCallPanel({
         </Pressable>
       ) : null}
 
-      {callNotesEnabled || coverageOverride !== undefined ? (
-        <TranscriptCoverageRow coverage={coverage} myUserId={myUserId} onOpenTranscript={openTranscript} />
+      {/* Who's missing from the transcript (nothing when everyone is in). */}
+      {transcriptOn && coverage ? (
+        <TranscriptCoverage
+          tone="call"
+          hideWhenAllIn
+          participants={coverage.participants}
+          speakers={coverage.speakers}
+          myUserId={myUserId}
+          style={styles.coverage}
+          onNavigate={(href) => {
+            setCallMinimized(true);
+            router.push(href as Href);
+          }}
+        />
       ) : null}
 
       <ScrollView ref={scroll} style={styles.list} contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
@@ -249,23 +249,9 @@ const styles = StyleSheet.create({
 
   list: { flex: 1 },
 
-  coverage: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderWidth: 1,
-    borderColor: CALL_COLORS.glassBorder,
-    gap: 4,
-  },
-  coverageHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  coverageTitle: { flex: 1, color: CALL_COLORS.text, fontSize: 13, fontWeight: "700" },
-  coverageOpen: { alignSelf: "flex-start", marginLeft: 24, marginTop: 4 },
-  coverageLink: { color: CALL_COLORS.teal, fontSize: 13, fontWeight: "700" },
-  coverageLine: { color: CALL_COLORS.text, fontSize: 13, lineHeight: 18, marginLeft: 24 },
-  coverageMark: { color: "#F5A524" },
-  coverageNote: { color: CALL_COLORS.muted, fontSize: 12, lineHeight: 16, marginLeft: 24, marginTop: 2 },
+  coverage: { marginBottom: 14 },
+  transcriptLink: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 5 },
+  transcriptLinkText: { color: CALL_COLORS.teal, fontSize: 13, fontWeight: "700" },
 
   card: {
     borderRadius: 18,

@@ -300,7 +300,6 @@ export default function CallTranscriptView({
             participants={head.participants}
             myUserId={myUserId}
             speakers={speakers}
-            live={live}
             style={styles.coverage}
             onNavigate={onNavigate}
           />

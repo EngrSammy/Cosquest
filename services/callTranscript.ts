@@ -59,10 +59,14 @@ export type CallTranscriptPage = {
 };
 
 export type CallOutlineReply = {
-  status: "pending" | "ready";
+  /** none: the call finished and nobody's speech was transcribed, so there will never be notes. */
+  status: "pending" | "ready" | "none";
   outline: CallOutline | null;
   /** Names for the outline's speakerIds and action-item owners. */
   speakers?: TranscriptSpeakers;
+  /** The server writes quick notes when no phone does (a couple of minutes after the call). */
+  quickNotes?: boolean;
+  reason?: "no_transcript" | string;
 };
 
 /** The outline was written on CosQuest's server from the transcript, without a model. */
@@ -72,6 +76,13 @@ export const QUICK_NOTES_MODEL = "server-extractive";
 export function errorStatus(error: unknown): number | null {
   const status = (error as { status?: unknown } | null)?.status;
   return typeof status === "number" ? status : null;
+}
+
+// The server said transcripts aren't switched on (501): remembered for this
+// session, so the notes sheet doesn't offer a transcript that can't open.
+let transcriptsOff = false;
+export function transcriptsUnavailable() {
+  return transcriptsOff;
 }
 
 export function fetchCallTranscript(
@@ -94,7 +105,11 @@ export function fetchCallTranscript(
     topics: Array.isArray(page?.topics) ? page.topics : [],
     speakers: page?.speakers || {},
     nextCursor: page?.nextCursor || null,
-  }));
+  }))
+    .catch((error) => {
+      if (errorStatus(error) === 501) transcriptsOff = true;
+      throw error;
+    });
 }
 
 export function fetchCallOutline(callId: string, token: string): Promise<CallOutlineReply> {
@@ -102,8 +117,10 @@ export function fetchCallOutline(callId: string, token: string): Promise<CallOut
     method: "GET",
     token,
   }).then((reply) => ({
-    status: reply?.outline ? "ready" : "pending",
+    status: reply?.outline ? "ready" : reply?.status === "none" ? "none" : "pending",
     outline: reply?.outline || null,
     speakers: reply?.speakers || {},
+    quickNotes: reply?.quickNotes === true,
+    reason: reply?.reason,
   }));
 }

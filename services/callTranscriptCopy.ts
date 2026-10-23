@@ -86,24 +86,33 @@ function clean(value: string | null | undefined) {
 const KNOWN: TranscriptParticipantStatus[] = ["transcribed", "no_sparks", "not_accepted", "declined", "silent"];
 
 function statusOf(p: TranscriptParticipant): TranscriptParticipantStatus {
-  // Unknown values from a newer server: treat as "nothing picked up" (no blame, no action).
+  // Unknown values from a newer server: treat as "didn't speak" (no blame, no action).
   return (KNOWN as string[]).includes(p.status) ? (p.status as TranscriptParticipantStatus) : "silent";
 }
 
-/** The short mark beside a name on a chip. */
-export function statusMark(status: TranscriptParticipantStatus | string, lines = 0): string {
+/**
+ * One vocabulary: the chip beside a name and the sentence about that person
+ * use the same words ("Needs Sparks" / "... needs Sparks on their phone").
+ * "Sparks" is only ever the feature.
+ */
+export function statusMark(status: TranscriptParticipantStatus | string): string {
   switch (status) {
     case "transcribed":
-      return lines === 1 ? "1 line" : `${lines} lines`;
+      return "In transcript";
     case "no_sparks":
-      return "No Sparks yet";
+      return "Needs Sparks";
     case "not_accepted":
-      return "Sparks off";
+      return "Turned off";
     case "declined":
-      return "Not transcribed";
+      return "Opted out";
     default:
-      return "Nothing picked up";
+      return "Didn't speak";
   }
+}
+
+/** First word of a name ("Ben Carter" -> "Ben"). */
+export function firstName(name: string): string {
+  return clean(name).split(/\s+/)[0] || name;
 }
 
 export type CoverageChip = {
@@ -111,54 +120,50 @@ export type CoverageChip = {
   name: string;
   isMe: boolean;
   status: TranscriptParticipantStatus;
-  /** Short text beside the name ("12 lines", "No Sparks yet"). */
+  /** Short text beside the name ("In transcript", "Needs Sparks"). */
   mark: string;
   /** Their lines are in the transcript. */
   inTranscript: boolean;
 };
 
 export type CoverageNote = {
-  kind: "me_no_sparks" | "me_not_accepted" | "me_declined" | "no_sparks" | "not_accepted" | "declined";
+  kind: "no_sparks" | "not_accepted" | "declined";
   text: string;
-  /** Only for the viewer's own "no Sparks" note: where to set it up. */
-  action?: { label: string; href: string };
 };
 
 export type Coverage = {
   /** Everyone, the viewer first, then the people in the transcript, then the rest. */
   chips: CoverageChip[];
-  /** One sentence per reason someone is missing (the viewer's own first). Empty when nobody is. */
+  /** The one line: "2 of 4 in the transcript · Cy needs Sparks · Eve opted out". */
+  line: string;
+  /** Nobody is missing (people who didn't speak are covered). */
+  allIn: boolean;
+  /** The viewer's own lines are missing: always shown, apart from the line. */
+  mine: { text: string; href?: string } | null;
+  /** Full sentences about the others who are missing (shown when expanded). */
   notes: CoverageNote[];
-  /** Shown under the notes when someone is missing because of their phone. */
+  /** Shown when expanded, when someone is missing. */
   explainer: string | null;
-  /** Everyone is in (or had Sparks on): one quiet line instead of notes. */
-  allIn: string | null;
-  /** "3 of 4 people are in the transcript". */
-  summary: string;
   inCount: number;
   total: number;
 };
 
-/**
- * What the coverage banner says. `live`: the call is still going (present
- * tense for "Sparks off").
- */
+const MISSING: TranscriptParticipantStatus[] = ["no_sparks", "not_accepted", "declined"];
+
+/** Who is (and isn't) in a call's transcript, in the app's words. */
 export function describeCoverage(
   participants: TranscriptParticipant[] | null | undefined,
   myUserId: string | null | undefined,
   speakers?: TranscriptSpeakers | null,
-  options: { live?: boolean } = {},
 ): Coverage {
-  const live = Boolean(options.live);
   const people = (participants || []).map((p) => {
     const status = statusOf(p);
-    const isMe = Boolean(myUserId) && p.userId === myUserId;
     return {
       userId: p.userId,
       name: personName(p.userId, speakers, p.displayName),
-      isMe,
+      isMe: Boolean(myUserId) && p.userId === myUserId,
       status,
-      mark: statusMark(status, p.lines || 0),
+      mark: statusMark(status),
       inTranscript: status === "transcribed",
     } satisfies CoverageChip;
   });
@@ -169,95 +174,118 @@ export function describeCoverage(
     .sort((a, b) => rank(a.chip) - rank(b.chip) || a.index - b.index)
     .map(({ chip }) => chip);
 
-  const notes: CoverageNote[] = [];
   const me = people.find((c) => c.isMe);
-  if (me?.status === "no_sparks") {
-    notes.push({
-      kind: "me_no_sparks",
-      text: "Your lines aren't here: Sparks isn't set up on your phone yet.",
-      action: { label: "Set up Sparks", href: SPARKS_SETUP_HREF },
-    });
-  } else if (me?.status === "not_accepted") {
-    notes.push({
-      kind: "me_not_accepted",
-      text: live ? "Your lines aren't here: Sparks is off for you on this call." : "Your lines aren't here: you had Sparks off for this call.",
-    });
-  } else if (me?.status === "declined") {
-    notes.push({ kind: "me_declined", text: "You chose not to be transcribed on this call." });
-  }
+  const mine =
+    me?.status === "no_sparks"
+      ? { text: "Your lines aren't here: get Sparks on this phone", href: SPARKS_SETUP_HREF }
+      : me?.status === "not_accepted"
+        ? { text: "Your lines aren't here: you turned transcription off for this call." }
+        : me?.status === "declined"
+          ? { text: "Your lines aren't here: you opted out of transcripts." }
+          : null;
 
   const others = people.filter((c) => !c.isMe);
   const named = (status: TranscriptParticipantStatus) => others.filter((c) => c.status === status).map((c) => c.name);
-
   const noSparks = named("no_sparks");
+  const turnedOff = named("not_accepted");
+  const optedOut = named("declined");
+  const firsts = (names: string[]) => joinNames(names.map(firstName));
+  const many = (names: string[]) => names.length > 1;
+
+  const notes: CoverageNote[] = [];
+  const short: string[] = [];
   if (noSparks.length) {
-    const many = noSparks.length > 1;
     notes.push({
       kind: "no_sparks",
-      text: `${joinNames(noSparks)} ${many ? "aren't" : "isn't"} in this transcript: Sparks isn't set up on their ${many ? "phones" : "phone"} yet.`,
+      text: `${joinNames(noSparks)} ${many(noSparks) ? "need" : "needs"} Sparks on their ${many(noSparks) ? "phones" : "phone"} to be in the transcript.`,
     });
+    short.push(`${firsts(noSparks)} ${many(noSparks) ? "need" : "needs"} Sparks`);
   }
-  const notAccepted = named("not_accepted");
-  if (notAccepted.length) {
-    notes.push({
-      kind: "not_accepted",
-      text: `${joinNames(notAccepted)} ${live ? (notAccepted.length > 1 ? "have" : "has") : "had"} Sparks off for this call.`,
-    });
+  if (turnedOff.length) {
+    notes.push({ kind: "not_accepted", text: `${joinNames(turnedOff)} turned transcription off for this call.` });
+    short.push(`${firsts(turnedOff)} turned it off`);
   }
-  const declined = named("declined");
-  if (declined.length) {
-    notes.push({ kind: "declined", text: `${joinNames(declined)} chose not to be transcribed.` });
+  if (optedOut.length) {
+    notes.push({ kind: "declined", text: `${joinNames(optedOut)} opted out of transcripts.` });
+    short.push(`${firsts(optedOut)} opted out`);
   }
-
-  const missingByPhone = noSparks.length > 0 || notAccepted.length > 0;
-  const explainer = missingByPhone ? "Each phone writes down only its owner's voice." : null;
 
   const total = people.length;
-  const inCount = people.filter((c) => c.inTranscript).length;
-  const silent = named("silent");
-  const allIn =
-    total > 0 && notes.length === 0
-      ? silent.length
-        ? `Everyone had Sparks on. Nothing was picked up from ${joinNames(silent)}.`
-        : "Everyone on the call is in this transcript."
-      : null;
-  const summary = total
-    ? inCount === total
-      ? total === 1
-        ? "1 person is in the transcript"
-        : `All ${total} people are in the transcript`
-      : `${inCount} of ${total} ${total === 1 ? "person is" : "people are"} in the transcript`
-    : "";
+  const missing = people.filter((c) => MISSING.includes(c.status)).length;
+  const inCount = total - missing;
+  const allIn = total > 0 && missing === 0;
+  const line = !total ? "" : allIn ? "Everyone is in the transcript" : [`${inCount} of ${total} in the transcript`, ...short].join(" · ");
+  const explainer = allIn ? null : "Each phone writes down only its owner's voice.";
 
-  return { chips, notes, explainer, allIn, summary, inCount, total };
+  return { chips, line, allIn, mine, notes, explainer, inCount, total };
 }
 
-// ---------- the in-call row ----------
+// ---------- quick notes ----------
+
+/** Quick notes quote people: "Ben: Three quests are still open." -> { who: "Ben", text: "Three quests..." }. */
+export function splitSaid(text: string): { who: string | null; text: string } {
+  const match = /^([^:\n]{1,40}):\s+([\s\S]+)$/.exec(text);
+  return match ? { who: match[1].trim(), text: match[2] } : { who: null, text };
+}
+
+const escapeRe = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * The compact lines for the in-call Sparks panel: one per person who won't be
- * in the transcript, by name, never guessing pronouns ("Ben: no Sparks yet").
+ * A quoted line may hold a short exchange: "Amara: Are we still meeting at
+ * ten? Ben: Ten works." -> two parts, one per speaker. A new speaker starts
+ * only after the end of a sentence and only with a name from `names` (the
+ * call's first names), so "on the board: who owns it?" is never split.
  */
-export function inCallMissing(
-  participants: TranscriptParticipant[] | null | undefined,
+export function splitQuotes(text: string, names: string[] = []): { who: string | null; text: string }[] {
+  const lead = splitSaid(text);
+  if (!lead.who) return [lead];
+  const known = names.map((n) => n.trim()).filter(Boolean).map(escapeRe);
+  if (!known.length) return [lead];
+  const next = new RegExp(`([.?!…]["'”’)]?)\\s+(${known.join("|")}):\\s+`, "g");
+  const parts: { who: string | null; text: string }[] = [];
+  let who: string = lead.who;
+  let from = 0;
+  let match: RegExpExecArray | null;
+  while ((match = next.exec(lead.text))) {
+    parts.push({ who, text: lead.text.slice(from, match.index + match[1].length) });
+    who = match[2];
+    from = match.index + match[0].length;
+  }
+  parts.push({ who, text: lead.text.slice(from) });
+  return parts;
+}
+
+/**
+ * The label for a quoted line: the first name the server wrote, with "(you)"
+ * when it is the viewer's (only when no one else on the call shares that
+ * first name, so it is never a guess).
+ */
+export function saidLabel(
+  who: string,
   myUserId: string | null | undefined,
   speakers?: TranscriptSpeakers | null,
-): { userId: string; isMe: boolean; text: string }[] {
-  const reason: Partial<Record<TranscriptParticipantStatus, string>> = {
-    no_sparks: "no Sparks yet",
-    not_accepted: "Sparks off",
-    declined: "chose not to be transcribed",
-  };
-  const out: { userId: string; isMe: boolean; text: string }[] = [];
-  for (const p of participants || []) {
-    const why = reason[statusOf(p)];
-    if (!why) continue;
-    const isMe = Boolean(myUserId) && p.userId === myUserId;
-    const who = isMe ? "You" : personName(p.userId, speakers, p.displayName);
-    out.push({ userId: p.userId, isMe, text: `${who}: ${why}` });
+): string {
+  if (!myUserId || !speakers?.[myUserId]) return who;
+  const firstOf = (id: string) => firstName(personName(id, speakers)).toLowerCase();
+  const target = who.trim().toLowerCase();
+  if (firstOf(myUserId) !== target) return who;
+  const clash = Object.keys(speakers).some((id) => id !== myUserId && firstOf(id) === target);
+  return clash ? who : `${who} (you)`;
+}
+
+/** A person as a quoted-line label: "Ben", or "Amara (you)" for the viewer. */
+export function ownerLabel(
+  userId: string,
+  myUserId: string | null | undefined,
+  speakers?: TranscriptSpeakers | null,
+  fallback?: string | null,
+): string {
+  if (Boolean(myUserId) && userId === myUserId) {
+    const mine = firstName(personName(userId, speakers));
+    return mine === "Someone" ? "You" : `${mine} (you)`;
   }
-  // The viewer first.
-  return out.sort((a, b) => Number(b.isMe) - Number(a.isMe));
+  const first = firstName(personName(userId, speakers, fallback));
+  return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
 // ---------- empty and error states ----------
@@ -267,15 +295,9 @@ export function emptyTranscriptCopy(
   participants: TranscriptParticipant[] | null | undefined,
   callStatus: string | null | undefined,
 ): string {
+  if (callStatus === "active") return "Nothing yet: lines show up here as people with Sparks talk.";
   const anyoneOn = (participants || []).some((p) => p.status === "transcribed" || p.status === "silent");
-  if (callStatus === "active") {
-    return anyoneOn
-      ? "Nothing said yet. Lines show up here as people talk."
-      : "No transcript yet: nobody on the call has Sparks on.";
-  }
-  return anyoneOn
-    ? "Sparks was on, but nothing said on the call was picked up."
-    : "No transcript yet: nobody on the call had Sparks on.";
+  return anyoneOn ? "Nothing said on this call was picked up." : "No transcript for this call: nobody had Sparks turned on.";
 }
 
 /** Plain words for the transcript endpoint's errors (by HTTP status). */
@@ -288,7 +310,7 @@ export function transcriptErrorCopy(status: number | null | undefined): { title:
     case 501:
       return {
         title: "Not available yet",
-        body: "Transcripts need an update to CosQuest's server. They'll appear here once it's done.",
+        body: "Transcripts aren't switched on for this server yet.",
         retry: false,
       };
     case 503:

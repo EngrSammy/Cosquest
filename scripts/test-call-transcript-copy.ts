@@ -7,10 +7,14 @@ import {
   callWhen,
   describeCoverage,
   emptyTranscriptCopy,
-  inCallMissing,
+  firstName,
   joinNames,
+  ownerLabel,
   personName,
+  saidLabel,
   speakerLabel,
+  splitQuotes,
+  splitSaid,
   statusMark,
   transcriptErrorCopy,
   type TranscriptParticipant,
@@ -74,131 +78,137 @@ test("joinNames", () => {
   assert.equal(joinNames(["Ben", "Cy", "Dee", "Eve", "Fay"]), "Ben, Cy and 3 others");
 });
 
-test("status marks", () => {
-  assert.equal(statusMark("transcribed", 1), "1 line");
-  assert.equal(statusMark("transcribed", 12), "12 lines");
-  assert.equal(statusMark("no_sparks"), "No Sparks yet");
-  assert.equal(statusMark("not_accepted"), "Sparks off");
-  assert.equal(statusMark("declined"), "Not transcribed");
-  assert.equal(statusMark("silent"), "Nothing picked up");
+test("one vocabulary: chip marks", () => {
+  assert.equal(statusMark("transcribed"), "In transcript");
+  assert.equal(statusMark("no_sparks"), "Needs Sparks");
+  assert.equal(statusMark("not_accepted"), "Turned off");
+  assert.equal(statusMark("declined"), "Opted out");
+  assert.equal(statusMark("silent"), "Didn't speak");
+  assert.equal(statusMark("brand_new_status"), "Didn't speak");
 });
 
-test("everyone transcribed: one quiet line, no notes", () => {
-  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "transcribed", 7)], "me", speakers);
-  assert.equal(c.allIn, "Everyone on the call is in this transcript.");
+test("everyone in (people who didn't speak count as in)", () => {
+  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "transcribed", 7), p("dee", "silent")], "me", speakers);
+  assert.equal(c.allIn, true);
+  assert.equal(c.line, "Everyone is in the transcript");
   assert.deepEqual(c.notes, []);
+  assert.equal(c.mine, null);
   assert.equal(c.explainer, null);
-  assert.equal(c.summary, "All 2 people are in the transcript");
+  assert.equal(c.chips.find((x) => x.userId === "dee")?.mark, "Didn't speak");
   assert.equal(c.chips[0].isMe, true);
 });
 
-test("silent people don't make a banner", () => {
-  const c = describeCoverage([p("me", "transcribed", 4), p("ben", "silent")], "me", speakers);
-  assert.equal(c.allIn, "Everyone had Sparks on. Nothing was picked up from Ben Carter.");
-  assert.deepEqual(c.notes, []);
-  assert.equal(c.summary, "1 of 2 people are in the transcript");
-  assert.equal(c.chips.find((x) => x.userId === "ben")?.mark, "Nothing picked up");
-});
-
-test("others without Sparks: named, plural, with the explainer", () => {
+test("others missing: the one line, the sentences and the chips use the same words", () => {
   const c = describeCoverage(
-    [p("me", "transcribed", 3), p("ben", "no_sparks"), p("cy", "no_sparks"), p("dee", "declined")],
+    [p("me", "transcribed", 3), p("ben", "transcribed", 2), p("cy", "no_sparks", 0, "Cy Mensah"), p("eve", "declined", 0, "Eve Park")],
     "me",
-    speakers,
+    { ...speakers, cy: { id: "cy", name: "Cy Mensah" } },
   );
-  assert.equal(c.allIn, null);
+  assert.equal(c.allIn, false);
+  assert.equal(c.line, "2 of 4 in the transcript · Cy needs Sparks · Eve opted out");
   assert.deepEqual(
     c.notes.map((n) => n.text),
+    ["Cy Mensah needs Sparks on their phone to be in the transcript.", "Eve Park opted out of transcripts."],
+  );
+  assert.deepEqual(
+    c.chips.map((x) => [x.userId, x.mark]),
     [
-      "Ben Carter and cy aren't in this transcript: Sparks isn't set up on their phones yet.",
-      "Dee Lawal chose not to be transcribed.",
+      ["me", "In transcript"],
+      ["ben", "In transcript"],
+      ["cy", "Needs Sparks"],
+      ["eve", "Opted out"],
     ],
   );
   assert.equal(c.explainer, "Each phone writes down only its owner's voice.");
-  assert.equal(c.summary, "1 of 4 people are in the transcript");
-  // The viewer first, then those in, then the rest (in server order).
+  for (const text of [c.line, ...c.notes.map((n) => n.text)]) assert.doesNotMatch(text, /\b(his|her|he|she)\b/i);
+});
+
+test("several people per reason: plural, first names in the one line", () => {
+  const c = describeCoverage(
+    [p("me", "transcribed", 3), p("ben", "no_sparks"), p("dee", "no_sparks"), p("x", "not_accepted", 0, "Xan Ito")],
+    "me",
+    speakers,
+  );
+  assert.equal(c.line, "1 of 4 in the transcript · Ben and Dee need Sparks · Xan turned it off");
   assert.deepEqual(
-    c.chips.map((x) => x.userId),
-    ["me", "ben", "cy", "dee"],
+    c.notes.map((n) => n.text),
+    [
+      "Ben Carter and Dee Lawal need Sparks on their phones to be in the transcript.",
+      "Xan Ito turned transcription off for this call.",
+    ],
   );
 });
 
-test("one person without Sparks: singular", () => {
-  const c = describeCoverage([p("me", "transcribed", 3), p("ben", "no_sparks")], "me", speakers);
-  assert.equal(c.notes[0].text, "Ben Carter isn't in this transcript: Sparks isn't set up on their phone yet.");
-});
-
-test("Sparks off: tense follows the call", () => {
-  const ended = describeCoverage([p("me", "transcribed", 3), p("dee", "not_accepted")], "me", speakers);
-  assert.equal(ended.notes[0].text, "Dee Lawal had Sparks off for this call.");
-  const live = describeCoverage([p("me", "transcribed", 3), p("dee", "not_accepted")], "me", speakers, { live: true });
-  assert.equal(live.notes[0].text, "Dee Lawal has Sparks off for this call.");
-  assert.equal(live.explainer, "Each phone writes down only its owner's voice.");
-});
-
-test("declined only: no explainer (it's a choice, not a phone problem)", () => {
-  const c = describeCoverage([p("me", "transcribed", 3), p("dee", "declined")], "me", speakers);
-  assert.equal(c.explainer, null);
-});
-
-test("the viewer without Sparks: first, with the setup action", () => {
+test("the viewer's own lines: a line of its own, with the setup link when Sparks is missing", () => {
   const c = describeCoverage([p("ben", "transcribed", 5), p("me", "no_sparks")], "me", speakers);
-  assert.equal(c.notes[0].kind, "me_no_sparks");
-  assert.equal(c.notes[0].text, "Your lines aren't here: Sparks isn't set up on your phone yet.");
-  assert.deepEqual(c.notes[0].action, { label: "Set up Sparks", href: "/sparks-model" });
+  assert.deepEqual(c.mine, { text: "Your lines aren't here: get Sparks on this phone", href: "/sparks-model" });
+  // The one line counts the viewer but doesn't repeat them.
+  assert.equal(c.line, "1 of 2 in the transcript");
   assert.equal(c.chips[0].userId, "me");
+  assert.equal(
+    describeCoverage([p("me", "not_accepted")], "me", speakers).mine?.text,
+    "Your lines aren't here: you turned transcription off for this call.",
+  );
+  assert.equal(describeCoverage([p("me", "declined")], "me", speakers).mine?.text, "Your lines aren't here: you opted out of transcripts.");
 });
 
-test("the viewer with Sparks off or opted out", () => {
-  assert.equal(
-    describeCoverage([p("me", "not_accepted")], "me", speakers).notes[0].text,
-    "Your lines aren't here: you had Sparks off for this call.",
-  );
-  assert.equal(
-    describeCoverage([p("me", "not_accepted")], "me", speakers, { live: true }).notes[0].text,
-    "Your lines aren't here: Sparks is off for you on this call.",
-  );
-  assert.equal(describeCoverage([p("me", "declined")], "me", speakers).notes[0].text, "You chose not to be transcribed on this call.");
-});
-
-test("names fall back to the participant's displayName; unknown statuses are treated as silent", () => {
+test("names fall back to the participant's displayName; unknown statuses are treated as didn't speak", () => {
   const c = describeCoverage([p("zed", "no_sparks", 0, "Zed Ade"), p("yan", "brand_new_status")], null, {});
-  assert.equal(c.notes[0].text, "Zed Ade isn't in this transcript: Sparks isn't set up on their phone yet.");
+  assert.equal(c.notes[0].text, "Zed Ade needs Sparks on their phone to be in the transcript.");
   assert.equal(c.chips.find((x) => x.userId === "yan")?.status, "silent");
 });
 
 test("no participants: nothing to say", () => {
   const c = describeCoverage(undefined, "me", speakers);
   assert.equal(c.total, 0);
-  assert.equal(c.allIn, null);
-  assert.equal(c.summary, "");
+  assert.equal(c.line, "");
 });
 
-test("in-call lines: by name, no pronouns, the viewer first", () => {
-  const lines = inCallMissing(
-    [p("ben", "no_sparks"), p("dee", "not_accepted"), p("cy", "transcribed", 2), p("me", "no_sparks"), p("eve", "declined", 0, "Eve")],
-    "me",
-    speakers,
-  );
-  assert.deepEqual(
-    lines.map((l) => l.text),
-    ["You: no Sparks yet", "Ben Carter: no Sparks yet", "Dee Lawal: Sparks off", "Eve: chose not to be transcribed"],
-  );
-  for (const l of lines) assert.doesNotMatch(l.text, /\b(his|her|he|she)\b/i);
+test("quick notes: quoted lines, (you) on the viewer's, never a guess", () => {
+  assert.deepEqual(splitSaid("Ben: Three quests are still open."), { who: "Ben", text: "Three quests are still open." });
+  assert.deepEqual(splitSaid("I'll update the board tonight."), { who: null, text: "I'll update the board tonight." });
+  assert.equal(saidLabel("Amara", "me", speakers), "Amara (you)");
+  assert.equal(saidLabel("Ben", "me", speakers), "Ben");
+  // Another Amara on the call: no (you), it could be either.
+  assert.equal(saidLabel("Amara", "me", { ...speakers, a2: { id: "a2", name: "Amara Eze" } }), "Amara");
+  assert.equal(saidLabel("Amara", null, speakers), "Amara");
+  assert.equal(ownerLabel("me", "me", speakers), "Amara (you)");
+  assert.equal(ownerLabel("ben", "me", speakers), "Ben");
+  assert.equal(ownerLabel("me", "me", {}), "You");
+  assert.equal(ownerLabel("zed", "me", {}, "someone on the call"), "Someone");
+  assert.equal(firstName("  Ben   Carter "), "Ben");
+});
+
+test("quick notes: a short exchange splits by speaker, only after a sentence and on a known name", () => {
+  const names = ["Amara", "Ben"];
+  assert.deepEqual(splitQuotes("Amara: Are we still meeting at ten? Ben: Ten works.", names), [
+    { who: "Amara", text: "Are we still meeting at ten?" },
+    { who: "Ben", text: "Ten works." },
+  ]);
+  assert.deepEqual(splitQuotes("Amara: One more thing on the board: who owns the new quest? Ben: I can take it.", names), [
+    { who: "Amara", text: "One more thing on the board: who owns the new quest?" },
+    { who: "Ben", text: "I can take it." },
+  ]);
+  // Not a known name: no split.
+  assert.deepEqual(splitQuotes("Ben: Ready? Answer: yes.", names), [{ who: "Ben", text: "Ready? Answer: yes." }]);
+  // No leading speaker, or no names: one part.
+  assert.deepEqual(splitQuotes("I'll book the hall.", names), [{ who: null, text: "I'll book the hall." }]);
+  assert.deepEqual(splitQuotes("Amara: Hi? Ben: Hello.", []), [{ who: "Amara", text: "Hi? Ben: Hello." }]);
 });
 
 test("empty transcript copy", () => {
-  assert.equal(emptyTranscriptCopy([p("a", "no_sparks")], "ended"), "No transcript yet: nobody on the call had Sparks on.");
-  assert.equal(emptyTranscriptCopy([], "active"), "No transcript yet: nobody on the call has Sparks on.");
-  assert.equal(emptyTranscriptCopy([p("a", "transcribed")], "active"), "Nothing said yet. Lines show up here as people talk.");
-  assert.equal(emptyTranscriptCopy([p("a", "silent")], "ready"), "Sparks was on, but nothing said on the call was picked up.");
+  assert.equal(emptyTranscriptCopy([p("a", "no_sparks")], "ended"), "No transcript for this call: nobody had Sparks turned on.");
+  assert.equal(emptyTranscriptCopy([], "ready"), "No transcript for this call: nobody had Sparks turned on.");
+  assert.equal(emptyTranscriptCopy([], "active"), "Nothing yet: lines show up here as people with Sparks talk.");
+  assert.equal(emptyTranscriptCopy([p("a", "transcribed")], "active"), "Nothing yet: lines show up here as people with Sparks talk.");
+  assert.equal(emptyTranscriptCopy([p("a", "silent")], "ready"), "Nothing said on this call was picked up.");
 });
 
 test("error copy by status", () => {
   assert.equal(transcriptErrorCopy(403).retry, false);
   assert.match(transcriptErrorCopy(403).body, /Only people who were on this call/);
   assert.equal(transcriptErrorCopy(404).title, "Call not found");
-  assert.match(transcriptErrorCopy(501).body, /update/);
+  assert.equal(transcriptErrorCopy(501).body, "Transcripts aren't switched on for this server yet.");
   assert.equal(transcriptErrorCopy(503).title, "Sparks is off");
   assert.equal(transcriptErrorCopy(null).retry, true);
   assert.equal(transcriptErrorCopy(500).title, "Couldn't load the transcript");

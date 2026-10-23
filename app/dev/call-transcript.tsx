@@ -8,8 +8,8 @@
 //   /dev/call-transcript?view=banners     every "who's in this transcript" message
 //   /dev/call-transcript?view=empty       nobody had Sparks on
 //   /dev/call-transcript?view=error&code=501
-//   /dev/call-transcript?view=panel       the in-call Sparks panel with its transcript row
-//   /dev/call-transcript?view=notes-quick | notes-model | notes-pending
+//   /dev/call-transcript?view=panel       the in-call Sparks panel with its transcript row (panel-all-in: no row)
+//   /dev/call-transcript?view=notes-quick | notes-model | notes-pending | notes-pending-quick | notes-none
 // Real components, fed mock data instead of the network.
 import { Redirect, router, useLocalSearchParams, type Href } from "expo-router";
 import { useState } from "react";
@@ -144,7 +144,7 @@ const OUTLINE: CallOutline = {
   generatedBy: { deviceIds: ["dev_1"], modelVersion: "mote-1.3" },
 };
 
-// Real server output for LINES, no live topics (regenerate: @cosquest/sparks-backend 1.3.3 extractiveSpans + extractiveReduce).
+// Real server output for LINES, no live topics (regenerate: @cosquest/sparks-backend extractiveSpans + extractiveReduce).
 const QUICK_OUTLINE: CallOutline = {
   callId: OUTLINE.callId,
   chatId: OUTLINE.chatId,
@@ -153,59 +153,39 @@ const QUICK_OUTLINE: CallOutline = {
   segmentCount: OUTLINE.segmentCount,
   generatedAt: OUTLINE.generatedAt,
   generatedBy: { deviceIds: [], modelVersion: "server-extractive" },
-  title: "Quests and Saturday",
-  summary: "Amara and Ben covered 2 topics: quests; saturday and meeting. 1 decision and 2 action items.",
+  title: "Quest and Board",
+  summary: "Amara and Ben talked about quest and board.",
   topics: [
     {
       topicId: "ot_1",
-      title: "Quests",
+      title: "Quest and Board",
       colorIndex: 0,
       order: 0,
-      summary: "Amara and Ben talked about quests. One decision.",
+      summary: "Ben: Three quests are still open from last week.",
       points: [
-        "Ben: Three quests are still open from last week.",
-        "Amara: And move the photo quest to next month."
+        "Amara: Move the photo quest to next month."
       ],
       decisions: [
-        "Amara: Let's close the map one, nobody has picked it up."
+        "Amara: Let's close the map one, nobody has picked it up.",
+        "Amara: Are we still meeting at ten? Ben: Ten works."
       ],
       actionItems: [
         {
           text: "I'll update the board tonight.",
+          ownerUserId: "u_ben"
+        },
+        {
+          text: "I'll book the hall for three hours.",
+          ownerUserId: "u_amara"
+        },
+        {
+          text: "Amara: One more thing on the board: who owns the new quest? Ben: I can take it.",
           ownerUserId: "u_ben"
         }
       ],
       spans: [
         {
           startMs: 2000,
-          endMs: 28500
-        }
-      ],
-      speakerIds: [
-        "u_amara",
-        "u_ben"
-      ]
-    },
-    {
-      topicId: "ot_2",
-      title: "Saturday and Meeting",
-      colorIndex: 1,
-      order: 1,
-      summary: "Amara and Ben talked about saturday, meeting and speakers.",
-      points: [
-        "Amara: Are we still meeting at ten?",
-        "Ben: Cy said they'd bring the speakers."
-      ],
-      decisions: [],
-      actionItems: [
-        {
-          text: "Great, I'll book the hall for three hours.",
-          ownerUserId: "u_amara"
-        }
-      ],
-      spans: [
-        {
-          startMs: 63000,
           endMs: 149500
         }
       ],
@@ -269,36 +249,46 @@ const MOCK_NOTES: CallNotes = {
   togglePaused: noop,
 };
 
-const BANNERS: { label: string; participants: TranscriptParticipant[]; live?: boolean }[] = [
-  { label: "Others without Sparks (and one opted out)", participants: MIXED, live: true },
-  {
-    label: "You without Sparks",
-    participants: [
-      { userId: "u_amara", displayName: "Amara Obi", lines: 0, status: "no_sparks" },
-      { userId: "u_ben", displayName: "Ben Carter", lines: 9, status: "transcribed" },
-      { userId: "u_cy", displayName: "Cy Mensah", lines: 0, status: "no_sparks" },
-    ],
-  },
-  {
-    label: "Sparks off, nothing picked up",
-    participants: [
-      { userId: "u_amara", displayName: "Amara Obi", lines: 7, status: "transcribed" },
-      { userId: "u_dee", displayName: "Dee Lawal", lines: 0, status: "not_accepted" },
-      { userId: "u_fay", displayName: "Fay Ndu", lines: 0, status: "silent" },
-    ],
-  },
-  {
-    label: "Everyone in",
-    participants: [
-      { userId: "u_amara", displayName: "Amara Obi", lines: 7, status: "transcribed" },
-      { userId: "u_ben", displayName: "Ben Carter", lines: 9, status: "transcribed" },
-    ],
-  },
+const YOU_NEED_SPARKS: TranscriptParticipant[] = [
+  { userId: "u_amara", displayName: "Amara Obi", lines: 0, status: "no_sparks" },
+  { userId: "u_ben", displayName: "Ben Carter", lines: 9, status: "transcribed" },
+  { userId: "u_cy", displayName: "Cy Mensah", lines: 0, status: "no_sparks" },
+];
+const TURNED_OFF: TranscriptParticipant[] = [
+  { userId: "u_amara", displayName: "Amara Obi", lines: 7, status: "transcribed" },
+  { userId: "u_dee", displayName: "Dee Lawal", lines: 0, status: "not_accepted" },
+  { userId: "u_fay", displayName: "Fay Ndu", lines: 0, status: "silent" },
+];
+const EVERYONE_IN: TranscriptParticipant[] = [
+  { userId: "u_amara", displayName: "Amara Obi", lines: 7, status: "transcribed" },
+  { userId: "u_ben", displayName: "Ben Carter", lines: 9, status: "transcribed" },
+  { userId: "u_fay", displayName: "Fay Ndu", lines: 0, status: "silent" },
+];
+
+const BANNERS: { label: string; participants: TranscriptParticipant[]; expanded?: boolean }[] = [
+  { label: "Others missing (as it first shows)", participants: MIXED },
+  { label: "Others missing (tapped open)", participants: MIXED, expanded: true },
+  { label: "You need Sparks", participants: YOU_NEED_SPARKS },
+  { label: "Turned off, didn't speak (tapped open)", participants: TURNED_OFF, expanded: true },
+  { label: "Everyone in", participants: EVERYONE_IN },
 ];
 
 // ---------- the route ----------
 
-const VIEWS = ["merged", "ended", "banners", "empty", "error", "panel", "notes-quick", "notes-model", "notes-pending"];
+const VIEWS = [
+  "merged",
+  "ended",
+  "banners",
+  "empty",
+  "error",
+  "panel",
+  "panel-all-in",
+  "notes-quick",
+  "notes-model",
+  "notes-pending",
+  "notes-pending-quick",
+  "notes-none",
+];
 
 export default function DevCallTranscript() {
   if (!__DEV__) {
@@ -331,10 +321,14 @@ function DevCallTranscriptScreen() {
     case "banners":
       return <Banners onBack={back} />;
     case "panel":
-      return <Panel onBack={back} />;
+      return <Panel onBack={back} participants={MIXED} />;
+    case "panel-all-in":
+      return <Panel onBack={back} participants={EVERYONE_IN} />;
     case "notes-quick":
     case "notes-model":
     case "notes-pending":
+    case "notes-pending-quick":
+    case "notes-none":
       return <Notes kind={view} onBack={back} />;
     default:
       return <Index />;
@@ -398,7 +392,7 @@ function Banners({ onBack }: { onBack: () => void }) {
               participants={b.participants}
               myUserId={ME}
               speakers={SPEAKERS}
-              live={b.live}
+              defaultExpanded={b.expanded}
               onNavigate={(href) => router.push(href as Href)}
             />
           </View>
@@ -408,7 +402,7 @@ function Banners({ onBack }: { onBack: () => void }) {
   );
 }
 
-function Panel({ onBack }: { onBack: () => void }) {
+function Panel({ onBack, participants }: { onBack: () => void; participants: TranscriptParticipant[] }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
@@ -420,7 +414,7 @@ function Panel({ onBack }: { onBack: () => void }) {
           topInset={insets.top}
           bottomInset={insets.bottom}
           onBack={onBack}
-          coverage={{ participants: MIXED, speakers: SPEAKERS }}
+          coverage={{ participants, speakers: SPEAKERS }}
           onOpenTranscript={() => router.push("/dev/call-transcript?view=merged" as Href)}
         />
       </CallBackground>
@@ -432,14 +426,20 @@ function Notes({ kind, onBack }: { kind: string; onBack: () => void }) {
   const [open, setOpen] = useState(true);
   const reply: CallOutlineReply =
     kind === "notes-pending"
-      ? { status: "pending", outline: null }
-      : { status: "ready", outline: kind === "notes-quick" ? QUICK_OUTLINE : OUTLINE, speakers: SPEAKERS };
+      ? { status: "pending", outline: null, quickNotes: false }
+      : kind === "notes-pending-quick"
+        ? { status: "pending", outline: null, quickNotes: true }
+        : kind === "notes-none"
+          ? { status: "none", outline: null, quickNotes: true, reason: "no_transcript" }
+          : { status: "ready", outline: kind === "notes-quick" ? QUICK_OUTLINE : OUTLINE, speakers: SPEAKERS, quickNotes: true };
   return (
     <View style={styles.screen}>
       <ScreenGradient />
-      <Pressable style={{ padding: 24, paddingTop: 60 }} onPress={() => setOpen(true)}>
-        <Text style={styles.devTitle}>Tap to open the notes again</Text>
-      </Pressable>
+      {open ? null : (
+        <Pressable style={{ padding: 24, paddingTop: 60 }} onPress={() => setOpen(true)}>
+          <Text style={styles.devTitle}>Tap to open the notes again</Text>
+        </Pressable>
+      )}
       <CallNotesSheet
         callId={CALL_ID}
         token={null}
