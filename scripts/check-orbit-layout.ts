@@ -10,6 +10,7 @@ import type { OrbitPerson } from "../components/calls/OrbitCall";
 import {
   CENTER_HOLD_MS,
   DECAY,
+  MIN_HOLD_MS,
   TICK_MS,
   holdCenter,
   layoutKey,
@@ -102,7 +103,7 @@ console.log(`2-minute call, 6 people, speaker updates every ${EVENT_MS} ms`);
 console.log(`  before: middle changed hands ${before.swaps} times (${perMinute(before.swaps)}/min), closest two ${before.minGap} ms apart`);
 console.log(`  after:  middle changed hands ${after.swaps} times (${perMinute(after.swaps)}/min), closest two ${after.minGap} ms apart`);
 
-check("the middle is held at least CENTER_HOLD_MS", after.minGap >= CENTER_HOLD_MS, `${after.minGap} ms`);
+check("nobody holds the middle for less than MIN_HOLD_MS", after.minGap >= MIN_HOLD_MS, `${after.minGap} ms`);
 check("at most a third of the swaps (and video resizes) of before", after.swaps * 3 <= before.swaps, `${after.swaps} vs ${before.swaps}`);
 
 // The middle still follows the conversation: someone who talks for 3 s
@@ -121,18 +122,38 @@ check("at most a third of the swaps (and video resizes) of before", after.swaps 
   }
   check("a new speaker takes the middle within the hold", tookAt >= 0 && tookAt <= CENTER_HOLD_MS, `${tookAt} ms`);
 
+  // bola stops, chidi talks: chidi gets the middle at once.
+  const chidi = ids.map((id) => person(id, id === "chidi"));
+  c = holdCenter(c, chidi, pickCenter(chidi, "caller", scores), 8100);
+  check("the speaker stops and the next one talks: handed over at once", c?.id === "chidi", String(c?.id));
+
+  // bola talks over chidi straight away, for 1 s: chidi keeps the middle
+  // (it only just got it).
+  for (let t = 8200; t <= 9200; t += EVENT_MS) {
+    const both = ids.map((id) => person(id, id === "bola" || id === "chidi"));
+    c = holdCenter(c, both, "bola", t);
+  }
+  check("talking over a new speaker doesn't take the middle for 1.5 s", c?.id === "chidi", String(c?.id));
+  {
+    const both = ids.map((id) => person(id, id === "bola" || id === "chidi"));
+    c = holdCenter(c, both, "bola", 9700);
+  }
+  check("...but does after the hold", c?.id === "bola", String(c?.id));
+  const bolaOnly = ids.map((id) => person(id, id === "bola"));
+  for (let t = 9800; t <= 10000; t += EVENT_MS) c = holdCenter(c, bolaOnly, pickCenter(bolaOnly, "caller", scores), t);
+
   // A breath (0.4 s of silence) doesn't send the middle back to the pinned person.
   const breath = ids.map((id) => person(id, false));
-  for (let t = 8100; t <= 8500; t += EVENT_MS) c = holdCenter(c, breath, pickCenter(breath, "caller", scores), t);
+  for (let t = 10100; t <= 10500; t += EVENT_MS) c = holdCenter(c, breath, pickCenter(breath, "caller", scores), t);
   check("a pause for breath keeps the speaker in the middle", c?.id === "bola", String(c?.id));
 
   // After a long silence it goes back.
-  for (let t = 8600; t <= 11000; t += EVENT_MS) c = holdCenter(c, breath, pickCenter(breath, "caller", scores), t);
+  for (let t = 10600; t <= 13000; t += EVENT_MS) c = holdCenter(c, breath, pickCenter(breath, "caller", scores), t);
   check("long silence: back to the pinned person", c?.id === "caller", String(c?.id));
 
   // The person in the middle leaves: replaced at once.
   const left = ids.filter((id) => id !== "caller").map((id) => person(id, false));
-  c = holdCenter(c, left, pickCenter(left, "caller", scores), 11100);
+  c = holdCenter(c, left, pickCenter(left, "caller", scores), 13100);
   check("the middle person leaves: someone else gets it at once", !!c && c.id !== "caller", String(c?.id));
 }
 

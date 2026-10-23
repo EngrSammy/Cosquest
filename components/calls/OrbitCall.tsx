@@ -143,20 +143,23 @@ const OrbitCircle = memo(function OrbitCircle({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
-  const pos = useRef(new Animated.ValueXY({ x, y })).current;
-  const dim = useRef(new Animated.Value(size)).current;
+  // Top-left corner of the circle.
+  const corner = useRef(new Animated.ValueXY({ x: x - size / 2, y: y - size / 2 })).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
-  // Position and size are layout, so they can't use the native driver: a
-  // short glide keeps the per-frame work (and the video resizing) brief.
-  // (It was a soft spring that took over a second to settle.)
+  // The circle glides to its new place on the native driver (a transform:
+  // no JS work per frame). Its size changes in one step: animating the size
+  // resized the live video inside on every frame, and the video surface
+  // dropped frames (black flashes) while it did. (It was a JS-thread spring
+  // on left/top/width/height that took over a second to settle.)
   useEffect(() => {
-    const glide = { duration: MOVE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: false };
-    Animated.parallel([
-      Animated.timing(pos, { ...glide, toValue: { x, y } }),
-      Animated.timing(dim, { ...glide, toValue: size }),
-    ]).start();
-  }, [x, y, size, pos, dim]);
+    Animated.timing(corner, {
+      toValue: { x: x - size / 2, y: y - size / 2 },
+      duration: MOVE_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [x, y, size, corner]);
 
   // The speaking pulse is only opacity and scale, so it runs on the native
   // driver: no JS work per frame while someone talks (it used to run on the
@@ -178,10 +181,7 @@ const OrbitCircle = memo(function OrbitCircle({
   }, [person.speaking, pulse]);
 
   // Built once per circle, not on every render.
-  const frame = useMemo(() => {
-    const half = Animated.multiply(dim, 0.5);
-    return { left: Animated.subtract(pos.x, half), top: Animated.subtract(pos.y, half), width: dim, height: dim };
-  }, [pos, dim]);
+  const move = useMemo(() => ({ transform: [{ translateX: corner.x }, { translateY: corner.y }] }), [corner]);
   const pulseStyle = useMemo(
     () => ({
       opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
@@ -194,7 +194,7 @@ const OrbitCircle = memo(function OrbitCircle({
   const video = person.hasVideo ? renderVideo(person.id) : null;
 
   return (
-    <Animated.View style={[styles.circleWrap, frame]}>
+    <Animated.View style={[styles.circleWrap, { width: size, height: size }, move]}>
       {/* Pulse while speaking */}
       {person.speaking ? (
         <Animated.View
@@ -260,15 +260,20 @@ const OrbitView = memo(function OrbitView({
   pinnedId,
   renderVideo,
   onTap,
+  onCenter,
 }: {
   people: OrbitPerson[];
   pinnedId: string | null;
   renderVideo: (id: string) => ReactNode;
   onTap: (person: OrbitPerson) => void;
+  // Who is in the middle (the "… is speaking" line follows it).
+  onCenter: (id: string | null) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const [box, setBox] = useState<Box>({ w: 0, h: 0 });
   const placed = useOrbitLayout(people, pinnedId, box);
+  const centerId = placed[0]?.person.id ?? null;
+  useEffect(() => onCenter(centerId), [centerId, onCenter]);
 
   const hidden = Math.max(0, people.length - placed.length);
   const min = Math.min(box.w, box.h);
@@ -397,7 +402,14 @@ export default function OrbitCallScreen({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
-  const speaker = people.find((p) => p.speaking && !p.isMe) || people.find((p) => p.speaking);
+  // The person in the middle when they're talking, so the line and the
+  // orbit agree; otherwise anyone talking (others before you).
+  const [centerId, setCenterId] = useState<string | null>(null);
+  const center = people.find((p) => p.id === centerId);
+  const speaker =
+    (center?.speaking ? center : undefined) ||
+    people.find((p) => p.speaking && !p.isMe) ||
+    people.find((p) => p.speaking);
   const comingSoon = (what: string) => Alert.alert(what, `${what} is coming soon.`);
 
   // Tap a circle: identity card. Tap the same circle again: progress view.
@@ -435,7 +447,7 @@ export default function OrbitCallScreen({
       {extra}
 
       {/* ORBIT */}
-      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} />
+      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} onCenter={setCenterId} />
 
       {/* FOCUS / WHO'S TALKING */}
       {focusOn ? (
@@ -664,7 +676,7 @@ const STYLE_PAIR = themedStyles({
   orbit: { flex: 1, marginHorizontal: 8, overflow: "hidden" },
   guide: { position: "absolute", borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(102,115,138,0.25)" },
 
-  circleWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
+  circleWrap: { position: "absolute", left: 0, top: 0, alignItems: "center", justifyContent: "center" },
   circle: {
     width: "100%",
     height: "100%",
