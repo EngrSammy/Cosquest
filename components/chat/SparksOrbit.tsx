@@ -204,7 +204,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   quietTitle: { fontFamily: FONTS.semibold, fontSize: 12, lineHeight: 16, color: INK },

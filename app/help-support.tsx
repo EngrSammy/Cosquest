@@ -240,7 +240,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.09,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   // Figma: 34 x 34, radius 100, padding 8, soft pink.

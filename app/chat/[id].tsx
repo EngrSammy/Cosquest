@@ -7105,7 +7105,7 @@ const STYLE_PAIR = themedStyles({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.09,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   // Pink/lilac glass for messages sent by the current user.
@@ -7120,7 +7120,7 @@ const STYLE_PAIR = themedStyles({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.09,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
 
@@ -7717,7 +7717,7 @@ const STYLE_PAIR = themedStyles({
     borderColor: "rgba(255,255,255,0.85)",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 2,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 4,

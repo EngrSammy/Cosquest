@@ -54,6 +54,12 @@ export const fetchCurrentUser = createAsyncThunk(
       );
     }
   },
+  {
+    // Not signed in yet (token not restored): don't ask. The server needs the
+    // token, and asking without it showed "Missing or malformed Authorization
+    // header". The screens ask again once it's there.
+    condition: (_email, { getState }) => Boolean(sessionToken(getState)),
+  },
 );
 
 // ==========================================

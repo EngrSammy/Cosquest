@@ -873,7 +873,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   textCardTop: {

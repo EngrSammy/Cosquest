@@ -48,11 +48,13 @@ export default function Community() {
 
   const email = authUser?.email || user?.email || "";
 
+  // Wait for the login token (restored a moment after the app opens).
+  const sessionToken = useAppSelector((state) => state.auth.token);
   useEffect(() => {
-    if (email) {
+    if (email && sessionToken) {
       dispatch(fetchCurrentUser(email));
     }
-  }, [dispatch, email]);
+  }, [dispatch, email, sessionToken]);
 
   const avatarKey =
     user?.profile?.avatarKey ||
@@ -221,7 +223,7 @@ function createCommunityStyles(isDark: boolean) { return StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   profileImg: {
