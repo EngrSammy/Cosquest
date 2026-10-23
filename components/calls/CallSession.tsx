@@ -11,7 +11,13 @@ import {
   useRoomContext,
   useTracks,
 } from "@livekit/react-native";
-import { LocalVideoTrack, RoomOptions, Track } from "livekit-client";
+import {
+  LocalVideoTrack,
+  RoomEvent,
+  RoomOptions,
+  Track,
+  VideoPresets,
+} from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -77,19 +83,60 @@ const ERROR_MESSAGE_MS = 5000;
 // LiveKit; they're listed explicitly so they can never be switched off
 // by accident. dtx saves data when nobody speaks; red adds a little
 // redundancy so a lost packet doesn't cut a word.
+//
+// Camera: 960x540 at 25 fps, sent as 540p + 360p + 180p (simulcast).
+// LiveKit's default is 1280x720 at 30 fps, which a phone has to encode
+// three times over for the whole call while also decoding everyone else.
+// Nobody sees a 720p picture here: a group call shows people in circles
+// (132 px at most) and a 1:1 call on a phone screen looks the same at
+// 540p, so 720p only cost CPU, heat and data.
+//
+// adaptiveStream: each picture is requested at the size it is shown, at
+// LiveKit's default density (2x on 3x phones). "screen" (3x on iPhones)
+// asked for half as many pixels again as the default, so every tile pulled
+// a bigger layer than it needed.
+const CAMERA_CAPTURE = VideoPresets.h540;
+
 const ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: { pixelDensity: "screen" },
+  adaptiveStream: true,
   dynacast: true,
   audioCaptureDefaults: {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
   },
+  videoCaptureDefaults: {
+    resolution: CAMERA_CAPTURE.resolution,
+  },
   publishDefaults: {
     dtx: true,
     red: true,
+    simulcast: true,
+    videoEncoding: CAMERA_CAPTURE.encoding,
+    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
   },
 };
+
+// The camera lists below only need to change when a camera does (someone
+// joins or leaves, a camera turns on or off, a picture arrives). By default
+// LiveKit's useTracks also updates on every active-speaker and connection-
+// quality change, which re-rendered every video on screen several times a
+// second in a group call.
+const CAMERA_EVENTS = [
+  RoomEvent.ParticipantConnected,
+  RoomEvent.ParticipantDisconnected,
+  RoomEvent.TrackPublished,
+  RoomEvent.TrackUnpublished,
+  RoomEvent.TrackSubscribed,
+  RoomEvent.TrackUnsubscribed,
+  RoomEvent.TrackMuted,
+  RoomEvent.TrackUnmuted,
+  RoomEvent.LocalTrackPublished,
+  RoomEvent.LocalTrackUnpublished,
+];
+const CAMERA_TRACKS_OPTIONS = { onlySubscribed: false, updateOnlyOn: CAMERA_EVENTS };
+const CAMERA_SOURCES = [Track.Source.Camera];
+const CAMERA_SLOTS = [{ source: Track.Source.Camera, withPlaceholder: true as const }];
 
 // Module-level on purpose — same react-hooks/purity reason as
 // generateLocalId in the chat screen.
@@ -389,14 +436,11 @@ function CallStage({
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } =
     useLocalParticipant();
 
-  const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const tracks = useTracks(CAMERA_SOURCES, CAMERA_TRACKS_OPTIONS);
 
   // One entry per person in the room (a placeholder when their camera is
   // off) - for the group video grid.
-  const cameraSlots = useTracks(
-    [{ source: Track.Source.Camera, withPlaceholder: true }],
-    { onlySubscribed: false },
-  );
+  const cameraSlots = useTracks(CAMERA_SLOTS, CAMERA_TRACKS_OPTIONS);
 
   // How many OTHER people have their camera on right now.
   const remoteVideoCount = tracks.filter(
@@ -457,14 +501,35 @@ function CallStage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inPrivate]);
+  // Who is in the room and which microphones they publish. The two effects
+  // below act on these only: remoteParticipants itself changes on every
+  // active-speaker / connection-quality update, several times a second in
+  // a group call, and each run sent LiveKit a subscription message per
+  // microphone and set every volume again.
+  const micKey = remoteParticipants
+    .map((p) => `${p.identity}:${[...p.audioTrackPublications.keys()].join("+")}`)
+    .join(",");
+  const latestRemotes = useRef(remoteParticipants);
+  latestRemotes.current = remoteParticipants;
+
+  const volumeChanged = useRef(false);
   useEffect(() => {
-    remoteParticipants.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
-  }, [inPrivate, remoteParticipants]);
+    if (!inPrivate && !volumeChanged.current) return;
+    volumeChanged.current = inPrivate;
+    latestRemotes.current.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
+  }, [inPrivate, micKey]);
 
   // Two pages: the call, and its Sparks (swipe across, or "Sparks ›").
   const { width: pageWidth } = useWindowDimensions();
   const pages = useRef<ScrollView>(null);
-  const openSparks = useCallback(() => pages.current?.scrollTo({ x: pageWidth, animated: true }), [pageWidth]);
+  // The Sparks page is built the first time it is opened. Before, it sat
+  // off-screen from the start of the call and re-rendered the whole
+  // transcript every second (call timer) and on every caption.
+  const [sparksSeen, setSparksSeen] = useState(false);
+  const openSparks = useCallback(() => {
+    setSparksSeen(true);
+    pages.current?.scrollTo({ x: pageWidth, animated: true });
+  }, [pageWidth]);
   const backToCall = useCallback(() => pages.current?.scrollTo({ x: 0, animated: true }), []);
   const pager = (callPage: React.ReactElement) => (
     <ScrollView
@@ -474,18 +539,21 @@ function CallStage({
       bounces={false}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={sparksSeen ? undefined : () => setSparksSeen(true)}
       style={styles.pages}>
       <View style={{ width: pageWidth }}>{callPage}</View>
       <View style={{ width: pageWidth }}>
         <CallBackground>
-          <SparksCallPanel
-            notes={notes}
-            call={call}
-            myUserId={myUserId}
-            topInset={insets.top}
-            bottomInset={insets.bottom}
-            onBack={backToCall}
-          />
+          {sparksSeen ? (
+            <SparksCallPanel
+              notes={notes}
+              call={call}
+              myUserId={myUserId}
+              topInset={insets.top}
+              bottomInset={insets.bottom}
+              onBack={backToCall}
+            />
+          ) : null}
         </CallBackground>
       </View>
     </ScrollView>
@@ -539,8 +607,13 @@ function CallStage({
   }, [answeredAt]);
 
   // FOCUS MODE: stop receiving everyone's voice (still in the call, circle stays).
+  // Nothing to do until focus is first turned on (voices are subscribed by
+  // default, see callSubscriptions.ts).
+  const focusUsed = useRef(false);
   useEffect(() => {
-    remoteParticipants.forEach((participant) => {
+    if (!focusOn && !focusUsed.current) return;
+    focusUsed.current = focusOn;
+    latestRemotes.current.forEach((participant) => {
       participant.audioTrackPublications.forEach((publication: any) => {
         try {
           publication.setSubscribed?.(!focusOn);
@@ -549,7 +622,7 @@ function CallStage({
         }
       });
     });
-  }, [focusOn, remoteParticipants]);
+  }, [focusOn, micKey]);
 
   // Group calls start on the loudspeaker (several people talking).
   useEffect(() => {
@@ -650,7 +723,9 @@ function CallStage({
     const next = facing === "user" ? "environment" : "user";
 
     try {
-      await track.restartTrack({ facingMode: next });
+      // Keep the call's camera size: without it the new camera opens at
+      // 1280x720 (the WebRTC default) for the rest of the call.
+      await track.restartTrack({ facingMode: next, resolution: CAMERA_CAPTURE.resolution });
       setFacing(next);
       return;
     } catch {
@@ -702,37 +777,50 @@ function CallStage({
 
   // Hooks before any early return (React needs the same order every render).
   const room = useRoomContext();
-  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
-  const stageMode = useStageMode(remoteCount + 1);
 
-  // ==========================================
-  // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
-  // ==========================================
+  // GROUP CALL people for the orbit. The same object is kept for a person
+  // while nothing about them changed, so the orbit (memo) and its circles
+  // skip the re-render that the call timer and captions cause every second.
+  const peopleCache = useRef(new Map<string, { key: string; person: OrbitPerson }>());
+  const peopleList: OrbitPerson[] = call.members
+    .filter((member) => member.status === "joined" || member.status === "ringing")
+    .map((member) => {
+      const isMe = !!myUserId && member.user.id === myUserId;
+      const remote = remoteParticipants.find((p) => p.identity === member.user.id);
+      const slot = cameraSlots.find((s) => s.participant.identity === member.user.id);
+      const next: OrbitPerson = {
+        id: member.user.id,
+        name: member.user.name || member.user.username || "Someone",
+        avatar: getAvatarSource(member.user),
+        speaking: speakingIds.includes(member.user.id),
+        micOff: isMe ? !isMicrophoneEnabled : remote ? !remote.isMicrophoneEnabled : false,
+        ringing: member.status === "ringing" && !remote && !isMe,
+        isMe,
+        rankLevel: (member.user as any).rank?.level ?? null,
+        rankName: (member.user as any).rank?.name ?? null,
+        username: member.user.username || null,
+        away: !!member.away,
+        hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
+      };
+      const key = JSON.stringify(next);
+      const cached = peopleCache.current.get(next.id);
+      if (cached?.key === key) return cached.person;
+      peopleCache.current.set(next.id, { key, person: next });
+      return next;
+    });
+  const lastPeople = useRef(peopleList);
+  if (
+    peopleList.length !== lastPeople.current.length ||
+    peopleList.some((person, index) => person !== lastPeople.current[index])
+  ) {
+    lastPeople.current = peopleList;
+  }
+  const people = lastPeople.current;
 
-  if (isGroup && !stageMode) {
-    const people: OrbitPerson[] = call.members
-      .filter((member) => member.status === "joined" || member.status === "ringing")
-      .map((member) => {
-        const isMe = !!myUserId && member.user.id === myUserId;
-        const remote = remoteParticipants.find((p) => p.identity === member.user.id);
-        const slot = cameraSlots.find((s) => s.participant.identity === member.user.id);
-        return {
-          id: member.user.id,
-          name: member.user.name || member.user.username || "Someone",
-          avatar: getAvatarSource(member.user),
-          speaking: speakingIds.includes(member.user.id),
-          micOff: isMe ? !isMicrophoneEnabled : remote ? !remote.isMicrophoneEnabled : false,
-          ringing: member.status === "ringing" && !remote && !isMe,
-          isMe,
-          rankLevel: (member.user as any).rank?.level ?? null,
-          rankName: (member.user as any).rank?.name ?? null,
-          username: member.user.username || null,
-          away: !!member.away,
-          hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
-        };
-      });
-
-    const renderVideo = (id: string) => {
+  // A person's camera in their circle. Changes only when a camera does
+  // (cameraSlots updates on camera events only, see CAMERA_EVENTS).
+  const renderVideo = useCallback(
+    (id: string) => {
       const slot = cameraSlots.find((s) => s.participant.identity === id);
       if (!slot || !isTrackReference(slot) || slot.publication.isMuted) {
         return null;
@@ -745,8 +833,18 @@ function CallStage({
           mirror={slot.participant.isLocal && facing === "user"}
         />
       );
-    };
+    },
+    [cameraSlots, facing],
+  );
+  const toggleFocus = useCallback(() => setFocusOn((value) => !value), []);
+  // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
+  const stageMode = useStageMode(remoteCount + 1);
 
+  // ==========================================
+  // GROUP CALL: ORBITAL VIEW (Group Calls doc, A · Light / B · Night Orbit)
+  // ==========================================
+
+  if (isGroup && !stageMode) {
     const onCall = people.filter((person) => !person.ringing).length;
 
     return pager(
@@ -764,7 +862,7 @@ function CallStage({
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
           onFlipCamera={flipCamera}
-          onToggleFocus={() => setFocusOn((value) => !value)}
+          onToggleFocus={toggleFocus}
           onLeave={hangUp}
           onMinimize={() => setCallMinimized(true)}
           onPeople={openAddPeople}
