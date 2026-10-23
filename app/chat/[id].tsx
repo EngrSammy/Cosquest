@@ -2093,12 +2093,17 @@ function CallLogContent({
   const voice = useJoinVoice(msg.conversationId || "", (conversation as any)?.title || "Voice chat");
   const showNotes = callNotesEnabled && answered && Boolean(log.callId);
 
+  // Names when the server sends none (the notes' own names come first).
+  const meId = authUser?.id || (authUser as any)?._id;
   const nameOf = (userId: string) => {
-    const meId = authUser?.id || (authUser as any)?._id;
     if (userId === meId) return "you";
     const other = conversation?.otherParticipant;
     if (other && (other.id === userId || other._id === userId)) return other.username || "them";
-    return "someone on the call";
+    // Group chats: the chat's member list, when the server sent one.
+    const members = (conversation as { participants?: { id?: string; _id?: string; userId?: string; username?: string }[] } | undefined)
+      ?.participants;
+    const member = members?.find((p) => [p.id, p._id, p.userId].includes(userId));
+    return member?.username || "someone on the call";
   };
 
   return (
@@ -2163,6 +2168,7 @@ function CallLogContent({
         visible={notesOpen}
         onClose={() => setNotesOpen(false)}
         nameOf={nameOf}
+        myUserId={meId || null}
       />
     ) : null}
     </>

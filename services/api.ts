@@ -53,7 +53,8 @@ export async function apiRequest<T>(
       data?.errors?.[0] ||
       "Something went wrong. Please try again.";
 
-    throw new Error(message);
+    // The HTTP status rides along, for screens that word each error differently.
+    throw Object.assign(new Error(message), { status: response.status });
   }
 
   return data as T;
