@@ -7207,7 +7207,8 @@ const STYLE_PAIR = themedStyles({
 
   replyBarMine: { width: 0 /* M14 */ },
 
-  replyBody: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
+  // flexShrink (not flex: 1) so the quote's natural width sizes the bubble.
+  replyBody: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 5 },
 
   replyLine: {
     flexDirection: "row",

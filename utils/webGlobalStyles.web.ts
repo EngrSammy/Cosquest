@@ -1,4 +1,4 @@
-﻿// WEB ONLY - small browser style fixes, loaded once from app/_layout.tsx.
+// WEB ONLY - small browser style fixes, loaded once from app/_layout.tsx.
 // (The phone version, webGlobalStyles.ts, does nothing.)
 const CSS = `
 /* Mouse/touch clicks: no focus outline around buttons.
