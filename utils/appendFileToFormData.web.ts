@@ -1,4 +1,4 @@
-﻿// WEB - add a picked/recorded file to an upload form.
+// WEB - add a picked/recorded file to an upload form.
 // In a browser, a recording or picked photo is a "blob:" address in the
 // page's memory, so we read it as a Blob and attach it with a file name.
 // The file name's ending is matched to the real type (browsers usually

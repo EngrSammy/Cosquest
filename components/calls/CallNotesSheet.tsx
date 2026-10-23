@@ -7,6 +7,7 @@
 // so the website shows it too. Only people who were on the call (and the
 // chat's admins) can read it.
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -90,9 +91,21 @@ export default function CallNotesSheet({
           {loaded.state === "loading" ? (
             <ActivityIndicator style={{ marginVertical: 40 }} color={ink.text("#C5399A")} />
           ) : loaded.state === "pending" ? (
-            <Text style={styles.empty}>
-              Sparks is still writing up this call. It's ready a minute or two after the call ends.
-            </Text>
+            <View>
+              <Text style={styles.empty}>
+                Sparks writes up calls on members' phones. It's ready a minute or two after the call ends, once someone
+                who was on the call has Sparks downloaded and opens the app.
+              </Text>
+              <Pressable
+                onPress={() => {
+                  onClose();
+                  router.push("/sparks-model");
+                }}
+                accessibilityRole="button"
+                hitSlop={8}>
+                <Text style={styles.setupLink}>Set up Sparks on this phone</Text>
+              </Pressable>
+            </View>
           ) : loaded.state === "error" ? (
             <Text style={styles.empty}>{loaded.message}</Text>
           ) : (
@@ -160,6 +173,7 @@ const STYLE_PAIR = themedStyles(
     bullet: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#3A3A44" },
     owner: { color: "#8A8A90" },
     empty: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#6B6B72", marginVertical: 24 },
+    setupLink: { fontFamily: FONTS.semibold, fontSize: 14, color: "#C5399A", marginTop: -12, marginBottom: 16 },
   },
   // Dark mode
   {

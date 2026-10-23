@@ -20,7 +20,7 @@ export default function Index() {
       }
 
       router.replace("/onboarding");
-    }, 1500);
+    }, 400); // was 1.5 s; the splash only needs a moment so it does not flash
 
     return () => clearTimeout(t);
   }, []);

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, current, isDraft, PayloadAction } from "@reduxjs/toolkit";
 
 import {
   createChat,
@@ -769,6 +769,12 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.pending, (state, action) => {
         const conversationId = action.meta.arg.conversationId;
 
+        // The background catch-up poll (append) shows no spinner, so it
+        // doesn't flip the flag (that re-rendered the whole chat twice).
+        if (action.meta.arg.mode === "append") {
+          return;
+        }
+
         state.messagesLoading[conversationId] = true;
       })
 
@@ -809,14 +815,29 @@ const chatSlice = createSlice({
 
           // Existing messages may have changed (edited/deleted/reacted to)
           // even if nothing new arrived — keep those in sync too.
+          // Only messages that really changed are replaced, so the list (and
+          // every memoized bubble) keeps the same objects when the poll
+          // brings nothing new. The backend ignores `after` and returns the
+          // latest page every time, so this used to rebuild the array and
+          // give ~30 messages new identities every 30 s.
           if (existing.length > 0) {
             const incomingById = new Map(
               incoming.map((message) => [message.id, message]),
             );
 
-            state.messages[conversationId] = (
-              state.messages[conversationId] || existing
-            ).map((message) => incomingById.get(message.id) || message);
+            const list = state.messages[conversationId] || existing;
+
+            list.forEach((message, index) => {
+              const next = incomingById.get(message.id);
+
+              if (
+                next &&
+                JSON.stringify(next) !==
+                  JSON.stringify(isDraft(message) ? current(message) : message)
+              ) {
+                list[index] = next;
+              }
+            });
           }
         } else {
           state.messages[conversationId] = incoming;

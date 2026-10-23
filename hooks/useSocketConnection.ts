@@ -199,17 +199,40 @@ export function useSocketConnection() {
     // fetchConversation.fulfilled reducer update both
     // conversationDetails and the conversations list array, which is
     // what the Direct Message list actually renders from.
+    // A burst of messages in a busy room sends a burst of chat:preview
+    // events; one GET per event (~0.3-0.6 s each from Lagos) piled up on the
+    // server and re-rendered the list each time. At most one request per
+    // conversation is in flight; events during it cause one more fetch at
+    // the end, so the final state is always fetched.
+    const previewInFlight = new Map<string, boolean>();
+    let previewActive = true;
+
+    const refreshPreview = (conversationId: string) => {
+      previewInFlight.set(conversationId, false);
+
+      Promise.resolve(dispatch(fetchConversation({ conversationId, token })))
+        .catch(() => undefined)
+        .finally(() => {
+          const again = previewInFlight.get(conversationId);
+          previewInFlight.delete(conversationId);
+
+          if (again && previewActive) {
+            refreshPreview(conversationId);
+          }
+        });
+    };
+
     const handleChatPreview = (payload: { conversationId: string }) => {
       if (!payload?.conversationId) {
         return;
       }
 
-      dispatch(
-        fetchConversation({
-          conversationId: payload.conversationId,
-          token,
-        }),
-      );
+      if (previewInFlight.has(payload.conversationId)) {
+        previewInFlight.set(payload.conversationId, true);
+        return;
+      }
+
+      refreshPreview(payload.conversationId);
     };
 
     // ======================================
@@ -309,6 +332,8 @@ export function useSocketConnection() {
       socket.off("connect", handleConnect);
 
       appStateSubscription.remove();
+
+      previewActive = false;
 
       // Clear any still-pending offline timers so they don't fire
       // (and dispatch into a socket that's being torn down) after

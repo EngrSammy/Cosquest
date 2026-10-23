@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, type ReactElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -127,6 +127,7 @@ import {
   nextSpeed,
 } from "@/components/chat/VoiceSpeed";
 import { WallpaperPicker } from "@/components/chat/WallpaperPicker";
+import { smallAvatarUrl } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import type { Wallpaper } from "@/constants/wallpapers";
 import {
@@ -137,6 +138,8 @@ import {
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
+import CallsTab from "@/components/calls/scheduled/CallsTab";
+import { ScreenGradient } from "@/components/chat/ui";
 
 type AttachmentDraft = {
   uri: string;
@@ -309,6 +312,13 @@ type SeenPerson = {
   avatarPhotoUrl?: string | null;
   seenAt?: string;
 };
+
+const GROUP_TABS = [
+  { key: "chat", label: "Chat" },
+  { key: "sparks", label: "Sparks" },
+  { key: "calls", label: "Calls" },
+  { key: "projects", label: "Projects" },
+] as const;
 
 const EMPTY_MESSAGES: Message[] = [];
 
@@ -633,13 +643,16 @@ function getAvatar(person?: {
   avatarUrl?: string | null;
   avatarPhotoUrl?: string | null;
 }) {
-  return (
+  const url =
     person?.profilePicture ||
     person?.avatarPhotoUrl ||
     person?.avatarUrl ||
     person?.avatar ||
-    null
-  );
+    null;
+
+  // Shown at 32-40 pt: a 240 px Cloudinary copy (~5-18 KB) instead of the
+  // full upload (~140-400 KB) for every sender in the list.
+  return url ? smallAvatarUrl(url) : null;
 }
 
 // ==========================================
@@ -2328,6 +2341,12 @@ export default function ChatScreen() {
   const [openSparkId, setOpenSparkId] = useState<string | null>(null);
   const [sparkRefresh, setSparkRefresh] = useState(0);
   const [showAllSparks, setShowAllSparks] = useState(false);
+
+  // Group chats: Chat / Sparks / Calls / Projects under the header. Sparks
+  // opens the Sparks list; Calls and Projects cover the chat (which stays
+  // mounted, so switching back keeps the scroll position and draft).
+  const [groupTab, setGroupTab] = useState<"chat" | "calls" | "projects">("chat");
+  const [tabsBottom, setTabsBottom] = useState(0);
   const [sparkSeed, setSparkSeed] = useState<Message | null>(null);
   const [attachmentDraft, setAttachmentDraft] =
     useState<AttachmentDraft | null>(null);
@@ -2571,7 +2590,11 @@ export default function ChatScreen() {
             })),
           );
         }
-        setSparks(result.sparks);
+        // Same Sparks as before (the usual case for the 60 s refresh): keep
+        // the old array, so the Spark context and every bubble don't re-render.
+        setSparks((current) =>
+          JSON.stringify(current) === JSON.stringify(result.sparks) ? current : result.sparks,
+        );
       })
       .catch((error) => {
         if (__DEV__) {
@@ -2607,6 +2630,10 @@ export default function ChatScreen() {
   // Calls are DM-only (the backend rejects calls in community/faction).
   const canCall = conversation?.type === "dm";
 
+  const replyCacheRef = useRef(
+    new WeakMap<Message, { original: Message; resolved: Message }>(),
+  );
+
   const visibleMessages = useMemo(() => {
     // Hide each pending bubble whose real copy has already arrived. Each
     // real message can only "use up" one pending bubble, so sending the
@@ -2630,15 +2657,48 @@ export default function ChatScreen() {
 
     const merged = [...stillPending, ...messages];
 
-    if (locallyDeletedIds.size === 0) {
-      return merged;
-    }
+    const withDeletes =
+      locallyDeletedIds.size === 0
+        ? merged
+        : merged.map((message) =>
+            locallyDeletedIds.has(message.id) && !message.deleted
+              ? { ...message, deleted: true }
+              : message,
+          );
 
-    return merged.map((message) =>
-      locallyDeletedIds.has(message.id) && !message.deleted
-        ? { ...message, deleted: true }
-        : message,
-    );
+    // The backend can send replyTo as just the original's id (or without
+    // its sender/text), which shows as "Reply / Message". Use the loaded
+    // original instead. Cached per message so memo(Bubble) still skips
+    // rows that didn't change.
+    const byId = new Map(withDeletes.map((message) => [message.id, message]));
+    const cache = replyCacheRef.current;
+
+    return withDeletes.map((message) => {
+      const raw = message.replyTo as Message | string | null | undefined;
+
+      if (!raw) {
+        return message;
+      }
+
+      const replyId =
+        typeof raw === "string" ? raw : raw.id || (raw as any)._id;
+      const original = replyId ? byId.get(String(replyId)) : undefined;
+
+      if (!original || original === raw) {
+        return message;
+      }
+
+      const cached = cache.get(message);
+
+      if (cached && cached.original === original) {
+        return cached.resolved;
+      }
+
+      const resolved = { ...message, replyTo: original };
+      cache.set(message, { original, resolved });
+
+      return resolved;
+    });
   }, [pendingMessages, messages, locallyDeletedIds, currentUserId]);
 
   // Stable extraData for the FlatList. Previously this was an inline object
@@ -2720,6 +2780,165 @@ export default function ChatScreen() {
       currentUsername,
       conversation?.otherParticipant?.isOnline,
       conversation?.otherParticipant?.lastReadAt,
+    ],
+  );
+
+  // The message list's rows. renderItem is a stable function that calls the
+  // latest render (kept in a ref), so the FlatList re-renders its rows only
+  // when messageListExtraData or the data change, not on every render of
+  // this screen (every keystroke in the composer, the slow-mode clock, the
+  // recorder, keyboard and scroll state). Everything a row reads that can
+  // change must be listed in messageListExtraData.
+  const renderMessageItemRef = useRef<(info: { item: Message; index: number }) => ReactElement | null>(
+    () => null,
+  );
+  renderMessageItemRef.current = ({ item, index }) => {
+    const mine = isMyMessage(item);
+
+    // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
+    const older = visibleMessages[index + 1];
+
+    const newer = visibleMessages[index - 1];
+
+    const showDate =
+      !older ||
+      getDateKey(older.createdAt) !== getDateKey(item.createdAt);
+
+    const firstInGroup =
+      showDate ||
+      !older ||
+      getSenderKey(older) !== getSenderKey(item);
+
+    const lastInGroup =
+      !newer ||
+      getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
+      getSenderKey(newer) !== getSenderKey(item);
+
+    const selected =
+      selectedIds.includes(item.id) || highlightedId === item.id;
+
+    const pinned = pinnedIds.includes(item.id);
+
+    return (
+      <View>
+        {showDate ? <DateSeparator message={item} /> : null}
+
+        <SwipeToReply
+          enabled={
+            !selectionMode &&
+            !item.pending &&
+            !item.deleted &&
+            item.kind !== "call"
+          }
+          onReply={() => startReply(item)}>
+          <Bubble
+            msg={item}
+            mine={mine}
+            groupChat={!!groupChat}
+            firstInGroup={firstInGroup}
+            lastInGroup={lastInGroup}
+            selected={selected}
+            pinned={pinned}
+            myReactionEmoji={findMyReaction(item)?.emoji}
+            onPress={handleMessagePress}
+            onLongPress={openMessageActions}
+            onReaction={(message, emoji) => {
+              if (selectionMode) {
+                toggleMessageSelection(message);
+
+                return;
+              }
+
+              reactToMessage(message, emoji);
+            }}
+            onMediaPress={handleMediaPress}
+            onReplyPress={scrollToMessage}
+            onCallBack={handleCallBack}
+            otherParticipant={conversation?.otherParticipant}
+          />
+        </SwipeToReply>
+
+        {quietSparkCardAfter.get(item.id) ? (
+          <SparkCard
+            spark={quietSparkCardAfter.get(item.id)!}
+            onOpen={(spark) => setOpenSparkId(spark.id)}
+          />
+        ) : null}
+
+        {rolePingsAfter.get(item.id) && token ? (
+          <RolePingCard
+            conversationId={conversationId}
+            token={token}
+            pings={rolePingsAfter.get(item.id)!}
+            onOpenMember={
+              groupChat
+                ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
+                : undefined
+            }
+          />
+        ) : null}
+
+        {/* Figma M15: your edited message - edit again or undo */}
+        {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
+          <View style={styles.editCard}>
+            <Text style={styles.editSection}>YOUR MESSAGE</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editLabel}>Saved text</Text>
+              <View style={styles.editSaved}>
+                <Text style={styles.editSavedText}>{item.content}</Text>
+              </View>
+              <View style={styles.editNote}>
+                <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
+                <Text style={styles.editNoteText}>Your message has been updated.</Text>
+              </View>
+              <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
+                <Text style={styles.editButtonText}>Edit again</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
+            <View style={styles.editBox}>
+              <Text style={styles.editHint}>Before your change</Text>
+              {item.previousContent ? (
+                <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
+              ) : null}
+              <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
+                <Text style={styles.editButtonText}>Undo · restore previous message</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+  const renderMessageItem = useCallback(
+    (info: { item: Message; index: number }) => renderMessageItemRef.current(info),
+    [],
+  );
+  // "Edited" cards hide after 10 minutes: the minute is part of the key.
+  const editMinute = Math.floor(Date.now() / 60000);
+  const messageListExtraData = useMemo(
+    () => ({
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      otherParticipant: conversation?.otherParticipant,
+      editMinute,
+    }),
+    [
+      listExtraData,
+      quietSparkCardAfter,
+      rolePingsAfter,
+      visibleMessages,
+      groupChat,
+      token,
+      conversationId,
+      conversation?.otherParticipant,
+      editMinute,
     ],
   );
 
@@ -2936,12 +3155,26 @@ export default function ChatScreen() {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  // True while this screen's socket is connected AND joined to the room
+  // (set by the socket effect below). Then message:new / edited / deleted
+  // arrive live and the catch-up fetch below is skipped; a rejoin after a
+  // reconnect does one catch-up fetch instead.
+  const roomJoinedRef = useRef(false);
+
   useEffect(() => {
     if (!token || !conversationId) {
       return;
     }
 
     const interval = setInterval(() => {
+      if (roomJoinedRef.current && getSocket()?.connected) {
+        if (conversationRef.current?.unreadCount) {
+          dispatch(readConversation({ conversationId, token }));
+        }
+
+        return;
+      }
+
       dispatch(
         fetchMessages({
           conversationId,
@@ -3016,15 +3249,48 @@ export default function ChatScreen() {
       }, 400);
     };
 
+    let joinedBefore = false;
+    let joinCount = 0;
+
     const doJoin = () => {
+      roomJoinedRef.current = false;
+
       joinConversation(conversationId).then((ack) => {
-        if (!ack.ok && !cancelled) {
-          console.error("CONVERSATION JOIN FAILED:", ack.error);
+        if (cancelled) {
+          return;
         }
+
+        if (!ack.ok) {
+          console.error("CONVERSATION JOIN FAILED:", ack.error);
+          return;
+        }
+
+        roomJoinedRef.current = true;
+
+        // A rejoin (after a dropped connection): fetch what was missed
+        // while disconnected, once.
+        if (joinedBefore && token) {
+          dispatch(
+            fetchMessages({
+              conversationId,
+              token,
+              after: messagesRef.current[0]?.id,
+              mode: "append",
+            }),
+          );
+        }
+
+        joinedBefore = true;
       });
 
-      // Covers coming back to the app with this chat still open.
-      markReadSoon();
+      // Covers coming back to the app with this chat still open. Not on the
+      // first join: opening the chat already marked it read (focus effect),
+      // so this was a second PATCH /read 400 ms later.
+      if (joinCount > 0) {
+        markReadSoon();
+      }
+
+      joinCount += 1;
     };
 
     // Avoid a premature "Socket not connected" error during startup.
@@ -3041,6 +3307,12 @@ export default function ChatScreen() {
     // for the rest of the time this screen stays open, with no visible
     // error — it'd just quietly fall back to the 30s safety poll.
     socket.on("connect", doJoin);
+
+    const handleDisconnect = () => {
+      roomJoinedRef.current = false;
+    };
+
+    socket.on("disconnect", handleDisconnect);
 
     const handleMessageNew = (payload: {
       conversationId: string;
@@ -3232,6 +3504,8 @@ export default function ChatScreen() {
       }
 
       socket.off("connect", doJoin);
+      socket.off("disconnect", handleDisconnect);
+      roomJoinedRef.current = false;
       socket.off("message:new", handleMessageNew);
       socket.off("message:edited", handleMessageEdited);
       socket.off("message:deleted", handleMessageDeleted);
@@ -5041,6 +5315,36 @@ export default function ChatScreen() {
       </View>
 
       {/* ================================== */}
+      {/* GROUP TABS (Figma · Chat / Sparks / Calls / Projects) */}
+      {/* ================================== */}
+
+      {groupChat && !selectionMode ? (
+        <View
+          style={styles.groupTabs}
+          onLayout={(event) =>
+            setTabsBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
+          }>
+          {GROUP_TABS.map((tab) => {
+            const on = tab.key === groupTab;
+            return (
+              <Pressable
+                key={tab.key}
+                style={[styles.groupTab, on && styles.groupTabOn]}
+                onPress={() =>
+                  tab.key === "sparks" ? setShowAllSparks(true) : setGroupTab(tab.key)
+                }
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}>
+                <Text style={[styles.groupTabText, on && styles.groupTabTextOn]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {/* ================================== */}
       {/* PINNED BANNER */}
       {/* ================================== */}
 
@@ -5103,7 +5407,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            extraData={[listExtraData, quietSparkCardAfter, rolePingsAfter]}
+            extraData={messageListExtraData}
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -5133,125 +5437,7 @@ export default function ChatScreen() {
                 </Text>
               </View>
             }
-            renderItem={({ item, index }) => {
-              const mine = isMyMessage(item);
-
-              // Inverted list: index + 1 is the OLDER message, index - 1 the NEWER one.
-              const older = visibleMessages[index + 1];
-
-              const newer = visibleMessages[index - 1];
-
-              const showDate =
-                !older ||
-                getDateKey(older.createdAt) !== getDateKey(item.createdAt);
-
-              const firstInGroup =
-                showDate ||
-                !older ||
-                getSenderKey(older) !== getSenderKey(item);
-
-              const lastInGroup =
-                !newer ||
-                getDateKey(newer.createdAt) !== getDateKey(item.createdAt) ||
-                getSenderKey(newer) !== getSenderKey(item);
-
-              const selected =
-                selectedIds.includes(item.id) || highlightedId === item.id;
-
-              const pinned = pinnedIds.includes(item.id);
-
-              return (
-                <View>
-                  {showDate ? <DateSeparator message={item} /> : null}
-
-                  <SwipeToReply
-                    enabled={
-                      !selectionMode &&
-                      !item.pending &&
-                      !item.deleted &&
-                      item.kind !== "call"
-                    }
-                    onReply={() => startReply(item)}>
-                    <Bubble
-                      msg={item}
-                      mine={mine}
-                      groupChat={!!groupChat}
-                      firstInGroup={firstInGroup}
-                      lastInGroup={lastInGroup}
-                      selected={selected}
-                      pinned={pinned}
-                      myReactionEmoji={findMyReaction(item)?.emoji}
-                      onPress={handleMessagePress}
-                      onLongPress={openMessageActions}
-                      onReaction={(message, emoji) => {
-                        if (selectionMode) {
-                          toggleMessageSelection(message);
-
-                          return;
-                        }
-
-                        reactToMessage(message, emoji);
-                      }}
-                      onMediaPress={handleMediaPress}
-                      onReplyPress={scrollToMessage}
-                      onCallBack={handleCallBack}
-                      otherParticipant={conversation?.otherParticipant}
-                    />
-                  </SwipeToReply>
-
-                  {quietSparkCardAfter.get(item.id) ? (
-                    <SparkCard
-                      spark={quietSparkCardAfter.get(item.id)!}
-                      onOpen={(spark) => setOpenSparkId(spark.id)}
-                    />
-                  ) : null}
-
-                  {rolePingsAfter.get(item.id) && token ? (
-                    <RolePingCard
-                      conversationId={conversationId}
-                      token={token}
-                      pings={rolePingsAfter.get(item.id)!}
-                      onOpenMember={
-                        groupChat
-                          ? () => router.push({ pathname: "/group/members/[id]", params: { id: conversationId } })
-                          : undefined
-                      }
-                    />
-                  ) : null}
-
-                  {/* Figma M15: your edited message - edit again or undo */}
-                  {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
-                    <View style={styles.editCard}>
-                      <Text style={styles.editSection}>YOUR MESSAGE</Text>
-                      <View style={styles.editBox}>
-                        <Text style={styles.editLabel}>Saved text</Text>
-                        <View style={styles.editSaved}>
-                          <Text style={styles.editSavedText}>{item.content}</Text>
-                        </View>
-                        <View style={styles.editNote}>
-                          <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
-                          <Text style={styles.editNoteText}>Your message has been updated.</Text>
-                        </View>
-                        <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
-                          <Text style={styles.editButtonText}>Edit again</Text>
-                        </Pressable>
-                      </View>
-
-                      <Text style={styles.editSection}>RESTORE PREVIOUS WORDING</Text>
-                      <View style={styles.editBox}>
-                        <Text style={styles.editHint}>Before your change</Text>
-                        {item.previousContent ? (
-                          <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
-                        ) : null}
-                        <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
-                          <Text style={styles.editButtonText}>Undo · restore previous message</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            }}
+            renderItem={renderMessageItem}
             // Option A: the list itself stops short of the side rail (M03),
             // so bubbles never run under it (a content padding wasn't enough
             // on Android).
@@ -5536,6 +5722,28 @@ export default function ChatScreen() {
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
               <Ionicons name="mic-outline" size={24} color="#B63D91" />
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {/* ================================== */}
+      {/* GROUP TAB PANELS (over the chat, under the tabs) */}
+      {/* ================================== */}
+
+      {groupChat && groupTab !== "chat" && !selectionMode ? (
+        <View style={[styles.groupTabPanel, { top: tabsBottom }]}>
+          {groupTab === "calls" ? (
+            <CallsTab
+              conversationId={conversationId}
+              title={(conversation as any)?.title || "Voice chat"}
+              myId={String(currentUserId)}
+            />
+          ) : (
+            <View style={styles.comingSoon}>
+              <ScreenGradient />
+              <Ionicons name="construct-outline" size={28} color={ink.text("#66738A")} />
+              <Text style={styles.comingSoonText}>Projects are coming soon.</Text>
             </View>
           )}
         </View>
@@ -6475,6 +6683,44 @@ const STYLE_PAIR = themedStyles({
 
   // HEADER
 
+  // GROUP TABS
+
+  groupTabs: {
+    flexDirection: "row",
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 3,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.55)",
+  },
+
+  groupTab: {
+    flex: 1,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 17,
+  },
+
+  groupTabOn: { backgroundColor: "#F7DDEE" },
+
+  groupTabText: { fontFamily: FONTS.medium, fontSize: 13, color: "#66738A" },
+
+  groupTabTextOn: { fontFamily: FONTS.semibold, color: "#B63D91" },
+
+  groupTabPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    elevation: 30,
+  },
+
+  comingSoon: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+
+  comingSoonText: { fontFamily: FONTS.regular, fontSize: 14, color: "#66738A" },
+
   headerContainer: {
     // Figma: the header sits on the chat background (no white bar).
     backgroundColor: "transparent",
@@ -6812,6 +7058,9 @@ const STYLE_PAIR = themedStyles({
   bubble: {
     // Figma M02: padding 12, radius 16 (4 at the top-left on the first one).
     minWidth: 62,
+    // Never wider than the column, or the Spark footer row pushes the
+    // bubble past the list edge (cut off beside the side rail).
+    maxWidth: "100%",
     borderRadius: 16,
     padding: 12,
 
@@ -7104,7 +7353,8 @@ const STYLE_PAIR = themedStyles({
 
   replyBarMine: { width: 0 /* M14 */ },
 
-  replyBody: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
+  // flexShrink (not flex: 1) so the quote's natural width sizes the bubble.
+  replyBody: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 5 },
 
   replyLine: {
     flexDirection: "row",

@@ -119,7 +119,10 @@ export default function ParticipantListSheet({
           initialNumToRender={14}
           maxToRenderPerBatch={20}
           windowSize={7}
-          removeClippedSubviews={Platform.OS !== "web"}
+          // Android only (the RN default): on iOS (Fabric) clipping inside this
+          // modal, whose rows change with every speaker update, is where the
+          // main thread was found stuck (updateClippedSubviewsWithClipRect).
+          removeClippedSubviews={Platform.OS === "android"}
           keyboardShouldPersistTaps="handled"
           style={styles.list}
           ListEmptyComponent={

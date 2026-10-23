@@ -185,8 +185,12 @@ export default function GroupInfo() {
       if (result.group?.canSeeMembers) {
         loadMembers(1);
       }
+      // Join requests load beside the page instead of holding the
+      // full-screen spinner for another round trip (~0.5 s from Lagos).
       if (result.group?.canEdit && result.group.pendingRequestCount > 0) {
-        setRequests(await getJoinRequests(groupId, token));
+        getJoinRequests(groupId, token)
+          .then(setRequests)
+          .catch(() => undefined);
       } else {
         setRequests([]);
       }
@@ -1154,7 +1158,7 @@ export default function GroupInfo() {
                 return (
                   <View style={styles.rows}>
                     <Text style={styles.sheetHint}>
-                      They can still read, but can't send messages for:
+                      They can still read, but can&apos;t send messages for:
                     </Text>
                     <GroupRow
                       icon="time-outline"

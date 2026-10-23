@@ -805,6 +805,7 @@ export default function CallSession() {
           ended={!!endMessage}
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
+          onFlipCamera={flipCamera}
           onToggleFocus={() => setFocusOn((value) => !value)}
           onLeave={hangUp}
           onMinimize={() => setCallMinimized(true)}

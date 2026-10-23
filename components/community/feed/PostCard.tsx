@@ -12,6 +12,7 @@ import {
 } from "@/store/thunks/postThunks";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -200,6 +201,21 @@ export function PostCard({ post, token }: { post: any; token: string }) {
   const [commentsVisible, setCommentsVisible] = useState(false);
 
   const [shareVisible, setShareVisible] = useState(false);
+
+  // The comments and share sheets mount the first time they're opened (and
+  // stay, so closing still animates). Mounted for every card, each comments
+  // sheet kept its own audio recorder polled every 500 ms and a blink loop,
+  // so a feed of 20 posts ran 20 of each while nobody was commenting.
+  const [commentsMounted, setCommentsMounted] = useState(false);
+  const [shareMounted, setShareMounted] = useState(false);
+
+  if (commentsVisible && !commentsMounted) {
+    setCommentsMounted(true);
+  }
+
+  if (shareVisible && !shareMounted) {
+    setShareMounted(true);
+  }
 
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -535,8 +551,19 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     .join(" · ");
 
   // The name pill: on the photo (see-through) or on a text card (white).
+  // Tapping the author opens their profile (your own posts open your tab).
+  const openAuthor = () => {
+    if (isMine) router.push("/profile");
+    else if (postUsername)
+      router.push({ pathname: "/user/[username]", params: { username: postUsername } });
+  };
+
   const authorPill = (onPhoto: boolean) => (
-    <View
+    <Pressable
+      onPress={openAuthor}
+      disabled={!isMine && !postUsername}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${authorName}'s profile`}
       style={[styles.pill, onPhoto ? styles.pillOnPhoto : styles.pillOnCard]}>
       <View style={[styles.ring, { borderColor: factionColor(authorFaction) }]}>
         <Image
@@ -558,7 +585,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 
   // ⋯ only on your own posts (edit / delete).
@@ -699,6 +726,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
       </Modal>
 
       {/* COMMENTS */}
+      {commentsMounted ? (
       <CommentsModal
         visible={commentsVisible}
         onClose={() => setCommentsVisible(false)}
@@ -711,8 +739,10 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         initialCount={commentsCount}
         onCountChange={setCommentsCount}
       />
+      ) : null}
 
       {/* SHARE */}
+      {shareMounted ? (
       <ShareSheet
         visible={shareVisible}
         post={post}
@@ -724,6 +754,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
           )
         }
       />
+      ) : null}
     </View>
   );
 }
