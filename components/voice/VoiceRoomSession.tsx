@@ -15,11 +15,11 @@ import {
   useRemoteParticipants,
   useTracks,
 } from "@livekit/react-native";
-import { RoomOptions, Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CALL_ROOM_OPTIONS, CAMERA_SLOTS, CAMERA_TRACKS_OPTIONS, useMicKey, useStablePeople } from "@/components/calls/callMedia";
 import OrbitCallScreen, { type OrbitPerson } from "@/components/calls/OrbitCall";
 import { startPrivate, useInPrivateFrom } from "@/components/calls/privateCall";
 import { CallBackground } from "@/components/calls/CallVisuals";
@@ -32,13 +32,6 @@ import { endVoiceSession, setVoiceMinimized, updateVoiceRoom, type VoiceSession 
 import { leaveVoiceRoom, pingVoiceRoom, VOICE_PING_MS } from "@/services/voiceRooms";
 import { useAppSelector } from "@/store/hooks";
 import { ensureCallPermissions, getAvatarSource } from "@/utils/callHelpers";
-
-const ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: { pixelDensity: "screen" },
-  dynacast: true,
-  audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  publishDefaults: { dtx: true, red: true },
-};
 
 function nowMs() {
   return Date.now();
@@ -114,7 +107,7 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
         connect
         audio
         video={false}
-        options={ROOM_OPTIONS}
+        options={CALL_ROOM_OPTIONS}
         onError={(error) => {
           console.error("VOICE ROOM ERROR:", error);
           Alert.alert("Voice chat", "The voice chat connection was lost.");
@@ -130,7 +123,8 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
   const myUserId = useAppSelector((state) => state.call.myUserId);
   const remoteParticipants = useRemoteParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
-  const cameraSlots = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }], { onlySubscribed: false });
+  // Camera events only (see callMedia.ts), not every speaker update.
+  const cameraSlots = useTracks(CAMERA_SLOTS, CAMERA_TRACKS_OPTIONS);
 
   const [focusOn, setFocusOn] = useState(false);
   const [startedAt] = useState(nowMs);
@@ -181,14 +175,28 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inPrivate]);
+  // Only when private changes or a microphone is added (useMicKey), not on
+  // every participant update.
+  const micKey = useMicKey(remoteParticipants);
+  const latestRemotes = useRef(remoteParticipants);
+  latestRemotes.current = remoteParticipants;
+  const volumeChanged = useRef(false);
   useEffect(() => {
-    remoteParticipants.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
-  }, [inPrivate, remoteParticipants]);
+    if (!inPrivate && !volumeChanged.current) return;
+    volumeChanged.current = inPrivate;
+    latestRemotes.current.forEach((participant: any) => participant.setVolume?.(inPrivate ? 0.25 : 1));
+  }, [inPrivate, micKey]);
 
   // Two pages: the voice chat, and its Sparks (swipe across, or "Sparks").
   const { width: pageWidth } = useWindowDimensions();
   const pages = useRef<ScrollView>(null);
-  const openSparks = useCallback(() => pages.current?.scrollTo({ x: pageWidth, animated: true }), [pageWidth]);
+  // The Sparks page is built the first time it is opened (it re-rendered the
+  // whole transcript every second off-screen before).
+  const [sparksSeen, setSparksSeen] = useState(false);
+  const openSparks = useCallback(() => {
+    setSparksSeen(true);
+    pages.current?.scrollTo({ x: pageWidth, animated: true });
+  }, [pageWidth]);
   const backToCall = useCallback(() => pages.current?.scrollTo({ x: 0, animated: true }), []);
   const [elapsed, setElapsed] = useState(0);
 
@@ -197,16 +205,21 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
     return () => clearInterval(timer);
   }, [startedAt]);
 
-  // FOCUS MODE: stop receiving voices (still in the voice chat).
+  // FOCUS MODE: stop receiving voices (still in the voice chat). Nothing to
+  // do until it is first turned on; then only when it changes or a
+  // microphone is added (it sent a message per microphone on every update).
+  const focusUsed = useRef(false);
   useEffect(() => {
-    remoteParticipants.forEach((participant) => {
+    if (!focusOn && !focusUsed.current) return;
+    focusUsed.current = focusOn;
+    latestRemotes.current.forEach((participant) => {
       participant.audioTrackPublications.forEach((publication: any) => {
         try {
           publication.setSubscribed?.(!focusOn);
         } catch {}
       });
     });
-  }, [focusOn, remoteParticipants]);
+  }, [focusOn, micKey]);
 
   const meId = myUserId || localParticipant?.identity || "";
   const speakingIds = [
@@ -219,7 +232,7 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
   const byId = new Map(session.voiceRoom.members.map((member) => [member.user.id, member.user]));
   const ids = new Set<string>([meId, ...session.voiceRoom.members.map((m) => m.user.id), ...remoteParticipants.map((p) => p.identity)]);
 
-  const people: OrbitPerson[] = [...ids].filter(Boolean).map((id) => {
+  const peopleList: OrbitPerson[] = [...ids].filter(Boolean).map((id) => {
     const isMe = id === meId;
     const remote = remoteParticipants.find((p) => p.identity === id);
     const user = byId.get(id);
@@ -238,19 +251,25 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
     };
   });
+  // Same objects while unchanged, so the orbit skips the timer's renders.
+  const people = useStablePeople(peopleList);
 
-  const renderVideo = (id: string) => {
-    const slot = cameraSlots.find((s) => s.participant.identity === id || (id === meId && s.participant.isLocal));
-    if (!slot || !isTrackReference(slot) || slot.publication.isMuted) return null;
-    return (
-      <VideoTrack
-        trackRef={slot as TrackReference}
-        style={StyleSheet.absoluteFill}
-        objectFit="cover"
-        mirror={slot.participant.isLocal}
-      />
-    );
-  };
+  const renderVideo = useCallback(
+    (id: string) => {
+      const slot = cameraSlots.find((s) => s.participant.identity === id || (id === meId && s.participant.isLocal));
+      if (!slot || !isTrackReference(slot) || slot.publication.isMuted) return null;
+      return (
+        <VideoTrack
+          trackRef={slot as TrackReference}
+          style={StyleSheet.absoluteFill}
+          objectFit="cover"
+          mirror={slot.participant.isLocal}
+        />
+      );
+    },
+    [cameraSlots, meId],
+  );
+  const toggleFocus = useCallback(() => setFocusOn((value) => !value), []);
 
   const toggleCamera = async () => {
     try {
@@ -267,6 +286,7 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       bounces={false}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={sparksSeen ? undefined : () => setSparksSeen(true)}
       style={styles.root}>
     <View style={{ width: pageWidth }}>
     <OrbitCallScreen
@@ -281,7 +301,7 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       ended={false}
       onToggleMic={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
       onToggleCamera={toggleCamera}
-      onToggleFocus={() => setFocusOn((value) => !value)}
+      onToggleFocus={toggleFocus}
       onLeave={onLeave}
       onMinimize={() => setVoiceMinimized(true)}
       onPeople={() => Alert.alert("Voice chat", "Everyone in this chat can join from the Call live card.")}
@@ -300,14 +320,16 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
     </View>
     <View style={{ width: pageWidth }}>
       <CallBackground>
-        <SparksCallPanel
-          notes={notes}
-          call={callLike}
-          myUserId={meId}
-          topInset={insets.top}
-          bottomInset={insets.bottom}
-          onBack={backToCall}
-        />
+        {sparksSeen ? (
+          <SparksCallPanel
+            notes={notes}
+            call={callLike}
+            myUserId={meId}
+            topInset={insets.top}
+            bottomInset={insets.bottom}
+            onBack={backToCall}
+          />
+        ) : null}
       </CallBackground>
     </View>
     </ScrollView>

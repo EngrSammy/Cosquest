@@ -11,19 +11,22 @@ import {
   useRoomContext,
   useTracks,
 } from "@livekit/react-native";
-import {
-  LocalVideoTrack,
-  RoomEvent,
-  RoomOptions,
-  Track,
-  VideoPresets,
-} from "livekit-client";
+import { LocalVideoTrack, Track } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
 import CallSubscriptionManager from "@/components/calls/CallSubscriptionManager";
+import {
+  CALL_ROOM_OPTIONS,
+  CAMERA_CAPTURE,
+  CAMERA_SLOTS,
+  CAMERA_SOURCES,
+  CAMERA_TRACKS_OPTIONS,
+  useMicKey,
+  useStablePeople,
+} from "@/components/calls/callMedia";
 import { useJoinConnectOptions } from "@/components/calls/callSubscriptions";
 import StageLayout, {
   type RenderStageVideo,
@@ -73,7 +76,7 @@ const END_MESSAGE_MS = 1400;
 // Connection errors stay longer, so the real reason can be read.
 const ERROR_MESSAGE_MS = 5000;
 
-// Room settings — created ONCE here, outside the component.
+// Room settings — created ONCE, outside the component.
 // (Written inline before, they were a brand-new object on every screen
 // update, which made LiveKit try to connect again and again — the
 // repeated "already connected to room" lines in the logs — and could
@@ -84,59 +87,8 @@ const ERROR_MESSAGE_MS = 5000;
 // by accident. dtx saves data when nobody speaks; red adds a little
 // redundancy so a lost packet doesn't cut a word.
 //
-// Camera: 960x540 at 25 fps, sent as 540p + 360p + 180p (simulcast).
-// LiveKit's default is 1280x720 at 30 fps, which a phone has to encode
-// three times over for the whole call while also decoding everyone else.
-// Nobody sees a 720p picture here: a group call shows people in circles
-// (132 px at most) and a 1:1 call on a phone screen looks the same at
-// 540p, so 720p only cost CPU, heat and data.
-//
-// adaptiveStream: each picture is requested at the size it is shown, at
-// LiveKit's default density (2x on 3x phones). "screen" (3x on iPhones)
-// asked for half as many pixels again as the default, so every tile pulled
-// a bigger layer than it needed.
-const CAMERA_CAPTURE = VideoPresets.h540;
-
-const ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: true,
-  dynacast: true,
-  audioCaptureDefaults: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-  },
-  videoCaptureDefaults: {
-    resolution: CAMERA_CAPTURE.resolution,
-  },
-  publishDefaults: {
-    dtx: true,
-    red: true,
-    simulcast: true,
-    videoEncoding: CAMERA_CAPTURE.encoding,
-    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
-  },
-};
-
-// The camera lists below only need to change when a camera does (someone
-// joins or leaves, a camera turns on or off, a picture arrives). By default
-// LiveKit's useTracks also updates on every active-speaker and connection-
-// quality change, which re-rendered every video on screen several times a
-// second in a group call.
-const CAMERA_EVENTS = [
-  RoomEvent.ParticipantConnected,
-  RoomEvent.ParticipantDisconnected,
-  RoomEvent.TrackPublished,
-  RoomEvent.TrackUnpublished,
-  RoomEvent.TrackSubscribed,
-  RoomEvent.TrackUnsubscribed,
-  RoomEvent.TrackMuted,
-  RoomEvent.TrackUnmuted,
-  RoomEvent.LocalTrackPublished,
-  RoomEvent.LocalTrackUnpublished,
-];
-const CAMERA_TRACKS_OPTIONS = { onlySubscribed: false, updateOnlyOn: CAMERA_EVENTS };
-const CAMERA_SOURCES = [Track.Source.Camera];
-const CAMERA_SLOTS = [{ source: Track.Source.Camera, withPlaceholder: true as const }];
+// The options themselves (and why the camera is 540p) are in callMedia.ts,
+// shared with the voice chats.
 
 // Module-level on purpose — same react-hooks/purity reason as
 // generateLocalId in the chat screen.
@@ -353,7 +305,7 @@ export default function CallSession() {
         connect
         audio
         video={active.call.type === "video"}
-        options={ROOM_OPTIONS}
+        options={CALL_ROOM_OPTIONS}
         connectOptions={connectOptions}
         onError={(error) => {
           // Show and log the REAL reason (e.g. invalid token, wrong
@@ -506,9 +458,7 @@ function CallStage({
   // active-speaker / connection-quality update, several times a second in
   // a group call, and each run sent LiveKit a subscription message per
   // microphone and set every volume again.
-  const micKey = remoteParticipants
-    .map((p) => `${p.identity}:${[...p.audioTrackPublications.keys()].join("+")}`)
-    .join(",");
+  const micKey = useMicKey(remoteParticipants);
   const latestRemotes = useRef(remoteParticipants);
   latestRemotes.current = remoteParticipants;
 
@@ -785,7 +735,6 @@ function CallStage({
   // same object is kept for a person while nothing about them changed, so
   // the orbit (memo) and its circles skip the re-render that the call timer
   // and captions cause every second.
-  const peopleCache = useRef(new Map<string, { key: string; person: OrbitPerson }>());
   const peopleList: OrbitPerson[] = (orbit ? call.members : [])
     .filter((member) => member.status === "joined" || member.status === "ringing")
     .map((member) => {
@@ -806,20 +755,9 @@ function CallStage({
         away: !!member.away,
         hasVideo: !!slot && isTrackReference(slot) && !slot.publication.isMuted,
       };
-      const key = JSON.stringify(next);
-      const cached = peopleCache.current.get(next.id);
-      if (cached?.key === key) return cached.person;
-      peopleCache.current.set(next.id, { key, person: next });
       return next;
     });
-  const lastPeople = useRef(peopleList);
-  if (
-    peopleList.length !== lastPeople.current.length ||
-    peopleList.some((person, index) => person !== lastPeople.current[index])
-  ) {
-    lastPeople.current = peopleList;
-  }
-  const people = lastPeople.current;
+  const people = useStablePeople(peopleList);
 
   // A person's camera in their circle. Changes only when a camera does
   // (cameraSlots updates on camera events only, see CAMERA_EVENTS).
