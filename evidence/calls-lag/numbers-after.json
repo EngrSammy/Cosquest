@@ -1,0 +1,155 @@
+{
+  "label": "after",
+  "src": "ddee98a",
+  "commit": "ddee98a129a96466580a3704a3522b0e4f6b503a",
+  "setup": "emulator API 35 x86_64, 720x1600@320dpi, 4 cores, 2 GB, swiftshader (no GPU); app release APK (JS bundled); group video call, 6 people: ada (phone, emulated front camera on, mic on but silent) + 5 LiveKit bots publishing 640x360@15fps simulcast VP8 camera + voice bursts (1-3 s on, 2-6 s off, overlapping)",
+  "window_s": 60.0,
+  "total_frames": {
+    "windows": [
+      3155,
+      3303
+    ],
+    "mean": 3229
+  },
+  "janky_pct": {
+    "windows": [
+      1.2,
+      1.18
+    ],
+    "mean": 1.19
+  },
+  "p50_ms": {
+    "windows": [
+      17.0,
+      17.0
+    ],
+    "mean": 17.0
+  },
+  "p90_ms": {
+    "windows": [
+      22.0,
+      22.0
+    ],
+    "mean": 22.0
+  },
+  "p95_ms": {
+    "windows": [
+      24.0,
+      24.0
+    ],
+    "mean": 24.0
+  },
+  "p99_ms": {
+    "windows": [
+      34.0,
+      32.0
+    ],
+    "mean": 33.0
+  },
+  "slow_ui_thread": {
+    "windows": [
+      5,
+      1
+    ],
+    "mean": 3
+  },
+  "frame_deadline_missed": {
+    "windows": [
+      38,
+      39
+    ],
+    "mean": 38.5
+  },
+  "cpu_top_avg_pct": {
+    "windows": [
+      70.9,
+      72.2
+    ],
+    "mean": 71.55
+  },
+  "cpu_proc_stat_avg_pct": {
+    "windows": [
+      72.0,
+      73.0
+    ],
+    "mean": 72.5
+  },
+  "cpu_js_thread_pct": {
+    "windows": [
+      4.7,
+      4.9
+    ],
+    "mean": 4.8
+  },
+  "cpu_ui_thread_pct": {
+    "windows": [
+      4.2,
+      4.3
+    ],
+    "mean": 4.25
+  },
+  "cpu_render_thread_pct": {
+    "windows": [
+      22.1,
+      23.4
+    ],
+    "mean": 22.75
+  },
+  "cpu_threads_top": [
+    {
+      "RenderThread": 22.1,
+      "mqt_v_js": 4.7,
+      "my0227.cosquest": 4.2,
+      "MediaCodec_loop": 3.4,
+      "EncoderQueue - ": 3.2,
+      "worker_thread -": 2.3,
+      "decoder-texture": 2.3,
+      "network_thread ": 1.9,
+      "CaptureThread": 1.8,
+      "CodecLooper": 1.5,
+      "EglThread": 1.4,
+      "AudioRecordJava": 1.2
+    },
+    {
+      "RenderThread": 23.4,
+      "mqt_v_js": 4.9,
+      "my0227.cosquest": 4.3,
+      "MediaCodec_loop": 3.6,
+      "EncoderQueue - ": 3.3,
+      "decoder-texture": 2.5,
+      "worker_thread -": 2.3,
+      "network_thread ": 1.9,
+      "CaptureThread": 1.8,
+      "EglThread": 1.6,
+      "CodecLooper": 1.6,
+      "HwBinder:2746#": 1.3
+    }
+  ],
+  "device_busy_pct_of_4_cores": {
+    "windows": [
+      26.4,
+      26.9
+    ],
+    "mean": 26.65
+  },
+  "UpdateSubscription_per_min": {
+    "windows": [
+      0.0,
+      0.0
+    ],
+    "mean": 0.0
+  },
+  "UpdateTrackSettings_per_min": {
+    "windows": [
+      68.0,
+      66.0
+    ],
+    "mean": 67.0
+  },
+  "UpdateSubscription_detail": [
+    {},
+    {}
+  ],
+  "bots_speak_bursts_total": 145,
+  "app_crashed": false
+}

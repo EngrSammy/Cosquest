@@ -20,14 +20,13 @@ import AddPeopleSheet from "@/components/calls/AddPeopleSheet";
 import CallSubscriptionManager from "@/components/calls/CallSubscriptionManager";
 import {
   CALL_ROOM_OPTIONS,
-  CAMERA_CAPTURE,
   CAMERA_SLOTS,
   CAMERA_SOURCES,
   CAMERA_TRACKS_OPTIONS,
   useMicKey,
   useStablePeople,
 } from "@/components/calls/callMedia";
-import { useJoinConnectOptions } from "@/components/calls/callSubscriptions";
+import { setVoicesMuted, useJoinConnectOptions } from "@/components/calls/callSubscriptions";
 import StageLayout, {
   type RenderStageVideo,
 } from "@/components/calls/StageLayout";
@@ -577,23 +576,13 @@ function CallStage({
     return () => clearInterval(interval);
   }, [answeredAt]);
 
-  // FOCUS MODE: stop receiving everyone's voice (still in the call, circle stays).
-  // Nothing to do until focus is first turned on (voices are subscribed by
-  // default, see callSubscriptions.ts).
-  const focusUsed = useRef(false);
+  // FOCUS MODE: stop receiving everyone's voice (still in the call, circle
+  // stays). The subscription manager does it (callSubscriptions.ts), so a
+  // microphone that starts during focus mode stays off too.
   useEffect(() => {
-    if (!focusOn && !focusUsed.current) return;
-    focusUsed.current = focusOn;
-    latestRemotes.current.forEach((participant) => {
-      participant.audioTrackPublications.forEach((publication: any) => {
-        try {
-          publication.setSubscribed?.(!focusOn);
-        } catch {
-          // Not subscribed yet: picked up on the next change.
-        }
-      });
-    });
-  }, [focusOn, micKey]);
+    setVoicesMuted(focusOn);
+    return () => setVoicesMuted(false);
+  }, [focusOn]);
 
   // Group calls start on the loudspeaker (several people talking).
   useEffect(() => {
@@ -696,9 +685,7 @@ function CallStage({
     const next = facing === "user" ? "environment" : "user";
 
     try {
-      // Keep the call's camera size: without it the new camera opens at
-      // 1280x720 (the WebRTC default) for the rest of the call.
-      await track.restartTrack({ facingMode: next, resolution: CAMERA_CAPTURE.resolution });
+      await track.restartTrack({ facingMode: next });
       setFacing(next);
       return;
     } catch {

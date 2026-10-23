@@ -6,6 +6,7 @@ import { RoomEvent, Track } from "livekit-client";
 import {
   manageCallSubscriptions,
   setStageVisible,
+  setVoicesMuted,
 } from "../components/calls/callSubscriptions";
 
 type Pub = { kind: string; calls: boolean[]; setSubscribed: (v: boolean) => void };
@@ -106,7 +107,25 @@ function expect(label: string, actual: number, expected: number) {
   expect("grid again: cameras subscribed", count(room, Track.Kind.Video, on), 260);
   stop();
 
-  // 6. One pass over 5,000 people.
+  // 6. Focus mode in a big call (autoSubscribe off): every microphone off,
+  // including one that starts while focus is on; all back when it ends.
+  room = makeRoom(20);
+  stop = manageCallSubscriptions(room as never, false);
+  await wait(200);
+  setVoicesMuted(true);
+  await wait(200);
+  expect("focus on: microphones subscribed", count(room, Track.Kind.Audio, on), 0);
+  const late = makePerson(20);
+  room.remoteParticipants.set(late.identity, late);
+  room.emit(RoomEvent.TrackPublished);
+  await wait(200);
+  expect("focus on, a new microphone: subscribed", count(room, Track.Kind.Audio, on), 0);
+  setVoicesMuted(false);
+  await wait(200);
+  expect("focus off: microphones subscribed", count(room, Track.Kind.Audio, on), 21);
+  stop();
+
+  // 7. One pass over 5,000 people.
   room = makeRoom(5000);
   const started = Date.now();
   stop = manageCallSubscriptions(room as never, true);

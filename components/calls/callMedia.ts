@@ -4,7 +4,7 @@
 // LiveKit room options and camera-track helpers shared by CallSession and
 // VoiceRoomSession, plus two small hooks that keep group-call screens from
 // re-rendering (or re-sending LiveKit messages) more often than needed.
-import { RoomEvent, Track, VideoPresets, type Participant, type RoomOptions } from "livekit-client";
+import { RoomEvent, Track, type Participant, type RoomOptions } from "livekit-client";
 import { useRef } from "react";
 
 import type { OrbitPerson } from "@/components/calls/OrbitCall";
@@ -14,19 +14,17 @@ import type { OrbitPerson } from "@/components/calls/OrbitCall";
 // accident. dtx saves data when nobody speaks; red adds a little redundancy
 // so a lost packet doesn't cut a word.
 //
-// Camera: 960x540 at 25 fps, sent as 540p + 360p + 180p (simulcast).
-// LiveKit's default is 1280x720 at 30 fps, which a phone has to encode
-// three times over for the whole call while also decoding everyone else.
-// Nobody sees a 720p picture here: a group call shows people in circles
-// (132 px at most) and a 1:1 call on a phone screen looks the same at
-// 540p, so 720p only cost CPU, heat and data.
+// Camera: LiveKit's default (1280x720, sent as 720p + 360p + 180p). Every
+// phone camera opens 720p natively. (A 960x540 request was tried: many
+// cameras have no such mode, so they opened twice at odd 4:3 sizes and
+// LiveKit could no longer switch layers - "encodings mismatch".) dynacast
+// already stops encoding any layer nobody is watching: in a group call
+// everyone sees small circles, so phones only encode the small layers.
 //
 // adaptiveStream: each picture is requested at the size it is shown, at
 // LiveKit's default density (2x on 3x phones). "screen" (3x on iPhones)
 // asked for half as many pixels again as the default, so every tile pulled
 // a bigger layer than it needed.
-export const CAMERA_CAPTURE = VideoPresets.h540;
-
 export const CALL_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
@@ -35,15 +33,9 @@ export const CALL_ROOM_OPTIONS: RoomOptions = {
     noiseSuppression: true,
     autoGainControl: true,
   },
-  videoCaptureDefaults: {
-    resolution: CAMERA_CAPTURE.resolution,
-  },
   publishDefaults: {
     dtx: true,
     red: true,
-    simulcast: true,
-    videoEncoding: CAMERA_CAPTURE.encoding,
-    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
   },
 };
 

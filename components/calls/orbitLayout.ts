@@ -13,14 +13,17 @@ export const DECAY = 0.985; // per tick: about 30 s to lose half
 const INNER_MAX = 6;
 const OUTER_MAX = 12;
 
-// The middle circle stays put at least this long before the next speaker
-// takes it. Without a hold, two people talking over each other (or a noisy
-// room) swapped the big and small circles several times a second, and every
-// swap resized the live videos inside them: lag, and pictures freezing
-// while LiveKit switched quality for the new size.
+// While the person in the middle is still talking, someone talking over them
+// waits this long for the middle. Without a hold, two people talking over
+// each other (or a noisy room) swapped the big and small circles several
+// times a second, and every swap resized the live videos inside them: lag,
+// and pictures freezing while LiveKit switched quality for the new size.
 export const CENTER_HOLD_MS = 1500;
 
-// How long a circle takes to glide to its new place / size.
+// Shortest time anyone holds the middle (stops a speaking flicker bouncing it).
+export const MIN_HOLD_MS = 400;
+
+// How long a circle takes to glide to its new place.
 export const MOVE_MS = 320;
 
 export type Box = { w: number; h: number };
@@ -73,10 +76,14 @@ export function placeOrbit(people: OrbitPerson[], box: Box, scores: Map<string, 
   ];
 }
 
-// The middle, with the hold above: a new speaker takes it once the current
-// one has had it CENTER_HOLD_MS; it goes back to the pinned person only
-// after the speaker has been quiet that long too (not at every pause for
-// breath). The person in the middle leaving frees it at once.
+// The middle, with the holds above:
+//  - the person in the middle has gone quiet and someone else talks: they
+//    take it at once (after MIN_HOLD_MS, so a flicker can't bounce it);
+//  - two people talk over each other: the one in the middle keeps it for
+//    CENTER_HOLD_MS before the other can take it;
+//  - nobody talks: back to the pinned person only after CENTER_HOLD_MS of
+//    quiet (not at every pause for breath);
+//  - the person in the middle leaves: freed at once.
 export type CenterHold = { id: string; since: number; spokeAt: number };
 
 export function holdCenter(current: CenterHold | null, people: OrbitPerson[], want: string | null, now: number): CenterHold | null {
@@ -84,9 +91,15 @@ export function holdCenter(current: CenterHold | null, people: OrbitPerson[], wa
   const here = current ? people.find((p) => p.id === current.id) : undefined;
   if (!current || !here) return { id: want, since: now, spokeAt: now };
   const spokeAt = here.speaking ? now : current.spokeAt;
-  if (want !== current.id && now - current.since >= CENTER_HOLD_MS) {
+  if (want !== current.id) {
+    const held = now - current.since;
     const wantSpeaking = !!people.find((p) => p.id === want)?.speaking;
-    if (wantSpeaking || now - spokeAt >= CENTER_HOLD_MS) return { id: want, since: now, spokeAt: now };
+    const take = wantSpeaking
+      ? here.speaking
+        ? held >= CENTER_HOLD_MS
+        : held >= MIN_HOLD_MS
+      : held >= MIN_HOLD_MS && now - spokeAt >= CENTER_HOLD_MS;
+    if (take) return { id: want, since: now, spokeAt: now };
   }
   return spokeAt === current.spokeAt ? current : { ...current, spokeAt };
 }
