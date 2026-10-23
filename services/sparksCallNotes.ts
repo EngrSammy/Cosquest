@@ -25,6 +25,9 @@ export type CallNotes = {
 
 const noop = () => {};
 
+// One object for every render (the call screen's Sparks pieces are memoized).
+const OFF: CallNotes = { phase: "off", notice: null, paused: false, lines: [], topic: null, sparks: [], accept: noop, decline: noop, togglePaused: noop };
+
 export function useSparksCallNotes(_options: {
   callId: string;
   chatId: string;
@@ -32,5 +35,5 @@ export function useSparksCallNotes(_options: {
   active: boolean;
   micOn: boolean;
 }): CallNotes {
-  return { phase: "off", notice: null, paused: false, lines: [], topic: null, sparks: [], accept: noop, decline: noop, togglePaused: noop };
+  return OFF;
 }

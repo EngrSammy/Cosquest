@@ -82,12 +82,38 @@ function watchLogin() {
   });
 }
 
+// A call is on screen (ringing, live or minimized).
+function inCall() {
+  return Boolean((store.getState() as any).call?.active);
+}
+
+// Runs `then` once no call is active any more.
+function afterCall(then: () => void) {
+  const unsubscribe = store.subscribe(() => {
+    if (inCall()) return;
+    unsubscribe();
+    then();
+  });
+}
+
 // Start the model download by itself on capable phones (Subomi: after login,
 // Wi-Fi only; the SDK waits for Wi-Fi on its own), then load it.
+//
+// Never starts a download during a call: answering a call straight from a
+// cold start boots Sparks from the call screen, and the download (about
+// 1 GB, hashed as it streams) then fought the call for Wi-Fi and CPU. It
+// starts when the call ends. A model that is already on the phone still
+// loads at once (that is only a file mapping), so call notes work.
 async function autoDownload(created: SparksSdk) {
   try {
     const caps = await created.getCapabilities();
     if (!caps) return;
+    if (inCall() && created.model.status().phase !== "ready") {
+      afterCall(() => {
+        if (sdk === created) void autoDownload(created);
+      });
+      return;
+    }
     // Phones too old for the model still note their owner's speech on calls:
     // ensure() fetches just the speech files for them.
     if (caps.tier === "none") return void (await created.model.ensure({ allowCellular: false }));
