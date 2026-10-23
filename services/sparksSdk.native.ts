@@ -108,7 +108,9 @@ async function autoDownload(created: SparksSdk) {
   try {
     const caps = await created.getCapabilities();
     if (!caps) return;
-    if (inCall() && created.model.status().phase !== "ready") {
+    // (Phones too old for the model only fetch the speech files, which call
+    // notes need now, so they don't wait.)
+    if (inCall() && caps.tier !== "none" && created.model.status().phase !== "ready") {
       afterCall(() => {
         if (sdk === created) void autoDownload(created);
       });
