@@ -46,7 +46,7 @@ const MILKY = {
   shadowOpacity: 0.09,
   shadowRadius: 4,
   shadowOffset: { width: 0, height: 4 },
-  elevation: 2,
+  elevation: 0 /* see-through: no Android shadow (grey frame) */,
 } as const;
 
 function RowIcon({ name }: { name: keyof typeof Ionicons.glyphMap }) {

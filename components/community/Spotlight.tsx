@@ -269,7 +269,7 @@ const STYLE_PAIR = themedStyles({
       width: 0,
       height: 2,
     },
-    elevation: 4,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   avatarSmall: {
@@ -285,7 +285,7 @@ const STYLE_PAIR = themedStyles({
       width: 0,
       height: 2,
     },
-    elevation: 4,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   avatarFallback: {
@@ -327,7 +327,7 @@ const STYLE_PAIR = themedStyles({
       width: 0,
       height: 3,
     },
-    elevation: 3,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   avatar: {

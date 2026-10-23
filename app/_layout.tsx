@@ -1,3 +1,5 @@
+// Android: no grey frames in see-through boxes (must load first).
+import "@/utils/noSeeThroughShadows";
 import "@/utils/hideScrollbars";
 import AvatarCatalogLoader from "@/components/AvatarCatalogLoader";
 import ActiveCallOverlay from "@/components/calls/ActiveCallOverlay";

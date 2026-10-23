@@ -129,11 +129,13 @@ export default function AccountInformation() {
 
   const [photo, setPhoto] = useState<string | null>(null);
 
+  // Wait for the login token (restored a moment after the app opens).
+  const sessionToken = useAppSelector((state) => state.auth.token);
   useEffect(() => {
-    if (email) {
+    if (email && sessionToken) {
       dispatch(fetchCurrentUser(email));
     }
-  }, [dispatch, email]);
+  }, [dispatch, email, sessionToken]);
 
   useEffect(() => {
     const fullName = `${firstName} ${lastName}`.trim();
@@ -558,7 +560,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.09,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   // Pink icon on a soft pink circle.

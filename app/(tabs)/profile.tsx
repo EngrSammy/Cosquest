@@ -356,11 +356,13 @@ export default function Profile() {
 
   const email = authUser?.email || user?.email || "";
 
+  // Wait for the login token (restored a moment after the app opens).
+  const sessionToken = useAppSelector((state) => state.auth.token);
   useEffect(() => {
-    if (email) {
+    if (email && sessionToken) {
       dispatch(fetchCurrentUser(email));
     }
-  }, [dispatch, email]);
+  }, [dispatch, email, sessionToken]);
 
   useEffect(() => {
     if (!token) {
@@ -1535,7 +1537,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   factionTopRow: {

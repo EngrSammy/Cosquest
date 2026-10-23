@@ -597,7 +597,7 @@ const STYLE_PAIR = themedStyles({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    elevation: 0 /* see-through: no Android shadow (grey frame) */,
   },
 
   composerAvatar: {
