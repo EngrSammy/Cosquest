@@ -11,6 +11,7 @@ import {
   createProject,
   getProject,
   getSubject,
+  linkProjectSpark,
   listProjects,
   setProjectArchived,
   uploadProjectFile,
@@ -107,4 +108,29 @@ export const uploadProjectFileThunk = createAsyncThunk<
   } catch (error) {
     return rejectWithValue(failed(error, `Couldn't upload ${picked.name}.`));
   }
+});
+
+// "+ Start Spark" on a subject: link a Spark, then reload the subject and project.
+export const linkSparkThunk = createAsyncThunk<
+  void,
+  { projectId: string; subjectId: string; sparkId: string; token: string },
+  { rejectValue: string }
+>("projects/linkSpark", async ({ projectId, subjectId, sparkId, token }, { dispatch, rejectWithValue }) => {
+  try {
+    await linkProjectSpark(projectId, subjectId, sparkId, token);
+    await Promise.all([dispatch(fetchSubject({ projectId, subjectId, token })), dispatch(fetchProject({ projectId, token }))]);
+  } catch (error) {
+    return rejectWithValue(failed(error, "Couldn't link the Spark."));
+  }
+});
+
+// Live: someone changed a project (socket "project:updated" { projectId }).
+// Reload it, and any of its subjects that are open.
+export const refreshProject = createAsyncThunk<void, string>("projects/refresh", async (projectId, { dispatch, getState }) => {
+  const state = getState() as any;
+  const token = state.auth?.token as string | null;
+  if (!token || !projectId) return;
+  await dispatch(fetchProject({ projectId, token }));
+  const keys = Object.keys(state.projects?.subjects || {}).filter((key) => key.startsWith(`${projectId}:`));
+  await Promise.all(keys.map((key) => dispatch(fetchSubject({ projectId, subjectId: key.split(":")[1], token }))));
 });

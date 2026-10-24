@@ -185,12 +185,13 @@ export default function Followers() {
             }),
           ).unwrap();
 
-      await dispatch(
+      // Refresh the list in the background (the button already changed).
+      dispatch(
         fetchFollowing({
           username: currentUsername,
           token,
         }),
-      ).unwrap();
+      );
     } catch (error) {
       Alert.alert(
         "Unable to Update",

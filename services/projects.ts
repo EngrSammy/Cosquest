@@ -5,10 +5,13 @@
 // "Costumes"...). Each subject keeps its FILES (PDF, images, documents up to
 // 25 MB) and its related SPARKS together.
 //
-// SAMPLE DATA FOR NOW: Emmanuel's backend has project routes, but we haven't
-// seen them yet. Every screen goes through the functions below (and the
-// Redux slice), so connecting the backend later only changes this file.
-import type { GroupPerson } from "./groups";
+// BACKEND (Emmanuel, commit cbb4005): the functions at the bottom call the
+// real routes. While they answer "Route not found" (not deployed yet) the
+// screens use the sample data below instead, so they work either way.
+import { appendFileToFormData } from "@/utils/appendFileToFormData";
+
+import { apiRequest } from "./api";
+import { getGroupMembers, type GroupPerson } from "./groups";
 
 export type ProjectFileKind = "pdf" | "image" | "doc" | "other";
 
@@ -67,6 +70,8 @@ export type Project = {
   // "Maya added a file · 12 min ago".
   lastActivity: { text: string; at: string } | null;
   createdAt: string;
+  // From the server's project detail: may this person edit / archive it?
+  canManage?: boolean;
 };
 
 export type SubjectDetail = { subject: ProjectSubject; files: ProjectFile[]; sparks: ProjectSpark[] };
@@ -304,17 +309,17 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 150));
 // THE FUNCTIONS THE SCREENS USE (sample data now; backend later)
 // ---------------------------------------------------------------------
 
-export async function listProjects(conversationId: string, _token: string): Promise<Project[]> {
+async function mockListProjects(conversationId: string, _token: string): Promise<Project[]> {
   await wait();
   return copy(storeFor(conversationId).projects);
 }
 
-export async function getProject(projectId: string, _token: string): Promise<Project> {
+async function mockGetProject(projectId: string, _token: string): Promise<Project> {
   await wait();
   return copy(findProject(projectId).project);
 }
 
-export async function createProject(conversationId: string, input: NewProjectInput, me: GroupPerson, _token: string): Promise<Project> {
+async function mockCreateProject(conversationId: string, input: NewProjectInput, me: GroupPerson, _token: string): Promise<Project> {
   await wait();
   const store = storeFor(conversationId);
   const project: Project = {
@@ -339,14 +344,14 @@ export async function createProject(conversationId: string, input: NewProjectInp
   return copy(project);
 }
 
-export async function setProjectArchived(projectId: string, archived: boolean, _token: string): Promise<Project> {
+async function mockSetProjectArchived(projectId: string, archived: boolean, _token: string): Promise<Project> {
   await wait();
   const { project } = findProject(projectId);
   project.archived = archived;
   return copy(project);
 }
 
-export async function addSubject(projectId: string, input: { name: string; description: string }, me: GroupPerson, _token: string): Promise<Project> {
+async function mockAddSubject(projectId: string, input: { name: string; description: string }, me: GroupPerson, _token: string): Promise<Project> {
   await wait();
   const { store, project } = findProject(projectId);
   project.subjects.push(subjectRow(nextId("sub"), input.name.trim(), input.description.trim()));
@@ -355,7 +360,7 @@ export async function addSubject(projectId: string, input: { name: string; descr
   return copy(project);
 }
 
-export async function getSubject(projectId: string, subjectId: string, _token: string): Promise<SubjectDetail> {
+async function mockGetSubject(projectId: string, subjectId: string, _token: string): Promise<SubjectDetail> {
   await wait();
   const { store, project } = findProject(projectId);
   const subject = project.subjects.find((s) => s.id === subjectId);
@@ -371,7 +376,7 @@ export async function getSubject(projectId: string, subjectId: string, _token: s
 
 export type PickedFile = { name: string; sizeBytes: number; mimeType?: string | null; uri: string };
 
-export async function uploadProjectFile(projectId: string, subjectId: string, picked: PickedFile, me: GroupPerson, _token: string): Promise<ProjectFile> {
+async function mockUploadProjectFile(projectId: string, subjectId: string, picked: PickedFile, me: GroupPerson, _token: string): Promise<ProjectFile> {
   if (picked.sizeBytes > MAX_FILE_BYTES) throw new Error(`${picked.name} is over 25 MB.`);
   await wait();
   const { store, project } = findProject(projectId);
@@ -389,4 +394,262 @@ export async function uploadProjectFile(projectId: string, subjectId: string, pi
   project.lastActivity = { text: `${(me.name || me.username || "Someone").split(" ")[0]} added a file`, at: added.createdAt };
   refresh(store, project);
   return copy(added);
+}
+
+// =====================================================================
+// THE FUNCTIONS THE SCREENS USE - Emmanuel's backend (commit cbb4005)
+// =====================================================================
+//   GET    /api/groups/:groupId/projects?status=active|archived
+//   POST   /api/groups/:groupId/projects        { name, description, location, dueAt, subjects }
+//   GET    /api/projects/:projectId             { project, files, sparks, upcomingCalls }
+//   PATCH  /api/projects/:projectId             { archived }
+//   POST   /api/projects/:projectId/subjects    { name, description }
+//   POST   /api/projects/:projectId/subjects/:subjectId/files   multipart "file"
+//   POST   /api/projects/:projectId/sparks      { sparkId, subjectId, fileId }
+// People come as ids only: names come from the group's member list.
+// Projects are for groups people create; the server refuses other rooms.
+let mockOnly = false;
+
+export function usingProjectsMock() {
+  return mockOnly;
+}
+
+function messageOf(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) return String((error as any).message || "");
+  return "";
+}
+
+async function withFallback<T>(real: () => Promise<T>, mock: () => Promise<T>): Promise<T> {
+  if (mockOnly) return mock();
+  try {
+    return await real();
+  } catch (error) {
+    if (/^Route not found/i.test(messageOf(error))) {
+      mockOnly = true;
+      return mock();
+    }
+    throw error;
+  }
+}
+
+// ---------- names (the group's members, once per group) ----------
+type Members = { people: Map<string, GroupPerson>; total: number };
+const membersByChat = new Map<string, Promise<Members>>();
+
+function membersOf(conversationId: string, token: string): Promise<Members> {
+  let pending = membersByChat.get(conversationId);
+  if (!pending) {
+    pending = getGroupMembers(conversationId, { limit: 100 }, token)
+      .then((result) => ({
+        people: new Map(result.members.map((member) => [member.id, member as GroupPerson])),
+        total: result.total || result.members.length,
+      }))
+      .catch(() => {
+        membersByChat.delete(conversationId);
+        return { people: new Map<string, GroupPerson>(), total: 0 };
+      });
+    membersByChat.set(conversationId, pending);
+  }
+  return pending;
+}
+
+const who = (members: Members, id: unknown, name?: string | null): GroupPerson =>
+  members.people.get(String(id || "")) || { id: String(id || ""), username: "", name: name || "Member" };
+
+const KIND_LABELS: Record<string, string> = {
+  image: "Sent a photo",
+  video: "Sent a video",
+  audio: "Sent a voice note",
+  file: "Sent a file",
+  album: "Sent photos",
+  sticker: "Sent a sticker",
+  poll: "Sent a poll",
+};
+
+function toFile(raw: any, members: Members): ProjectFile {
+  const name = raw?.fileName || "File";
+  return {
+    id: String(raw?.id || ""),
+    subjectId: raw?.subjectId ? String(raw.subjectId) : "",
+    name,
+    kind: fileKindOf(name, raw?.mimeType),
+    sizeBytes: Number(raw?.sizeBytes) || 0,
+    url: raw?.url || null,
+    uploadedBy: who(members, raw?.uploadedBy),
+    createdAt: raw?.createdAt || new Date().toISOString(),
+  };
+}
+
+function toSpark(raw: any, members: Members, files: ProjectFile[]): ProjectSpark {
+  const latest = raw?.latestMessage;
+  return {
+    id: String(raw?.id || ""),
+    subjectId: raw?.subjectId ? String(raw.subjectId) : "",
+    subject: raw?.subject || "Spark",
+    lastMessage: latest
+      ? { author: who(members, latest.senderId, latest.senderName), text: latest.text || KIND_LABELS[latest.kind] || "Sent a message" }
+      : null,
+    people: Number(raw?.participantCount) || 0,
+    active: Boolean(raw?.active),
+    lastActivityAt: raw?.lastActivityAt || latest?.createdAt || new Date().toISOString(),
+    fileName: raw?.fileId ? files.find((file) => file.id === String(raw.fileId))?.name || null : null,
+  };
+}
+
+function toProject(raw: any, members: Members, detail?: { files: ProjectFile[]; sparks: ProjectSpark[] }): Project {
+  const creator = who(members, raw?.createdBy);
+  const others = [...members.people.values()].filter((person) => person.id !== creator.id);
+  const subjects: ProjectSubject[] = (raw?.subjects || []).map((subject: any) => {
+    const id = String(subject?.id || "");
+    const files = (detail?.files || []).filter((file) => file.subjectId === id);
+    const sparks = (detail?.sparks || [])
+      .filter((spark) => spark.subjectId === id)
+      .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
+    return {
+      id,
+      name: subject?.name || "Subject",
+      description: subject?.description || "",
+      fileCount: files.length,
+      sparkCount: sparks.length,
+      latestFile: files[0] || null,
+      latestSpark: sparks[0] || null,
+    };
+  });
+  return {
+    id: String(raw?.id || ""),
+    conversationId: String(raw?.conversationId || ""),
+    name: raw?.name || "Project",
+    description: raw?.description || "",
+    place: raw?.location || null,
+    date: raw?.dueAt || null,
+    icon: "sparkles",
+    archived: Boolean(raw?.archived),
+    createdBy: creator,
+    members: [creator, ...others].slice(0, 3),
+    memberCount: members.total || 1,
+    subjects,
+    fileCount: Number(raw?.fileCount) || 0,
+    sparkCount: Number(raw?.sparkCount) || 0,
+    lastActivity: raw?.updatedAt ? { text: "Updated", at: raw.updatedAt } : null,
+    createdAt: raw?.updatedAt || new Date().toISOString(),
+    canManage: raw?.canManage,
+  };
+}
+
+// The project detail, turned into the screens' shapes (shared by a project
+// and its subjects).
+async function projectDetail(projectId: string, token: string) {
+  const r = await apiRequest<any>(`/api/projects/${encodeURIComponent(projectId)}`, { token });
+  const members = await membersOf(String(r?.project?.conversationId || ""), token);
+  const files = (r?.files || []).map((file: any) => toFile(file, members));
+  const sparks = (r?.sparks || []).map((spark: any) => toSpark(spark, members, files));
+  return { project: toProject(r?.project, members, { files, sparks }), files, sparks };
+}
+
+export async function listProjects(conversationId: string, token: string): Promise<Project[]> {
+  return withFallback(
+    async () => {
+      const base = `/api/groups/${encodeURIComponent(conversationId)}/projects`;
+      const [active, archived, members] = await Promise.all([
+        apiRequest<any>(`${base}?status=active`, { token }),
+        apiRequest<any>(`${base}?status=archived`, { token }),
+        membersOf(conversationId, token),
+      ]);
+      return [...(active?.projects || []), ...(archived?.projects || [])].map((raw: any) => toProject(raw, members));
+    },
+    () => mockListProjects(conversationId, token),
+  );
+}
+
+export async function getProject(projectId: string, token: string): Promise<Project> {
+  return withFallback(async () => (await projectDetail(projectId, token)).project, () => mockGetProject(projectId, token));
+}
+
+export async function getSubject(projectId: string, subjectId: string, token: string): Promise<SubjectDetail> {
+  return withFallback(
+    async () => {
+      const { project, files, sparks } = await projectDetail(projectId, token);
+      const subject = project.subjects.find((item) => item.id === subjectId);
+      if (!subject) throw new Error("Subject not found in this project.");
+      return {
+        subject,
+        files: files.filter((file: ProjectFile) => file.subjectId === subjectId),
+        sparks: sparks
+          .filter((spark: ProjectSpark) => spark.subjectId === subjectId)
+          .sort((a: ProjectSpark, b: ProjectSpark) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()),
+      };
+    },
+    () => mockGetSubject(projectId, subjectId, token),
+  );
+}
+
+export async function createProject(conversationId: string, input: NewProjectInput, me: GroupPerson, token: string): Promise<Project> {
+  return withFallback(
+    async () => {
+      const r = await apiRequest<any>(`/api/groups/${encodeURIComponent(conversationId)}/projects`, {
+        method: "POST",
+        token,
+        body: {
+          name: input.name.trim(),
+          description: input.description.trim(),
+          location: input.place?.trim() || "",
+          dueAt: input.date || null,
+          subjects: input.subjects.map((name) => name.trim()).filter(Boolean).map((name) => ({ name })),
+        },
+      });
+      return toProject(r?.project, await membersOf(conversationId, token));
+    },
+    () => mockCreateProject(conversationId, input, me, token),
+  );
+}
+
+export async function setProjectArchived(projectId: string, archived: boolean, token: string): Promise<Project> {
+  return withFallback(
+    async () => {
+      await apiRequest<any>(`/api/projects/${encodeURIComponent(projectId)}`, { method: "PATCH", token, body: { archived } });
+      return (await projectDetail(projectId, token)).project;
+    },
+    () => mockSetProjectArchived(projectId, archived, token),
+  );
+}
+
+export async function addSubject(projectId: string, input: { name: string; description: string }, me: GroupPerson, token: string): Promise<Project> {
+  return withFallback(
+    async () => {
+      await apiRequest<any>(`/api/projects/${encodeURIComponent(projectId)}/subjects`, {
+        method: "POST",
+        token,
+        body: { name: input.name.trim(), description: input.description.trim() },
+      });
+      return (await projectDetail(projectId, token)).project;
+    },
+    () => mockAddSubject(projectId, input, me, token),
+  );
+}
+
+export async function uploadProjectFile(projectId: string, subjectId: string, picked: PickedFile, me: GroupPerson, token: string): Promise<ProjectFile> {
+  if (picked.sizeBytes > MAX_FILE_BYTES) throw new Error(`${picked.name} is over 25 MB.`);
+  return withFallback(
+    async () => {
+      const form = new FormData();
+      await appendFileToFormData(form, "file", { uri: picked.uri, name: picked.name, type: picked.mimeType || undefined });
+      const r = await apiRequest<any>(
+        `/api/projects/${encodeURIComponent(projectId)}/subjects/${encodeURIComponent(subjectId)}/files`,
+        { method: "POST", token, body: form },
+      );
+      const members: Members = { people: new Map([[me.id, me]]), total: 0 };
+      return toFile(r?.file, members);
+    },
+    () => mockUploadProjectFile(projectId, subjectId, picked, me, token),
+  );
+}
+
+// "+ Start Spark" on a subject: link one of the group's Sparks to it.
+export async function linkProjectSpark(projectId: string, subjectId: string, sparkId: string, token: string): Promise<void> {
+  await apiRequest<any>(`/api/projects/${encodeURIComponent(projectId)}/sparks`, {
+    method: "POST",
+    token,
+    body: { sparkId, subjectId },
+  });
 }

@@ -30,7 +30,9 @@ export default function ProjectsTab({ conversationId, title }: { conversationId:
   const selectProjects = useMemo(() => makeSelectChatProjects(), []);
   const projects = useAppSelector((state) => selectProjects(state, conversationId));
   const loaded = useAppSelector((state) => !!state.projects.loadedChats[conversationId]);
-  const error = useAppSelector((state) => state.projects.errorByChat[conversationId] || "");
+  const serverError = useAppSelector((state) => state.projects.errorByChat[conversationId] || "");
+  // Projects are for groups people create (the backend's rule).
+  const error = /belong to a group/i.test(serverError) ? "Projects are for groups you create." : serverError;
   const [view, setView] = useState<"active" | "archived">("active");
   const [query, setQuery] = useState("");
 

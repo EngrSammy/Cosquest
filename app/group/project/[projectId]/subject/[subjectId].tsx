@@ -10,16 +10,17 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { personName, useChatTitle, useMyPerson } from "@/components/calls/scheduled/ChoiceSheet";
+import { ChoiceSheet, personName, useChatTitle, useMyPerson, type Choice } from "@/components/calls/scheduled/ChoiceSheet";
 import { UI } from "@/components/chat/ui";
 import { GroupScreen } from "@/components/groups/GroupUi";
 import { FileRow, SparkCard } from "@/components/projects/ProjectParts";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
-import { countsLine, formatBytes, formatWhen, MAX_FILE_BYTES, type ProjectFile } from "@/services/projects";
+import { countsLine, formatBytes, formatWhen, MAX_FILE_BYTES, usingProjectsMock, type ProjectFile } from "@/services/projects";
+import { listSparks } from "@/services/sparks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectProject, selectSubjectDetail } from "@/store/slices/projectSlice";
-import { fetchProject, fetchSubject, uploadProjectFileThunk } from "@/store/thunks/projectThunks";
+import { fetchProject, fetchSubject, linkSparkThunk, uploadProjectFileThunk } from "@/store/thunks/projectThunks";
 import { safeBack } from "@/utils/safeBack";
 
 export default function SubjectScreen() {
@@ -38,6 +39,8 @@ export default function SubjectScreen() {
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(0);
   const [newestFirst, setNewestFirst] = useState(true);
+  // "+ Start Spark": the group's Sparks to link to this subject.
+  const [linkChoices, setLinkChoices] = useState<Choice<string>[] | null>(null);
 
   useEffect(() => {
     if (!token || !projectId || !subjectId) return;
@@ -107,11 +110,40 @@ export default function SubjectScreen() {
       { text: "Cancel", style: "cancel" },
     ]);
 
-  const startSpark = () =>
-    Alert.alert("Start a Spark", "Long-press any message in the group chat and choose Start a Spark.", [
-      { text: "Not now", style: "cancel" },
-      { text: "Open chat", onPress: () => router.push({ pathname: "/chat/[id]", params: { id: project.conversationId } }) },
-    ]);
+  const openChat = () => router.push({ pathname: "/chat/[id]", params: { id: project.conversationId } });
+
+  // "+ Start Spark": link one of the group's Sparks here, or start a new one
+  // in the chat (from a message). Sample data: straight to the chat.
+  const startSpark = async () => {
+    if (usingProjectsMock() || !token) {
+      Alert.alert("Start a Spark", "Long-press any message in the group chat and choose Start a Spark.", [
+        { text: "Not now", style: "cancel" },
+        { text: "Open chat", onPress: openChat },
+      ]);
+      return;
+    }
+    try {
+      const { sparks: groupSparks } = await listSparks(project.conversationId, token);
+      const linked = new Set(sparks.map((spark) => spark.id));
+      setLinkChoices([
+        { value: "__new", label: "Start a new Spark in the chat" },
+        ...groupSparks.filter((spark) => !linked.has(spark.id)).map((spark) => ({ value: spark.id, label: spark.subject })),
+      ]);
+    } catch {
+      openChat();
+    }
+  };
+
+  const pickSpark = async (value: string) => {
+    setLinkChoices(null);
+    if (value === "__new") return openChat();
+    if (!token) return;
+    try {
+      await dispatch(linkSparkThunk({ projectId: project.id, subjectId: subject.id, sparkId: value, token })).unwrap();
+    } catch (message) {
+      Alert.alert("Link a Spark", String(message || "Couldn't link the Spark."));
+    }
+  };
 
   return (
     <GroupScreen title={chatTitle || "Group"} onBack={back}>
@@ -223,6 +255,15 @@ export default function SubjectScreen() {
           Files and Sparks stay together in {subject.name}.{"\n"}Also accessible from the {project.name} project.
         </Text>
       </ScrollView>
+
+      <ChoiceSheet
+        visible={!!linkChoices}
+        title="Link a Spark to this subject"
+        choices={linkChoices || []}
+        selected=""
+        onSelect={pickSpark}
+        onClose={() => setLinkChoices(null)}
+      />
     </GroupScreen>
   );
 }

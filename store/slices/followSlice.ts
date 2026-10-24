@@ -43,6 +43,8 @@ const initialState: FollowState = {
   error: null,
 };
 
+const unfollowedAside = new Map<string, unknown>();
+
 const followSlice = createSlice({
   name: "follow",
   initialState,
@@ -146,8 +148,15 @@ const followSlice = createSlice({
             : "Failed to load following";
       })
 
-      .addCase(followUserThunk.pending, (state) => {
+      // FOLLOW STRAIGHT AWAY: the button shows "Following" as soon as it's
+      // tapped; if the server says no, it changes back.
+      .addCase(followUserThunk.pending, (state, action) => {
         state.error = null;
+        const username = action.meta.arg.username;
+        if (!state.following.some((user) => user.username?.toLowerCase() === username.toLowerCase())) {
+          state.following.unshift({ username } as any);
+          state.followingTotal += 1;
+        }
       })
 
       .addCase(followUserThunk.fulfilled, (state) => {
@@ -157,6 +166,10 @@ const followSlice = createSlice({
 
       .addCase(followUserThunk.rejected, (state, action) => {
         state.loading = false;
+        const username = action.meta.arg.username.toLowerCase();
+        const before = state.following.length;
+        state.following = state.following.filter((user) => user.username?.toLowerCase() !== username);
+        if (state.following.length < before && state.followingTotal > 0) state.followingTotal -= 1;
 
         state.error =
           typeof action.payload === "string"
@@ -164,27 +177,33 @@ const followSlice = createSlice({
             : "Failed to follow user";
       })
 
-      .addCase(unfollowUserThunk.pending, (state) => {
+      // UNFOLLOW STRAIGHT AWAY (kept aside in case the server says no).
+      .addCase(unfollowUserThunk.pending, (state, action) => {
         state.error = null;
+        const username = action.meta.arg.username.toLowerCase();
+        const index = state.following.findIndex((user) => user.username?.toLowerCase() === username);
+        if (index >= 0) {
+          unfollowedAside.set(username, state.following[index] as any);
+          state.following.splice(index, 1);
+          if (state.followingTotal > 0) state.followingTotal -= 1;
+        }
       })
 
       .addCase(unfollowUserThunk.fulfilled, (state, action) => {
         state.loading = false;
         state.error = null;
-
-        const username = action.meta.arg.username;
-
-        state.following = state.following.filter(
-          (user) => user.username.toLowerCase() !== username.toLowerCase(),
-        );
-
-        if (state.followingTotal > 0) {
-          state.followingTotal -= 1;
-        }
+        unfollowedAside.delete(action.meta.arg.username.toLowerCase());
       })
 
       .addCase(unfollowUserThunk.rejected, (state, action) => {
         state.loading = false;
+        const username = action.meta.arg.username.toLowerCase();
+        const kept = unfollowedAside.get(username);
+        unfollowedAside.delete(username);
+        if (kept && !state.following.some((user) => user.username?.toLowerCase() === username)) {
+          state.following.unshift(kept as any);
+          state.followingTotal += 1;
+        }
 
         state.error =
           typeof action.payload === "string"
