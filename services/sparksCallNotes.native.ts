@@ -144,7 +144,15 @@ export function useSparksCallNotes({
         // The speech files come with the Sparks AI download. Try again when
         // the model status changes, and every 15 s as a backup.
         setPhase("waiting");
-        offModel = onModelStatus(() => setRetry((n) => n + 1));
+        // Only when the phase changes: during a download the status fires
+        // several times a second (progress), and every retry re-rendered the
+        // whole call screen, videos included.
+        let lastPhase = "";
+        offModel = onModelStatus((status) => {
+          if (status.phase === lastPhase) return;
+          lastPhase = status.phase;
+          setRetry((n) => n + 1);
+        });
         timer = setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
         return;
       }
@@ -216,17 +224,28 @@ export function useSparksCallNotes({
   const topic = last ? { title: last.title, colorIndex: last.colorIndex } : null;
   const sparks = useMemo(() => groupBySpark([...finals, ...Object.values(partials)], shifts), [finals, partials, shifts]);
 
-  return {
-    phase,
-    notice,
-    paused,
-    lines,
-    topic,
-    sparks,
-    accept: useCallback(() => record(true), [record]),
-    decline: useCallback(() => record(false), [record]),
-    togglePaused: useCallback(() => setPaused((p) => !p), []),
-  };
+  const accept = useCallback(() => record(true), [record]);
+  const decline = useCallback(() => record(false), [record]);
+  const togglePaused = useCallback(() => setPaused((p) => !p), []);
+  const topicTitle = topic?.title ?? null;
+  const topicColor = topic?.colorIndex ?? null;
+
+  // The same object until something shown changes, so the call screen's
+  // memoized Sparks pieces skip the renders the call timer causes.
+  return useMemo(
+    () => ({
+      phase,
+      notice,
+      paused,
+      lines,
+      topic: topicTitle === null ? null : { title: topicTitle, colorIndex: topicColor ?? 0 },
+      sparks,
+      accept,
+      decline,
+      togglePaused,
+    }),
+    [phase, notice, paused, lines, topicTitle, topicColor, sparks, accept, decline, togglePaused],
+  );
 }
 
 /**

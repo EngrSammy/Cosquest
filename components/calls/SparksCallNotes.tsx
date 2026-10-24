@@ -6,6 +6,7 @@
 // and a way into the Sparks panel (also: swipe the call screen right).
 // Nothing is shown when Sparks isn't running on this phone.
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { CALL_COLORS } from "@/components/calls/CallVisuals";
@@ -23,7 +24,9 @@ export function nameOf(call: Call, userId: string, myUserId: string | null) {
   return speakerLabel(userId, myUserId, null, person?.name || person?.username).text;
 }
 
-export default function SparksCallNotes({
+// memo: the call screen re-renders every second (timer); the notes only
+// when the captions do (useSparksCallNotes keeps the same object till then).
+export default memo(function SparksCallNotes({
   notes,
   call,
   myUserId,
@@ -135,7 +138,7 @@ export default function SparksCallNotes({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "stretch", marginHorizontal: 20, gap: 8 },

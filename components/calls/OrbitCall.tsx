@@ -15,11 +15,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
+import {
+  DECAY,
+  MOVE_MS,
+  TICK_MS,
+  holdCenter,
+  layoutKey,
+  pickCenter,
+  placeOrbit,
+  type Box,
+  type CenterHold,
+} from "@/components/calls/orbitLayout";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const INK = "#24283C";
@@ -62,39 +73,52 @@ function initials(name: string) {
 }
 
 // ---------------------------------------------------------------------
-// Engagement: speaking adds to a person's score, silence slowly lowers it.
+// Engagement and layout: components/calls/orbitLayout.ts
 // ---------------------------------------------------------------------
-const TICK_MS = 500;
-const DECAY = 0.985; // per tick: about 30 s to lose half
-const INNER_MAX = 6;
-const OUTER_MAX = 12;
-
-function useEngagement(people: OrbitPerson[]) {
+// Scores tick every 500 ms, but the orbit only re-renders when the layout
+// actually changes (someone moves ring or takes the middle). It used to
+// re-render twice a second for the whole call, live videos included.
+function useOrbitLayout(people: OrbitPerson[], pinnedId: string | null, box: Box) {
   const scores = useRef(new Map<string, number>());
+  const center = useRef<CenterHold | null>(null);
+  const shownKey = useRef("");
   const [, setVersion] = useState(0);
-  const latest = useRef(people);
-  latest.current = people;
+  const latest = useRef({ people, pinnedId, box });
+  latest.current = { people, pinnedId, box };
+
+  const resolveCenter = (now: number) => {
+    const { people: list, pinnedId: pinned } = latest.current;
+    center.current = holdCenter(center.current, list, pickCenter(list, pinned, scores.current), now);
+    return center.current?.id ?? null;
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
       const next = new Map<string, number>();
-      for (const person of latest.current) {
+      for (const person of latest.current.people) {
         const before = scores.current.get(person.id) || 0;
         next.set(person.id, before * DECAY + (person.speaking ? 1 : 0));
       }
       scores.current = next;
-      setVersion((v) => v + 1);
+      const { people: list, box: size } = latest.current;
+      const key = layoutKey(placeOrbit(list, size, next, resolveCenter(Date.now())), size);
+      if (key !== shownKey.current) setVersion((v) => v + 1);
     }, TICK_MS);
     return () => clearInterval(timer);
+    // resolveCenter only reads refs.
   }, []);
 
-  return scores.current;
+  const placed = placeOrbit(people, box, scores.current, resolveCenter(Date.now()));
+  shownKey.current = layoutKey(placed, box);
+  return placed;
 }
 
 // ---------------------------------------------------------------------
 // One circle: animates to its slot, pulses while speaking.
 // ---------------------------------------------------------------------
-function OrbitCircle({
+// memo: a new speaker re-renders only the circles whose person changed, not
+// every live video in the orbit.
+const OrbitCircle = memo(function OrbitCircle({
   person,
   x,
   y,
@@ -103,8 +127,8 @@ function OrbitCircle({
   pinned,
   faded,
   label,
-  video,
-  onPress,
+  renderVideo,
+  onTap,
 }: {
   person: OrbitPerson;
   x: number;
@@ -114,22 +138,34 @@ function OrbitCircle({
   pinned: boolean;
   faded: boolean;
   label: boolean;
-  video: ReactNode;
-  onPress: () => void;
+  renderVideo: (id: string) => ReactNode;
+  onTap: (person: OrbitPerson) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
-  const pos = useRef(new Animated.ValueXY({ x, y })).current;
-  const dim = useRef(new Animated.Value(size)).current;
+  // Centre of the circle.
+  const center = useRef(new Animated.ValueXY({ x, y })).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
+  // The circle glides to its new place (left/top, a short 320 ms glide) and
+  // its size changes in one step. Animating the size resized the live video
+  // inside on every frame, and the video surface dropped frames (black
+  // flashes) while it did. (It was a JS-thread spring on left/top/width/
+  // height that took over a second to settle.) Not a transform: Android
+  // draws the video on its own surface, which doesn't follow transforms,
+  // so the picture was left behind (black circles).
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(pos, { toValue: { x, y }, useNativeDriver: false, friction: 9, tension: 40 }),
-      Animated.spring(dim, { toValue: size, useNativeDriver: false, friction: 9, tension: 40 }),
-    ]).start();
-  }, [x, y, size, pos, dim]);
+    Animated.timing(center, {
+      toValue: { x, y },
+      duration: MOVE_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [x, y, center]);
 
+  // The speaking pulse is only opacity and scale, so it runs on the native
+  // driver: no JS work per frame while someone talks (it used to run on the
+  // JS thread for every speaker, the whole time they spoke).
   useEffect(() => {
     if (!person.speaking) {
       pulse.stopAnimation();
@@ -138,40 +174,45 @@ function OrbitCircle({
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-        Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [person.speaking, pulse]);
 
-  const half = Animated.multiply(dim, 0.5);
-  const left = Animated.subtract(pos.x, half);
-  const top = Animated.subtract(pos.y, half);
+  // Built once per circle, not on every render.
+  // The new size grows or shrinks around the centre (not the old corner),
+  // so a resized circle doesn't overlap its neighbours while it moves.
+  const move = useMemo(
+    () => ({ left: Animated.subtract(center.x, size / 2), top: Animated.subtract(center.y, size / 2) }),
+    [center, size],
+  );
+  const pulseStyle = useMemo(
+    () => ({
+      opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
+      transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }],
+    }),
+    [pulse],
+  );
   const ringColor = person.ringing || faded ? GREY : color;
   const fontSize = Math.max(11, Math.round(size * 0.28));
+  const video = person.hasVideo ? renderVideo(person.id) : null;
 
   return (
-    <Animated.View style={[styles.circleWrap, { left, top, width: dim, height: dim }]}>
+    <Animated.View style={[styles.circleWrap, { width: size, height: size }, move]}>
       {/* Pulse while speaking */}
       {person.speaking ? (
         <Animated.View
           pointerEvents="none"
-          style={[
-            styles.pulse,
-            {
-              borderColor: ringColor,
-              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
-              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }],
-            },
-          ]}
+          style={[styles.pulse, { borderColor: ringColor }, pulseStyle]}
         />
       ) : null}
       {person.speaking ? <View pointerEvents="none" style={[styles.glow, { backgroundColor: ringColor }]} /> : null}
 
       <Pressable
-        onPress={onPress}
+        onPress={() => onTap(person)}
         accessibilityLabel={person.name}
         style={[
           styles.circle,
@@ -214,77 +255,43 @@ function OrbitCircle({
       ) : null}
     </Animated.View>
   );
-}
+});
 
 // ---------------------------------------------------------------------
 // The orbit
 // ---------------------------------------------------------------------
-function OrbitView({
+// memo: the call timer and captions re-render the screen every second or
+// so; the orbit (and the videos in it) only when people or cameras change.
+const OrbitView = memo(function OrbitView({
   people,
   pinnedId,
   renderVideo,
   onTap,
+  onCenter,
 }: {
   people: OrbitPerson[];
   pinnedId: string | null;
   renderVideo: (id: string) => ReactNode;
   onTap: (person: OrbitPerson) => void;
+  // Who is in the middle (the "… is speaking" line follows it).
+  onCenter: (id: string | null) => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  const scores = useEngagement(people);
-
-  const placed = useMemo(() => {
-    if (!box.w || !people.length) return [];
-    const cx = box.w / 2;
-    const cy = box.h / 2;
-    const min = Math.min(box.w, box.h);
-    const centerSize = Math.min(132, min * 0.34);
-    const innerR = min * 0.3;
-    const outerR = min * 0.45;
-    const innerSize = Math.min(66, min * 0.17);
-    const outerSize = Math.min(42, min * 0.11);
-
-    // Center: the loudest speaker now, else the pinned person, else the most engaged.
-    const byScore = [...people].sort((a, b) => (scores.get(b.id) || 0) - (scores.get(a.id) || 0));
-    const speakingNow = byScore.filter((p) => p.speaking);
-    const center =
-      speakingNow[0] || people.find((p) => p.id === pinnedId) || byScore[0];
-
-    const rest = byScore.filter((p) => p.id !== center.id);
-    // Engaged (spoke recently) go inside; ringing people never go inside.
-    const inner = rest.filter((p) => !p.ringing && (scores.get(p.id) || 0) > 0.3).slice(0, INNER_MAX);
-    // With few people, fill the inner ring anyway (it looks empty otherwise).
-    const fill = rest.filter((p) => !inner.includes(p) && !p.ringing);
-    while (inner.length < Math.min(INNER_MAX, 4) && fill.length) inner.push(fill.shift()!);
-    const outer = rest.filter((p) => !inner.includes(p)).slice(0, OUTER_MAX);
-
-    // Stable slot order (by id), so circles don't swap places needlessly.
-    const ring = (list: OrbitPerson[], radius: number, size: number, offset: number) =>
-      [...list]
-        .sort((a, b) => a.id.localeCompare(b.id))
-        .map((person, index, all) => {
-          const angle = offset + (index / all.length) * Math.PI * 2;
-          return { person, x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius, size, ring: "inner" as const };
-        });
-
-    return [
-      { person: center, x: cx, y: cy, size: centerSize, ring: "center" as const },
-      ...ring(inner, innerR, innerSize, -Math.PI / 2),
-      ...ring(outer, outerR, outerSize, -Math.PI / 2 + Math.PI / Math.max(outer.length, 1)).map((slot) => ({
-        ...slot,
-        ring: "outer" as const,
-      })),
-    ];
-    // scores changes every tick; people/pinned/box drive the rest.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, pinnedId, box, scores]);
+  const [box, setBox] = useState<Box>({ w: 0, h: 0 });
+  const placed = useOrbitLayout(people, pinnedId, box);
+  const centerId = placed[0]?.person.id ?? null;
+  useEffect(() => onCenter(centerId), [centerId, onCenter]);
 
   const hidden = Math.max(0, people.length - placed.length);
   const min = Math.min(box.w, box.h);
 
   return (
-    <View style={styles.orbit} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View
+      style={styles.orbit}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setBox((current) => (current.w === width && current.h === height ? current : { w: width, h: height }));
+      }}>
       {/* Dotted guide rings */}
       {min ? (
         <>
@@ -304,8 +311,8 @@ function OrbitView({
           pinned={slot.person.id === pinnedId && slot.ring === "center"}
           faded={slot.ring === "outer" && !slot.person.speaking}
           label={slot.ring !== "outer"}
-          video={renderVideo(slot.person.id)}
-          onPress={() => onTap(slot.person)}
+          renderVideo={renderVideo}
+          onTap={onTap}
         />
       ))}
 
@@ -316,7 +323,7 @@ function OrbitView({
       ) : null}
     </View>
   );
-}
+});
 
 // ---------------------------------------------------------------------
 // The call screen (header, orbit, last line, controls)
@@ -402,13 +409,23 @@ export default function OrbitCallScreen({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
-  const speaker = people.find((p) => p.speaking && !p.isMe) || people.find((p) => p.speaking);
+  // The person in the middle when they're talking, so the line and the
+  // orbit agree; otherwise anyone talking (others before you).
+  const [centerId, setCenterId] = useState<string | null>(null);
+  const center = people.find((p) => p.id === centerId);
+  const speaker =
+    (center?.speaking ? center : undefined) ||
+    people.find((p) => p.speaking && !p.isMe) ||
+    people.find((p) => p.speaking);
   const comingSoon = (what: string) => Alert.alert(what, `${what} is coming soon.`);
 
   // Tap a circle: identity card. Tap the same circle again: progress view.
   const [card, setCard] = useState<{ id: string; step: "card" | "progress" } | null>(null);
-  const tapPerson = (person: OrbitPerson) =>
-    setCard((current) => (current?.id === person.id ? { id: person.id, step: "progress" } : { id: person.id, step: "card" }));
+  const tapPerson = useCallback(
+    (person: OrbitPerson) =>
+      setCard((current) => (current?.id === person.id ? { id: person.id, step: "progress" } : { id: person.id, step: "card" })),
+    [],
+  );
   const cardPerson = card ? people.find((person) => person.id === card.id) || null : null;
 
   return (
@@ -437,7 +454,7 @@ export default function OrbitCallScreen({
       {extra}
 
       {/* ORBIT */}
-      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} />
+      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} onCenter={setCenterId} />
 
       {/* FOCUS / WHO'S TALKING */}
       {focusOn ? (

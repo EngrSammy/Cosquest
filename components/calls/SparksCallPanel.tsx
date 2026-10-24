@@ -11,7 +11,7 @@
 // when everyone is in; "Full transcript ›" sits in the header.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { callNotesEnabled } from "@/components/calls/CallNotesSheet";
@@ -97,7 +97,8 @@ function SparkCard({ spark, call, myUserId }: { spark: CallSpark; call: Call; my
   );
 }
 
-export default function SparksCallPanel({
+// memo: re-renders when the call's Sparks change, not with the call timer.
+export default memo(function SparksCallPanel({
   notes,
   call,
   myUserId,
@@ -228,7 +229,7 @@ export default function SparksCallPanel({
       </ScrollView>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 20 },
