@@ -6,23 +6,27 @@
 // and a way into the Sparks panel (also: swipe the call screen right).
 // Nothing is shown when Sparks isn't running on this phone.
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { CALL_COLORS } from "@/components/calls/CallVisuals";
+import { speakerLabel } from "@/services/callTranscriptCopy";
 import type { Call } from "@/services/calls";
 import type { CallNotes } from "@/services/sparksCallNotes";
 
 // Topic colours; a topic that comes back keeps its colour (colorIndex).
 export const TOPIC_COLORS = ["#3FD3E0", "#F5A524", "#C5399A", "#2FB36B", "#8B7CF6", "#FF7A59", "#4C9AFF", "#E5D04B"];
 
+/** Everyone by name; the viewer's own lines get "(you)" (as in the transcript). */
 export function nameOf(call: Call, userId: string, myUserId: string | null) {
-  if (userId === myUserId) return "You";
   const person =
     call.members.find((m) => m.user.id === userId)?.user || (call.caller?.id === userId ? call.caller : null);
-  return person?.name || person?.username || "Someone";
+  return speakerLabel(userId, myUserId, null, person?.name || person?.username).text;
 }
 
-export default function SparksCallNotes({
+// memo: the call screen re-renders every second (timer); the notes only
+// when the captions do (useSparksCallNotes keeps the same object till then).
+export default memo(function SparksCallNotes({
   notes,
   call,
   myUserId,
@@ -134,7 +138,7 @@ export default function SparksCallNotes({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "stretch", marginHorizontal: 20, gap: 8 },

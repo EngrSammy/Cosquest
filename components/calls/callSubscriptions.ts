@@ -114,6 +114,22 @@ function subscribeVisible(listener: () => void) {
   };
 }
 
+// FOCUS MODE ("hear nobody, stay in the call"): every microphone
+// unsubscribed while it's on. Kept here, not in the call screen, so this
+// manager is the only thing that subscribes and unsubscribes: when the call
+// screen did it, the manager could subscribe a microphone that started
+// during focus mode again, and that person was heard.
+let voicesMuted = false;
+
+export function setVoicesMuted(muted: boolean) {
+  if (voicesMuted === muted) {
+    return;
+  }
+
+  voicesMuted = muted;
+  listeners.forEach((listener) => listener());
+}
+
 // Who the stage currently shows (null = no stage). Used by the dev mock.
 export function useStageVisible() {
   return useSyncExternalStore(subscribeVisible, getStageVisible, getStageVisible);
@@ -132,7 +148,7 @@ function wants(
   allVideo: boolean,
 ) {
   if (publication.kind === Track.Kind.Audio) {
-    return true;
+    return !voicesMuted;
   }
 
   // Video (camera, or a screen share if one is ever added).
