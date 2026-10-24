@@ -17,6 +17,7 @@ import {
   fetchScheduledCall,
   fetchScheduledCalls,
   respondScheduledCallThunk,
+  updateScheduledCallThunk,
 } from "../thunks/scheduledCallThunks";
 
 type State = {
@@ -89,7 +90,8 @@ const scheduledCallSlice = createSlice({
       .addCase(fetchScheduledCall.fulfilled, (state, action) => keep(state, action.payload))
       .addCase(createScheduledCallThunk.fulfilled, (state, action) => keep(state, action.payload))
       .addCase(cancelScheduledCallThunk.fulfilled, (state, action) => keep(state, action.payload))
-      .addCase(respondScheduledCallThunk.fulfilled, (state, action) => keep(state, action.payload));
+      .addCase(respondScheduledCallThunk.fulfilled, (state, action) => keep(state, action.payload))
+      .addCase(updateScheduledCallThunk.fulfilled, (state, action) => keep(state, action.payload));
   },
 });
 

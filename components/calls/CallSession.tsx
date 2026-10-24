@@ -302,7 +302,8 @@ export default function CallSession() {
         serverUrl={active.livekitUrl}
         token={active.token}
         connect
-        audio
+        // The caller's mic starts after the ringing (see "CALLER'S MIC" below).
+        audio={active.direction === "incoming"}
         video={active.call.type === "video"}
         options={CALL_ROOM_OPTIONS}
         connectOptions={connectOptions}
@@ -501,6 +502,7 @@ function CallStage({
               topInset={insets.top}
               bottomInset={insets.bottom}
               onBack={backToCall}
+              clearMinimize={!call.isGroup}
             />
           ) : null}
         </CallBackground>
@@ -514,8 +516,27 @@ function CallStage({
     ...(localParticipant?.isSpeaking && myUserId ? [myUserId] : []),
   ];
 
-  // Caller hears "brr-brr" until the other person picks up.
-  useCallTone("ringback", direction === "outgoing" && !answered && !endMessage);
+  // Caller hears "brr-brr" until the other person picks up. It stops as soon
+  // as the server says the call was accepted, before their audio arrives.
+  const ringing = direction === "outgoing" && !answered && call.status !== "accepted" && !endMessage;
+  useCallTone("ringback", ringing);
+
+  // CALLER'S MIC: the ringback plays through expo-audio, which takes over the
+  // iPhone's audio session (playback only, then off when it stops). A mic
+  // published during the ringing never came back, so the other person heard
+  // nothing and neither did the caller. The caller joins with the mic off and
+  // turns it on once the ringing has stopped. Muting during the ringing wins.
+  const micTouched = useRef(false);
+  const micStarted = useRef(direction === "incoming");
+  useEffect(() => {
+    if (micStarted.current || ringing || endMessage) return;
+    const t = setTimeout(() => {
+      if (micStarted.current) return;
+      micStarted.current = true;
+      if (!micTouched.current) localParticipant.setMicrophoneEnabled(true).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [ringing, endMessage, localParticipant]);
 
   const myCameraOn = isCameraEnabled && !!localTrack;
 
@@ -627,6 +648,8 @@ function CallStage({
   // ---------- controls ----------
 
   const toggleMic = () => {
+    micTouched.current = true;
+    micStarted.current = true;
     localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
   };
 

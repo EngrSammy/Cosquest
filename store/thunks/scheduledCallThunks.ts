@@ -15,6 +15,7 @@ import {
   listScheduledCalls,
   messageOf,
   respondToScheduledCall,
+  updateScheduledCall,
   type ScheduledCall,
   type ScheduledCallInput,
 } from "@/services/scheduledCalls";
@@ -78,5 +79,17 @@ export const respondScheduledCallThunk = createAsyncThunk<
     return await respondToScheduledCall(callId, status, me, token);
   } catch (error) {
     return rejectWithValue(failed(error, "Couldn't send your reply."));
+  }
+});
+
+export const updateScheduledCallThunk = createAsyncThunk<
+  ScheduledCall,
+  { callId: string; changes: Partial<ScheduledCallInput>; token: string },
+  { rejectValue: string }
+>("scheduledCalls/update", async ({ callId, changes, token }, { rejectWithValue }) => {
+  try {
+    return await updateScheduledCall(callId, changes, token);
+  } catch (error) {
+    return rejectWithValue(failed(error, "Couldn't save your changes."));
   }
 });
