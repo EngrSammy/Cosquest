@@ -1,3 +1,4 @@
+import { refreshProject } from "@/store/thunks/projectThunks";
 import { onScheduledAdmission, onScheduledWaiting } from "@/components/calls/scheduled/scheduledCallJoin";
 import { scheduledCallUpdated } from "@/store/slices/scheduledCallSlice";
 import { applyPrivateUpdate, receivePrivateIncoming } from "@/components/calls/privateCall";
@@ -258,6 +259,11 @@ export function useSocketConnection() {
 
     // Scheduled group calls: created / edited / cancelled / RSVP (the call
     // without passcode or invite link; the slice keeps the ones it has).
+    // Projects: someone changed one (files, subjects, Sparks, archive).
+    const handleProjectUpdated = (payload: { projectId?: string }) => {
+      if (payload?.projectId) dispatch(refreshProject(payload.projectId));
+    };
+
     const handleScheduledCallUpdated = (payload: { call?: any }) => {
       if (payload?.call) dispatch(scheduledCallUpdated(payload.call));
     };
@@ -327,6 +333,7 @@ export function useSocketConnection() {
     socket.on("call:incoming", handleCallIncoming);
     socket.on("call:updated", handleCallUpdated);
     socket.on("scheduled-call:updated", handleScheduledCallUpdated);
+    socket.on("project:updated", handleProjectUpdated);
     socket.on("scheduled-call:waiting", onScheduledWaiting);
     socket.on("scheduled-call:admission", onScheduledAdmission);
     socket.on("connect", handleConnect);
@@ -341,6 +348,7 @@ export function useSocketConnection() {
       socket.off("call:incoming", handleCallIncoming);
       socket.off("call:updated", handleCallUpdated);
       socket.off("scheduled-call:updated", handleScheduledCallUpdated);
+      socket.off("project:updated", handleProjectUpdated);
       socket.off("scheduled-call:waiting", onScheduledWaiting);
       socket.off("scheduled-call:admission", onScheduledAdmission);
       socket.off("connect", handleConnect);

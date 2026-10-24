@@ -5472,10 +5472,15 @@ export default function ChatScreen() {
       )}
 
       {/* SPARKS RAIL (layout option A: side rail) */}
-      {sparksChat && !selectionMode && !desktop && sparkLayout === "rail" ? (
+      {sparksChat && !selectionMode && !desktop && sparkLayout === "rail" && (!groupChat || groupTab === "chat") ? (
         <SparksRail
           sparks={sparks}
-          top={insets.top + (pinnedMessageId ? 136 : 76)}
+          // Below the group tabs (Chat / Sparks / Calls / Projects) when there are some.
+          top={
+            groupChat && tabsBottom
+              ? tabsBottom + 10 + (pinnedMessageId ? 60 : 0)
+              : insets.top + (pinnedMessageId ? 136 : 76)
+          }
           onOpen={(spark) => setOpenSparkId(spark.id)}
           onShowAll={() => setShowAllSparks(true)}
         />

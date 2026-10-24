@@ -476,7 +476,8 @@ export default function UserProfileScreen() {
               ]}
               onPress={toggleFollow}
               disabled={!!busy}>
-              {busy === "follow" ? (
+              {/* Follow changes straight away (it changes back if the server says no). */}
+              {false ? (
                 <ActivityIndicator
                   size="small"
                   color={ink.text(iFollow ? "#C5399A" : "#FFFFFF")}

@@ -61,8 +61,13 @@ export default function CallsTab({
   const selectCalls = useMemo(() => makeSelectChatCalls(), []);
   const calls = useAppSelector((state) => selectCalls(state, conversationId));
   const loaded = useAppSelector((state) => !!state.scheduledCalls.loadedChats[conversationId]);
-  const loading = !loaded;
-  const error = useAppSelector((state) => (loaded ? "" : state.scheduledCalls.errorByChat[conversationId] || ""));
+  const serverError = useAppSelector((state) => (loaded ? "" : state.scheduledCalls.errorByChat[conversationId] || ""));
+  // Scheduled calls are for groups people create (the backend's rule).
+  const error = /belong to a group/i.test(serverError)
+    ? "Scheduled calls are for groups you create. In this room, use Meet now to start a voice chat."
+    : serverError;
+  // Loading only until the first answer (the list, or an error).
+  const loading = !loaded && !error;
   const [view, setView] = useState<"upcoming" | "past">("upcoming");
 
   // Reload whenever the chat comes back into view (e.g. after scheduling).

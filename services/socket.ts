@@ -37,7 +37,7 @@ export function connectSocket(token: string): Socket {
     // "Missing auth token") — surfaced here for visibility while wiring
     // this up; the reconnect itself is handled automatically by
     // socket.io-client's default reconnection behavior.
-    console.error("SOCKET CONNECT ERROR:", error.message);
+    console.warn("Socket couldn't connect yet (retrying):", error.message);
   });
 
   return socket;

@@ -189,7 +189,7 @@ export default function Notifications() {
 
     const isFollowing = followingUsernames.has(username.toLowerCase());
 
-    setBusyUsernames((current) => ({ ...current, [username]: true }));
+    // Follow changes straight away (the follow list updates at once), so no spinner.
 
     try {
       if (isFollowing) {
