@@ -7,7 +7,7 @@
 // scheduling ("Call scheduled · Invitations sent").
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +22,7 @@ import { SparkChip } from "@/components/calls/scheduled/ScheduledCallCard";
 import { Card, PrimaryButton, SecondaryButton, UI } from "@/components/chat/ui";
 import { GroupScreen } from "@/components/groups/GroupUi";
 import { useJoinVoice } from "@/components/voice/voiceUi";
+import { joinScheduledCall } from "@/components/calls/scheduled/scheduledCallJoin";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import {
@@ -34,6 +35,7 @@ import {
   REPEAT_LABELS,
   messageOf,
   timeZoneLabel,
+  usingScheduledCallsMock,
   type RsvpStatus,
   type ScheduledCall,
 } from "@/services/scheduledCalls";
@@ -96,7 +98,21 @@ export default function ScheduledCallDetails() {
   const [copied, setCopied] = useState(false);
 
   const chatTitle = useChatTitle(call?.conversationId || "");
-  const { join, joining } = useJoinVoice(call?.conversationId || "", chatTitle || "Voice chat");
+  // Join: the call's own room (passcode, waiting room). While the backend
+  // isn't deployed (mock calls), the group's voice chat as before.
+  const voice = useJoinVoice(call?.conversationId || "", chatTitle || "Voice chat");
+  const [joiningCall, setJoiningCall] = useState(false);
+  const join = async () => {
+    if (!call) return;
+    if (usingScheduledCallsMock()) return voice.join();
+    setJoiningCall(true);
+    try {
+      await joinScheduledCall(call);
+    } finally {
+      setJoiningCall(false);
+    }
+  };
+  const joining = voice.joining || joiningCall;
 
   useEffect(() => {
     if (!token || !callId) return;
@@ -203,7 +219,17 @@ export default function ScheduledCallDetails() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Call details</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Call details</Text>
+          {hosting && !cancelled && !over && start > new Date() ? (
+            <Pressable
+              hitSlop={10}
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: "/group/schedule/[id]", params: { id: call.conversationId, callId: call.id } })}>
+              <Text style={styles.edit}>Edit</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         {cancelled ? (
           <View style={[styles.banner, styles.bannerMuted]}>
@@ -367,6 +393,8 @@ const STYLE_PAIR = themedStyles(
     },
     content: { paddingHorizontal: 16, paddingTop: 4 },
     title: { fontFamily: FONTS.bold, fontSize: 24, lineHeight: 30, color: UI.INK },
+    titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    edit: { fontFamily: FONTS.semibold, fontSize: 15, color: UI.PINK },
     banner: {
       flexDirection: "row",
       alignItems: "center",
