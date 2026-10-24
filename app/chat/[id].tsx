@@ -139,6 +139,7 @@ import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
 import CallsTab from "@/components/calls/scheduled/CallsTab";
+import ProjectsTab from "@/components/projects/ProjectsTab";
 import ScheduledCallMessage, { type ScheduledCallCardData } from "@/components/calls/scheduled/ScheduledCallMessage";
 import { ScreenGradient } from "@/components/chat/ui";
 
@@ -5761,11 +5762,7 @@ export default function ChatScreen() {
               myId={String(currentUserId)}
             />
           ) : (
-            <View style={styles.comingSoon}>
-              <ScreenGradient />
-              <Ionicons name="construct-outline" size={28} color={ink.text("#66738A")} />
-              <Text style={styles.comingSoonText}>Projects are coming soon.</Text>
-            </View>
+            <ProjectsTab conversationId={conversationId} title={(conversation as any)?.title || ""} />
           )}
         </View>
       ) : null}
