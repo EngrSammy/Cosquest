@@ -147,17 +147,19 @@ const OrbitCircle = memo(function OrbitCircle({
   const corner = useRef(new Animated.ValueXY({ x: x - size / 2, y: y - size / 2 })).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
-  // The circle glides to its new place on the native driver (a transform:
-  // no JS work per frame). Its size changes in one step: animating the size
-  // resized the live video inside on every frame, and the video surface
-  // dropped frames (black flashes) while it did. (It was a JS-thread spring
-  // on left/top/width/height that took over a second to settle.)
+  // The circle glides to its new place (left/top, a short 320 ms glide) and
+  // its size changes in one step. Animating the size resized the live video
+  // inside on every frame, and the video surface dropped frames (black
+  // flashes) while it did. (It was a JS-thread spring on left/top/width/
+  // height that took over a second to settle.) Not a transform: Android
+  // draws the video on its own surface, which doesn't follow transforms,
+  // so the picture was left behind (black circles).
   useEffect(() => {
     Animated.timing(corner, {
       toValue: { x: x - size / 2, y: y - size / 2 },
       duration: MOVE_MS,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [x, y, size, corner]);
 
@@ -181,7 +183,7 @@ const OrbitCircle = memo(function OrbitCircle({
   }, [person.speaking, pulse]);
 
   // Built once per circle, not on every render.
-  const move = useMemo(() => ({ transform: [{ translateX: corner.x }, { translateY: corner.y }] }), [corner]);
+  const move = useMemo(() => ({ left: corner.x, top: corner.y }), [corner]);
   const pulseStyle = useMemo(
     () => ({
       opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
@@ -676,7 +678,7 @@ const STYLE_PAIR = themedStyles({
   orbit: { flex: 1, marginHorizontal: 8, overflow: "hidden" },
   guide: { position: "absolute", borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(102,115,138,0.25)" },
 
-  circleWrap: { position: "absolute", left: 0, top: 0, alignItems: "center", justifyContent: "center" },
+  circleWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
   circle: {
     width: "100%",
     height: "100%",
