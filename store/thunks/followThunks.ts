@@ -69,6 +69,10 @@ export const followUserThunk = createAsyncThunk(
     try {
       return await followUser(username, token);
     } catch (error) {
+      // Already following: that's what we wanted.
+      if (error instanceof Error && /already follow/i.test(error.message)) {
+        return { message: error.message, following: true };
+      }
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to follow user",
       );
@@ -91,6 +95,10 @@ export const unfollowUserThunk = createAsyncThunk(
     try {
       return await unfollowUser(username, token);
     } catch (error) {
+      // Already not following: that's what we wanted.
+      if (error instanceof Error && /(not|n't) follow/i.test(error.message)) {
+        return { message: error.message, following: false };
+      }
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to unfollow user",
       );

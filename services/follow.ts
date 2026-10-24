@@ -52,14 +52,28 @@ export async function getFollowing(
     ? `&search=${encodeURIComponent(search.trim())}`
     : "";
 
-  return apiRequest<FollowUsersResponse>(
-    `/api/users/${encodeURIComponent(
-      username,
-    )}/following?page=1&limit=20${searchPart}`,
-    {
-      token,
-    },
-  );
+  // A search: the first page is enough.
+  if (searchPart) {
+    return apiRequest<FollowUsersResponse>(
+      `/api/users/${encodeURIComponent(username)}/following?page=1&limit=20${searchPart}`,
+      { token },
+    );
+  }
+
+  // EVERYONE YOU FOLLOW: every page, so Follow / Following is right for
+  // all of them (not only the first 20).
+  const users: FollowUser[] = [];
+  let total = 0;
+  for (let page = 1; page <= 50; page++) {
+    const response = await apiRequest<FollowUsersResponse>(
+      `/api/users/${encodeURIComponent(username)}/following?page=${page}&limit=50`,
+      { token },
+    );
+    users.push(...(response?.users || []));
+    total = response?.pagination?.total ?? users.length;
+    if (!response?.pagination?.hasMore || !response?.users?.length) break;
+  }
+  return { users, pagination: { page: 1, limit: users.length, total, hasMore: false } } as FollowUsersResponse;
 }
 
 export async function followUser(username: string, token: string) {

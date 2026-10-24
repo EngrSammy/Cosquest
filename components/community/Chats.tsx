@@ -34,7 +34,7 @@ import { useSparksBoot } from "@/hooks/useSparks";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useThemedStyles, useInk } from "@/constants/chatTheme";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
-import { fetchFollowing, followUserThunk } from "@/store/thunks/followThunks";
+import { fetchFollowing, followUserThunk, unfollowUserThunk } from "@/store/thunks/followThunks";
 
 // ==========================================
 // DESIGN TOKENS (from M01)
@@ -400,18 +400,22 @@ export function Chats() {
     }
   }
 
+  // Follow <-> Following, straight away (tap Following to unfollow). The
+  // follow list updates at once; it changes back if the server says no.
   async function handleFollow(person: FollowUser) {
     if (!token) return;
-    setProcessingUsername(person.username);
+    const isFollowing = followingUsernames.has(person.username.toLowerCase());
     try {
-      await dispatch(followUserThunk({ username: person.username, token })).unwrap();
-      if (currentUsername) {
-        await dispatch(fetchFollowing({ username: currentUsername, token })).unwrap();
+      if (isFollowing) {
+        await dispatch(unfollowUserThunk({ username: person.username, token })).unwrap();
+      } else {
+        await dispatch(followUserThunk({ username: person.username, token })).unwrap();
       }
     } catch (followError) {
-      Alert.alert("Unable to Follow", getErrorMessage(followError, "Could not follow this user."));
-    } finally {
-      setProcessingUsername(null);
+      Alert.alert(
+        isFollowing ? "Unable to Unfollow" : "Unable to Follow",
+        getErrorMessage(followError, isFollowing ? "Could not unfollow this user." : "Could not follow this user."),
+      );
     }
   }
 
