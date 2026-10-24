@@ -368,6 +368,7 @@ function VoiceEndedCard({ conversationId }: { conversationId: string }) {
         visible={open}
         onClose={() => setOpen(false)}
         nameOf={(userId) => (userId === myId ? "you" : value.names[userId] || "someone on the call")}
+        myUserId={myId}
       />
     </>
   );

@@ -7,7 +7,7 @@
 // (id = the group chat's conversation id)
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,11 +37,13 @@ import {
   timeZoneLabel,
   type CallAudience,
   type CallRepeat,
+  type ScheduledCallInput,
 } from "@/services/scheduledCalls";
 import { listSparks } from "@/services/sparks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { createScheduledCallThunk } from "@/store/thunks/scheduledCallThunks";
-import { scheduleCallReminder } from "@/utils/callReminders";
+import { selectScheduledCall } from "@/store/slices/scheduledCallSlice";
+import { createScheduledCallThunk, fetchScheduledCall, updateScheduledCallThunk } from "@/store/thunks/scheduledCallThunks";
+import { cancelCallReminder, scheduleCallReminder } from "@/utils/callReminders";
 import { safeBack } from "@/utils/safeBack";
 
 type LinkedSpark = { id: string; subject: string } | null;
@@ -157,7 +159,10 @@ export default function ScheduleCall() {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, callId: editParam } = useLocalSearchParams<{ id: string; callId?: string }>();
+  // EDIT: opened from Call details' Edit (?callId=...).
+  const editId = Array.isArray(editParam) ? editParam[0] : editParam;
+  const editing = useAppSelector((state) => selectScheduledCall(state, editId));
   const conversationId = Array.isArray(id) ? id[0] : id;
   const token = useAppSelector((state) => state.auth.token);
   const dispatch = useAppDispatch();
@@ -184,6 +189,35 @@ export default function ScheduleCall() {
   const [tried, setTried] = useState(false);
 
   const update = (patch: Partial<Form>) => setForm((current) => ({ ...current, ...patch }));
+
+  // EDIT: load the call if needed, then fill the form with it (once).
+  useEffect(() => {
+    if (editId && token && !editing) dispatch(fetchScheduledCall({ callId: editId, token }));
+  }, [editId, token, editing, dispatch]);
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!editing || prefilled.current) return;
+    prefilled.current = true;
+    const at = new Date(editing.startsAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const day = new Date(at);
+    day.setHours(0, 0, 0, 0);
+    setForm({
+      topic: editing.topic,
+      description: editing.description || "",
+      spark: editing.spark,
+      day: Math.max(0, Math.round((day.getTime() - today.getTime()) / 86400000)),
+      minutes: at.getHours() * 60 + at.getMinutes(),
+      durationMin: editing.durationMin,
+      repeat: editing.repeat,
+      participants: editing.participants.map(({ status: _status, ...person }) => person),
+      hostVideo: editing.hostVideo,
+      participantVideo: editing.participantVideo,
+      whoCanJoin: editing.whoCanJoin,
+      waitingRoom: editing.waitingRoom,
+    });
+  }, [editing]);
 
   // The chat's Sparks, for "Linked Spark".
   useEffect(() => {
@@ -223,6 +257,31 @@ export default function ScheduleCall() {
     if (!valid || !token || saving) return;
     setSaving(true);
     try {
+      // EDIT: send only what changed (time changes reset everyone's reply).
+      if (editId && editing) {
+        const changes: Partial<ScheduledCallInput> = {
+          topic: form.topic.trim(),
+          description: form.description.trim(),
+          hostVideo: form.hostVideo,
+          participantVideo: form.participantVideo,
+          whoCanJoin: form.whoCanJoin,
+          waitingRoom: form.waitingRoom,
+        };
+        if (Math.abs(new Date(editing.startsAt).getTime() - startsAt.getTime()) >= 60000) {
+          changes.startsAt = startsAt.toISOString();
+          changes.timeZone = deviceTimeZone();
+        }
+        if (form.durationMin !== editing.durationMin) changes.durationMin = form.durationMin;
+        if (form.repeat !== editing.repeat) changes.repeat = form.repeat;
+        if ((editing.spark?.id || null) !== (form.spark?.id || null)) changes.spark = form.spark;
+        const ids = (people: { id: string }[]) => people.map((person) => person.id).sort().join(",");
+        if (ids(editing.participants) !== ids(form.participants)) changes.participants = form.participants;
+        const updated = await dispatch(updateScheduledCallThunk({ callId: editId, changes, token })).unwrap();
+        await cancelCallReminder(updated.id);
+        await scheduleCallReminder(updated);
+        router.replace({ pathname: "/group/scheduled-call/[callId]", params: { callId: updated.id } });
+        return;
+      }
       const call = await dispatch(
         createScheduledCallThunk({
         conversationId,
@@ -265,7 +324,7 @@ export default function ScheduleCall() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>Schedule a call</Text>
+            <Text style={styles.title}>{editId ? "Edit call" : "Schedule a call"}</Text>
             <Pressable onPress={back} hitSlop={8}>
               <Text style={styles.cancel}>Cancel</Text>
             </Pressable>
@@ -406,7 +465,7 @@ export default function ScheduleCall() {
           </Card>
 
           <PrimaryButton
-            label="Schedule call"
+            label={editId ? "Save changes" : "Schedule call"}
             onPress={submit}
             loading={saving}
             disabled={tried && !valid}

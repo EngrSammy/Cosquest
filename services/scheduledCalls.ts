@@ -423,6 +423,62 @@ export async function respondToScheduledCall(
   );
 }
 
+// PATCH /api/scheduled-calls/:callId (host only) -> { call }
+// Send only what changed: the server resets everyone's reply to "pending"
+// whenever the time fields are sent.
+export async function updateScheduledCall(
+  callId: string,
+  changes: Partial<ScheduledCallInput>,
+  token: string,
+): Promise<ScheduledCall> {
+  return withFallback(
+    async () => {
+      const { participants, ...rest } = changes;
+      const body: Record<string, unknown> = { ...rest };
+      if (participants) body.participantIds = participants.map((person) => person.id).filter(Boolean);
+      const r = await apiRequest<any>(`/api/scheduled-calls/${encodeURIComponent(callId)}`, { method: "PATCH", token, body });
+      return normalizeScheduledCall(r?.call);
+    },
+    async () => {
+      const call: any = await mockGetScheduledCall(callId, token);
+      const participants = changes.participants
+        ? changes.participants.map((person) => ({ ...person, status: "pending" as RsvpStatus }))
+        : call.participants;
+      return { ...call, ...changes, participants } as ScheduledCall;
+    },
+  );
+}
+
+export type ScheduledJoin =
+  | { status: "ready"; token: string; livekitUrl: string; videoEnabled: boolean }
+  | { status: "waiting" };
+
+// POST /api/scheduled-calls/:callId/join { passcode } -> ready | 202 waiting
+export async function joinScheduledCallRequest(callId: string, passcode: string, token: string): Promise<ScheduledJoin> {
+  const r = await apiRequest<any>(`/api/scheduled-calls/${encodeURIComponent(callId)}/join`, {
+    method: "POST",
+    token,
+    body: passcode ? { passcode } : {},
+  });
+  if (r?.status === "waiting") return { status: "waiting" };
+  if (!r?.token || !r?.livekitUrl) throw new Error("The server did not return the call details.");
+  return { status: "ready", token: r.token, livekitUrl: r.livekitUrl, videoEnabled: Boolean(r.videoEnabled) };
+}
+
+// POST /api/scheduled-calls/:callId/admission/:userId { status } (host) -> { call }
+export async function admitToScheduledCall(
+  callId: string,
+  userId: string,
+  status: "admitted" | "denied",
+  token: string,
+): Promise<ScheduledCall> {
+  const r = await apiRequest<any>(
+    `/api/scheduled-calls/${encodeURIComponent(callId)}/admission/${encodeURIComponent(userId)}`,
+    { method: "POST", token, body: { status } },
+  );
+  return normalizeScheduledCall(r?.call);
+}
+
 // ---------------------------------------------------------------------
 // Time helpers (used by the Calls tab, the form and the details page)
 // ---------------------------------------------------------------------
