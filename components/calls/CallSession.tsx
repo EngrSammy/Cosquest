@@ -664,7 +664,9 @@ function CallStage({
       const allowed = await ensureCallPermissions("video");
 
       if (allowed) {
-        setFacing("user");
+        // Facing stays as it was: LiveKit turns the camera back on with the
+        // last one used (resetting it to "user" made the next Flip ask for
+        // the camera already open, and the self view mirror the wrong way).
         await localParticipant.setCameraEnabled(true);
       }
     } catch {

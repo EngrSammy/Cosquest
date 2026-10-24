@@ -143,8 +143,8 @@ const OrbitCircle = memo(function OrbitCircle({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
-  // Top-left corner of the circle.
-  const corner = useRef(new Animated.ValueXY({ x: x - size / 2, y: y - size / 2 })).current;
+  // Centre of the circle.
+  const center = useRef(new Animated.ValueXY({ x, y })).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
   // The circle glides to its new place (left/top, a short 320 ms glide) and
@@ -155,13 +155,13 @@ const OrbitCircle = memo(function OrbitCircle({
   // draws the video on its own surface, which doesn't follow transforms,
   // so the picture was left behind (black circles).
   useEffect(() => {
-    Animated.timing(corner, {
-      toValue: { x: x - size / 2, y: y - size / 2 },
+    Animated.timing(center, {
+      toValue: { x, y },
       duration: MOVE_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [x, y, size, corner]);
+  }, [x, y, center]);
 
   // The speaking pulse is only opacity and scale, so it runs on the native
   // driver: no JS work per frame while someone talks (it used to run on the
@@ -183,7 +183,12 @@ const OrbitCircle = memo(function OrbitCircle({
   }, [person.speaking, pulse]);
 
   // Built once per circle, not on every render.
-  const move = useMemo(() => ({ left: corner.x, top: corner.y }), [corner]);
+  // The new size grows or shrinks around the centre (not the old corner),
+  // so a resized circle doesn't overlap its neighbours while it moves.
+  const move = useMemo(
+    () => ({ left: Animated.subtract(center.x, size / 2), top: Animated.subtract(center.y, size / 2) }),
+    [center, size],
+  );
   const pulseStyle = useMemo(
     () => ({
       opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
