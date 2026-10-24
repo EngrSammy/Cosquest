@@ -1,3 +1,4 @@
+import { onScheduledAdmission, onScheduledWaiting } from "@/components/calls/scheduled/scheduledCallJoin";
 import { scheduledCallUpdated } from "@/store/slices/scheduledCallSlice";
 import { applyPrivateUpdate, receivePrivateIncoming } from "@/components/calls/privateCall";
 import { useEffect, useRef } from "react";
@@ -326,6 +327,8 @@ export function useSocketConnection() {
     socket.on("call:incoming", handleCallIncoming);
     socket.on("call:updated", handleCallUpdated);
     socket.on("scheduled-call:updated", handleScheduledCallUpdated);
+    socket.on("scheduled-call:waiting", onScheduledWaiting);
+    socket.on("scheduled-call:admission", onScheduledAdmission);
     socket.on("connect", handleConnect);
 
     return () => {
@@ -338,6 +341,8 @@ export function useSocketConnection() {
       socket.off("call:incoming", handleCallIncoming);
       socket.off("call:updated", handleCallUpdated);
       socket.off("scheduled-call:updated", handleScheduledCallUpdated);
+      socket.off("scheduled-call:waiting", onScheduledWaiting);
+      socket.off("scheduled-call:admission", onScheduledAdmission);
       socket.off("connect", handleConnect);
 
       appStateSubscription.remove();
