@@ -11,6 +11,10 @@ import { useEffect, useRef } from "react";
 
 import { useAppSelector } from "@/store/hooks";
 import { openFromNotification } from "@/utils/openFromNotification";
+import { ensureAlertChannel } from "@/components/alerts/alertSound";
+
+// Faction alerts: their own high-importance channel on Android.
+ensureAlertChannel();
 
 // Show pushes while the app is open (once, at startup).
 Notifications.setNotificationHandler({

@@ -27,7 +27,18 @@ export type VoiceRoom = {
   startedBy: VoicePerson;
   startedAt?: string;
   // away: in a private call from this voice chat right now.
-  members: { user: VoicePerson; joinedAt?: string; away?: boolean }[];
+  members: {
+    user: VoicePerson;
+    joinedAt?: string;
+    away?: boolean;
+    // Stage (Emmanuel): speaker or listener, a listener's raised hand, muted by an admin.
+    role?: "speaker" | "listener";
+    handRaised?: boolean;
+    mutedByAdmin?: boolean;
+  }[];
+  // Stage on: only speakers can talk.
+  stage?: boolean;
+  speakerCount?: number;
   memberCount: number;
   maxMembers: number;
 };
@@ -36,6 +47,10 @@ export type VoiceJoinInfo = {
   voiceRoom: VoiceRoom;
   token: string;
   livekitUrl: string;
+  // What I may do here: mute / remove people, run the stage, end it.
+  canModerate?: boolean;
+  canManageStage?: boolean;
+  canEnd?: boolean;
 };
 
 // The ping interval the backend expects (it drops people after 90 s).
@@ -79,7 +94,14 @@ export async function joinVoiceRoom(conversationId: string, token: string): Prom
   if (!voiceRoom || !response?.token || !response?.livekitUrl) {
     throw new Error("The server did not return the voice chat details.");
   }
-  return { voiceRoom, token: response.token, livekitUrl: response.livekitUrl };
+  return {
+    voiceRoom,
+    token: response.token,
+    livekitUrl: response.livekitUrl,
+    canModerate: Boolean(response.canModerate),
+    canManageStage: Boolean(response.canManageStage),
+    canEnd: Boolean(response.canEnd),
+  };
 }
 
 export async function pingVoiceRoom(roomId: string, token: string) {

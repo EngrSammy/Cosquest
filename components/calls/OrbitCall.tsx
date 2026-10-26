@@ -36,6 +36,8 @@ import type { Room } from "livekit-client";
 
 import { ConnectionPill, EveryoneSheet, SharePanel } from "./CallExtras";
 import { CAN_SHARE_SCREEN, useCallTools } from "./useCallTools";
+import { useModeration, type ModerationSource, type PersonAction } from "./useModeration";
+import SendAlertSheet from "@/components/alerts/SendAlertSheet";
 
 const INK = "#24283C";
 const MUTED = "#66738A";
@@ -60,6 +62,12 @@ export type OrbitPerson = {
   factionName?: string | null;
   // In a private call: translucent circle with the away marker.
   away?: boolean;
+  // Stage: a listener (can't talk), a raised hand, muted by an admin.
+  listener?: boolean;
+  handRaised?: boolean;
+  mutedByAdmin?: boolean;
+  // Faction in danger: the flare on the sender.
+  flare?: boolean;
 };
 
 // Rank -> ring color (doc: "circle color identifies leadership rank").
@@ -237,13 +245,21 @@ const OrbitCircle = memo(function OrbitCircle({
       </Pressable>
 
       {/* Pinned (call starter) */}
-      {pinned ? (
+      {person.flare ? (
+        <View style={[styles.badge, { backgroundColor: "#E5484D" }]} accessibilityLabel="Faction in danger">
+          <Ionicons name="flame" size={size >= 90 ? 14 : 10} color="#FFFFFF" />
+        </View>
+      ) : pinned ? (
         <View style={[styles.badge, styles.badgePin]}>
           <Ionicons name="pin" size={size >= 90 ? 15 : 11} color="#FFFFFF" />
         </View>
       ) : person.away ? (
         <View style={[styles.badge, styles.badgeAway]} accessibilityLabel="In a private call">
           <Ionicons name="remove" size={11} color="#FFFFFF" />
+        </View>
+      ) : person.handRaised ? (
+        <View style={[styles.badge, styles.badgePin]} accessibilityLabel="Hand raised">
+          <Text style={{ fontSize: size >= 90 ? 13 : 10 }}>✋</Text>
         </View>
       ) : person.micOff ? (
         <View style={[styles.badge, styles.badgeMuted]}>
@@ -377,7 +393,7 @@ function ControlButton({
 export default function OrbitCallScreen({
   title,
   subtitle,
-  people,
+  people: rawPeople,
   pinnedId,
   renderVideo,
   micOn,
@@ -395,6 +411,7 @@ export default function OrbitCallScreen({
   onPrivateCall,
   extra,
   room,
+  moderation,
 }: {
   title: string;
   subtitle: string;
@@ -421,7 +438,12 @@ export default function OrbitCallScreen({
   // The call's LiveKit room: connection warning, screen sharing, speaker switch,
   // blocked camera / mic messages.
   room?: Room | null;
+  // Admin mute / remove and the stage: what this call is (Emmanuel's moderation).
+  moderation?: ModerationSource;
 }) {
+  const mod = useModeration(moderation, rawPeople);
+  const people = mod.people;
+  const [alertOpen, setAlertOpen] = useState(false);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -476,6 +498,15 @@ export default function OrbitCallScreen({
             {subtitle}
           </Text>
         </View>
+        {mod.alertTarget ? (
+          <Pressable
+            style={[styles.roundBtn, { backgroundColor: "rgba(229,72,77,0.14)" }]}
+            onPress={() => setAlertOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Faction in danger: alert my faction">
+            <Ionicons name="warning-outline" size={20} color="#E5484D" />
+          </Pressable>
+        ) : null}
         {tools.canRouteAudio ? (
           <Pressable
             style={styles.roundBtn}
@@ -529,7 +560,23 @@ export default function OrbitCallScreen({
 
       {/* CONTROLS: Mic · Video · Share · Focus · Sparks · Leave */}
       <View style={[styles.controls, { paddingBottom: insets.bottom + 14 }]}>
-        <ControlButton icon={micOn ? "mic-outline" : "mic-off-outline"} label="Mic" active={!micOn} onPress={onToggleMic} disabled={ended} />
+        {mod.listener ? (
+          <ControlButton
+            icon={mod.handRaised ? "hand-left" : "hand-left-outline"}
+            label={mod.handRaised ? "Lower hand" : "Raise hand"}
+            active={mod.handRaised}
+            onPress={mod.toggleHand}
+            disabled={ended}
+          />
+        ) : (
+          <ControlButton
+            icon={micOn ? "mic-outline" : "mic-off-outline"}
+            label="Mic"
+            active={!micOn}
+            onPress={mod.micLock && !micOn ? () => Alert.alert("Microphone", mod.micLock!) : onToggleMic}
+            disabled={ended}
+          />
+        )}
         <ControlButton icon={cameraOn ? "videocam" : "videocam-outline"} label="Video" active={cameraOn} onPress={onToggleCamera} disabled={ended} />
         {onFlipCamera && cameraOn && !tools.share?.isLocal ? (
           <ControlButton icon="camera-reverse-outline" label="Flip" onPress={onFlipCamera} disabled={ended} />
@@ -547,7 +594,18 @@ export default function OrbitCallScreen({
         <ControlButton icon="close" label="Leave" kind="leave" onPress={onLeave} disabled={ended} />
       </View>
 
-      <EveryoneSheet people={people} visible={everyoneOpen} onClose={() => setEveryoneOpen(false)} />
+      <EveryoneSheet
+        people={people}
+        visible={everyoneOpen}
+        onClose={() => setEveryoneOpen(false)}
+        stage={mod.stage}
+        onSelect={(person) => {
+          setEveryoneOpen(false);
+          setCard({ id: person.id, step: "card" });
+        }}
+      />
+
+      <SendAlertSheet target={mod.alertTarget} visible={alertOpen} onClose={() => setAlertOpen(false)} />
 
       {cardPerson && card ? (
         <IdentitySheet
@@ -557,6 +615,7 @@ export default function OrbitCallScreen({
           onClose={() => setCard(null)}
           onProgress={() => setCard({ id: cardPerson.id, step: "progress" })}
           onBack={() => setCard({ id: cardPerson.id, step: "card" })}
+          actions={mod.actionsFor(cardPerson)}
           onPrivateCall={() =>
             onPrivateCall
               ? onPrivateCall(cardPerson)
@@ -588,6 +647,7 @@ function IdentitySheet({
   onProgress,
   onBack,
   onPrivateCall,
+  actions,
 }: {
   person: OrbitPerson;
   step: "card" | "progress";
@@ -596,6 +656,8 @@ function IdentitySheet({
   onProgress: () => void;
   onBack: () => void;
   onPrivateCall: () => void;
+  // Admins / the host: Mute, Remove, Make speaker...
+  actions?: PersonAction[];
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
@@ -664,6 +726,20 @@ function IdentitySheet({
                 <Text style={styles.cardButtonOutlineText}>View progress</Text>
               </Pressable>
             </View>
+            {actions?.length ? (
+              <View style={[styles.cardButtons, { flexWrap: "wrap", marginTop: 10 }]}>
+                {actions.map((action) => (
+                  <Pressable
+                    key={action.key}
+                    style={[styles.cardButton, styles.cardButtonOutline]}
+                    onPress={action.onPress}
+                    accessibilityRole="button">
+                    <Ionicons name={action.icon as any} size={16} color={ink.text(action.destructive ? "#C0394B" : PINK)} />
+                    <Text style={[styles.cardButtonOutlineText, action.destructive ? { color: "#C0394B" } : null]}>{action.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             <Text style={styles.cardHint}>Tap again for progress</Text>
           </>
         ) : (

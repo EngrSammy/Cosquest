@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794736792960",
+    "project_id": "mcj-work",
+    "storage_bucket": "mcj-work.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794736792960:android:c2d2b4da5b5e2904c71d65",
+        "android_client_info": {
+          "package_name": "com.dammy0227.cosquest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApjFYyippR6wsg3-nZSyfNA0FSDjiKXTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

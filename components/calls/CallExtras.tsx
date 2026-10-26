@@ -61,13 +61,32 @@ export function SharePanel({ share, name, onStop }: { share: ShareInfo; name: st
   );
 }
 
-export function EveryoneSheet({ people, visible, onClose }: { people: OrbitPerson[]; visible: boolean; onClose: () => void }) {
+export function EveryoneSheet({
+  people,
+  visible,
+  onClose,
+  onSelect,
+  stage,
+}: {
+  people: OrbitPerson[];
+  visible: boolean;
+  onClose: () => void;
+  // Tap a person: their card (with Mute / Remove / Make speaker for admins).
+  onSelect?: (person: OrbitPerson) => void;
+  // Voice chats: the stage switch for whoever runs it.
+  stage?: { on: boolean; speakerCount: number; onToggle: () => void } | null;
+}) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
   // Talking first, then you, then everyone else by name.
+  // Raised hands first, then talking, then you, then everyone by name.
   const sorted = [...people].sort(
-    (a, b) => Number(!!b.speaking) - Number(!!a.speaking) || Number(!!b.isMe) - Number(!!a.isMe) || a.name.localeCompare(b.name),
+    (a, b) =>
+      Number(!!b.handRaised) - Number(!!a.handRaised) ||
+      Number(!!b.speaking) - Number(!!a.speaking) ||
+      Number(!!b.isMe) - Number(!!a.isMe) ||
+      a.name.localeCompare(b.name),
   );
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -79,13 +98,34 @@ export function EveryoneSheet({ people, visible, onClose }: { people: OrbitPerso
               <Ionicons name="close" size={22} color={ink.text("#24283C")} />
             </Pressable>
           </View>
+          {stage ? (
+            <Pressable style={styles.stageRow} onPress={stage.onToggle} accessibilityRole="switch" accessibilityState={{ checked: stage.on }}>
+              <Ionicons name="megaphone-outline" size={18} color={ink.text(PINK)} />
+              <View style={styles.stageText}>
+                <Text style={styles.stageTitle}>Stage {stage.on ? "on" : "off"}</Text>
+                <Text style={styles.stageHint}>
+                  {stage.on ? `Only speakers can talk (${stage.speakerCount}). Tap someone to make them a speaker.` : "Everyone can talk. Turn on to choose who speaks."}
+                </Text>
+              </View>
+              <View style={[styles.switch, stage.on && styles.switchOn]}>
+                <View style={[styles.knob, stage.on && styles.knobOn]} />
+              </View>
+            </Pressable>
+          ) : null}
           <ScrollView style={styles.list}>
             {sorted.map((person) => (
-              <View key={person.id} style={styles.row}>
+              <Pressable
+                key={person.id}
+                style={styles.row}
+                onPress={onSelect && !person.isMe ? () => onSelect(person) : undefined}
+                disabled={!onSelect || person.isMe}>
                 <View style={[styles.dot, person.speaking ? styles.dotOn : null]} />
                 <Text style={styles.name} numberOfLines={1}>
                   {person.isMe ? `${person.name} (you)` : person.name}
                 </Text>
+                {person.handRaised ? <Text style={[styles.tag, styles.tagPink]}>✋ Hand raised</Text> : null}
+                {person.listener && !person.handRaised ? <Text style={styles.tag}>Listener</Text> : null}
+                {person.mutedByAdmin ? <Text style={styles.tag}>Muted by admin</Text> : null}
                 {person.away ? <Text style={styles.tag}>In a private call</Text> : null}
                 {person.speaking ? <Text style={[styles.tag, styles.tagPink]}>Speaking</Text> : null}
                 <Ionicons
@@ -93,7 +133,7 @@ export function EveryoneSheet({ people, visible, onClose }: { people: OrbitPerso
                   size={18}
                   color={ink.text(person.micOff ? "#C0394B" : "#66738A")}
                 />
-              </View>
+              </Pressable>
             ))}
           </ScrollView>
         </Pressable>
@@ -138,6 +178,14 @@ const STYLE_PAIR = themedStyles(
     name: { flex: 1, fontFamily: FONTS.medium, fontSize: 15, color: "#24283C" },
     tag: { fontFamily: FONTS.regular, fontSize: 12, color: "#66738A" },
     tagPink: { fontFamily: FONTS.medium, color: PINK },
+    stageRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, marginBottom: 6, borderRadius: 16, backgroundColor: "#F7E4F0" },
+    stageText: { flex: 1 },
+    stageTitle: { fontFamily: FONTS.semibold, fontSize: 15, color: "#24283C" },
+    stageHint: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 12.5, color: "#66738A" },
+    switch: { width: 44, height: 26, borderRadius: 13, padding: 3, backgroundColor: "#D3D8E0" },
+    switchOn: { backgroundColor: PINK },
+    knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#FFFFFF" },
+    knobOn: { marginLeft: 18 },
   },
   {
     pill: { backgroundColor: "rgba(245,158,11,0.18)" },
@@ -149,5 +197,9 @@ const STYLE_PAIR = themedStyles(
     name: { color: "#F4F5FA" },
     tag: { color: "#9AA1B4" },
     tagPink: { color: "#F29BD3" },
+    stageRow: { backgroundColor: "rgba(195,77,156,0.18)" },
+    stageTitle: { color: "#F4F5FA" },
+    stageHint: { color: "#B5BBCB" },
+    switch: { backgroundColor: "#3A3D50" },
   },
 );

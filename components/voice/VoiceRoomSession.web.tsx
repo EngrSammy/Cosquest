@@ -257,6 +257,7 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
   return (
     <OrbitCallScreen
       room={roomRef.current}
+      moderation={{ kind: "voice", room: session.voiceRoom, canModerate: !!session.canModerate, canManageStage: !!session.canManageStage, onRemoved: endVoiceSession }}
       title={session.title}
       subtitle={`Voice chat · ${people.length} on call · ${formatDuration(elapsed)}`}
       people={people}
