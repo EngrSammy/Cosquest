@@ -84,7 +84,49 @@ test("one vocabulary: chip marks", () => {
   assert.equal(statusMark("not_accepted"), "Turned off");
   assert.equal(statusMark("declined"), "Opted out");
   assert.equal(statusMark("silent"), "Didn't speak");
-  assert.equal(statusMark("brand_new_status"), "Didn't speak");
+  // A status this build doesn't know: only what we know, never "didn't speak".
+  assert.equal(statusMark("brand_new_status"), "No lines came through");
+  assert.equal(statusMark("muted"), "Mic off");
+  assert.equal(statusMark("not_listening"), "Sparks didn't start");
+  assert.equal(statusMark("no_lines"), "No lines came through");
+});
+
+test("25 Oct voice chat: a phone that sent nothing is never 'didn't speak'", () => {
+  // What Seyi's phone showed: the backend could not tell why no lines came (SDK 1.2.7 phone).
+  const c = describeCoverage([p("me", "no_lines"), p("ben", "transcribed", 20)], "me", speakers);
+  assert.equal(c.line, "1 of 2 in the transcript");
+  assert.equal(c.chips[0].mark, "No lines came through");
+  assert.equal(c.mine?.text, "Your lines aren't here: nothing came through from this phone.");
+  assert.equal(c.nobodyMissing, false);
+  const other = describeCoverage([p("me", "transcribed", 20), p("ben", "no_lines")], "me", speakers);
+  assert.equal(other.line, "1 of 2 in the transcript · nothing came through from Ben");
+  assert.match(other.notes[0].text, /doesn't mean they didn't speak/);
+  for (const c2 of [c, other]) for (const chip of c2.chips) assert.doesNotMatch(chip.mark, /speak/);
+});
+
+test("SDK 1.2.8 phones: didn't speak only when the phone listened; mic off; Sparks didn't start", () => {
+  const c = describeCoverage(
+    [p("me", "transcribed", 5), p("ben", "silent"), p("cy", "muted"), p("dee", "not_listening")],
+    "me",
+    speakers,
+  );
+  assert.equal(c.line, "1 of 4 in the transcript · Sparks didn't start for Dee · Ben didn't speak · cy had their mic off");
+  assert.deepEqual(
+    c.chips.map((x) => [x.userId, x.mark]),
+    [
+      ["me", "In transcript"],
+      ["ben", "Didn't speak"],
+      ["cy", "Mic off"],
+      ["dee", "Sparks didn't start"],
+    ],
+  );
+  assert.equal(c.notes[0].kind, "not_listening");
+  assert.equal(c.nobodyMissing, false);
+  const mine = describeCoverage([p("me", "not_listening"), p("ben", "transcribed", 3)], "me", speakers);
+  assert.equal(mine.mine?.text, "Your lines aren't here: Sparks didn't start on this phone for this call.");
+  const live = describeCoverage([p("me", "transcribed", 1), p("cy", "muted")], "me", speakers, { live: true });
+  assert.equal(live.line, "1 of 2 in the transcript · cy has their mic off");
+  assert.equal(live.nobodyMissing, true);
 });
 
 test("everyone in: only when everyone's lines are there", () => {
@@ -176,10 +218,10 @@ test("the viewer's own lines: a line of its own, with the setup link when Sparks
   assert.equal(describeCoverage([p("me", "declined")], "me", speakers).mine?.text, "Your lines aren't here: you opted out of transcripts.");
 });
 
-test("names fall back to the participant's displayName; unknown statuses are treated as didn't speak", () => {
+test("names fall back to the participant's displayName; unknown statuses are treated as no lines (never didn't speak)", () => {
   const c = describeCoverage([p("zed", "no_sparks", 0, "Zed Ade"), p("yan", "brand_new_status")], null, {});
   assert.equal(c.notes[0].text, "Zed Ade needs Sparks on their phone to be in the transcript.");
-  assert.equal(c.chips.find((x) => x.userId === "yan")?.status, "silent");
+  assert.equal(c.chips.find((x) => x.userId === "yan")?.status, "no_lines");
 });
 
 test("no participants: nothing to say", () => {

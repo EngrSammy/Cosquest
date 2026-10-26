@@ -38,6 +38,9 @@ const CHIP_ICON: Record<CoverageChip["status"], keyof typeof Ionicons.glyphMap> 
   no_sparks: "cloud-download-outline",
   not_accepted: "pause-circle-outline",
   declined: "remove-circle-outline",
+  muted: "mic-off-outline",
+  not_listening: "alert-circle-outline",
+  no_lines: "help-circle-outline",
 };
 
 export default function TranscriptCoverage({
@@ -77,7 +80,7 @@ export default function TranscriptCoverage({
   const warn = color(AMBER, "#F5A524");
   const good = color(TEAL, CALL_COLORS.teal);
   const iconColor = (status: CoverageChip["status"]) =>
-    status === "transcribed" ? good : status === "no_sparks" || status === "not_accepted" ? warn : muted;
+    status === "transcribed" ? good : status === "no_sparks" || status === "not_accepted" || status === "not_listening" || status === "no_lines" ? warn : muted;
   const mine = coverage.mine;
   const open = (href: string) => (onNavigate ? onNavigate(href) : router.push(href as Href));
 

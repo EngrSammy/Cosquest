@@ -105,6 +105,16 @@ export function useSparksCallNotes({
 
   const notice = usable ? sdk!.calls.getTranscriptionNotice() : null;
 
+  // Sparks may start after the call screen opened (a voice chat joined from
+  // its card boots Sparks itself). The answer read at mount was then "unset"
+  // and the notice showed again to someone who had said "Turn on" for good:
+  // read it again once Sparks is running.
+  useEffect(() => {
+    if (!usable || decision !== "unset") return;
+    const saved = sdk!.calls.getConsent(callId).decision;
+    if (saved !== "unset") setDecision(saved);
+  }, [usable, sdk, callId, decision]);
+
   // Captions and topic colours for this call.
   useEffect(() => {
     if (!usable) return;

@@ -18,7 +18,11 @@ export type TranscriptParticipantStatus =
   | "no_sparks" // none of their phones has Sparks (speech files) yet
   | "not_accepted" // their phone can, but Sparks was off for them on this call
   | "declined" // they turned it off: never transcribed, by design
-  | "silent"; // Sparks was on, nothing they said was picked up
+  // Backend module 1.3.4 (SDK 1.2.8 phones report whether they listened):
+  | "silent" // their phone listened with the mic on and heard nothing: they didn't speak
+  | "muted" // their phone listened, but their mic was off the whole time
+  | "not_listening" // Sparks never started on their phone for this call (a phone problem, not silence)
+  | "no_lines"; // no lines came from their phone, and it is too old to say why
 
 export type TranscriptParticipant = {
   userId: string;
@@ -83,11 +87,20 @@ function clean(value: string | null | undefined) {
 
 // ---------- per person ----------
 
-const KNOWN: TranscriptParticipantStatus[] = ["transcribed", "no_sparks", "not_accepted", "declined", "silent"];
+const KNOWN: TranscriptParticipantStatus[] = [
+  "transcribed",
+  "no_sparks",
+  "not_accepted",
+  "declined",
+  "silent",
+  "muted",
+  "not_listening",
+  "no_lines",
+];
 
 function statusOf(p: TranscriptParticipant): TranscriptParticipantStatus {
-  // Unknown values from a newer server: treat as "didn't speak" (no blame, no action).
-  return (KNOWN as string[]).includes(p.status) ? (p.status as TranscriptParticipantStatus) : "silent";
+  // Unknown values from a newer server: say only what we know (no lines), never "didn't speak".
+  return (KNOWN as string[]).includes(p.status) ? (p.status as TranscriptParticipantStatus) : "no_lines";
 }
 
 /**
@@ -105,8 +118,14 @@ export function statusMark(status: TranscriptParticipantStatus | string): string
       return "Turned off";
     case "declined":
       return "Opted out";
-    default:
+    case "silent":
       return "Didn't speak";
+    case "muted":
+      return "Mic off";
+    case "not_listening":
+      return "Sparks didn't start";
+    default:
+      return "No lines came through";
   }
 }
 
@@ -127,7 +146,7 @@ export type CoverageChip = {
 };
 
 export type CoverageNote = {
-  kind: "no_sparks" | "not_accepted" | "declined";
+  kind: "no_sparks" | "not_accepted" | "declined" | "not_listening" | "no_lines";
   text: string;
 };
 
@@ -150,7 +169,10 @@ export type Coverage = {
   total: number;
 };
 
-const MISSING: TranscriptParticipantStatus[] = ["no_sparks", "not_accepted", "declined"];
+// Missing because of their phone or their choice (not because they were quiet or muted).
+const MISSING: TranscriptParticipantStatus[] = ["no_sparks", "not_accepted", "declined", "not_listening", "no_lines"];
+// No lines, but nothing is wrong: they were quiet, or their mic was off.
+const QUIET: TranscriptParticipantStatus[] = ["silent", "muted"];
 
 /**
  * Who is (and isn't) in a call's transcript, in the app's words. Only people
@@ -175,7 +197,7 @@ export function describeCoverage(
     } satisfies CoverageChip;
   });
 
-  const rank = (c: CoverageChip) => (c.isMe ? 0 : c.inTranscript ? 1 : c.status === "silent" ? 2 : 3);
+  const rank = (c: CoverageChip) => (c.isMe ? 0 : c.inTranscript ? 1 : QUIET.includes(c.status) ? 2 : 3);
   const chips = people
     .map((chip, index) => ({ chip, index }))
     .sort((a, b) => rank(a.chip) - rank(b.chip) || a.index - b.index)
@@ -189,7 +211,11 @@ export function describeCoverage(
         ? { text: "Your lines aren't here: you turned transcription off for this call." }
         : me?.status === "declined"
           ? { text: "Your lines aren't here: you opted out of transcripts." }
-          : null;
+          : me?.status === "not_listening"
+            ? { text: "Your lines aren't here: Sparks didn't start on this phone for this call.", href: SPARKS_SETUP_HREF }
+            : me?.status === "no_lines"
+              ? { text: "Your lines aren't here: nothing came through from this phone." }
+              : null;
 
   const others = people.filter((c) => !c.isMe);
   const named = (status: TranscriptParticipantStatus) => others.filter((c) => c.status === status).map((c) => c.name);
@@ -216,10 +242,30 @@ export function describeCoverage(
     notes.push({ kind: "declined", text: `${joinNames(optedOut)} opted out of transcripts.` });
     short.push(`${firsts(optedOut)} opted out`);
   }
+  const notStarted = named("not_listening");
+  if (notStarted.length) {
+    notes.push({
+      kind: "not_listening",
+      text: `Sparks didn't start on ${joinNames(notStarted)}'s ${many(notStarted) ? "phones" : "phone"} for this call, so nothing they said is here.`,
+    });
+    short.push(`Sparks didn't start for ${firsts(notStarted)}`);
+  }
+  const noLines = named("no_lines");
+  if (noLines.length) {
+    notes.push({
+      kind: "no_lines",
+      text: `No lines came through from ${joinNames(noLines)}'s ${many(noLines) ? "phones" : "phone"}. Their phone may not have been able to transcribe, so this doesn't mean they didn't speak.`,
+    });
+    short.push(`nothing came through from ${firsts(noLines)}`);
+  }
   const quiet = named("silent");
   if (quiet.length) {
     const verb = !live ? "didn't speak" : many(quiet) ? "haven't spoken yet" : "hasn't spoken yet";
     short.push(`${firsts(quiet)} ${verb}`);
+  }
+  const micOff = named("muted");
+  if (micOff.length) {
+    short.push(`${firsts(micOff)} ${live ? (many(micOff) ? "have" : "has") + " their mic off" : "had their mic off"}`);
   }
 
   const total = people.length;
@@ -315,7 +361,7 @@ export function emptyTranscriptCopy(
   callStatus: string | null | undefined,
 ): string {
   if (callStatus === "active") return "Nothing yet: lines show up here as people with Sparks talk.";
-  const anyoneOn = (participants || []).some((p) => p.status === "transcribed" || p.status === "silent");
+  const anyoneOn = (participants || []).some((p) => ["transcribed", "silent", "muted", "not_listening", "no_lines"].includes(p.status));
   return anyoneOn ? "Nothing said on this call was picked up." : "No transcript for this call: nobody had Sparks turned on.";
 }
 
