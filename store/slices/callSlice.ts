@@ -180,6 +180,12 @@ const callSlice = createSlice({
       state.myUserId = action.payload;
     },
 
+    // "Respond" to a faction alert from a call: like accepting it.
+    joinedFromAlert(state, action: PayloadAction<any>) {
+      state.active = { ...action.payload, direction: "incoming" };
+      state.incoming = null;
+    },
+
     clearActiveCall(state) {
       if (state.active) {
         rememberDismissed(state, state.active.call.id);
@@ -298,6 +304,7 @@ export const {
   socketCallIncoming,
   socketCallUpdated,
   setCallUserId,
+  joinedFromAlert,
   clearActiveCall,
   dismissIncomingCall,
   clearCalls,

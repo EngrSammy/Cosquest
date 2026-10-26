@@ -11,11 +11,26 @@
 //   call                        -> nothing (the ringing screen shows calls)
 //   anything else               -> Notifications
 import { router } from "expo-router";
+import { Linking } from "react-native";
+
+import { showFactionAlertById } from "@/components/alerts/alertStore";
 
 export function openFromNotification(data: any, actor?: { username?: string | null } | null) {
   if (!data || typeof data !== "object") return;
   const type = String(data.type || "");
   if (type === "call") return;
+
+  // Game pushes (raids, gifts...): their cosquest://play link.
+  if (typeof data.url === "string" && data.url.startsWith("cosquest://")) {
+    Linking.openURL(data.url).catch(() => {});
+    return;
+  }
+
+  // Faction in danger: the alert, with Respond.
+  if (type === "faction_alert" && data.alertId) {
+    showFactionAlertById(String(data.alertId));
+    return;
+  }
 
   if (type === "message" && data.chatId) {
     router.push({ pathname: "/chat/[id]", params: { id: String(data.chatId) } });

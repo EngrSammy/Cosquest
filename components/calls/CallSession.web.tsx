@@ -796,6 +796,7 @@ export default function CallSession() {
       <>
         <OrbitCallScreen
           room={roomRef.current}
+          moderation={active?.call ? { kind: "call", call: active.call, onRemoved: () => finish(null, false) } : undefined}
           title={displayName}
           subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
           people={people}

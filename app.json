@@ -36,7 +36,8 @@
         "android.permission.BLUETOOTH"
       ],
       "package": "com.dammy0227.cosquest",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "single",
@@ -85,7 +86,14 @@
         }
       ],
       "expo-asset",
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      [
+        "expo-notifications",
+        {
+          "color": "#C34D9C",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

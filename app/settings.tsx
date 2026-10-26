@@ -1,5 +1,6 @@
 import { FONTS } from "@/constants/fonts";
 import { logout as logoutApi } from "@/services/auth";
+import { unregisterThisPhone } from "@/utils/pushDevice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout as logoutLocal } from "@/store/slices/authSlice";
 import { clearUser } from "@/store/slices/userSlice";
@@ -72,6 +73,8 @@ export default function Settings() {
 
   async function handleLogout() {
     try {
+      // This phone stops getting this account's pushes (before the session ends).
+      await unregisterThisPhone(token);
       if (token) {
         await logoutApi(token);
       }

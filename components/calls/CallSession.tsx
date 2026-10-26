@@ -803,6 +803,7 @@ function CallStage({
       <>
         <OrbitCallScreen
           room={room}
+          moderation={{ kind: "call", call, onRemoved: () => onFinish(null, false) }}
           title={displayName}
           subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
           people={people}

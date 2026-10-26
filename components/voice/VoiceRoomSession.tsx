@@ -296,6 +296,7 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
     <View style={{ width: pageWidth }}>
     <OrbitCallScreen
       room={liveRoom}
+      moderation={{ kind: "voice", room: session.voiceRoom, canModerate: !!session.canModerate, canManageStage: !!session.canManageStage, onRemoved: endVoiceSession }}
       title={session.title}
       subtitle={`Voice chat · ${people.length} on call · ${formatDuration(elapsed)}`}
       people={people}
