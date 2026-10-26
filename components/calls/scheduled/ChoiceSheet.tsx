@@ -21,7 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckBadge, TextField, UI } from "@/components/chat/ui";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
-import { getGroupMembers, type GroupPerson } from "@/services/groups";
+import { getChatMembers } from "@/services/chats";
+import type { GroupPerson } from "@/services/groups";
 import { useAppSelector } from "@/store/hooks";
 import { getAvatarSource } from "@/utils/callHelpers";
 
@@ -200,7 +201,8 @@ export function MembersSheet({
       setLoading(true);
       setError("");
       try {
-        const result = await getGroupMembers(groupId, { search: search.trim(), limit: 100 }, token);
+        // The chat's members: works in groups, Community and factions.
+        const result = await getChatMembers(groupId, { search: search.trim(), limit: 100 }, token);
         if (!stale) setMembers(result.members.filter((member) => member.id !== myId));
       } catch (err) {
         if (!stale) setError(err instanceof Error ? err.message : "Couldn't load members.");

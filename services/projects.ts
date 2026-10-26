@@ -11,7 +11,8 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
-import { getGroupMembers, type GroupPerson } from "./groups";
+import { getChatMembers } from "./chats";
+import type { GroupPerson } from "./groups";
 
 export type ProjectFileKind = "pdf" | "image" | "doc" | "other";
 
@@ -440,7 +441,7 @@ const membersByChat = new Map<string, Promise<Members>>();
 function membersOf(conversationId: string, token: string): Promise<Members> {
   let pending = membersByChat.get(conversationId);
   if (!pending) {
-    pending = getGroupMembers(conversationId, { limit: 100 }, token)
+    pending = getChatMembers(conversationId, { limit: 100 }, token)
       .then((result) => ({
         people: new Map(result.members.map((member) => [member.id, member as GroupPerson])),
         total: result.total || result.members.length,
