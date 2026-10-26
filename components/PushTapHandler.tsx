@@ -1,28 +1,28 @@
 // ==========================================
-// TAPPING A PUSH NOTIFICATION (phones)
+// PUSH NOTIFICATIONS ON THE PHONE: shown while open, and tapped
 // ==========================================
-// Opens what it's about (data from the backend's src/utils/push.js):
-//   scheduled-call  -> Call details        { scheduledCallId }
-//   message / mention / group -> the chat  { chatId }
-//   follow          -> Notifications
-//   call            -> nothing here (the ringing screen handles calls)
-// Also when the tap launched the app (after login is restored).
+// 1. While the app is open, a push that still arrives (game events; the
+//    backend sends banners instead of pushes for the rest) is shown as a
+//    system banner instead of being received silently.
+// 2. Tapping a push - also one that opened the app from closed - opens what
+//    it's about (utils/openFromNotification), once login is restored.
 import * as Notifications from "expo-notifications";
-import { router } from "expo-router";
 import { useEffect, useRef } from "react";
 
 import { useAppSelector } from "@/store/hooks";
+import { openFromNotification } from "@/utils/openFromNotification";
 
-function openFrom(data: any) {
-  if (!data || typeof data !== "object") return;
-  if (data.type === "scheduled-call" && data.scheduledCallId) {
-    router.push({ pathname: "/group/scheduled-call/[callId]", params: { callId: String(data.scheduledCallId) } });
-  } else if (data.chatId && data.type !== "call") {
-    router.push({ pathname: "/chat/[id]", params: { id: String(data.chatId) } });
-  } else if (data.type === "follow") {
-    router.push("/notifications");
-  }
-}
+// Show pushes while the app is open (once, at startup).
+Notifications.setNotificationHandler({
+  handleNotification: async () =>
+    ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }) as any,
+});
 
 export default function PushTapHandler() {
   const token = useAppSelector((state) => state.auth.token);
@@ -37,7 +37,7 @@ export default function PushTapHandler() {
     const data = response.notification.request.content.data;
     // Not signed in yet (app just launched): open it once login is restored.
     if (!token) pending.current = data;
-    else openFrom(data);
+    else openFromNotification(data);
   };
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function PushTapHandler() {
     const data = pending.current;
     pending.current = null;
     // Let the first screen mount before navigating.
-    const timer = setTimeout(() => openFrom(data), 300);
+    const timer = setTimeout(() => openFromNotification(data), 300);
     return () => clearTimeout(timer);
   }, [token]);
 

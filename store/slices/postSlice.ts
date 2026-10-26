@@ -352,15 +352,20 @@ function normalizePost(raw: unknown): Post | null {
             ? author.avatarUrl
             : null;
 
+  // The server's "viewer" (Emmanuel): this person's own like / bookmark.
   const liked =
-    typeof raw.liked === "boolean"
+    typeof raw.viewer?.liked === "boolean"
+      ? raw.viewer.liked
+      : typeof raw.liked === "boolean"
       ? raw.liked
       : typeof raw.likedByMe === "boolean"
         ? raw.likedByMe
         : false;
 
   const bookmarked =
-    typeof raw.bookmarked === "boolean"
+    typeof raw.viewer?.bookmarked === "boolean"
+      ? raw.viewer.bookmarked
+      : typeof raw.bookmarked === "boolean"
       ? raw.bookmarked
       : typeof raw.bookmarkedByMe === "boolean"
         ? raw.bookmarkedByMe

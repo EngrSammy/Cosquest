@@ -802,6 +802,7 @@ function CallStage({
     return pager(
       <>
         <OrbitCallScreen
+          room={room}
           title={displayName}
           subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
           people={people}

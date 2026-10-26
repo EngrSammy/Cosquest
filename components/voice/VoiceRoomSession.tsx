@@ -1,3 +1,4 @@
+import { flipCamera, type Facing } from "@/components/calls/flipCamera";
 ﻿// ==========================================
 // VOICE CHAT (phones): the live room, shown as the orbit (Part 1)
 // ==========================================
@@ -12,6 +13,7 @@ import {
   VideoTrack,
   isTrackReference,
   useLocalParticipant,
+  useRoomContext,
   useRemoteParticipants,
   useTracks,
 } from "@livekit/react-native";
@@ -123,10 +125,13 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
   const myUserId = useAppSelector((state) => state.call.myUserId);
   const remoteParticipants = useRemoteParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const liveRoom = useRoomContext();
   // Camera events only (see callMedia.ts), not every speaker update.
   const cameraSlots = useTracks(CAMERA_SLOTS, CAMERA_TRACKS_OPTIONS);
 
   const [focusOn, setFocusOn] = useState(false);
+  // Front or back camera (Flip).
+  const [facing, setFacing] = useState<Facing>("user");
   const [startedAt] = useState(nowMs);
   const insets = useSafeAreaInsets();
 
@@ -263,11 +268,11 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
           trackRef={slot as TrackReference}
           style={StyleSheet.absoluteFill}
           objectFit="cover"
-          mirror={slot.participant.isLocal}
+          mirror={slot.participant.isLocal && facing === "user"}
         />
       );
     },
-    [cameraSlots, meId],
+    [cameraSlots, meId, facing],
   );
   const toggleFocus = useCallback(() => setFocusOn((value) => !value), []);
 
@@ -290,6 +295,7 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       style={styles.root}>
     <View style={{ width: pageWidth }}>
     <OrbitCallScreen
+      room={liveRoom}
       title={session.title}
       subtitle={`Voice chat · ${people.length} on call · ${formatDuration(elapsed)}`}
       people={people}
@@ -301,6 +307,10 @@ function VoiceStage({ session, onLeave }: { session: VoiceSession; onLeave: () =
       ended={false}
       onToggleMic={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
       onToggleCamera={toggleCamera}
+      onFlipCamera={async () => {
+        const next = await flipCamera(localParticipant as any, facing);
+        if (next) setFacing(next);
+      }}
       onToggleFocus={toggleFocus}
       onLeave={onLeave}
       onMinimize={() => setVoiceMinimized(true)}

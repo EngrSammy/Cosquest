@@ -1,3 +1,4 @@
+import { flipCamera, type Facing } from "@/components/calls/flipCamera";
 // ==========================================
 // SCHEDULED CALL (website): the call's own room, shown as the orbit
 // ==========================================
@@ -50,6 +51,8 @@ export default function ScheduledCallSession({ session }: { session: Connected }
   const [cameraOn, setCameraOn] = useState(false);
   const [localVideo, setLocalVideo] = useState<LocalVideoTrack | null>(null);
   const [focusOn, setFocusOn] = useState(false);
+  // Front or back camera (Flip).
+  const [facing, setFacing] = useState<Facing>("user");
   const [needsAudioTap, setNeedsAudioTap] = useState(false);
   const [startedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -117,7 +120,8 @@ export default function ScheduledCallSession({ session }: { session: Connected }
         await room.connect(session.livekitUrl, session.token);
         if (cancelled) return;
         refresh();
-        await room.localParticipant.setMicrophoneEnabled(true);
+        // Mic blocked: stay in the call to listen (the orbit screen explains).
+        await room.localParticipant.setMicrophoneEnabled(true).catch(() => setMicOn(false));
         setNeedsAudioTap(!room.canPlaybackAudio);
       } catch (error) {
         console.error("SCHEDULED CALL ERROR (web):", error);
@@ -197,7 +201,7 @@ export default function ScheduledCallSession({ session }: { session: Connected }
   });
 
   const renderVideo = (id: string) => {
-    if (id === meId) return localVideo ? <WebVideo track={localVideo} mirror /> : null;
+    if (id === meId) return localVideo ? <WebVideo track={localVideo} mirror={facing === "user"} /> : null;
     const remote = remotes.find((r) => r.identity === id);
     return remote?.video ? <WebVideo track={remote.video} /> : null;
   };
@@ -205,6 +209,7 @@ export default function ScheduledCallSession({ session }: { session: Connected }
   return (
     <>
       <OrbitCallScreen
+        room={roomRef.current}
         title={call.topic}
         subtitle={`Scheduled call · ${people.length} on call · ${formatDuration(elapsed)}`}
         people={people}
@@ -216,6 +221,10 @@ export default function ScheduledCallSession({ session }: { session: Connected }
         ended={false}
         onToggleMic={toggleMic}
         onToggleCamera={toggleCamera}
+        onFlipCamera={async () => {
+          const next = await flipCamera(roomRef.current?.localParticipant, facing);
+          if (next) setFacing(next);
+        }}
         onToggleFocus={() => setFocusOn((value) => !value)}
         onLeave={leave}
         onMinimize={() => setScheduledMinimized(true)}

@@ -9,6 +9,7 @@ import DesktopShell from "@/components/desktop/DesktopShell";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
 import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
 import PushTapHandler from "@/components/PushTapHandler";
+import InAppBanner from "@/components/notifications/InAppBanner";
 import ScheduledCallLayer from "@/components/calls/scheduled/ScheduledCallLayer";
 import SessionGate from "@/components/SessionGate";
 import { UserProvider } from "@/context/UserContext";
@@ -110,6 +111,9 @@ export default function RootLayout() {
 
             {/* Tapping a push notification opens what it's about */}
             <PushTapHandler />
+
+            {/* Pop-up banners while the app is open */}
+            <InAppBanner />
 
             {/* Scheduled calls: the waiting room and the call */}
             <ScheduledCallLayer />
