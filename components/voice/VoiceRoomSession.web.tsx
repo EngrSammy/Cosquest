@@ -1,3 +1,4 @@
+import { flipCamera, type Facing } from "@/components/calls/flipCamera";
 ﻿// ==========================================
 // VOICE CHAT (website): the live room, shown as the orbit (Part 1)
 // ==========================================
@@ -80,6 +81,8 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
   const [cameraOn, setCameraOn] = useState(false);
   const [localVideo, setLocalVideo] = useState<LocalVideoTrack | null>(null);
   const [focusOn, setFocusOn] = useState(false);
+  // Front or back camera (Flip).
+  const [facing, setFacing] = useState<Facing>("user");
   const [needsAudioTap, setNeedsAudioTap] = useState(false);
   const [startedAt] = useState(nowMs);
   const [elapsed, setElapsed] = useState(0);
@@ -153,7 +156,8 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
         await room.connect(session.livekitUrl, session.token);
         if (cancelled) return;
         refresh();
-        await room.localParticipant.setMicrophoneEnabled(true);
+        // Mic blocked: stay in the call to listen (the orbit screen explains).
+        await room.localParticipant.setMicrophoneEnabled(true).catch(() => setMicOn(false));
         setNeedsAudioTap(!room.canPlaybackAudio);
       } catch (error) {
         console.error("VOICE ROOM ERROR (web):", error);
@@ -245,13 +249,14 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
   });
 
   const renderVideo = (id: string) => {
-    if (id === meId) return localVideo ? <WebVideo track={localVideo} mirror /> : null;
+    if (id === meId) return localVideo ? <WebVideo track={localVideo} mirror={facing === "user"} /> : null;
     const remote = remotes.find((r) => r.identity === id);
     return remote?.video ? <WebVideo track={remote.video} /> : null;
   };
 
   return (
     <OrbitCallScreen
+      room={roomRef.current}
       title={session.title}
       subtitle={`Voice chat · ${people.length} on call · ${formatDuration(elapsed)}`}
       people={people}
@@ -265,6 +270,10 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
       onSparks={() => Alert.alert("Sparks in calls", "Sparks listens in the CosQuest phone app: it turns what people say into text on their own phones and picks out the topics. Open this call in the app to see Sparks live. After the call, its Sparks notes show in the chat here too.")}
       onPrivateCall={(person) => startPrivate({ kind: "voice", id: session.voiceRoom.id }, person.id)}
       onToggleCamera={toggleCamera}
+      onFlipCamera={async () => {
+        const next = await flipCamera(roomRef.current?.localParticipant, facing);
+        if (next) setFacing(next);
+      }}
       onToggleFocus={() => setFocusOn((value) => !value)}
       onLeave={leave}
       onMinimize={() => setVoiceMinimized(true)}

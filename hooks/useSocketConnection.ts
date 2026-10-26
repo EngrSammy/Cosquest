@@ -1,3 +1,4 @@
+import { pushBanner } from "@/components/notifications/bannerStore";
 import { refreshProject } from "@/store/thunks/projectThunks";
 import { onScheduledAdmission, onScheduledWaiting } from "@/components/calls/scheduled/scheduledCallJoin";
 import { scheduledCallUpdated } from "@/store/slices/scheduledCallSlice";
@@ -325,6 +326,8 @@ export function useSocketConnection() {
     );
 
     socket.on("notification:new", handleNotification);
+    // Pop-up banner while the app is open (instead of a push).
+    socket.on("banner", pushBanner);
     socket.on("presence:online", handlePresenceOnline);
     socket.on("presence:offline", handlePresenceOffline);
     socket.on("typing:start", handleTypingStart);
@@ -340,6 +343,7 @@ export function useSocketConnection() {
 
     return () => {
       socket.off("notification:new", handleNotification);
+      socket.off("banner", pushBanner);
       socket.off("presence:online", handlePresenceOnline);
       socket.off("presence:offline", handlePresenceOffline);
       socket.off("typing:start", handleTypingStart);

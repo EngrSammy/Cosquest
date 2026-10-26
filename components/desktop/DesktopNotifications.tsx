@@ -27,11 +27,13 @@ const BLUE = "#2E9BF0";
 const INK = "#191922";
 const MUTED = "#6B6F80";
 
-type Kind = "follow" | "mention" | "group" | "cosquest";
+type Kind = "follow" | "activity" | "mention" | "group" | "cosquest";
 type Filter = "all" | Kind;
 
 const KINDS: Record<Kind, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   follow: { label: "Follows", icon: "person-add", color: PINK },
+  // Likes, comments, reposts, and posts from people you follow.
+  activity: { label: "Activity", icon: "heart", color: PINK },
   mention: { label: "Mentions", icon: "at", color: BLUE },
   group: { label: "Groups", icon: "people", color: BLUE },
   cosquest: { label: "CosQuest", icon: "sparkles", color: PINK },
@@ -39,6 +41,7 @@ const KINDS: Record<Kind, { label: string; icon: keyof typeof Ionicons.glyphMap;
 
 function kindOf(item: AppNotificationItem): Kind {
   if (item.type === "follow") return "follow";
+  if (["like", "comment", "repost", "post"].includes(item.type || "")) return "activity";
   if (item.type === "mention") return "mention";
   const text = `${item.type || ""} ${item.message || ""}`.toLowerCase();
   if (/group|join|squad|faction|invite|request/.test(text) && item.actor) return "group";
@@ -105,7 +108,7 @@ export default function DesktopNotifications({
   const [filter, setFilter] = useState<Filter>("all");
 
   const counts = useMemo(() => {
-    const result: Record<Kind, number> = { follow: 0, mention: 0, group: 0, cosquest: 0 };
+    const result: Record<Kind, number> = { follow: 0, activity: 0, mention: 0, group: 0, cosquest: 0 };
     notifications.forEach((item) => (result[kindOf(item)] += 1));
     return result;
   }, [notifications]);
@@ -119,7 +122,7 @@ export default function DesktopNotifications({
       .filter((section) => section.items.length);
   }, [notifications, filter]);
 
-  const tabs: Filter[] = ["all", "follow", "mention", "group", "cosquest"];
+  const tabs: Filter[] = ["all", "follow", "activity", "mention", "group", "cosquest"];
 
   return (
     <View style={styles.page}>
@@ -189,7 +192,13 @@ export default function DesktopNotifications({
                       const username = item.actor?.username;
                       const following = isFollowing(username);
                       const busy = isBusy(username);
-                      const openChat = item.scheduledCallId
+                      const openChat = item.postId
+                        ? () =>
+                            router.push({
+                              pathname: "/post/[id]",
+                              params: { id: item.postId!, ...(item.commentId ? { commentId: item.commentId } : {}) },
+                            } as any)
+                        : item.scheduledCallId
                         ? () => router.push({ pathname: "/group/scheduled-call/[callId]", params: { callId: item.scheduledCallId! } })
                         : item.conversationId
                         ? () => router.push({ pathname: "/chat/[id]", params: { id: item.conversationId! } })

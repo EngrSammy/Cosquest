@@ -1,3 +1,4 @@
+import { flipCamera, type Facing } from "@/components/calls/flipCamera";
 // ==========================================
 // SCHEDULED CALL (phones): the call's own room, shown as the orbit
 // ==========================================
@@ -11,6 +12,7 @@ import {
   VideoTrack,
   isTrackReference,
   useLocalParticipant,
+  useRoomContext,
   useRemoteParticipants,
   useTracks,
 } from "@livekit/react-native";
@@ -86,8 +88,11 @@ function Stage({ session }: { session: Connected }) {
   const myUserId = useAppSelector((state) => state.call.myUserId);
   const remoteParticipants = useRemoteParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const liveRoom = useRoomContext();
   const cameraSlots = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }], { onlySubscribed: false });
   const [focusOn, setFocusOn] = useState(false);
+  // Front or back camera (Flip).
+  const [facing, setFacing] = useState<Facing>("user");
   const [startedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   const hosting = Boolean(call.canManage);
@@ -143,7 +148,7 @@ function Stage({ session }: { session: Connected }) {
     const slot = cameraSlots.find((s) => s.participant.identity === id || (id === meId && s.participant.isLocal));
     if (!slot || !isTrackReference(slot) || slot.publication.isMuted) return null;
     return (
-      <VideoTrack trackRef={slot as TrackReference} style={StyleSheet.absoluteFill} objectFit="cover" mirror={slot.participant.isLocal} />
+      <VideoTrack trackRef={slot as TrackReference} style={StyleSheet.absoluteFill} objectFit="cover" mirror={slot.participant.isLocal && facing === "user"} />
     );
   };
 
@@ -161,6 +166,7 @@ function Stage({ session }: { session: Connected }) {
   return (
     <>
       <OrbitCallScreen
+        room={liveRoom}
         title={call.topic}
         subtitle={`Scheduled call · ${people.length} on call · ${formatDuration(elapsed)}`}
         people={people}
@@ -172,6 +178,10 @@ function Stage({ session }: { session: Connected }) {
         ended={false}
         onToggleMic={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
         onToggleCamera={toggleCamera}
+        onFlipCamera={async () => {
+          const next = await flipCamera(localParticipant as any, facing);
+          if (next) setFacing(next);
+        }}
         onToggleFocus={() => setFocusOn((value) => !value)}
         onLeave={leaveScheduledCall}
         onMinimize={() => setScheduledMinimized(true)}

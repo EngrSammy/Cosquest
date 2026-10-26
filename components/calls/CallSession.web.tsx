@@ -413,8 +413,9 @@ export default function CallSession() {
         updateRemoteCount();
 
         // The browser shows its own microphone / camera permission popup here.
-        await room.localParticipant.setMicrophoneEnabled(true);
-        setMicOn(true);
+        // Mic blocked: stay in the call to listen (the call screen explains).
+        const micOk = await room.localParticipant.setMicrophoneEnabled(true).then(() => true, () => false);
+        setMicOn(micOk);
 
         if (isVideoCall) {
           await room.localParticipant.setCameraEnabled(true);
@@ -794,6 +795,7 @@ export default function CallSession() {
     return (
       <>
         <OrbitCallScreen
+          room={roomRef.current}
           title={displayName}
           subtitle={endMessage ? endMessage : `Group call · ${onCall} on call${answered ? ` · ${formatDuration(elapsed)}` : ""}`}
           people={people}

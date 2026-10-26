@@ -112,6 +112,8 @@ export default function UserProfileScreen() {
 
   const iFollow =
     followingOverride ??
+    // The server says (profile.relationship), else the people I follow.
+    ((profile as any)?.relationship?.following as boolean | undefined) ??
     following.some(
       (person) => person.username?.toLowerCase() === username.toLowerCase(),
     );

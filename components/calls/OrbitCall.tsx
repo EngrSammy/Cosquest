@@ -32,6 +32,10 @@ import {
   type CenterHold,
 } from "@/components/calls/orbitLayout";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import type { Room } from "livekit-client";
+
+import { ConnectionPill, EveryoneSheet, SharePanel } from "./CallExtras";
+import { CAN_SHARE_SCREEN, useCallTools } from "./useCallTools";
 
 const INK = "#24283C";
 const MUTED = "#66738A";
@@ -268,6 +272,7 @@ const OrbitView = memo(function OrbitView({
   renderVideo,
   onTap,
   onCenter,
+  onMore,
 }: {
   people: OrbitPerson[];
   pinnedId: string | null;
@@ -275,6 +280,8 @@ const OrbitView = memo(function OrbitView({
   onTap: (person: OrbitPerson) => void;
   // Who is in the middle (the "… is speaking" line follows it).
   onCenter: (id: string | null) => void;
+  // Tap "+N": everyone in the call.
+  onMore?: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const [box, setBox] = useState<Box>({ w: 0, h: 0 });
@@ -317,9 +324,14 @@ const OrbitView = memo(function OrbitView({
       ))}
 
       {hidden ? (
-        <View style={[styles.more, { left: box.w / 2 - 22, top: box.h - 30 }]}>
+        <Pressable
+          style={[styles.more, { left: box.w / 2 - 22, top: box.h - 30 }]}
+          onPress={onMore}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={`${hidden} more people. Show everyone in the call`}>
           <Text style={styles.moreText}>+{hidden}</Text>
-        </View>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -382,6 +394,7 @@ export default function OrbitCallScreen({
   onSparks,
   onPrivateCall,
   extra,
+  room,
 }: {
   title: string;
   subtitle: string;
@@ -405,6 +418,9 @@ export default function OrbitCallScreen({
   // Private call on top (needs the server). Without it: "coming soon".
   onPrivateCall?: (person: OrbitPerson) => void;
   extra?: ReactNode;
+  // The call's LiveKit room: connection warning, screen sharing, speaker switch,
+  // blocked camera / mic messages.
+  room?: Room | null;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
@@ -418,6 +434,20 @@ export default function OrbitCallScreen({
     people.find((p) => p.speaking && !p.isMe) ||
     people.find((p) => p.speaking);
   const comingSoon = (what: string) => Alert.alert(what, `${what} is coming soon.`);
+  const tools = useCallTools(room);
+  const [everyoneOpen, setEveryoneOpen] = useState(false);
+  const openEveryone = useCallback(() => setEveryoneOpen(true), []);
+  const sharerName = tools.share
+    ? people.find((p) => p.id === tools.share!.participant.identity)?.name || tools.share.participant.name || "Someone"
+    : "";
+  // Website: share your screen. Phones: they see a shared screen; sharing from a phone comes later.
+  const shareScreen = () =>
+    CAN_SHARE_SCREEN && room
+      ? tools.toggleShare(sharerName)
+      : Alert.alert(
+          "Screen sharing",
+          "Sharing your screen from the phone is coming soon. Share from CosQuest on a computer, and everyone in the call sees it, here too.",
+        );
 
   // Tap a circle: identity card. Tap the same circle again: progress view.
   const [card, setCard] = useState<{ id: string; step: "card" | "progress" } | null>(null);
@@ -446,6 +476,15 @@ export default function OrbitCallScreen({
             {subtitle}
           </Text>
         </View>
+        {tools.canRouteAudio ? (
+          <Pressable
+            style={styles.roundBtn}
+            onPress={tools.toggleSpeaker}
+            accessibilityRole="button"
+            accessibilityLabel={tools.speakerOn ? "Loudspeaker on. Switch to the earpiece" : "Earpiece on. Switch to the loudspeaker"}>
+            <Ionicons name={tools.speakerOn ? "volume-high-outline" : "ear-outline"} size={20} color={ink.text(INK)} />
+          </Pressable>
+        ) : null}
         <Pressable style={[styles.roundBtn, styles.roundBtnPink]} onPress={onPeople} accessibilityLabel="Add people">
           <Ionicons name="people-outline" size={20} color={ink.text(PINK)} />
         </Pressable>
@@ -453,8 +492,11 @@ export default function OrbitCallScreen({
 
       {extra}
 
+      <ConnectionPill connection={tools.connection} />
+      {tools.share ? <SharePanel share={tools.share} name={sharerName} onStop={() => tools.toggleShare()} /> : null}
+
       {/* ORBIT */}
-      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} onCenter={setCenterId} />
+      <OrbitView people={people} pinnedId={pinnedId} renderVideo={renderVideo} onTap={tapPerson} onCenter={setCenterId} onMore={openEveryone} />
 
       {/* FOCUS / WHO'S TALKING */}
       {focusOn ? (
@@ -489,15 +531,23 @@ export default function OrbitCallScreen({
       <View style={[styles.controls, { paddingBottom: insets.bottom + 14 }]}>
         <ControlButton icon={micOn ? "mic-outline" : "mic-off-outline"} label="Mic" active={!micOn} onPress={onToggleMic} disabled={ended} />
         <ControlButton icon={cameraOn ? "videocam" : "videocam-outline"} label="Video" active={cameraOn} onPress={onToggleCamera} disabled={ended} />
-        {onFlipCamera && cameraOn ? (
+        {onFlipCamera && cameraOn && !tools.share?.isLocal ? (
           <ControlButton icon="camera-reverse-outline" label="Flip" onPress={onFlipCamera} disabled={ended} />
         ) : (
-          <ControlButton icon="share-outline" label="Share" onPress={() => comingSoon("Screen sharing")} disabled={ended} />
+          <ControlButton
+            icon={tools.share?.isLocal ? "stop-circle-outline" : "share-outline"}
+            label={tools.share?.isLocal ? "Stop" : "Share"}
+            active={!!tools.share?.isLocal}
+            onPress={shareScreen}
+            disabled={ended}
+          />
         )}
         <ControlButton icon="headset-outline" label="Focus" active={focusOn} onPress={onToggleFocus} disabled={ended} />
         <ControlButton icon="sparkles" label="Sparks" kind="sparks" onPress={onSparks || (() => comingSoon("Sparks in calls"))} disabled={ended} />
         <ControlButton icon="close" label="Leave" kind="leave" onPress={onLeave} disabled={ended} />
       </View>
+
+      <EveryoneSheet people={people} visible={everyoneOpen} onClose={() => setEveryoneOpen(false)} />
 
       {cardPerson && card ? (
         <IdentitySheet
