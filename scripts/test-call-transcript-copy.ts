@@ -268,6 +268,14 @@ test("empty transcript copy", () => {
   assert.equal(emptyTranscriptCopy([], "active"), "Nothing yet: lines show up here as people with Sparks talk.");
   assert.equal(emptyTranscriptCopy([p("a", "transcribed")], "active"), "Nothing yet: lines show up here as people with Sparks talk.");
   assert.equal(emptyTranscriptCopy([p("a", "silent")], "ready"), "Nothing said on this call was picked up.");
+  assert.equal(emptyTranscriptCopy([p("a", "muted"), p("b", "not_accepted")], "ready"), "Nothing said on this call was picked up.");
+  // 26 Oct (Emmanuel): a phone with Sparks on whose lines never arrived is not "nobody had Sparks".
+  const lost = "No lines came through for this call. That doesn't mean nobody spoke.";
+  assert.equal(emptyTranscriptCopy([p("me", "no_lines")], "ended"), lost);
+  assert.equal(emptyTranscriptCopy([p("me", "not_listening"), p("b", "silent")], "ready"), lost);
+  // A status this build doesn't know reads like the chip ("No lines came through"), never "nobody had Sparks".
+  assert.equal(emptyTranscriptCopy([p("me", "brand_new_status")], "ready"), lost);
+  assert.equal(emptyTranscriptCopy([p("a", "not_accepted"), p("b", "declined")], "ready"), "No transcript for this call: nobody had Sparks turned on.");
 });
 
 test("error copy by status", () => {
