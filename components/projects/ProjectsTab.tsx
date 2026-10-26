@@ -32,7 +32,9 @@ export default function ProjectsTab({ conversationId, title }: { conversationId:
   const loaded = useAppSelector((state) => !!state.projects.loadedChats[conversationId]);
   const serverError = useAppSelector((state) => state.projects.errorByChat[conversationId] || "");
   // Projects are for groups people create (the backend's rule).
-  const error = /belong to a group/i.test(serverError) ? "Projects are for groups you create." : serverError;
+  // Community / faction room: projects are only for groups people create.
+  const notGroup = /belong to a group/i.test(serverError);
+  const error = notGroup ? "Projects are for groups you create." : serverError;
   const [view, setView] = useState<"active" | "archived">("active");
   const [query, setQuery] = useState("");
 
@@ -60,13 +62,15 @@ export default function ProjectsTab({ conversationId, title }: { conversationId:
         <Text style={styles.title}>Projects</Text>
         <Text style={styles.subtitle}>Keep your plans, Sparks and files in one place.</Text>
 
-        <Pressable
-          style={styles.newButton}
-          onPress={() => router.push({ pathname: "/group/project/new/[id]", params: { id: conversationId } })}
-          accessibilityRole="button">
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-          <Text style={styles.newText}>New project</Text>
-        </Pressable>
+        {!notGroup ? (
+          <Pressable
+            style={styles.newButton}
+            onPress={() => router.push({ pathname: "/group/project/new/[id]", params: { id: conversationId } })}
+            accessibilityRole="button">
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Text style={styles.newText}>New project</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.search}>
           <Ionicons name="search" size={20} color={ink.text(UI.MUTED)} />

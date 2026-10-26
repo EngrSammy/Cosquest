@@ -63,7 +63,9 @@ export default function CallsTab({
   const loaded = useAppSelector((state) => !!state.scheduledCalls.loadedChats[conversationId]);
   const serverError = useAppSelector((state) => (loaded ? "" : state.scheduledCalls.errorByChat[conversationId] || ""));
   // Scheduled calls are for groups people create (the backend's rule).
-  const error = /belong to a group/i.test(serverError)
+  // Community / faction room: scheduled calls are only for groups people create.
+  const notGroup = /belong to a group/i.test(serverError);
+  const error = notGroup
     ? "Scheduled calls are for groups you create. In this room, use Meet now to start a voice chat."
     : serverError;
   // Loading only until the first answer (the list, or an error).
@@ -104,13 +106,15 @@ export default function CallsTab({
         <Text style={styles.subtitle}>A little planning. More time together.</Text>
 
         <View style={styles.actions}>
-          <Pressable
-            style={[styles.action, styles.schedule]}
-            onPress={() => router.push({ pathname: "/group/schedule/[id]", params: { id: conversationId } })}
-            accessibilityRole="button">
-            <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.scheduleText}>Schedule a call</Text>
-          </Pressable>
+          {!notGroup ? (
+            <Pressable
+              style={[styles.action, styles.schedule]}
+              onPress={() => router.push({ pathname: "/group/schedule/[id]", params: { id: conversationId } })}
+              accessibilityRole="button">
+              <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.scheduleText}>Schedule a call</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={[styles.action, styles.meet, joining && styles.off]}
             onPress={join}
