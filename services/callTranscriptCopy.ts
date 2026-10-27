@@ -355,14 +355,25 @@ export function ownerLabel(
 
 // ---------- empty and error states ----------
 
-/** What an empty transcript says. */
+/**
+ * What an empty transcript says. Read through statusOf, like the chips, so a
+ * status this build doesn't know never reads as "nobody had Sparks turned on"
+ * (26 Oct: build 13 showed "Didn't speak" beside the viewer and "nobody had
+ * Sparks turned on" underneath for the same person, for a status it didn't
+ * know). When a phone had Sparks on but its lines never came through, say
+ * that, not that nobody spoke.
+ */
 export function emptyTranscriptCopy(
   participants: TranscriptParticipant[] | null | undefined,
   callStatus: string | null | undefined,
 ): string {
   if (callStatus === "active") return "Nothing yet: lines show up here as people with Sparks talk.";
-  const anyoneOn = (participants || []).some((p) => ["transcribed", "silent", "muted", "not_listening", "no_lines"].includes(p.status));
-  return anyoneOn ? "Nothing said on this call was picked up." : "No transcript for this call: nobody had Sparks turned on.";
+  const statuses = (participants || []).map(statusOf);
+  if (statuses.some((s) => s === "no_lines" || s === "not_listening" || s === "transcribed")) {
+    return "No lines came through for this call. That doesn't mean nobody spoke.";
+  }
+  if (statuses.some((s) => s === "silent" || s === "muted")) return "Nothing said on this call was picked up.";
+  return "No transcript for this call: nobody had Sparks turned on.";
 }
 
 /** Plain words for the transcript endpoint's errors (by HTTP status). */
