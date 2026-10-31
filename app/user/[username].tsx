@@ -42,6 +42,7 @@ import { fetchFollowing } from "@/store/thunks/followThunks";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
 import { safeBack } from "@/utils/safeBack";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { openReport } from "@/components/report/reportStore";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
@@ -666,6 +667,19 @@ export default function UserProfileScreen() {
                 </Text>
               </Pressable>
             )}
+
+            {profile?.id ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  // After the menu closes (iOS drops a modal opened mid-animation).
+                  setTimeout(() => openReport({ targetType: "profile", targetId: String(profile.id), what: `@${username}` }), 300);
+                }}>
+                <Ionicons name="flag-outline" size={20} color={ink.text("#191922")} />
+                <Text style={styles.menuText}>Report @{username}</Text>
+              </Pressable>
+            ) : null}
 
             <Pressable
               style={[styles.menuItem, styles.menuCancel]}
