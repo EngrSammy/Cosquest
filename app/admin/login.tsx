@@ -4,15 +4,18 @@
 // Email + password, or (already signed in to CosQuest on this website, e.g.
 // with Google) "Continue as @you". Either way it's the dashboard's own
 // session: the phone stays signed in.
+// Invited to be a super admin? Signed in to CosQuest here, the invitation
+// shows on this page: accept it (then the dashboard opens) or decline it.
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Notice } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
 import { AdminError, signInWithAppSession, signInWithPassword } from "@/services/admin";
+import { type MyInvitation, answerInvitation, getMyInvitations } from "@/services/adminSettings";
 import { useAppSelector } from "@/store/hooks";
 
 function messageFor(error: unknown) {
@@ -33,6 +36,35 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"password" | "app" | null>(null);
   const [error, setError] = useState("");
+  const [invitations, setInvitations] = useState<MyInvitation[]>([]);
+  const [answering, setAnswering] = useState<string | null>(null);
+
+  // Signed in to CosQuest on this website: any pending admin invitation?
+  useEffect(() => {
+    if (!appToken) return;
+    getMyInvitations(appToken)
+      .then((result) => setInvitations(result.invitations || []))
+      .catch(() => setInvitations([]));
+  }, [appToken]);
+
+  const answer = async (invitation: MyInvitation, accept: boolean) => {
+    if (!appToken) return;
+    setAnswering(invitation.id + (accept ? "a" : "d"));
+    setError("");
+    try {
+      await answerInvitation(appToken, invitation.id, accept);
+      if (accept) {
+        await signInWithAppSession(appToken);
+        router.replace("/admin" as any);
+      } else {
+        setInvitations((list) => list.filter((item) => item.id !== invitation.id));
+      }
+    } catch (e: any) {
+      setError(e?.message || "Couldn't answer the invitation.");
+    } finally {
+      setAnswering(null);
+    }
+  };
 
   const done = () => router.replace("/admin" as any);
 
@@ -86,6 +118,23 @@ export default function AdminLogin() {
         </View>
         <Text style={{ marginTop: 22, fontFamily: FONTS.regular, fontSize: 24, color: t.text }}>Admin dashboard</Text>
         <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 13, color: t.muted }}>For CosQuest super admins. Signing in here keeps your phone signed in.</Text>
+
+        {invitations.map((invitation) => (
+          <View key={invitation.id} style={{ marginTop: 22, padding: 16, borderRadius: 14, backgroundColor: t.pinkSoft }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="key-outline" size={18} color={t.pinkText} />
+              <Text style={{ fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>You're invited to be a super admin</Text>
+            </View>
+            <Text style={{ marginTop: 8, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: t.muted }}>
+              {invitation.invitedBy?.name || "A super admin"} invited you{invitation.reason ? `: “${invitation.reason}”` : "."} Super admins can review reports, moderate
+              members and content, change settings and invite admins. Expires {new Date(invitation.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              <Button label="Accept & continue" variant="primary" onPress={() => answer(invitation, true)} loading={answering === invitation.id + "a"} />
+              <Button label="Decline" onPress={() => answer(invitation, false)} loading={answering === invitation.id + "d"} />
+            </View>
+          </View>
+        ))}
 
         {appToken ? (
           <>
