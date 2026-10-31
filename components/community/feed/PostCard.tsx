@@ -34,6 +34,7 @@ import { PostMenu } from "./PostMenu";
 import { SharedPostEmbed } from "./SharedPostEmbed";
 import { ShareSheet } from "./ShareSheet";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { openReport } from "@/components/report/reportStore";
 
 /* =========================================================
    HELPERS
@@ -588,9 +589,9 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     </Pressable>
   );
 
-  // ⋯ only on your own posts (edit / delete).
+  // ⋯ on every post: edit / delete your own, report other people's.
   const menuButton = (onPhoto: boolean) =>
-    isMine ? (
+    isMine || post?.id ? (
       <Pressable
         style={[styles.menuButton, onPhoto && styles.menuButtonOnPhoto]}
         onPress={() => setMenuVisible(true)}
@@ -658,6 +659,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         onClose={() => setMenuVisible(false)}
         onEdit={startEdit}
         onDelete={deletePost}
+        onReport={() => post?.id && openReport({ targetType: "post", targetId: String(post.id), what: "post" })}
       />
 
       {/* EDIT POST MODAL */}

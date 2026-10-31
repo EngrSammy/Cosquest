@@ -11,6 +11,7 @@ import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
 import PushTapHandler from "@/components/PushTapHandler";
 import PushRegistration from "@/components/PushRegistration";
 import InAppBanner from "@/components/notifications/InAppBanner";
+import ReportLayer from "@/components/report/ReportLayer";
 import FactionAlertLayer from "@/components/alerts/FactionAlertLayer";
 import ScheduledCallLayer from "@/components/calls/scheduled/ScheduledCallLayer";
 import SessionGate from "@/components/SessionGate";
@@ -117,6 +118,7 @@ export default function RootLayout() {
 
             {/* Pop-up banners while the app is open */}
             <InAppBanner />
+            <ReportLayer />
 
             {/* Faction in danger */}
             <FactionAlertLayer />

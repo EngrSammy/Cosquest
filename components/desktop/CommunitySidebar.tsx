@@ -6,7 +6,7 @@
 import { router } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { Chats } from "@/components/community/Chats";
+import ChatHub from "@/components/community/ChatHub";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 
@@ -24,7 +24,7 @@ export default function CommunitySidebar() {
         </Pressable>
       </View>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <Chats />
+        <ChatHub />
       </ScrollView>
     </View>
   );

@@ -142,6 +142,7 @@ import CallsTab from "@/components/calls/scheduled/CallsTab";
 import ProjectsTab from "@/components/projects/ProjectsTab";
 import ScheduledCallMessage, { type ScheduledCallCardData } from "@/components/calls/scheduled/ScheduledCallMessage";
 import { ScreenGradient } from "@/components/chat/ui";
+import { openReport } from "@/components/report/reportStore";
 
 type AttachmentDraft = {
   uri: string;
@@ -6035,6 +6036,21 @@ export default function ChatScreen() {
                   label="Undo edit"
                   onPress={menuTap(
                     () => selectedMessage && undoEdit(selectedMessage),
+                  )}
+                />
+              ) : null}
+
+              {!selectedMessageIsMine &&
+              selectedMessage &&
+              !["call", "scheduled_call", "sparks_bot"].includes(String(selectedMessage.kind)) ? (
+                <MenuItem
+                  icon="flag-outline"
+                  label="Report"
+                  danger
+                  onPress={menuTap(
+                    () =>
+                      selectedMessage &&
+                      openReport({ targetType: "message", targetId: String(selectedMessage.id), what: "message" }),
                   )}
                 />
               ) : null}

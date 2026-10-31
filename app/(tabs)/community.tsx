@@ -3,7 +3,7 @@ import { Chats } from "@/components/community/Chats";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import DesktopFeed from "@/components/desktop/DesktopFeed";
 import { Feeds } from "@/components/community/Feeds";
-import { Spotlight } from "@/components/community/Spotlight";
+import { setHubView } from "@/components/community/ChatHub";
 import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import { useChatScheme } from "@/constants/chatTheme";
@@ -24,9 +24,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type Tab = "Feeds" | "Chats" | "Spotlight";
+type Tab = "Feeds" | "Chats" | "Community";
 
-const TABS: Tab[] = ["Feeds", "Chats", "Spotlight"];
+const TABS: Tab[] = ["Feeds", "Chats", "Community"];
 
 export default function Community() {
   const insets = useSafeAreaInsets();
@@ -135,7 +135,13 @@ export default function Community() {
                     active ? styles.tabActive : styles.tabInactive,
                   ]}
                   hitSlop={6}
-                  onPress={() => (desktop && key === "Chats" ? router.navigate("/chat" as any) : setTab(key))}>
+                  onPress={() => {
+                    // Computers: Chats and Community open the chat page (the list beside the open chat).
+                    if (desktop && key !== "Feeds") {
+                      setHubView(key === "Chats" ? "chats" : "community");
+                      router.navigate("/chat" as any);
+                    } else setTab(key);
+                  }}>
                   <Text
                     style={[styles.tabText, active && styles.tabTextActive]}>
                     {key}
@@ -151,11 +157,11 @@ export default function Community() {
             <Feeds />
           ) : tab === "Chats" ? (
             <View style={styles.padded}>
-              <Chats />
+              <Chats view="chats" />
             </View>
           ) : (
             <View style={styles.padded}>
-              <Spotlight />
+              <Chats view="community" />
             </View>
           )}
         </View>

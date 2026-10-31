@@ -13,6 +13,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ActivityIndicator, ImageSourcePropType, Pressable, ScrollView, Text, View } from "react-native";
+import { Spotlight } from "@/components/community/Spotlight";
 
 import { ScreenGradient } from "@/components/chat/ui";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
@@ -22,7 +23,7 @@ const PINK = "#C34D9C";
 const INK = "#1C1E21";
 const MUTED = "#65676B";
 
-type Tab = "Posts" | "Reels" | "Thoughts";
+type Tab = "Posts" | "Reels" | "Thoughts" | "Spotlight";
 type GridPost = { id: string; image?: string | null };
 
 function Button({
@@ -166,6 +167,7 @@ export default function DesktopProfile({
     { key: "Posts", count: imagePosts.length },
     { key: "Reels", count: reels.length },
     { key: "Thoughts", count: thoughts.length },
+    { key: "Spotlight", count: 0 },
   ];
 
   return (
@@ -346,6 +348,9 @@ export default function DesktopProfile({
                   />
                 )
               ) : null}
+
+              {/* Spotlight (moved here from the Community page) */}
+              {tab === "Spotlight" ? <Spotlight /> : null}
             </Card>
           </View>
           {/* Right: your faction */}

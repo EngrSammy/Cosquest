@@ -8,6 +8,8 @@ type PostMenuProps = {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  // Other people's posts: report it.
+  onReport?: () => void;
 };
 
 /*
@@ -22,12 +24,18 @@ export function PostMenu({
   onClose,
   onEdit,
   onDelete,
+  onReport,
 }: PostMenuProps) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const handleEdit = () => {
     onClose();
     setTimeout(onEdit, MODAL_CLOSE_DELAY);
+  };
+
+  const handleReport = () => {
+    onClose();
+    if (onReport) setTimeout(onReport, MODAL_CLOSE_DELAY);
   };
 
   const handleDelete = () => {
@@ -64,9 +72,18 @@ export function PostMenu({
             </>
           ) : null}
 
+          {/* REPORT (someone else's post) */}
+          {!isMine && onReport ? (
+            <Pressable style={styles.item} onPress={handleReport}>
+              <Ionicons name="flag-outline" size={21} color={ink.text("#D9364F")} />
+
+              <Text style={[styles.itemText, styles.deleteText]}>Report post</Text>
+            </Pressable>
+          ) : null}
+
           {/* CANCEL */}
           <Pressable
-            style={[styles.cancel, !isMine && styles.cancelOnly]}
+            style={[styles.cancel, !isMine && !onReport && styles.cancelOnly]}
             onPress={onClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
