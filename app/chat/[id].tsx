@@ -2377,6 +2377,16 @@ export default function ChatScreen() {
   const [groupTab, setGroupTab] = useState<"chat" | "calls" | "projects">("chat");
   const [tabsBottom, setTabsBottom] = useState(0);
   const [sparkSeed, setSparkSeed] = useState<Message | null>(null);
+  // "Create Spark" (rail / Sparks column): the Start a Spark sheet, seeded
+  // with the chat's latest message from a person.
+  const createSparkFromLatest = () => {
+    const seed = [...messages].reverse().find((m) => !m.deleted && !["call", "scheduled_call", "sparks_bot", "poll"].includes(String(m.kind || "")));
+    if (!seed) {
+      Alert.alert("Create Spark", "Send a message first, then start a Spark from it.");
+      return;
+    }
+    setSparkSeed(seed);
+  };
   const [attachmentDraft, setAttachmentDraft] =
     useState<AttachmentDraft | null>(null);
   const [attachmentCaption, setAttachmentCaption] = useState("");
@@ -5150,6 +5160,7 @@ export default function ChatScreen() {
             }
             pinnedBy={pinnedByName ? `Pinned by ${pinnedByName}` : null}
             onOpen={(spark) => setOpenSparkId(spark.id)}
+            onCreate={createSparkFromLatest}
           />
         ) : null
       }>
@@ -5353,7 +5364,10 @@ export default function ChatScreen() {
           onLayout={(event) =>
             setTabsBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
           }>
-          {GROUP_TABS.map((tab) => {
+          {GROUP_TABS.filter(
+            // The Community room: Chat and Sparks only (no Calls / Projects).
+            (tab) => !(conversation?.type === "community" && (tab.key === "calls" || tab.key === "projects")),
+          ).map((tab) => {
             const on = tab.key === groupTab;
             return (
               <Pressable
@@ -5490,6 +5504,7 @@ export default function ChatScreen() {
           }
           onOpen={(spark) => setOpenSparkId(spark.id)}
           onShowAll={() => setShowAllSparks(true)}
+          onCreate={createSparkFromLatest}
         />
       ) : null}
 

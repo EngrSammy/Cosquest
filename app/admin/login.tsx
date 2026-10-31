@@ -4,6 +4,7 @@
 // Email + password, or (already signed in to CosQuest on this website, e.g.
 // with Google) "Continue as @you". Either way it's the dashboard's own
 // session: the phone stays signed in.
+// Show / hide the password, and "Remember me" (the email, in this browser).
 // Invited to be a super admin? Signed in to CosQuest here, the invitation
 // shows on this page: accept it (then the dashboard opens) or decline it.
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,8 @@ import { FONTS } from "@/constants/fonts";
 import { AdminError, signInWithAppSession, signInWithPassword } from "@/services/admin";
 import { type MyInvitation, answerInvitation, getMyInvitations } from "@/services/adminSettings";
 import { useAppSelector } from "@/store/hooks";
+
+const REMEMBER_KEY = "cq_admin_email";
 
 function messageFor(error: unknown) {
   if (error instanceof AdminError) {
@@ -32,8 +35,24 @@ export default function AdminLogin() {
   const appToken = useAppSelector((state) => state.auth.token);
   const appUser = useAppSelector((state) => (state.user.user || state.auth.user) as any);
   const username = appUser?.profile?.username || appUser?.username || null;
-  const [email, setEmail] = useState("");
+  // "Remember me": the email is kept in this browser (never the password -
+  // the browser's own password manager offers to save that).
+  const [email, setEmail] = useState(() => {
+    try {
+      return (typeof window !== "undefined" && window.localStorage.getItem(REMEMBER_KEY)) || "";
+    } catch {
+      return "";
+    }
+  });
+  const [remember, setRemember] = useState(() => {
+    try {
+      return typeof window !== "undefined" && Boolean(window.localStorage.getItem(REMEMBER_KEY));
+    } catch {
+      return false;
+    }
+  });
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState<"password" | "app" | null>(null);
   const [error, setError] = useState("");
   const [invitations, setInvitations] = useState<MyInvitation[]>([]);
@@ -74,6 +93,10 @@ export default function AdminLogin() {
     setError("");
     try {
       await signInWithPassword(email.trim(), password);
+      try {
+        if (remember) window.localStorage.setItem(REMEMBER_KEY, email.trim());
+        else window.localStorage.removeItem(REMEMBER_KEY);
+      } catch {}
       done();
     } catch (e) {
       setError(messageFor(e));
@@ -152,9 +175,49 @@ export default function AdminLogin() {
         )}
 
         <Text style={{ marginBottom: 6, fontFamily: FONTS.medium, fontSize: 12.5, color: t.text }}>Email</Text>
-        <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" placeholderTextColor={t.faint} style={input} />
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          // Lets the browser fill and save the sign-in details.
+          autoComplete="email"
+          textContentType="username"
+          {...({ name: "email", id: "admin-email" } as object)}
+          placeholder="you@example.com"
+          placeholderTextColor={t.faint}
+          style={input}
+        />
         <Text style={{ marginTop: 14, marginBottom: 6, fontFamily: FONTS.medium, fontSize: 12.5, color: t.text }}>Password</Text>
-        <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="Your password" placeholderTextColor={t.faint} style={input} onSubmitEditing={withPassword} />
+        <View style={{ justifyContent: "center" }}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoComplete="current-password"
+            textContentType="password"
+            {...({ name: "password", id: "admin-password" } as object)}
+            placeholder="Your password"
+            placeholderTextColor={t.faint}
+            style={[input, { paddingRight: 48 }]}
+            onSubmitEditing={withPassword}
+          />
+          <Pressable
+            onPress={() => setShowPassword((v) => !v)}
+            hitSlop={8}
+            style={{ position: "absolute", right: 12, padding: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
+            <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={t.muted} />
+          </Pressable>
+        </View>
+
+        <Pressable onPress={() => setRemember((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14 }} accessibilityRole="checkbox" accessibilityState={{ checked: remember }}>
+          <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: remember ? t.pink : t.faint, backgroundColor: remember ? t.pink : "transparent", alignItems: "center", justifyContent: "center" }}>
+            {remember ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
+          </View>
+          <Text style={{ flex: 1, fontFamily: FONTS.regular, fontSize: 12.5, color: t.text }}>Remember me on this computer</Text>
+        </Pressable>
 
         {error ? <Text style={{ marginTop: 12, fontFamily: FONTS.regular, fontSize: 12.5, color: t.red }}>{error}</Text> : null}
 

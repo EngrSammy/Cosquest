@@ -102,20 +102,40 @@ function QuietCard({ spark, onPress }: { spark: Spark; onPress: () => void }) {
   );
 }
 
+// "Create Spark" (Figma): a pink circle in a green ring, under the Sparks.
+function CreateSparkCircle({ onPress }: { onPress: () => void }) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  return (
+    <Pressable onPress={onPress} style={styles.circleItem} accessibilityRole="button" accessibilityLabel="Create Spark">
+      <View style={{ width: 58, height: 58, borderRadius: 29, borderWidth: 3, borderColor: "#3DD68C", alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" }}>
+        <View style={{ width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: PINK }}>
+          <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+        </View>
+      </View>
+      <Text style={styles.circleLabel} numberOfLines={2}>
+        Create Spark
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function SparksRail({
   sparks,
   top,
   onOpen,
   onShowAll,
+  onCreate,
 }: {
   sparks: Spark[];
   // Distance from the top of the chat (below the header / pinned bar).
   top: number;
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
+  // "Create Spark" (shown even when there are no Sparks yet).
+  onCreate?: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
-  if (!sparks.length) {
+  if (!sparks.length && !onCreate) {
     return null;
   }
 
@@ -138,6 +158,8 @@ export default function SparksRail({
           <Text style={styles.allText}>All · {sparks.length}</Text>
         </Pressable>
       ) : null}
+
+      {onCreate ? <CreateSparkCircle onPress={onCreate} /> : null}
     </View>
   );
 }
