@@ -11,6 +11,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import type { RoomArt } from "@/constants/roomArt";
 
 const PINK = "#C34D9C";
 const BADGE = "#B0157F";
@@ -100,6 +101,92 @@ export function PersonRow({
   );
 }
 
+// ---------- Community: a built-in room with its own picture ----------
+// (Figma: Community — General, faction rooms.) The round picture hangs off
+// the card's left edge and rises above it; a faction shows its logo in
+// place of the name. Unread badge on the right, "200 Members" under it.
+const ART_CARD_H = 72;
+
+function ArtRoomCard({
+  art,
+  title,
+  preview,
+  members,
+  unread,
+  muted,
+  onPress,
+}: {
+  art: RoomArt;
+  title: string;
+  preview: string;
+  members?: number;
+  unread: number;
+  muted?: boolean;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const ink = useInk();
+  const artH = art.width / art.ratio;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.artRow, { paddingTop: Math.max(0, artH - ART_CARD_H) }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${preview}${unread ? `. ${unread} unread` : ""}`}>
+      {({ pressed, hovered }: any) => (
+        <>
+          <View style={[styles.artCard, { paddingLeft: art.width + 10 }, (pressed || hovered) && styles.artCardPressed]}>
+            <View style={styles.text}>
+              {art.logo ? (
+                <Image
+                  source={art.logo}
+                  style={{ height: 22, width: 22 * (art.logoRatio || 3) }}
+                  contentFit="contain"
+                  accessibilityLabel={title}
+                />
+              ) : (
+                <View style={styles.cardTitleRow}>
+                  <Text style={styles.artTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  {muted ? <Ionicons name="notifications-off-outline" size={13} color={ink.text("#8A93A6")} /> : null}
+                </View>
+              )}
+              {art.subtitle ? (
+                <Text style={styles.artTitle} numberOfLines={1}>
+                  {art.subtitle}
+                </Text>
+              ) : null}
+              <Text style={[styles.artPreview, unread > 0 && styles.previewUnread]} numberOfLines={1}>
+                {preview}
+              </Text>
+            </View>
+            <View style={styles.artSide}>
+              <View style={styles.artBadgeSlot}>
+                {unread ? (
+                  <View style={[styles.artBadge, { backgroundColor: muted ? "#A0A6B5" : art.badge }]}>
+                    <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
+                  </View>
+                ) : null}
+              </View>
+              {members ? (
+                <Text style={styles.artMembers}>
+                  {members.toLocaleString()} {members === 1 ? "Member" : "Members"}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <Image
+            source={art.dp}
+            style={[styles.artDp, { width: art.width, height: artH }]}
+            contentFit="contain"
+          />
+        </>
+      )}
+    </Pressable>
+  );
+}
+
 // ---------- Community: a room or group card ----------
 export function RoomCard({
   title,
@@ -109,6 +196,7 @@ export function RoomCard({
   unread,
   photoUrl,
   icon,
+  art,
   muted,
   onPress,
 }: {
@@ -119,11 +207,26 @@ export function RoomCard({
   unread: number;
   photoUrl?: string | null;
   icon: keyof typeof Ionicons.glyphMap;
+  // A built-in room's own picture (used unless a photo was uploaded).
+  art?: RoomArt | null;
   muted?: boolean;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  if (art && !photoUrl) {
+    return (
+      <ArtRoomCard
+        art={art}
+        title={title}
+        preview={preview}
+        members={members}
+        unread={unread}
+        muted={muted}
+        onPress={onPress}
+      />
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
@@ -161,6 +264,21 @@ export function RoomCard({
   );
 }
 
+// Every Community hub card (rooms, factions, groups): light and frosted,
+// rounded, with a white edge and a soft shadow (Figma: Community — General).
+const FROSTED_CARD = {
+  borderRadius: 22,
+  backgroundColor: "rgba(237,241,247,0.92)",
+  borderWidth: 1.5,
+  borderColor: "rgba(255,255,255,0.95)",
+  shadowColor: "#24283C",
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;
+const FROSTED_PRESSED = "rgba(247,228,240,0.95)";
+
 const STYLE_PAIR = themedStyles(
   {
     // Read / Unread
@@ -190,20 +308,14 @@ const STYLE_PAIR = themedStyles(
 
     // Room card
     card: {
+      ...FROSTED_CARD,
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
       padding: 12,
       marginBottom: 12,
-      borderRadius: 18,
-      backgroundColor: "#FFFFFF",
-      shadowColor: "#24283C",
-      shadowOpacity: 0.07,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 2,
     },
-    cardPressed: { backgroundColor: "#FBF5F9" },
+    cardPressed: { backgroundColor: FROSTED_PRESSED },
     cardImage: { width: 76, height: 76, borderRadius: 14, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: "#F7E4F0" },
     cardPhoto: { width: 76, height: 76 },
     cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -211,6 +323,26 @@ const STYLE_PAIR = themedStyles(
     cardSubtitle: { marginTop: 1, fontFamily: FONTS.medium, fontSize: 12, color: PINK },
     members: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 11.5, color: "#8A93A6" },
     cardBadge: { alignSelf: "flex-start" },
+
+    // Built-in room with its picture
+    artRow: { marginBottom: 14 },
+    artCard: {
+      ...FROSTED_CARD,
+      height: ART_CARD_H,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginLeft: 4,
+      paddingRight: 12,
+    },
+    artCardPressed: { backgroundColor: FROSTED_PRESSED },
+    artDp: { position: "absolute", left: 0, bottom: 0 },
+    artTitle: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 15, lineHeight: 20, color: "#191922" },
+    artPreview: { marginTop: 2, fontFamily: FONTS.medium, fontSize: 13, color: "#6B6F80" },
+    artSide: { alignSelf: "stretch", alignItems: "flex-end", justifyContent: "space-between", paddingVertical: 8 },
+    artBadgeSlot: { flex: 1, justifyContent: "center" },
+    artBadge: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+    artMembers: { fontFamily: FONTS.medium, fontSize: 9.5, color: "#3A3D4A" },
   },
   {
     segmentItem: { backgroundColor: "#252837" },
@@ -225,8 +357,10 @@ const STYLE_PAIR = themedStyles(
     previewUnread: { color: "#E3E6EE" },
     time: { color: "#8A93A6" },
     timeUnread: { color: "#F29BD3" },
-    card: { backgroundColor: "#1F2130" },
+    card: { backgroundColor: "#1F2130", borderColor: "rgba(255,255,255,0.08)" },
     cardPressed: { backgroundColor: "#262838" },
+    artCard: { backgroundColor: "#1F2130", borderColor: "rgba(255,255,255,0.08)" },
+    artCardPressed: { backgroundColor: "#262838" },
     cardImage: { backgroundColor: "rgba(195,77,156,0.18)" },
     cardTitle: { color: "#F4F5FA" },
     cardSubtitle: { color: "#F29BD3" },

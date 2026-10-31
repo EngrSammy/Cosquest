@@ -1,15 +1,28 @@
 // ==========================================
 // SPARKS RAIL (Figma M03 · Option A: side rail) + DORMANT CARD (M08)
 // ==========================================
-// Circles down the right side of the chat for active (pulsing) and pinned
-// Sparks, each with its subject and "3 people"; quiet Sparks as small cards
-// ("Route ideas · Quiet · Open ->"). Revived Sparks are teal with a clock.
+// Circles down the right side of the chat, each with a gradient ring, the
+// sparkle icon, its subject and "3 people" (quiet Sparks: "Quiet", a grey
+// ring). Active ones pulse; revived ones get a teal ring. "Create Spark"
+// at the end starts a new one.
 // DormantSparkCard is the card shown in the main chat under a quiet Spark's
 // last message. Built from the screenshots for testing.
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as React from "react";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
@@ -22,8 +35,52 @@ const INK = "#24283C";
 const MUTED = "#66738A";
 const LILAC = "#F0EDF9";
 
+// Circles shown on the rail (active and pinned first, then quiet); the
+// rest are under "All".
 const MAX_CIRCLES = 3;
-const MAX_QUIET = 2;
+
+const SPARKLE = require("@/assets/images/magenta-sparkles.png");
+const SPARKLE_WHITE = require("@/assets/images/white-sparkles.png");
+
+// Ring gradients (Figma): taken in turn, so neighbours differ.
+const RINGS: [string, string][] = [
+  ["#F05DB4", "#7E2A63"],
+  ["#F5A524", "#B63D91"],
+  ["#8E6CF0", "#B63D91"],
+];
+const REVIVED_RING: [string, string] = ["#5CCBD1", "#1F6F77"];
+const QUIET_RING: [string, string] = ["#D3D8E2", "#9AA3B5"];
+const CREATE_RING: [string, string] = ["#3DDC84", "#B63D91"];
+const CREATE_FILL: [string, string] = ["#B63D91", "#2E6B5E"];
+
+const CIRCLE = 58;
+const RING_W = 3;
+
+// A gradient ring around a filled middle with the sparkle icon.
+function RingCircle({
+  ring,
+  fill,
+  white,
+}: {
+  ring: [string, string];
+  fill?: [string, string];
+  white?: boolean;
+}) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  return (
+    <LinearGradient colors={ring} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ring}>
+      {fill ? (
+        <LinearGradient colors={fill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ringInner}>
+          <Image source={white ? SPARKLE_WHITE : SPARKLE} style={styles.sparkle} contentFit="contain" />
+        </LinearGradient>
+      ) : (
+        <View style={styles.ringInner}>
+          <Image source={white ? SPARKLE_WHITE : SPARKLE} style={styles.sparkle} contentFit="contain" />
+        </View>
+      )}
+    </LinearGradient>
+  );
+}
 
 function timeOf(value?: string) {
   if (!value) return "";
@@ -34,9 +91,11 @@ function timeOf(value?: string) {
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+function SparkCircle({ spark, index, onPress }: { spark: Spark; index: number; onPress: () => void }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const pulse = useRef(new Animated.Value(0)).current;
+  const quiet = !spark.active && !spark.pinned;
+  const ring = spark.revived ? REVIVED_RING : quiet ? QUIET_RING : RINGS[index % RINGS.length];
   const color = spark.revived ? TEAL : PINK;
 
   useEffect(() => {
@@ -55,7 +114,10 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
   }, [spark.active, pulse]);
 
   return (
-    <Pressable onPress={onPress} style={styles.circleItem} accessibilityLabel={`Spark: ${spark.subject}`}>
+    <Pressable
+      onPress={onPress}
+      style={styles.circleItem}
+      accessibilityLabel={`${quiet ? "Quiet Spark" : "Spark"}: ${spark.subject}`}>
       <View style={styles.circleWrap}>
         {spark.active ? (
           <Animated.View
@@ -63,15 +125,15 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
             style={[
               styles.pulse,
               {
-                borderColor: color,
+                borderColor: ring[0],
                 opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
-                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
               },
             ]}
           />
         ) : null}
-        <View style={[styles.circle, spark.revived && styles.circleRevived]}>
-          <Ionicons name={spark.revived ? "time-outline" : "sparkles-outline"} size={24} color={color} />
+        <View style={[styles.shadow, quiet && styles.quiet]}>
+          <RingCircle ring={ring} />
         </View>
         {spark.pinned ? (
           <View style={styles.pinBadge}>
@@ -82,22 +144,27 @@ function SparkCircle({ spark, onPress }: { spark: Spark; onPress: () => void }) 
       <Text style={styles.circleLabel} numberOfLines={2}>
         {spark.subject}
       </Text>
-      <Text style={[styles.circlePeople, { color }]}>
-        {spark.participantCount} {spark.participantCount === 1 ? "person" : "people"}
-      </Text>
+      {quiet ? (
+        <Text style={styles.circleQuiet}>Quiet</Text>
+      ) : (
+        <Text style={[styles.circlePeople, { color }]}>
+          {spark.participantCount} {spark.participantCount === 1 ? "person" : "people"}
+        </Text>
+      )}
     </Pressable>
   );
 }
 
-function QuietCard({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+function CreateCircle({ onPress }: { onPress: () => void }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable onPress={onPress} style={styles.quietCard} accessibilityLabel={`Quiet Spark: ${spark.subject}`}>
-      <Text style={styles.quietTitle} numberOfLines={2}>
-        {spark.subject}
-      </Text>
-      <Text style={styles.quietState}>Quiet</Text>
-      <Text style={styles.quietOpen}>Open →</Text>
+    <Pressable onPress={onPress} style={styles.circleItem} accessibilityRole="button" accessibilityLabel="Create Spark">
+      <View style={styles.circleWrap}>
+        <View style={styles.shadow}>
+          <RingCircle ring={CREATE_RING} fill={CREATE_FILL} white />
+        </View>
+      </View>
+      <Text style={styles.circleLabel}>Create Spark</Text>
     </Pressable>
   );
 }
@@ -107,30 +174,30 @@ export default function SparksRail({
   top,
   onOpen,
   onShowAll,
+  onCreate,
 }: {
   sparks: Spark[];
   // Distance from the top of the chat (below the header / pinned bar).
   top: number;
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
+  // "Create Spark" circle at the end (left out when not given).
+  onCreate?: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
-  if (!sparks.length) {
+  if (!sparks.length && !onCreate) {
     return null;
   }
 
-  const circles = sparks.filter((spark) => spark.active || spark.pinned).slice(0, MAX_CIRCLES);
-  const quiet = sparks.filter((spark) => !spark.active && !spark.pinned).slice(0, MAX_QUIET);
-  const hidden = sparks.length - circles.length - quiet.length;
+  const lit = sparks.filter((spark) => spark.active || spark.pinned);
+  const quiet = sparks.filter((spark) => !spark.active && !spark.pinned);
+  const circles = [...lit, ...quiet].slice(0, MAX_CIRCLES);
+  const hidden = sparks.length - circles.length;
 
   return (
     <View style={[styles.rail, { top }]} pointerEvents="box-none">
-      {circles.map((spark) => (
-        <SparkCircle key={spark.id} spark={spark} onPress={() => onOpen(spark)} />
-      ))}
-
-      {quiet.map((spark) => (
-        <QuietCard key={spark.id} spark={spark} onPress={() => onOpen(spark)} />
+      {circles.map((spark, index) => (
+        <SparkCircle key={spark.id} spark={spark} index={index} onPress={() => onOpen(spark)} />
       ))}
 
       {hidden > 0 ? (
@@ -138,6 +205,8 @@ export default function SparksRail({
           <Text style={styles.allText}>All · {sparks.length}</Text>
         </Pressable>
       ) : null}
+
+      {onCreate ? <CreateCircle onPress={onCreate} /> : null}
     </View>
   );
 }
@@ -171,6 +240,84 @@ export function DormantSparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spa
 }
 
 // Every Spark: active, pinned, and quiet ones.
+// The list of a chat's Sparks with the All / History filter: inside the
+// "All Sparks" sheet (from the rail) and on the group's Sparks page.
+export function SparksList({
+  sparks,
+  onOpen,
+  style,
+  contentContainerStyle,
+}: {
+  sparks: Spark[];
+  onOpen: (spark: Spark) => void;
+  style?: StyleProp<ViewStyle>;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+}) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const [filter, setFilter] = React.useState<"all" | "history">("all");
+  const filteredSparks = filter === "history"
+    ? sparks.filter((spark) => spark.revived)
+    : sparks;
+
+  return (
+    <>
+      <View style={styles.filterRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: filter === "all" }}
+          onPress={() => setFilter("all")}
+          style={[styles.filterTab, filter === "all" && styles.filterTabSelected]}>
+          <Text style={[styles.filterText, filter === "all" && styles.filterTextSelected]}>All Sparks</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: filter === "history" }}
+          onPress={() => setFilter("history")}
+          style={[styles.filterTab, filter === "history" && styles.filterTabSelected]}>
+          <Ionicons name="time-outline" size={15} color={filter === "history" ? TEAL : MUTED} />
+          <Text style={[styles.filterText, filter === "history" && styles.filterTextSelected]}>History</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView style={style} contentContainerStyle={contentContainerStyle} showsVerticalScrollIndicator={false}>
+        {filteredSparks.length === 0 ? (
+          <Text style={styles.empty}>
+            {filter === "history" ? "No revived Spark history yet." : "No Sparks yet."}
+          </Text>
+        ) : null}
+        {filteredSparks.map((spark) => (
+          <Pressable key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
+            <View style={[styles.cardIcon, spark.revived && styles.circleRevived]}>
+              <Ionicons
+                name={spark.active ? "sparkles-outline" : "time-outline"}
+                size={18}
+                color={spark.revived ? TEAL : PINK}
+              />
+            </View>
+            <View style={styles.cardText}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {spark.subject}
+                </Text>
+                {spark.pinned ? <Ionicons name="pin" size={12} color={PINK} /> : null}
+              </View>
+              <Text style={styles.cardMeta}>
+                {spark.active ? `Active · ${spark.participantCount} people` : `Quiet · ${timeOf(spark.lastActivityAt)}`} ·{" "}
+                {spark.messageCount} {spark.messageCount === 1 ? "message" : "messages"}{spark.revived ? " · revived" : ""}
+              </Text>
+              {spark.summary ? (
+                <Text style={styles.cardSummary} numberOfLines={2}>
+                  {spark.summary}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
 export function SparksListSheet({
   visible,
   sparks,
@@ -184,10 +331,6 @@ export function SparksListSheet({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = React.useState<"all" | "history">("all");
-  const filteredSparks = filter === "history"
-    ? sparks.filter((spark) => spark.revived)
-    : sparks;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -201,60 +344,7 @@ export function SparksListSheet({
           </Pressable>
         </View>
         <Text style={styles.sheetHint}>Browse Sparks in this conversation or revisit revived Spark history.</Text>
-
-        <View style={styles.filterRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: filter === "all" }}
-            onPress={() => setFilter("all")}
-            style={[styles.filterTab, filter === "all" && styles.filterTabSelected]}>
-            <Text style={[styles.filterText, filter === "all" && styles.filterTextSelected]}>All Sparks</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: filter === "history" }}
-            onPress={() => setFilter("history")}
-            style={[styles.filterTab, filter === "history" && styles.filterTabSelected]}>
-            <Ionicons name="time-outline" size={15} color={filter === "history" ? TEAL : MUTED} />
-            <Text style={[styles.filterText, filter === "history" && styles.filterTextSelected]}>History</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView style={styles.list}>
-          {filteredSparks.length === 0 ? (
-            <Text style={styles.empty}>
-              {filter === "history" ? "No revived Spark history yet." : "No Sparks yet."}
-            </Text>
-          ) : null}
-          {filteredSparks.map((spark) => (
-            <Pressable key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
-              <View style={[styles.cardIcon, spark.revived && styles.circleRevived]}>
-                <Ionicons
-                  name={spark.active ? "sparkles-outline" : "time-outline"}
-                  size={18}
-                  color={spark.revived ? TEAL : PINK}
-                />
-              </View>
-              <View style={styles.cardText}>
-                <View style={styles.cardTitleRow}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {spark.subject}
-                  </Text>
-                  {spark.pinned ? <Ionicons name="pin" size={12} color={PINK} /> : null}
-                </View>
-                <Text style={styles.cardMeta}>
-                  {spark.active ? `Active · ${spark.participantCount} people` : `Quiet · ${timeOf(spark.lastActivityAt)}`} ·{" "}
-                  {spark.messageCount} {spark.messageCount === 1 ? "message" : "messages"}{spark.revived ? " · revived" : ""}
-                </Text>
-                {spark.summary ? (
-                  <Text style={styles.cardSummary} numberOfLines={2}>
-                    {spark.summary}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <SparksList sparks={sparks} onOpen={onOpen} style={styles.list} />
       </View>
     </Modal>
   );
@@ -268,20 +358,37 @@ const STYLE_PAIR = themedStyles({
 
   circleItem: { width: 82, alignItems: "center" },
 
-  circleWrap: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+  circleWrap: { width: CIRCLE, height: CIRCLE, alignItems: "center", justifyContent: "center" },
 
-  pulse: { position: "absolute", width: 56, height: 56, borderRadius: 28, borderWidth: 3 },
+  pulse: { position: "absolute", width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: 3 },
 
-  circle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  shadow: {
+    borderRadius: CIRCLE / 2,
+    shadowColor: "#8E2E6F",
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+
+  quiet: { opacity: 0.85 },
+
+  ring: {
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
+    padding: RING_W,
+  },
+
+  ringInner: {
+    flex: 1,
+    borderRadius: CIRCLE / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3DDED",
-    borderWidth: 3,
-    borderColor: "rgba(182,61,145,0.16)",
+    backgroundColor: "#F8E8F1",
   },
+
+  sparkle: { width: 26, height: 26 },
 
   circleRevived: { backgroundColor: "#DDEFF2", borderColor: "rgba(42,138,146,0.18)" },
 
@@ -310,13 +417,7 @@ const STYLE_PAIR = themedStyles({
 
   circlePeople: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 11, lineHeight: 14 },
 
-  quietCard: { width: 76, padding: 10, borderRadius: 14, backgroundColor: LILAC },
-
-  quietTitle: { fontFamily: FONTS.semibold, fontSize: 12, lineHeight: 16, color: INK },
-
-  quietState: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 11, color: MUTED },
-
-  quietOpen: { marginTop: 6, fontFamily: FONTS.medium, fontSize: 12, color: PINK },
+  circleQuiet: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 11, lineHeight: 14, color: MUTED },
 
   allButton: { paddingHorizontal: 10, height: 26, borderRadius: 13, justifyContent: "center", backgroundColor: LILAC },
 

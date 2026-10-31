@@ -5,15 +5,7 @@ import {
   registerQuest,
   unregisterQuest,
 } from "../thunks/questThunks";
-
-type Quest = {
-  id: string;
-  title: string;
-  description?: string;
-  status?: string;
-  latitude?: number;
-  longitude?: number;
-};
+import type { Quest } from "@/services/quests";
 
 type QuestState = {
   quests: Quest[];

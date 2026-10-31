@@ -8,11 +8,27 @@ import { Tabs } from "expo-router";
 import { SparksSetupPrompt } from "@/components/sparks/SparksSetupPrompt";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
+// Open tab: pink in both themes. The rest: grey on the light bar, white on
+// the dark one.
 const ACTIVE = "#DC179F";
-const INACTIVE = "#FFFFFF";
+const ACTIVE_LIGHT = "#B63D91";
+const INACTIVE_LIGHT = "#9A9AA8";
+const INACTIVE_DARK = "#FFFFFF";
+
+// The bar itself: very see-through frosted glass, light or dark. iOS and
+// the website blur what's behind it, so the tint can be thin; Android
+// only gets the tint (a real blur there needs every screen wrapped in a
+// BlurTargetView), so it keeps a bit more of it for the icons to read.
+const ANDROID = Platform.OS === "android";
+const BAR_LIGHT = ANDROID
+  ? (["rgba(255,255,255,0.32)", "rgba(240,242,248,0.26)"] as const)
+  : (["rgba(255,255,255,0.10)", "rgba(240,242,248,0.05)"] as const);
+const BAR_DARK = ANDROID
+  ? (["rgba(30,28,36,0.38)", "rgba(30,28,36,0.30)"] as const)
+  : (["rgba(30,28,36,0.14)", "rgba(30,28,36,0.08)"] as const);
 
 // Figma: the open tab gets a short pink line above its icon.
 function TabIcon({
@@ -35,13 +51,14 @@ export default function TabLayout() {
   // Computer: the left rail replaces the bottom tab bar.
   const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
+  const { dark } = useInk();
   return (
     <>
     <SparksSetupPrompt />
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: ACTIVE,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: dark ? ACTIVE : ACTIVE_LIGHT,
+        tabBarInactiveTintColor: dark ? INACTIVE_DARK : INACTIVE_LIGHT,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarLabelStyle: styles.label,
@@ -55,14 +72,12 @@ export default function TabLayout() {
           backgroundColor: "transparent",
           elevation: 0,
         },
-        // Figma: a darker grey see-through bar.
+        // A see-through bar: light frosted in light mode, darker grey glass
+        // in dark mode.
         tabBarBackground: () => (
           <View style={styles.barShadow}>
-            <BlurView intensity={25} tint="dark" style={styles.barClip}>
-              <LinearGradient
-                colors={["rgba(52, 46, 52, 0.78)", "rgba(52, 46, 52, 0.62)"]}
-                style={StyleSheet.absoluteFill}
-              />
+            <BlurView intensity={dark ? 40 : 45} tint={dark ? "dark" : "light"} style={styles.barClip}>
+              <LinearGradient colors={dark ? BAR_DARK : BAR_LIGHT} style={StyleSheet.absoluteFill} />
             </BlurView>
             <View pointerEvents="none" style={styles.barOutline} />
           </View>
@@ -128,8 +143,8 @@ const STYLE_PAIR = themedStyles({
   barShadow: {
     ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
+    shadowColor: "#24283C",
+    shadowOpacity: 0.14,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
@@ -145,7 +160,7 @@ const STYLE_PAIR = themedStyles({
     ...StyleSheet.absoluteFill,
     borderRadius: RADIUS,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
+    borderColor: "rgba(255,255,255,0.9)",
   },
 
   label: {
@@ -166,6 +181,11 @@ const STYLE_PAIR = themedStyles({
     width: 26,
     height: 3,
     borderRadius: 2,
-    backgroundColor: ACTIVE,
+    backgroundColor: ACTIVE_LIGHT,
   },
+}, {
+  // Dark mode: the bar as before (deeper shadow, faint edge, brighter pink).
+  barShadow: { shadowColor: "#000", shadowOpacity: 0.22 },
+  barOutline: { borderColor: "rgba(255,255,255,0.35)" },
+  activeLine: { backgroundColor: ACTIVE },
 });
