@@ -124,7 +124,8 @@ function isFullWidth(path: string) {
 
 // No frame before login, during onboarding, or on the full-screen call.
 function shellHidden(path: string) {
-  return path === "/" || path.startsWith("/onboarding") || path.startsWith("/call");
+  // /admin: the super admin dashboard has its own frame.
+  return path === "/" || path.startsWith("/onboarding") || path.startsWith("/call") || path.startsWith("/admin");
 }
 
 function MyAvatar() {
