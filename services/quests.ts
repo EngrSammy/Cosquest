@@ -1,12 +1,31 @@
 import { apiRequest } from "./api";
 
+export type Money = { amount: number; currency: string };
+
+// The shape GET /api/quests returns (status: "live" | "upcoming" | ...).
 export type Quest = {
   id: string;
+  slug?: string;
   title: string;
   description?: string;
+  coverImageUrl?: string;
+  hostName?: string;
   status?: string;
-  latitude?: number;
-  longitude?: number;
+  startsAt?: string;
+  endsAt?: string;
+  location?: {
+    name?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+  };
+  prizePool?: Money | null;
+  entryFee?: Money | null;
+  maxParticipants?: number;
+  registrationCount?: number;
+  spacesRemaining?: number;
+  interests?: string[];
+  faction?: string | null;
 };
 
 export async function getQuests(params?: {
@@ -26,9 +45,12 @@ export async function getQuests(params?: {
 
   const queryString = query.toString();
 
-  return apiRequest<Quest[]>(
+  // The backend answers { quests: [...] }.
+  const response = await apiRequest<{ quests?: Quest[] } | Quest[]>(
     `/api/quests${queryString ? `?${queryString}` : ""}`,
   );
+
+  return Array.isArray(response) ? response : response?.quests || [];
 }
 
 export async function getQuest(questId: string) {

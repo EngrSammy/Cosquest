@@ -26,6 +26,8 @@ import {
 import { GroupAvatar } from "@/components/groups/GroupUi";
 import { AVATARS, smallAvatarUrl } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
+import { roomArtFor } from "@/constants/roomArt";
+import RoomArtAvatar from "@/components/community/RoomArtAvatar";
 import { apiRequest } from "@/services/api";
 import { FollowUser } from "@/services/follow";
 import { getSocket } from "@/services/socket";
@@ -203,10 +205,15 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
       : chat.lastMessage.preview || "Message"
     : "No messages yet";
 
+  // Community — General and faction rooms: their own picture.
+  const art = roomArtFor(chat);
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.groupRow, first && styles.groupRowCard, pressed && styles.pressed]}>
       {chat.type === "group" && chat.group?.photoUrl ? (
         <GroupAvatar name={title} photoUrl={chat.group.photoUrl} size={48} />
+      ) : art ? (
+        <RoomArtAvatar art={art} size={48} />
       ) : (
         <View style={styles.groupIcon}>
           <Ionicons name={look.icon} size={22} color={COLORS.pink} />
@@ -601,6 +608,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                     unread={chat.unreadCount || 0}
                     photoUrl={chat.group?.photoUrl}
                     icon={chat.type === "community" ? "earth-outline" : groupLook(chat).icon}
+                    art={roomArtFor(chat)}
                     muted={!!chat.group?.muted}
                     onPress={() => openChat(chat.id)}
                   />

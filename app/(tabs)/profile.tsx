@@ -12,6 +12,8 @@ import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { RankBadge } from "@/components/chat/RankBadge";
 import { nextRankFor, useRanks, type Rank } from "@/services/ranks";
 import { Spotlight } from "@/components/community/Spotlight";
+import DesktopProfile from "@/components/desktop/DesktopProfile";
+import { useIsDesktop } from "@/hooks/useDesktop";
 
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -321,9 +323,6 @@ function ThoughtItem({ post }: { post: Post }) {
     </View>
   );
 }
-
-import { useIsDesktop } from "@/hooks/useDesktop";
-import DesktopProfile from "@/components/desktop/DesktopProfile";
 
 export default function Profile() {
   // Computer: your card | your posts, side by side.
@@ -715,16 +714,14 @@ export default function Profile() {
               </View>
             )}
 
-            <View style={styles.heroCircle} pointerEvents="none">
-              {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 47.87%, #C34D9C 100%) */}
-              <LinearGradient
-                colors={["rgba(0,0,0,0)", PINK]}
-                locations={[0.4787, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </View>
+            {/* The photo fades into the page: full width, bottom 30%. */}
+            <LinearGradient
+              colors={ink.dark ? HERO_FADE_DARK : HERO_FADE_LIGHT}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.heroFade}
+              pointerEvents="none"
+            />
           </View>
 
           {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
@@ -1014,16 +1011,14 @@ export default function Profile() {
               </View>
             )}
 
-            <View style={styles.heroCircle} pointerEvents="none">
-              {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 47.87%, #C34D9C 100%) */}
-              <LinearGradient
-                colors={["rgba(0,0,0,0)", PINK]}
-                locations={[0.4787, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </View>
+            {/* The photo fades into the page: full width, bottom 30%. */}
+            <LinearGradient
+              colors={ink.dark ? HERO_FADE_DARK : HERO_FADE_LIGHT}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.heroFade}
+              pointerEvents="none"
+            />
           </View>
 
           {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
@@ -1281,7 +1276,9 @@ const SCREEN_W = Math.min(Dimensions.get("window").width, 640);
 // Figma photo: a 316 x 316 square on a 402 wide screen.
 const HERO_SIZE = Math.min(316, SCREEN_W - 2 * 30);
 // The pink circle is a little wider than the photo, and sits at its bottom.
-const HERO_CIRCLE = Math.round(HERO_SIZE * 1.06);
+// The banner's bottom fade, into the page background (light / dark).
+const HERO_FADE_LIGHT = ["rgba(244,248,253,0)", "rgba(244,248,253,0.95)"] as const;
+const HERO_FADE_DARK = ["rgba(23,24,35,0)", "rgba(23,24,35,0.95)"] as const;
 // Figma avatar: 89.21 x 89.21 on the 316 photo.
 const AVATAR_SIZE = Math.round(HERO_SIZE * (89.21 / 316));
 
@@ -1425,16 +1422,12 @@ const STYLE_PAIR = themedStyles({
   },
 
   // The big pink circle at the bottom of the photo.
-  heroCircle: {
+  heroFade: {
     position: "absolute",
-    width: HERO_CIRCLE,
-    height: HERO_CIRCLE,
-    borderRadius: HERO_CIRCLE / 2,
-    left: (HERO_SIZE - HERO_CIRCLE) / 2,
-    bottom: -4,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "flex-end",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "30%",
   },
 
   // Pink behind the avatar (Figma).

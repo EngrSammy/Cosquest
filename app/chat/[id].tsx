@@ -95,6 +95,9 @@ import { RankBadge, RankLine, RoleBadge } from "@/components/chat/RankBadge";
 import type { Rank } from "@/services/ranks";
 import SparkPanel from "@/components/chat/SparkPanel";
 import SparksRail, { DormantSparkCard, SparksListSheet } from "@/components/chat/SparksRail";
+import SparksTab from "@/components/chat/SparksTab";
+import RoomArtAvatar from "@/components/community/RoomArtAvatar";
+import { roomArtFor } from "@/constants/roomArt";
 import StartSparkSheet from "@/components/chat/StartSparkSheet";
 import MessageActionsSheet from "@/components/chat/MessageActionsSheet";
 import RolePingCard from "@/components/chat/RolePingCard";
@@ -141,7 +144,6 @@ import { safeBack } from "@/utils/safeBack";
 import CallsTab from "@/components/calls/scheduled/CallsTab";
 import ProjectsTab from "@/components/projects/ProjectsTab";
 import ScheduledCallMessage, { type ScheduledCallCardData } from "@/components/calls/scheduled/ScheduledCallMessage";
-import { ScreenGradient } from "@/components/chat/ui";
 import { openReport } from "@/components/report/reportStore";
 
 type AttachmentDraft = {
@@ -320,6 +322,9 @@ type SeenPerson = {
   avatarPhotoUrl?: string | null;
   seenAt?: string;
 };
+
+// Space under the pinned card (the Sparks rail starts below it).
+const PINNED_GAP = 8;
 
 const GROUP_TABS = [
   { key: "chat", label: "Chat" },
@@ -2371,10 +2376,10 @@ export default function ChatScreen() {
   const [sparkRefresh, setSparkRefresh] = useState(0);
   const [showAllSparks, setShowAllSparks] = useState(false);
 
-  // Group chats: Chat / Sparks / Calls / Projects under the header. Sparks
-  // opens the Sparks list; Calls and Projects cover the chat (which stays
-  // mounted, so switching back keeps the scroll position and draft).
-  const [groupTab, setGroupTab] = useState<"chat" | "calls" | "projects">("chat");
+  // Group chats: Chat / Sparks / Calls / Projects under the header. Sparks,
+  // Calls and Projects are pages over the chat (which stays mounted, so
+  // switching back keeps the scroll position and draft).
+  const [groupTab, setGroupTab] = useState<"chat" | "sparks" | "calls" | "projects">("chat");
   const [tabsBottom, setTabsBottom] = useState(0);
   const [sparkSeed, setSparkSeed] = useState<Message | null>(null);
   const [attachmentDraft, setAttachmentDraft] =
@@ -2448,6 +2453,9 @@ export default function ChatScreen() {
       cancelled = true;
     };
   }, [token, otherUsername]);
+
+  // Community — General and faction rooms: their own picture in the header.
+  const headerArt = conversation ? roomArtFor(conversation as any) : null;
 
   const openTheirProfile = () => {
     // Groups: the photo / name opens Group info.
@@ -4958,6 +4966,17 @@ export default function ChatScreen() {
   const beginCallRef = useRef(beginCall);
   beginCallRef.current = beginCall;
 
+  // "Create Spark" on the rail: a Spark grows from a message, so it starts
+  // from the newest one that can seed it (the sheet shows which).
+  const startSparkFromLatest = () => {
+    const seed = messages.find((message) => !message.deleted && !message.pending && !message.spark);
+    if (seed) {
+      setSparkSeed(seed);
+    } else {
+      Alert.alert("Create Spark", "Send a message first, then start a Spark from it.");
+    }
+  };
+
   const handleCallBack = useCallback((type: "audio" | "video") => {
     beginCallRef.current(type);
   }, []);
@@ -5150,6 +5169,7 @@ export default function ChatScreen() {
             }
             pinnedBy={pinnedByName ? `Pinned by ${pinnedByName}` : null}
             onOpen={(spark) => setOpenSparkId(spark.id)}
+            onCreate={startSparkFromLatest}
           />
         ) : null
       }>
@@ -5243,10 +5263,12 @@ export default function ChatScreen() {
                 disabled={!otherUsername && conversation?.type !== "group"}
                 accessibilityRole="button"
                 accessibilityLabel="View profile">
-                {groupChat && !headerAvatar ? null : (
+                {groupChat && !headerAvatar && !headerArt ? null : (
                 <View style={styles.headerAvatarWrap}>
-                  <View style={styles.headerAvatar}>
-                    {headerAvatar ? (
+                  <View style={[styles.headerAvatar, !headerAvatar && headerArt && styles.headerAvatarArt]}>
+                    {!headerAvatar && headerArt ? (
+                      <RoomArtAvatar art={headerArt} size={40} />
+                    ) : headerAvatar ? (
                       <ExpoImage
                         source={{
                           uri: headerAvatar,
@@ -5353,15 +5375,16 @@ export default function ChatScreen() {
           onLayout={(event) =>
             setTabsBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
           }>
-          {GROUP_TABS.map((tab) => {
+          {GROUP_TABS.filter(
+            // The Community room: Chat and Sparks only (no Calls / Projects).
+            (tab) => !(conversation?.type === "community" && (tab.key === "calls" || tab.key === "projects")),
+          ).map((tab) => {
             const on = tab.key === groupTab;
             return (
               <Pressable
                 key={tab.key}
                 style={[styles.groupTab, on && styles.groupTabOn]}
-                onPress={() =>
-                  tab.key === "sparks" ? setShowAllSparks(true) : setGroupTab(tab.key)
-                }
+                onPress={() => setGroupTab(tab.key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}>
                 <Text style={[styles.groupTabText, on && styles.groupTabTextOn]}>
@@ -5485,11 +5508,12 @@ export default function ChatScreen() {
           // Below the group tabs (Chat / Sparks / Calls / Projects) when there are some.
           top={
             groupChat && tabsBottom
-              ? tabsBottom + 10 + (pinnedMessageId ? 60 : 0)
-              : insets.top + (pinnedMessageId ? 136 : 76)
+              ? tabsBottom + 10 + (pinnedMessageId ? 62 + PINNED_GAP : 0)
+              : insets.top + (pinnedMessageId ? 138 + PINNED_GAP : 76)
           }
           onOpen={(spark) => setOpenSparkId(spark.id)}
           onShowAll={() => setShowAllSparks(true)}
+          onCreate={startSparkFromLatest}
         />
       ) : null}
 
@@ -5767,7 +5791,13 @@ export default function ChatScreen() {
 
       {groupChat && groupTab !== "chat" && !selectionMode ? (
         <View style={[styles.groupTabPanel, { top: tabsBottom }]}>
-          {groupTab === "calls" ? (
+          {groupTab === "sparks" ? (
+            <SparksTab
+              sparks={sparks}
+              onOpen={(spark) => setOpenSparkId(spark.id)}
+              onCreate={startSparkFromLatest}
+            />
+          ) : groupTab === "calls" ? (
             <CallsTab
               conversationId={conversationId}
               title={(conversation as any)?.title || "Voice chat"}
@@ -6792,6 +6822,9 @@ const STYLE_PAIR = themedStyles({
 
   headerAvatarImage: { width: "100%", height: "100%" },
 
+  // The room picture brings its own round background.
+  headerAvatarArt: { backgroundColor: "transparent", overflow: "visible" },
+
   headerAvatarWrap: { marginLeft: 4, position: "relative" },
 
   // Photo + name together: tap to open their profile.
@@ -6964,14 +6997,24 @@ const STYLE_PAIR = themedStyles({
   // PINNED BANNER
 
   pinnedBanner: {
-    // Figma M02: full width, 62 tall, padding 12 / 18, gap 10, #F0EDF9.
+    // Figma: an inset card, radius 18, with a soft pink shadow.
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     minHeight: 62,
-    paddingHorizontal: 18,
+    marginHorizontal: 12,
+    marginBottom: PINNED_GAP,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#F0EDF9",
+    borderRadius: 18,
+    backgroundColor: "#F3DDEC",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
+    shadowColor: "#8E2E6F",
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   pinnedBannerText: { flex: 1 },
