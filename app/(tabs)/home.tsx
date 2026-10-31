@@ -44,7 +44,8 @@ const COSXP = require("@/assets/images/dashboard/cosxp.png");
 
 // The backend's quests are three Lagos tests for now: show the design's
 // San Diego set until real nearby quests exist. false = GET /api/quests.
-const USE_SAMPLE_QUESTS = true;
+// Real quests now (created in the admin dashboard's Quests & Events).
+const USE_SAMPLE_QUESTS = false;
 const DEFAULT_RADIUS_MI = 50;
 
 const formatCount = (value: number) => String(Math.max(0, Math.floor(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -87,6 +88,11 @@ export default function HomeScreen() {
 
   // Quests joined or registered for from here (the list has no "mine" flag yet).
   const [registered, setRegistered] = useState<Set<string>>(() => new Set());
+  // Quests the server says you're registered for (isRegistered).
+  useEffect(() => {
+    const mine = quests.filter((quest) => quest.isRegistered).map((quest) => quest.id);
+    if (mine.length) setRegistered((current) => new Set([...current, ...mine]));
+  }, [quests]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 

@@ -26,6 +26,11 @@ export type Quest = {
   spacesRemaining?: number;
   interests?: string[];
   faction?: string | null;
+  // Signed in: whether you're registered (from the server).
+  isRegistered?: boolean;
+  kind?: "quest" | "event";
+  distanceMiles?: number;
+  requireAtVenue?: boolean;
 };
 
 export async function getQuests(params?: {

@@ -22,6 +22,7 @@ type Item = { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; 
 
 export const WORKSPACE: Item[] = [
   { key: "overview", label: "Overview", icon: "grid-outline", path: "/admin" },
+  { key: "quests", label: "Quests & Events", icon: "map-outline", path: "/admin/quests" },
   { key: "moderation", label: "Moderation", icon: "shield-checkmark-outline", path: "/admin/moderation" },
   { key: "members", label: "Members", icon: "people-outline", path: "/admin/members" },
   { key: "groups", label: "Groups", icon: "albums-outline", path: "/admin/groups" },

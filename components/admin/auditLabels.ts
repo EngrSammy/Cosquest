@@ -32,6 +32,12 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   "admin.signin": "Signed in",
   "admin.signout": "Signed out",
   "audit.export": "Exported the audit log",
+  "quest.create": "Created a quest (draft)",
+  "quest.publish": "Published a quest",
+  "quest.unpublish": "Unpublished a quest",
+  "quest.update": "Edited a quest",
+  "quest.duplicate": "Duplicated a quest",
+  "quest.cancel": "Cancelled a quest",
 };
 
 export const AUDIT_AREAS: Record<string, string> = {
@@ -44,6 +50,7 @@ export const AUDIT_AREAS: Record<string, string> = {
   roles: "Roles",
   settings: "Settings",
   auth: "Sign-ins",
+  quests: "Quests & Events",
 };
 
 export const actionLabel = (action: string) => AUDIT_ACTIONS[action] || action.replace(/[._]/g, " ");
