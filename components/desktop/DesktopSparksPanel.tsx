@@ -54,12 +54,15 @@ export default function DesktopSparksPanel({
   pinnedBy,
   onOpen,
   onOpenPinned,
+  onCreate,
 }: {
   sparks: Spark[];
   pinnedText?: string | null;
   pinnedBy?: string | null;
   onOpen: (spark: Spark) => void;
   onOpenPinned?: () => void;
+  // "Create Spark": the Start a Spark sheet, from the chat's latest message.
+  onCreate?: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
@@ -74,6 +77,32 @@ export default function DesktopSparksPanel({
     <View style={styles.panel}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.section}>SPARKS IN THIS CHAT</Text>
+
+        {onCreate ? (
+          <Pressable
+            onPress={onCreate}
+            accessibilityRole="button"
+            style={({ hovered }: any) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 12,
+              marginBottom: 6,
+              padding: 10,
+              borderRadius: 16,
+              borderWidth: 1.5,
+              borderColor: "#3DD68C",
+              backgroundColor: hovered ? "rgba(61,214,140,0.08)" : "transparent",
+            })}>
+            <View style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "#B63D91" }}>
+              <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: FONTS.semibold, fontSize: 14, color: ink.text("#24283C") }}>Create Spark</Text>
+              <Text style={{ marginTop: 1, fontFamily: FONTS.regular, fontSize: 12, color: ink.text("#66738A") }}>Start a topic from the latest message</Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {live.length ? (
           <View style={styles.circles}>

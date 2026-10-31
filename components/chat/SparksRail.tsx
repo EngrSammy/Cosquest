@@ -181,7 +181,8 @@ export default function SparksRail({
   top: number;
   onOpen: (spark: Spark) => void;
   onShowAll: () => void;
-  // "Create Spark" circle at the end (left out when not given).
+  // "Create Spark" circle at the end, shown even when there are no Sparks yet
+  // (left out when not given).
   onCreate?: () => void;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);

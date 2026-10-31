@@ -5169,6 +5169,7 @@ export default function ChatScreen() {
             }
             pinnedBy={pinnedByName ? `Pinned by ${pinnedByName}` : null}
             onOpen={(spark) => setOpenSparkId(spark.id)}
+            onCreate={startSparkFromLatest}
           />
         ) : null
       }>
@@ -5374,7 +5375,10 @@ export default function ChatScreen() {
           onLayout={(event) =>
             setTabsBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
           }>
-          {GROUP_TABS.map((tab) => {
+          {GROUP_TABS.filter(
+            // The Community room: Chat and Sparks only (no Calls / Projects).
+            (tab) => !(conversation?.type === "community" && (tab.key === "calls" || tab.key === "projects")),
+          ).map((tab) => {
             const on = tab.key === groupTab;
             return (
               <Pressable
