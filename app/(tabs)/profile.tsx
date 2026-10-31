@@ -11,6 +11,7 @@ import { fetchPosts } from "@/store/thunks/postThunks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { RankBadge } from "@/components/chat/RankBadge";
 import { nextRankFor, useRanks, type Rank } from "@/services/ranks";
+import { Spotlight } from "@/components/community/Spotlight";
 
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -34,7 +35,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-type Tab = "Posts" | "Reels" | "Thoughts";
+type Tab = "Posts" | "Reels" | "Thoughts" | "Spotlight";
 
 // Figma colours
 const PINK = "#C34D9C";
@@ -867,7 +868,7 @@ export default function Profile() {
               <View style={styles.wideRight}>
         {/* TABS (the open one is dark and bold) */}
         <View style={styles.tabs}>
-          {(["Posts", "Reels", "Thoughts"] as Tab[]).map((key) => {
+          {(["Posts", "Reels", "Thoughts", "Spotlight"] as Tab[]).map((key) => {
             const active = tab === key;
 
             return (
@@ -881,7 +882,9 @@ export default function Profile() {
                       ? "grid-outline"
                       : key === "Reels"
                         ? "play-circle-outline"
-                        : "person-outline"
+                        : key === "Thoughts"
+                          ? "person-outline"
+                          : "star-outline"
                   }
                   size={18}
                   color={ink.text(active ? "#191922" : "#9C9CAA")}
@@ -978,6 +981,13 @@ export default function Profile() {
               </Text>
             </View>
           )
+        ) : null}
+
+        {/* SPOTLIGHT (moved here from the Community page) */}
+        {tab === "Spotlight" ? (
+          <View style={{ marginTop: 8 }}>
+            <Spotlight />
+          </View>
         ) : null}
               </View>
             </View>
@@ -1135,7 +1145,7 @@ export default function Profile() {
 
         {/* TABS (the open one is dark and bold) */}
         <View style={styles.tabs}>
-          {(["Posts", "Reels", "Thoughts"] as Tab[]).map((key) => {
+          {(["Posts", "Reels", "Thoughts", "Spotlight"] as Tab[]).map((key) => {
             const active = tab === key;
 
             return (
@@ -1149,7 +1159,9 @@ export default function Profile() {
                       ? "grid-outline"
                       : key === "Reels"
                         ? "play-circle-outline"
-                        : "person-outline"
+                        : key === "Thoughts"
+                          ? "person-outline"
+                          : "star-outline"
                   }
                   size={18}
                   color={ink.text(active ? "#191922" : "#9C9CAA")}
@@ -1246,6 +1258,13 @@ export default function Profile() {
               </Text>
             </View>
           )
+        ) : null}
+
+        {/* SPOTLIGHT (moved here from the Community page) */}
+        {tab === "Spotlight" ? (
+          <View style={{ marginTop: 8 }}>
+            <Spotlight />
+          </View>
         ) : null}
           </>
         )}

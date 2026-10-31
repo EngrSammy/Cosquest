@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { Chats } from "@/components/community/Chats";
+import ChatHub from "@/components/community/ChatHub";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { useIsDesktop } from "@/hooks/useDesktop";
@@ -44,7 +44,7 @@ export default function ChatLayout() {
           contentContainerStyle={styles.listScroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-          <Chats />
+          <ChatHub />
         </ScrollView>
       </View>
 

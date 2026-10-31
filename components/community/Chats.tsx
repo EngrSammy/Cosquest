@@ -36,6 +36,8 @@ import { themedStyles, useThemedStyles, useInk } from "@/constants/chatTheme";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
 import { fetchFollowing, followUserThunk, unfollowUserThunk } from "@/store/thunks/followThunks";
 
+import { PersonRow, ReadUnread, RoomCard } from "./HubRows";
+
 // ==========================================
 // DESIGN TOKENS (from M01)
 // ==========================================
@@ -243,7 +245,30 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
 // SCREEN
 // ==========================================
 
-export function Chats() {
+// The hub's views (new Figma): "chats" = people only (Read / Unread);
+// "community" = Community — General, faction rooms and groups as cards.
+// "all" = the old combined hub.
+export type HubView = "all" | "chats" | "community";
+
+function roomTitle(chat: ChatItem) {
+  if (chat.type === "community") return chat.title && chat.title !== "Community" ? chat.title : "Community — General";
+  return chat.title || (chat.type === "faction" ? "Faction" : "Group");
+}
+
+function roomSubtitle(chat: ChatItem) {
+  if (chat.type === "community") return "Everyone on CosQuest";
+  if (chat.type === "faction") return "Your faction room";
+  return groupLook(chat).label;
+}
+
+function lastLine(chat: ChatItem) {
+  if (!chat.lastMessage) return "No messages yet";
+  return chat.lastMessage.senderName
+    ? `${chat.lastMessage.senderName}: ${chat.lastMessage.preview || "Message"}`
+    : chat.lastMessage.preview || "Message";
+}
+
+export function Chats({ view = "all" }: { view?: HubView } = {}) {
   const styles = useThemedStyles(chatHubStylePair);
   const ink = useInk();
   const dispatch = useAppDispatch();
@@ -265,6 +290,8 @@ export function Chats() {
 
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // Chats view: Read (everything) or Unread only, like WhatsApp.
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
   // Find People
   const [peopleVisible, setPeopleVisible] = useState(false);
@@ -474,8 +501,9 @@ export function Chats() {
     return null;
   }
 
-  const showGroups = filter !== "dms";
-  const showDms = filter !== "groups";
+  const showGroups = view === "community" || (view === "all" && filter !== "dms");
+  const showDms = view === "all" && filter !== "groups";
+  const peopleRows = visibleDms.filter((chat) => !unreadOnly || (chat.unreadCount || 0) > 0);
 
   return (
     <View
@@ -496,7 +524,9 @@ export function Chats() {
           value={query}
           onChangeText={setQuery}
           style={styles.searchInput}
-          placeholder="Search groups, people and messages"
+          placeholder={
+            view === "chats" ? "Search people and messages" : view === "community" ? "Search groups and messages" : "Search groups, people and messages"
+          }
           placeholderTextColor={ink.text(COLORS.soft)}
           autoCapitalize="none"
           autoCorrect={false}
@@ -508,7 +538,15 @@ export function Chats() {
         ) : null}
       </View>
 
-      {/* CHIPS */}
+      {/* Chats: Read / Unread. The old hub: its chips. */}
+      {view === "chats" ? (
+        <ReadUnread
+          unreadOnly={unreadOnly}
+          onChange={setUnreadOnly}
+          unreadCount={dmConversations.filter((chat) => (chat.unreadCount || 0) > 0).length}
+        />
+      ) : null}
+      {view === "all" ? (
       <View style={styles.chips}>
         {(
           [
@@ -527,12 +565,13 @@ export function Chats() {
           </Pressable>
         ))}
       </View>
+      ) : null}
 
       {/* YOUR GROUPS */}
       {showGroups ? (
         <>
           <View style={styles.sectionRow}>
-            <Text style={styles.section}>YOUR GROUPS</Text>
+            {view === "all" ? <Text style={styles.section}>YOUR GROUPS</Text> : null}
           </View>
 
           {loading && !conversations.length ? (
@@ -552,7 +591,22 @@ export function Chats() {
           ) : (
             <View style={styles.groupList}>
               {visibleGroups.map((chat, index) => (
-                <GroupRow key={chat.id} chat={chat} first={index === 0} onPress={() => openChat(chat.id)} />
+                view === "community" ? (
+                  <RoomCard
+                    key={chat.id}
+                    title={roomTitle(chat)}
+                    subtitle={roomSubtitle(chat)}
+                    preview={lastLine(chat)}
+                    members={chat.memberCount}
+                    unread={chat.unreadCount || 0}
+                    photoUrl={chat.group?.photoUrl}
+                    icon={chat.type === "community" ? "earth-outline" : groupLook(chat).icon}
+                    muted={!!chat.group?.muted}
+                    onPress={() => openChat(chat.id)}
+                  />
+                ) : (
+                  <GroupRow key={chat.id} chat={chat} first={index === 0} onPress={() => openChat(chat.id)} />
+                )
               ))}
             </View>
           )}
@@ -631,7 +685,60 @@ export function Chats() {
         </>
       ) : null}
 
-      {/* CREATE A GROUP */}
+      {/* CHATS (people): one row per conversation, like WhatsApp */}
+      {view === "chats" ? (
+        loading && !conversations.length ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="small" color={COLORS.pink} />
+            <Text style={styles.centerText}>Loading chats...</Text>
+          </View>
+        ) : error && !conversations.length ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable style={styles.retry} onPress={() => dispatch(fetchChats(token))}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View>
+            {peopleRows.length === 0 ? (
+              <Text style={styles.empty}>{unreadOnly ? "No unread chats." : q ? "No chats match your search." : "No chats yet."}</Text>
+            ) : null}
+            {peopleRows.map((chat) => {
+              const other = chat.otherParticipant || {};
+              const username = other.username || "";
+              const followed = followingByUsername.get(username.toLowerCase());
+              const name = followed?.name || other.name || username || "Someone";
+              const photoUrl = other.avatarPhotoUrl || followed?.avatarPhotoUrl || null;
+              const photo = photoUrl ? { uri: smallAvatarUrl(photoUrl) } : other.avatarKey ? getAvatarSource(other) : null;
+              return (
+                <PersonRow
+                  key={chat.id}
+                  name={name}
+                  photo={photo}
+                  initials={initialsOf(name)}
+                  tint={avatarTint(name)}
+                  preview={chat.lastMessage ? lastLine(chat) : "Say hi 👋"}
+                  time={timeLabel(chat.lastMessage?.createdAt || chat.updatedAt)}
+                  unread={chat.unreadCount || 0}
+                  online={!!other.isOnline}
+                  onPress={() => openChat(chat.id)}
+                />
+              );
+            })}
+            <Pressable
+              onPress={openPeople}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 }}
+              accessibilityRole="button">
+              <Ionicons name="person-add-outline" size={18} color={COLORS.pink} />
+              <Text style={{ fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.pink }}>Find people to message</Text>
+            </Pressable>
+          </View>
+        )
+      ) : null}
+
+      {/* CREATE A GROUP (not on the Chats view) */}
+      {view !== "chats" ? (
       <Pressable
         style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
         onPress={() => router.push("/group/new")}
@@ -639,6 +746,7 @@ export function Chats() {
         <Ionicons name="add" size={20} color="#FFFFFF" />
         <Text style={styles.createText}>Create a group</Text>
       </Pressable>
+      ) : null}
 
       {/* FIND PEOPLE */}
       <Modal visible={peopleVisible} transparent animationType="slide" onRequestClose={closePeople}>
