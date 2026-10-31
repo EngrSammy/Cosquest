@@ -28,6 +28,7 @@ import {
   timeAgo,
 } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
+import { downloadCsv } from "@/services/adminExtras";
 import { AdminError, getOverview, type AuditItem, type Overview, type ReportPreview } from "@/services/admin";
 
 const REASONS: Record<string, string> = {
@@ -179,7 +180,7 @@ export default function AdminOverview() {
         right={
           <>
             <Button label={range} icon="calendar-outline" />
-            <Button label="Export report" icon="download-outline" disabled />
+            <Button label="Export report" icon="download-outline" onPress={() => downloadCsv("/overview/export").catch(() => {})} />
           </>
         }
       />

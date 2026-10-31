@@ -6,7 +6,7 @@
 // (pause posting, suspend), always with a reason and a confirmation.
 // Group-only actions live on the Chats page.
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
@@ -15,6 +15,7 @@ import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Card, CardHeader, Initials, Loading, Notice, PageHeader, Pill, StatCard, Trend, formatNumber, timeAgo } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
 import { REASON_LABELS } from "@/services/adminContent";
+import { downloadCsv } from "@/services/adminExtras";
 import { type MemberDetail, type MemberRow, getMember, getMemberStats, liftRestriction, listMembers, restrictMember } from "@/services/adminPeople";
 
 type Tab = "all" | "pending" | "muted" | "suspended";
@@ -289,6 +290,7 @@ export default function AdminMembers() {
   const t = useAdminTheme();
   const { width } = useWindowDimensions();
   const wide = width >= 1200;
+  const params = useLocalSearchParams<{ member?: string }>();
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getMemberStats>> | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
@@ -297,7 +299,11 @@ export default function AdminMembers() {
   const [rows, setRows] = useState<MemberRow[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(typeof params.member === "string" ? params.member : null);
+  // Opened from the top bar search: show that member.
+  useEffect(() => {
+    if (typeof params.member === "string") setSelected(params.member);
+  }, [params.member]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -311,7 +317,7 @@ export default function AdminMembers() {
       setRows(result.members);
       setTotal(result.total);
       setError("");
-      setSelected((current) => (current && result.members.some((m) => m.id === current) ? current : result.members[0]?.id || null));
+      setSelected((current) => current || result.members[0]?.id || null);
     } catch (e: any) {
       setError(e?.code === "not_deployed" ? "The Members backend (Phase 3) isn't deployed yet." : e?.message || "Couldn't load members.");
     }
@@ -327,7 +333,7 @@ export default function AdminMembers() {
 
   return (
     <View>
-      <PageHeader title="Members" subtitle="Know your members, review their safety history and keep participation safe." right={<Button label="Export members" icon="download-outline" disabled />} />
+      <PageHeader title="Members" subtitle="Know your members, review their safety history and keep participation safe." right={<Button label="Export members" icon="download-outline" onPress={() => downloadCsv("/members/export", { tab, q: q.trim() || undefined, role: role === "all" ? undefined : role }).catch(() => {})} />} />
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 20 }}>
         <StatCard title="Total membership" icon="people-outline" value={formatNumber(stats?.total)} footer={<Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: t.muted }}>Registered CosQuest accounts</Text>} />

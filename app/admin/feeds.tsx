@@ -5,14 +5,15 @@
 // reports, and removing it (hidden, kept as evidence) or restoring it.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 
 import { ConfirmBox, Divider, DoneNote, Field, Pager, ReasonBox, ReportStatusPill, SearchBox, Select, Tabs, Toggle } from "@/components/admin/controls";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Card, CardHeader, Initials, Loading, Notice, PageHeader, StatCard, formatNumber, timeAgo } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
+import { createCommunityPost, downloadCsv } from "@/services/adminExtras";
 import { type AdminPost, REASON_LABELS, getFeedStats, getPost, listPosts, removePost, restorePost } from "@/services/adminContent";
 
 type Tab = "all" | "reported" | "removed";
@@ -227,10 +228,63 @@ function PostPanel({ postId, onChanged }: { postId: string; onChanged: () => voi
   );
 }
 
+function Composer({ onClose, onPosted }: { onClose: () => void; onPosted: (id: string) => void }) {
+  const t = useAdminTheme();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const post = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await createCommunityPost(text.trim());
+      onPosted(result.post.id);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't publish the post.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <CardHeader title="Create community post" subtitle="Published to the community feed from your account" />
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        multiline
+        maxLength={2000}
+        placeholder="Share an announcement, a meetup or a reminder…"
+        placeholderTextColor={t.faint}
+        style={{
+          minHeight: 110,
+          padding: 12,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: t.border,
+          backgroundColor: t.card,
+          textAlignVertical: "top",
+          fontFamily: FONTS.regular,
+          fontSize: 14,
+          color: t.text,
+          ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+        }}
+      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 }}>
+        <Text style={{ flex: 1, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>{text.length}/2,000 · text post (photo posts are coming)</Text>
+        <Button label="Cancel" onPress={onClose} />
+        <Button label="Publish" variant="primary" onPress={post} loading={busy} disabled={!text.trim()} />
+      </View>
+      {error ? <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12.5, color: t.red }}>{error}</Text> : null}
+    </Card>
+  );
+}
+
 export default function AdminFeeds() {
   const t = useAdminTheme();
   const { width } = useWindowDimensions();
   const wide = width >= 1200;
+  const params = useLocalSearchParams<{ post?: string }>();
+  const [composing, setComposing] = useState(false);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getFeedStats>> | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
@@ -239,7 +293,11 @@ export default function AdminFeeds() {
   const [rows, setRows] = useState<AdminPost[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(typeof params.post === "string" ? params.post : null);
+  // Opened from the top bar search: show that post.
+  useEffect(() => {
+    if (typeof params.post === "string") setSelected(params.post);
+  }, [params.post]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -253,7 +311,7 @@ export default function AdminFeeds() {
       setRows(result.posts);
       setTotal(result.total);
       setError("");
-      setSelected((current) => (current && result.posts.some((p) => p.id === current) ? current : result.posts[0]?.id || null));
+      setSelected((current) => current || result.posts[0]?.id || null);
     } catch (e: any) {
       setError(e?.code === "not_deployed" ? "The Feeds backend (Phase 2) isn't deployed yet." : e?.message || "Couldn't load posts.");
     }
@@ -269,7 +327,28 @@ export default function AdminFeeds() {
 
   return (
     <View>
-      <PageHeader title="Feeds" subtitle="Manage the native CosQuest community feed, from fresh creations to reported posts." right={<Button label="Export posts" icon="download-outline" disabled />} />
+      <PageHeader
+        title="Feeds"
+        subtitle="Manage the native CosQuest community feed, from fresh creations to reported posts."
+        right={
+          <>
+            <Button label="Export posts" icon="download-outline" onPress={() => downloadCsv("/feeds/posts/export", { tab, q: q.trim() || undefined, type: type === "all" ? undefined : type }).catch(() => {})} />
+            <Button label="Create community post" icon="add" variant="primary" onPress={() => setComposing(true)} />
+          </>
+        }
+      />
+      {composing ? (
+        <Composer
+          onClose={() => setComposing(false)}
+          onPosted={(id) => {
+            setComposing(false);
+            setTab("all");
+            setSelected(id);
+            loadStats();
+            loadList();
+          }}
+        />
+      ) : null}
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 20 }}>
         <StatCard title="Feed posts" icon="newspaper-outline" value={formatNumber(stats?.posts)} footer={<Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: t.muted }}>Published in the last 7 days</Text>} />

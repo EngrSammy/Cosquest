@@ -27,6 +27,7 @@ import {
   getReportStats,
   listReports,
 } from "@/services/adminContent";
+import { downloadCsv, getTriage } from "@/services/adminExtras";
 
 type Tab = "open" | "new" | "in_review" | "resolved";
 
@@ -334,6 +335,50 @@ function ReviewPanel({ reportId, onChanged }: { reportId: string; onChanged: () 
   );
 }
 
+function TriageHandoff({ refreshKey }: { refreshKey: number }) {
+  const t = useAdminTheme();
+  const [data, setData] = useState<Awaited<ReturnType<typeof getTriage>> | null>(null);
+  useEffect(() => {
+    getTriage().then(setData).catch(() => setData(null));
+  }, [refreshKey]);
+  if (!data) return null;
+  return (
+    <Card style={{ marginTop: 20 }}>
+      <CardHeader title="Triage handoff" subtitle="Keep the next reviewer informed" />
+      {data.admins.length ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 24 }}>
+          {data.admins.map((a) => (
+            <View key={a.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, minWidth: 180 }}>
+              <Initials name={a.name} size={32} />
+              <View>
+                <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>
+                  {a.name}
+                  {a.you ? " (you)" : ""}
+                </Text>
+                <Text style={{ marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>
+                  {a.inReview} report{a.inReview === 1 ? "" : "s"} in review{a.high ? ` · ${a.high} high priority` : ""}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>No reports are in review right now.</Text>
+      )}
+      <View style={{ marginTop: 16 }}>
+        <Notice
+          tone={data.unassignedHigh ? "amber" : "blue"}
+          text={
+            data.unassignedHigh
+              ? `${data.unassignedHigh} high-priority report${data.unassignedHigh === 1 ? " is" : "s are"} not assigned yet. Review the evidence before taking action; a report alone does not establish a violation.`
+              : "Every high-priority report has a reviewer. Review the evidence before taking action; a report alone does not establish a violation."
+          }
+        />
+      </View>
+    </Card>
+  );
+}
+
 export default function AdminModeration() {
   const t = useAdminTheme();
   const { width } = useWindowDimensions();
@@ -386,14 +431,16 @@ export default function AdminModeration() {
     return () => clearTimeout(timer);
   }, [loadList, q]);
 
+  const [triageKey, setTriageKey] = useState(0);
   const refresh = () => {
     loadStats();
     loadList();
+    setTriageKey((k) => k + 1);
   };
 
   return (
     <View>
-      <PageHeader title="Moderation" subtitle="Review reports with context. Make fair, traceable decisions for your community." right={<Button label="Export reports" icon="download-outline" disabled />} />
+      <PageHeader title="Moderation" subtitle="Review reports with context. Make fair, traceable decisions for your community." right={<Button label="Export reports" icon="download-outline" onPress={() => downloadCsv("/reports/export", { status: tab, q: q.trim() || undefined, type: type === "all" ? undefined : type, priority: priority === "all" ? undefined : priority, assignee: assignee === "any" ? undefined : assignee }).catch(() => {})} />} />
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 20 }}>
         <StatCard title="Open reports" icon="flag-outline" value={formatNumber(stats?.open)} footer={<Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: t.muted }}>Across feeds, chats and members</Text>} />
@@ -465,6 +512,8 @@ export default function AdminModeration() {
           )}
         </Card>
       </View>
+
+      <TriageHandoff refreshKey={triageKey} />
     </View>
   );
 }

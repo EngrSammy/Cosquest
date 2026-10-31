@@ -6,12 +6,13 @@
 // reports and chat, archive / restore.
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 
 import { ConfirmBox, Divider, DoneNote, Field, Pager, ReasonBox, SearchBox, Select, Tabs, Toggle } from "@/components/admin/controls";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Card, CardHeader, Initials, Loading, Notice, PageHeader, Pill, StatCard, formatNumber, timeAgo } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
+import { contactOwner, createGroup, downloadCsv } from "@/services/adminExtras";
 import { type GroupDetail, type GroupRow, decideJoinRequest, getGroup, getGroupStats, listGroups, setGroupArchived, updateGroupSettings } from "@/services/adminPeople";
 
 type Tab = "all" | "active" | "attention" | "archived";
@@ -73,6 +74,8 @@ function GroupPanel({ groupId, onChanged }: { groupId: string; onChanged: () => 
   const [membersAdd, setMembersAdd] = useState(false);
   const [listVisible, setListVisible] = useState(true);
   const [archiving, setArchiving] = useState(false);
+  const [contacting, setContacting] = useState(false);
+  const [message, setMessage] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState("");
@@ -93,6 +96,7 @@ function GroupPanel({ groupId, onChanged }: { groupId: string; onChanged: () => 
   useEffect(() => {
     setData(null);
     setArchiving(false);
+    setContacting(false);
     setReason("");
     setDone("");
     load();
@@ -164,6 +168,35 @@ function GroupPanel({ groupId, onChanged }: { groupId: string; onChanged: () => 
             <Text style={{ marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>Group owner · @{group.owner.username || "member"}</Text>
           </View>
         </View>
+      ) : null}
+      {group.owner && !group.archived ? (
+        contacting ? (
+          <View style={{ marginTop: 12 }}>
+            <ReasonBox label="Message to the owner" value={message} onChange={setMessage} placeholder="e.g. Two reports in your group need attention; please remind members of the guidelines." />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+              <Button
+                label="Send message"
+                variant="primary"
+                loading={busy === "contact"}
+                disabled={message.trim().length < 3}
+                onPress={() =>
+                  run("contact", async () => {
+                    const result = await contactOwner(group.id, message.trim());
+                    setMessage("");
+                    setContacting(false);
+                    return result;
+                  }, `Message sent to ${group.owner!.name}.`)
+                }
+              />
+              <Button label="Cancel" onPress={() => setContacting(false)} />
+            </View>
+            <Text style={{ marginTop: 8, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>They get it in CosQuest as a notice from “CosQuest admins”.</Text>
+          </View>
+        ) : (
+          <View style={{ flexDirection: "row", marginTop: 12 }}>
+            <Button label="Contact owner" icon="mail-outline" onPress={() => { setContacting(true); setDone(""); }} />
+          </View>
+        )
       ) : null}
       {admins.filter((a) => a.role === "admin").length ? (
         <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12, color: t.muted }}>
@@ -265,6 +298,62 @@ function GroupPanel({ groupId, onChanged }: { groupId: string; onChanged: () => 
   );
 }
 
+function CreateGroup({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const t = useAdminTheme();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [kind, setKind] = useState<"open" | "private">("open");
+  const [approval, setApproval] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const input = {
+    height: 42,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: t.border,
+    backgroundColor: t.card,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: t.text,
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  };
+  const create = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await createGroup({ name: name.trim(), description: description.trim(), kind, joinMode: approval ? "approval" : "instant" });
+      onCreated(result.group.id);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't create the group.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <CardHeader title="Create group" subtitle="You'll be its owner; you can add admins from the app" />
+      <Text style={{ marginBottom: 8, fontFamily: FONTS.medium, fontSize: 12.5, color: t.text }}>Name</Text>
+      <TextInput value={name} onChangeText={setName} maxLength={80} placeholder="e.g. CosQuest Announcements" placeholderTextColor={t.faint} style={input} />
+      <ReasonBox label="Description · optional" value={description} onChange={setDescription} placeholder="What the group is for." />
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+        {(["open", "private"] as const).map((k) => (
+          <Pressable key={k} onPress={() => setKind(k)} style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: kind === k ? t.pink : t.border, backgroundColor: kind === k ? t.pinkSoft : t.card }}>
+            <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>{k === "open" ? "Open" : "Private"}</Text>
+            <Text style={{ marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>{k === "open" ? "Anyone can find it" : "Invite only"}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Toggle value={approval} onChange={setApproval} label="Approve join requests" hint="New members wait for an admin before joining." />
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+        <Button label="Create group" variant="primary" onPress={create} loading={busy} disabled={name.trim().length < 2} />
+        <Button label="Cancel" onPress={onClose} />
+      </View>
+      {error ? <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12.5, color: t.red }}>{error}</Text> : null}
+    </Card>
+  );
+}
+
 export default function AdminGroups() {
   const t = useAdminTheme();
   const { width } = useWindowDimensions();
@@ -279,6 +368,11 @@ export default function AdminGroups() {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(typeof params.group === "string" ? params.group : null);
+  const [creating, setCreating] = useState(false);
+  // Opened from the top bar search or the bell: show that group.
+  useEffect(() => {
+    if (typeof params.group === "string") setSelected(params.group);
+  }, [params.group]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -308,7 +402,28 @@ export default function AdminGroups() {
 
   return (
     <View>
-      <PageHeader title="Groups" subtitle="Support healthy communities, manage joining and keep group owners connected." right={<Button label="Export groups" icon="download-outline" disabled />} />
+      <PageHeader
+        title="Groups"
+        subtitle="Support healthy communities, manage joining and keep group owners connected."
+        right={
+          <>
+            <Button label="Export groups" icon="download-outline" onPress={() => downloadCsv("/groups/export", { tab, q: q.trim() || undefined, kind: kind === "all" ? undefined : kind }).catch(() => {})} />
+            <Button label="Create group" icon="add" variant="primary" onPress={() => setCreating(true)} />
+          </>
+        }
+      />
+      {creating ? (
+        <CreateGroup
+          onClose={() => setCreating(false)}
+          onCreated={(id) => {
+            setCreating(false);
+            setTab("all");
+            setSelected(id);
+            loadStats();
+            loadList();
+          }}
+        />
+      ) : null}
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 20 }}>
         <StatCard title="Total groups" icon="albums-outline" value={formatNumber(stats?.total)} footer={<Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: t.muted }}>Across the CosQuest community</Text>} />

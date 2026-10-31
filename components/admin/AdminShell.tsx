@@ -13,6 +13,8 @@ import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-na
 import { FONTS } from "@/constants/fonts";
 import { signOutAdmin, useAdminSession } from "@/services/admin";
 
+import AdminAlerts from "./AdminAlerts";
+import AdminSearch from "./AdminSearch";
 import { useAdminTheme } from "./theme";
 import { initials } from "./ui";
 
@@ -153,17 +155,9 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
         <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>{page.label === "Overview" ? "Overview" : page.label}</Text>
       </View>
 
-      {!narrow ? (
-        <View style={{ width: 280, height: 38, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: t.cardSoft }}>
-          <Ionicons name="search-outline" size={16} color={t.faint} />
-          <Text style={{ flex: 1, fontFamily: FONTS.regular, fontSize: 12.5, color: t.faint }} numberOfLines={1}>
-            Search members, content, groups…
-          </Text>
-          <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: t.faint }}>⌘ K</Text>
-        </View>
-      ) : null}
+      {!narrow ? <AdminSearch /> : null}
 
-      <Ionicons name="notifications-outline" size={20} color={t.muted} />
+      <AdminAlerts />
       <View style={{ width: 1, height: 28, backgroundColor: t.border }} />
 
       <View>

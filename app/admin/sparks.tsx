@@ -7,7 +7,7 @@
 // Direct-message Sparks are private and never shown. Pin / delete / merge
 // administration is proposed; requirements are pending.
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
@@ -181,6 +181,7 @@ export default function AdminSparks() {
   const t = useAdminTheme();
   const { width } = useWindowDimensions();
   const wide = width >= 1200;
+  const params = useLocalSearchParams<{ spark?: string }>();
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getSparkStats>> | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
@@ -188,7 +189,11 @@ export default function AdminSparks() {
   const [rows, setRows] = useState<AdminSpark[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(typeof params.spark === "string" ? params.spark : null);
+  // Opened from the top bar search: show that Spark.
+  useEffect(() => {
+    if (typeof params.spark === "string") setSelected(params.spark);
+  }, [params.spark]);
 
   const loadStats = useCallback(async () => {
     try {
