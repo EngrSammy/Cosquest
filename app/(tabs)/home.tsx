@@ -16,6 +16,10 @@ import { Alert, FlatList, Platform, Pressable, RefreshControl, ScrollView, Text,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HeroQuest, { RED_PIN } from "@/components/dashboard/HeroQuest";
+import SeeAllLink from "@/components/dashboard/SeeAllLink";
+import { useRecentJoins } from "@/services/questFeed";
+import { lookupCity } from "@/utils/cityLookup";
+import { useRefreshLocation } from "@/utils/useRefreshLocation";
 import GetTicketSheet from "@/components/tickets/GetTicketSheet";
 import NextTicketCard from "@/components/tickets/NextTicketCard";
 import TicketHeaderButton from "@/components/tickets/TicketHeaderButton";
@@ -58,11 +62,12 @@ const formatCount = (value: number) => String(Math.max(0, Math.floor(value))).re
 function useCity(lat?: number | null, lng?: number | null) {
   const [city, setCity] = useState<string | null>(null);
   useEffect(() => {
-    if (Platform.OS === "web" || typeof lat !== "number" || typeof lng !== "number") return;
+    if (typeof lat !== "number" || typeof lng !== "number") return;
     let stale = false;
-    Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
-      .then(([place]) => {
-        if (!stale) setCity(place?.city || place?.subregion || place?.region || null);
+    // Phones: the phone's lookup; website: a free browser lookup (utils/cityLookup).
+    lookupCity(lat, lng)
+      .then((name) => {
+        if (!stale) setCity(name);
       })
       .catch(() => {
         // No address lookup: the chip just says "Near you".
@@ -105,6 +110,8 @@ export default function HomeScreen() {
   const firstName = profile?.firstName || profile?.username || "there";
   const radius = user?.preferences?.radiusMiles ?? DEFAULT_RADIUS_MI;
   const lookedUpCity = useCity(user?.location?.lat, user?.location?.lng);
+  // Your saved location follows you (only if location is already allowed).
+  useRefreshLocation();
   const city = USE_SAMPLE_QUESTS ? SAMPLE_CITY : lookedUpCity;
   // CosCoin and CosXP. The user record only has pointsBalance so far (shown
   // as XP); coins appear once the backend sends coinBalance.
@@ -183,6 +190,8 @@ export default function HomeScreen() {
   };
 
   const firstLoad = questsLoading && !quests.length && !refreshing;
+  // "Bigtooth Joined · Wagm Joined" under the big pin.
+  const recentJoins = useRecentJoins(featured && !featured.id.startsWith("sample_") ? featured.id : null);
 
   return (
     <View style={styles.screen}>
@@ -256,6 +265,7 @@ export default function HomeScreen() {
         {/* FEATURED QUEST */}
         <HeroQuest
           quest={firstLoad ? null : featured}
+          recentJoins={recentJoins}
           joined={!!featured && registered.has(featured.id)}
           busy={!!featured && busyId === featured.id}
           dark={ink.dark}
@@ -283,6 +293,7 @@ export default function HomeScreen() {
             )}
           />
         ) : null}
+        {ongoing.length ? <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "live" } } as any)} /> : null}
 
         {/* UPCOMING EVENTS */}
         <Text style={styles.sectionTitle}>UPCOMING EVENTS</Text>
@@ -310,6 +321,7 @@ export default function HomeScreen() {
             {firstLoad ? "Finding quests near you…" : "No upcoming events yet. Check back soon."}
           </Text>
         )}
+        {upcoming.length ? <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming" } } as any)} /> : null}
       </ScrollView>
     </View>
   );

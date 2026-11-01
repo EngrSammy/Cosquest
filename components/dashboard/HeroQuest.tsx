@@ -46,12 +46,16 @@ function Countdown({ target }: { target: number }) {
   return target > now ? <TimerChip text={formatCountdown(target - now)} /> : <TimerChip text="--:--:--" idle />;
 }
 
+// The joiners' names, in the Figma's colours.
+const JOIN_COLORS = ["#E0349B", "#1BA6C9", "#9B5CF0", "#9DB01E"];
+
 export default function HeroQuest({
   quest,
   joined,
   busy,
   dark,
   onJoin,
+  recentJoins = [],
 }: {
   quest: Quest | null;
   joined: boolean;
@@ -59,6 +63,8 @@ export default function HeroQuest({
   // Dark mode: the text on the map turns light (the chips stay pastel).
   dark?: boolean;
   onJoin: () => void;
+  // The latest people who joined (newest first), from GET /api/quests/:id/joins.
+  recentJoins?: { name: string; you?: boolean }[];
 }) {
   const live = !!quest && isLiveQuest(quest);
   const target = quest ? new Date((live ? quest.endsAt : quest.startsAt) || 0).getTime() : 0;
@@ -114,10 +120,23 @@ export default function HeroQuest({
             <Text style={styles.joinedTitle} numberOfLines={2}>
               {quest.title}
             </Text>
-            <Text style={[styles.joinedText, dark && styles.lightText]}>
-              {count ? `${count} Joined` : "Be the first to join"}
-              {typeof quest.spacesRemaining === "number" ? ` · ${quest.spacesRemaining} spots left` : ""}
-            </Text>
+            {recentJoins.length ? (
+              <>
+                {recentJoins.slice(0, 4).map((join, i) => (
+                  <Text key={`${join.name}${i}`} style={[styles.joinedText, dark && styles.lightText]} numberOfLines={1}>
+                    <Text style={{ fontWeight: "700", color: JOIN_COLORS[i % JOIN_COLORS.length] }}>{join.you ? "You" : join.name}</Text> Joined
+                  </Text>
+                ))}
+                {count > recentJoins.length ? (
+                  <Text style={[styles.joinedText, dark && styles.lightText]}>+{count - Math.min(4, recentJoins.length)} more</Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={[styles.joinedText, dark && styles.lightText]}>
+                {count ? `${count} Joined` : "Be the first to join"}
+                {typeof quest.spacesRemaining === "number" ? ` · ${quest.spacesRemaining} spots left` : ""}
+              </Text>
+            )}
           </View>
         ) : null}
       </View>
