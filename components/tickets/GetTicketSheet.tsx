@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import type { Quest } from "@/services/quests";
 import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes } from "@/services/tickets";
 import { useAppSelector } from "@/store/hooks";
@@ -27,6 +28,8 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
+  // Computers: a centered window instead of a bottom sheet.
+  const desktop = useIsDesktop();
   const token = useAppSelector((state) => state.auth.token);
   const [types, setTypes] = useState<TicketType[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -96,10 +99,12 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
-          <View style={styles.handle} />
+    <Modal visible transparent animationType={desktop ? "fade" : "slide"} onRequestClose={onClose}>
+      <Pressable style={[styles.backdrop, desktop && { justifyContent: "center", padding: 24 }]} onPress={onClose}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: insets.bottom + 18 }, desktop && { maxWidth: 520, borderRadius: 24, paddingTop: 22, paddingBottom: 22 }]}
+          onPress={() => {}}>
+          {desktop ? null : <View style={styles.handle} />}
           <View style={styles.head}>
             <Text style={styles.title} numberOfLines={2}>
               {quest.title}

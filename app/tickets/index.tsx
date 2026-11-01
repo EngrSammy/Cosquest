@@ -9,6 +9,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
 import { useInk } from "@/constants/chatTheme";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { FONTS } from "@/constants/fonts";
 import { loadSaved, saveTickets, useTicketOwner } from "@/services/ticketCache";
 import { type MyTicket, getMyTickets } from "@/services/tickets";
@@ -24,6 +25,8 @@ export default function MyTickets() {
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const owner = useTicketOwner();
+  // Computers: tickets in two columns.
+  const desktop = useIsDesktop();
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -52,7 +55,7 @@ export default function MyTickets() {
   return (
     <View style={{ flex: 1, backgroundColor: ink.dark ? "#14151F" : "#F4F8FD" }}>
       <TicketScreenHeader title="My tickets" />
-      <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, marginBottom: 10 }}>
+      <View style={[{ flexDirection: "row", gap: 10, paddingHorizontal: 16, marginBottom: 10 }, desktop && { width: "100%", maxWidth: 1040, alignSelf: "center", paddingHorizontal: 24 }]}>
         {(["upcoming", "past"] as const).map((key) => (
           <Pressable
             key={key}
@@ -66,7 +69,7 @@ export default function MyTickets() {
         ))}
       </View>
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 12, maxWidth: 640, width: "100%", alignSelf: "center" }}
+        contentContainerStyle={[{ padding: 16, gap: 12, maxWidth: 640, width: "100%", alignSelf: "center" }, desktop && { maxWidth: 1040, flexDirection: "row", flexWrap: "wrap", padding: 24, gap: 16 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
         {error ? <Text style={{ fontFamily: FONTS.regular, fontSize: 13.5, color: "#D9364F" }}>{error}</Text> : null}
         {!items ? (
@@ -76,7 +79,7 @@ export default function MyTickets() {
             <Pressable
               key={t.id}
               onPress={() => router.push({ pathname: "/tickets/[id]", params: { id: t.id } } as any)}
-              style={{ flexDirection: "row", gap: 12, padding: 12, borderRadius: 18, backgroundColor: ink.dark ? "#1F2130" : "#FFFFFF" }}>
+              style={[{ flexDirection: "row", gap: 12, padding: 12, borderRadius: 18, backgroundColor: ink.dark ? "#1F2130" : "#FFFFFF" }, desktop && { width: "48.9%" as any, flexGrow: 1, padding: 16 }]}>
               {t.quest?.coverImageUrl ? (
                 <Image source={{ uri: t.quest.coverImageUrl }} style={{ width: 72, height: 72, borderRadius: 12 }} contentFit="cover" />
               ) : (
@@ -108,7 +111,7 @@ export default function MyTickets() {
             </Pressable>
           ))
         ) : (
-          <View style={{ alignItems: "center", marginTop: 50, gap: 8 }}>
+          <View style={{ alignItems: "center", marginTop: 50, gap: 8, width: "100%" }}>
             <Ionicons name="ticket-outline" size={40} color={ink.text("#9AA1B4")} />
             <Text style={{ fontFamily: FONTS.medium, fontSize: 15, color: ink.text("#24283C") }}>{scope === "upcoming" ? "No upcoming tickets" : "No past tickets"}</Text>
             <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: ink.text("#66738A") }}>Register for an event from the home page.</Text>

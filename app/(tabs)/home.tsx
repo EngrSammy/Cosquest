@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HeroQuest, { RED_PIN } from "@/components/dashboard/HeroQuest";
 import SeeAllLink from "@/components/dashboard/SeeAllLink";
+import DesktopHome from "@/components/dashboard/DesktopHome";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { useRecentJoins } from "@/services/questFeed";
 import { lookupCity } from "@/utils/cityLookup";
 import { useRefreshLocation } from "@/utils/useRefreshLocation";
@@ -169,8 +171,42 @@ export default function HomeScreen() {
   };
 
   const firstLoad = questsLoading && !quests.length && !refreshing;
+  // Computers get the desktop layout (same data and actions).
+  const isDesktop = useIsDesktop();
   // "Bigtooth Joined · Wagm Joined" under the big pin.
   const recentJoins = useRecentJoins(featured ? featured.id : null);
+
+  if (isDesktop) {
+    return (
+      <DesktopHome
+        firstName={firstName}
+        avatar={avatar as any}
+        city={city}
+        radius={radius}
+        coins={coins}
+        xp={xp}
+        featured={featured}
+        ongoing={ongoing}
+        upcoming={upcoming}
+        registered={registered}
+        recentJoins={recentJoins}
+        firstLoad={firstLoad}
+        nearMe={!!nearMe}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onRegister={register}
+        onOpen={openQuest}>
+        <GetTicketSheet
+          quest={ticketQuest}
+          onClose={() => setTicketQuest(null)}
+          onTicket={(questId) => {
+            setRegistered((current) => new Set(current).add(questId));
+            dispatch(fetchQuests(nearMe));
+          }}
+        />
+      </DesktopHome>
+    );
+  }
 
   return (
     <View style={styles.screen}>

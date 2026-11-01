@@ -11,6 +11,7 @@ import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Tex
 
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
 import { useInk } from "@/constants/chatTheme";
+import { useIsDesktop } from "@/hooks/useDesktop";
 import { FONTS } from "@/constants/fonts";
 import { type Quest, getQuests } from "@/services/quests";
 import { formatMoney } from "@/services/tickets";
@@ -32,6 +33,8 @@ function whenText(q: Quest) {
 
 export default function AllQuests() {
   const ink = useInk();
+  // Computers: filters on one line, quests as a grid of picture cards.
+  const desktop = useIsDesktop();
   const params = useLocalSearchParams<{ tab?: string; radius?: string }>();
   const user = useAppSelector((state) => state.user.user) as any;
   const token = useAppSelector((state) => state.auth.token);
@@ -77,7 +80,7 @@ export default function AllQuests() {
   return (
     <View style={{ flex: 1, backgroundColor: ink.dark ? "#14151F" : "#F4F8FD" }}>
       <TicketScreenHeader title={tab === "live" ? "Live quests" : "Upcoming events"} />
-      <View style={{ paddingHorizontal: 16, gap: 10, maxWidth: 720, width: "100%", alignSelf: "center" }}>
+      <View style={[{ paddingHorizontal: 16, gap: 10, maxWidth: 720, width: "100%", alignSelf: "center" }, desktop && { maxWidth: 1240, paddingHorizontal: 28, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 14 }]}>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {(["live", "upcoming"] as const).map((key) => (
             <Pressable key={key} onPress={() => setTab(key)} style={chip(tab === key)}>
@@ -85,14 +88,14 @@ export default function AllQuests() {
             </Pressable>
           ))}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={desktop ? { flexGrow: 0 } : undefined}>
           {RADII.map((r) => (
             <Pressable key={r} disabled={!hasPlace && r !== 0} onPress={() => setRadius(r)} style={[chip(radius === r), !hasPlace && r !== 0 && { opacity: 0.4 }]}>
               <Text style={chipText(radius === r)}>{r ? `${r} mi` : "Anywhere"}</Text>
             </Pressable>
           ))}
         </ScrollView>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, height: 42, paddingHorizontal: 12, borderRadius: 21, backgroundColor: ink.dark ? "#1F2130" : "#FFFFFF" }}>
+        <View style={[{ flexDirection: "row", alignItems: "center", gap: 8, height: 42, paddingHorizontal: 12, borderRadius: 21, backgroundColor: ink.dark ? "#1F2130" : "#FFFFFF" }, desktop && { flex: 1, minWidth: 260 }]}>
           <Ionicons name="search" size={16} color={ink.text("#7A8296")} />
           <TextInput
             value={q}
@@ -105,13 +108,55 @@ export default function AllQuests() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 12, maxWidth: 720, width: "100%", alignSelf: "center" }}
+        contentContainerStyle={[{ padding: 16, gap: 12, maxWidth: 720, width: "100%", alignSelf: "center" }, desktop && { maxWidth: 1240, padding: 28, flexDirection: "row", flexWrap: "wrap", gap: 20 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
         {error ? <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: "#D9364F" }}>{error}</Text> : null}
         {!items ? (
           <ActivityIndicator color={PINK} style={{ marginTop: 40 }} />
         ) : shown.length ? (
-          shown.map((x) => (
+          shown.map((x) =>
+            desktop ? (
+              <Pressable
+                key={x.id}
+                onPress={() => router.push({ pathname: "/quests/[id]", params: { id: x.id } } as any)}
+                style={({ hovered }: any) => ({
+                  width: "31.8%" as any,
+                  minWidth: 280,
+                  flexGrow: 1,
+                  maxWidth: 400,
+                  borderRadius: 20,
+                  overflow: "hidden",
+                  backgroundColor: ink.dark ? "#1F2130" : "#FFFFFF",
+                  borderWidth: 1,
+                  borderColor: hovered ? PINK : ink.dark ? "#2C2F42" : "#E7ECF4",
+                })}>
+                {x.coverImageUrl ? (
+                  <Image source={{ uri: x.coverImageUrl }} style={{ width: "100%", height: 170 }} contentFit="cover" />
+                ) : (
+                  <View style={{ height: 170, alignItems: "center", justifyContent: "center", backgroundColor: ink.dark ? "#2A1E2C" : "#FBEAF3" }}>
+                    <Ionicons name={tab === "live" ? "flash" : "calendar"} size={44} color={PINK} />
+                  </View>
+                )}
+                <View style={{ padding: 16, gap: 4 }}>
+                  <Text style={{ fontFamily: FONTS.medium, fontSize: 12.5, color: tab === "live" ? "#1D9A6C" : PINK }} numberOfLines={1}>
+                    {whenText(x)}
+                  </Text>
+                  <Text style={{ fontFamily: FONTS.bold, fontSize: 17, color: ink.text("#24283C") }} numberOfLines={1}>
+                    {x.title}
+                  </Text>
+                  <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: ink.text("#66738A") }} numberOfLines={1}>
+                    {x.location?.name || ""}
+                    {typeof x.distanceMiles === "number" ? ` · ${x.distanceMiles} mi` : ""}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+                    <Text style={{ flex: 1, fontFamily: FONTS.semibold, fontSize: 14, color: ink.text("#24283C") }}>
+                      {x.isRegistered ? "✓ You're in" : formatMoney(x.entryFee as any)}
+                    </Text>
+                    {x.prizePool?.amount ? <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: ink.text("#66738A") }}>Prize {formatMoney(x.prizePool as any)}</Text> : null}
+                  </View>
+                </View>
+              </Pressable>
+            ) : (
             <Pressable
               key={x.id}
               onPress={() => router.push({ pathname: "/quests/[id]", params: { id: x.id } } as any)}
@@ -141,9 +186,10 @@ export default function AllQuests() {
                 </Text>
               </View>
             </Pressable>
-          ))
+            ),
+          )
         ) : (
-          <View style={{ alignItems: "center", marginTop: 50, gap: 8 }}>
+          <View style={{ alignItems: "center", marginTop: 50, gap: 8, width: "100%" }}>
             <Ionicons name={tab === "live" ? "flash-outline" : "calendar-outline"} size={40} color={ink.text("#9AA1B4")} />
             <Text style={{ fontFamily: FONTS.medium, fontSize: 15, color: ink.text("#24283C") }}>{tab === "live" ? "Nothing live right now" : "No upcoming events"}</Text>
             <Text style={{ textAlign: "center", fontFamily: FONTS.regular, fontSize: 13, color: ink.text("#66738A") }}>
