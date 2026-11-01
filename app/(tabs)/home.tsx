@@ -3,9 +3,8 @@
 // ==========================================
 // "Hello {name}" with city, quest radius, coins and gems; the featured
 // quest on the big pin (Join); ongoing quests (ENTER); upcoming events
-// (Register). Quests come from GET /api/quests; joining and registering
-// use POST /api/quests/:id/registrations. While USE_SAMPLE_QUESTS is on,
-// it shows the Figma's San Diego quests instead (constants/sampleQuests.ts).
+// (Register). Real quests only, from GET /api/quests (created in the admin
+// dashboard's Quests & Events); every ticket goes through "Get a ticket".
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,7 +37,6 @@ import {
   useThemedStyles,
 } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
-import { makeSampleQuests, SAMPLE_CITY } from "@/constants/sampleQuests";
 import type { Quest } from "@/services/quests";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchQuests, registerQuest } from "@/store/thunks/questThunks";
@@ -49,10 +47,6 @@ const MAP = require("@/assets/images/map-texture.png");
 const COSCOIN = require("@/assets/images/dashboard/coscoin.png");
 const COSXP = require("@/assets/images/dashboard/cosxp.png");
 
-// The backend's quests are three Lagos tests for now: show the design's
-// San Diego set until real nearby quests exist. false = GET /api/quests.
-// Real quests now (created in the admin dashboard's Quests & Events).
-const USE_SAMPLE_QUESTS = false;
 const DEFAULT_RADIUS_MI = 50;
 
 const formatCount = (value: number) => String(Math.max(0, Math.floor(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -90,9 +84,8 @@ export default function HomeScreen() {
   const user = useAppSelector((state) => state.user.user);
   const apiQuests = useAppSelector((state) => state.quest.quests);
   const apiLoading = useAppSelector((state) => state.quest.loading);
-  const [sampleQuests] = useState(makeSampleQuests);
-  const quests = USE_SAMPLE_QUESTS ? sampleQuests : apiQuests;
-  const questsLoading = USE_SAMPLE_QUESTS ? false : apiLoading;
+  const quests = apiQuests;
+  const questsLoading = apiLoading;
 
   // Quests joined or registered for from here (the list has no "mine" flag yet).
   const [registered, setRegistered] = useState<Set<string>>(() => new Set());
@@ -112,7 +105,7 @@ export default function HomeScreen() {
   const lookedUpCity = useCity(user?.location?.lat, user?.location?.lng);
   // Your saved location follows you (only if location is already allowed).
   useRefreshLocation();
-  const city = USE_SAMPLE_QUESTS ? SAMPLE_CITY : lookedUpCity;
+  const city = lookedUpCity;
   // CosCoin and CosXP. The user record only has pointsBalance so far (shown
   // as XP); coins appear once the backend sends coinBalance.
   const coins = Number((user as any)?.coinBalance ?? 0);
@@ -123,7 +116,7 @@ export default function HomeScreen() {
   } as any);
 
   const load = useCallback(async () => {
-    const work: Promise<unknown>[] = USE_SAMPLE_QUESTS ? [] : [dispatch(fetchQuests(undefined))];
+    const work: Promise<unknown>[] = [dispatch(fetchQuests(undefined))];
     if (authUser?.email && !user) work.push(dispatch(fetchCurrentUser(authUser.email)));
     await Promise.all(work);
   }, [dispatch, authUser?.email, user]);
@@ -157,47 +150,22 @@ export default function HomeScreen() {
     };
   }, [quests, city]);
 
+  // Register / Join / ENTER: "Get a ticket" (paid, through Stripe); once
+  // you have one, My tickets.
   const register = async (quest: Quest) => {
     if (!token) return;
-    // Tickets: already in -> My tickets; otherwise choose a ticket.
-    if (!quest.id.startsWith("sample_")) {
-      if (registered.has(quest.id)) router.push("/tickets" as any);
-      else setTicketQuest(quest);
-      return;
-    }
-    if (registered.has(quest.id)) return;
-    // Sample quests don't exist on the backend: just mark them.
-    if (quest.id.startsWith("sample_")) {
-      setRegistered((current) => new Set(current).add(quest.id));
-      return;
-    }
-    setBusyId(quest.id);
-    try {
-      await dispatch(registerQuest({ questId: quest.id, token })).unwrap();
-      setRegistered((current) => new Set(current).add(quest.id));
-      dispatch(fetchQuests(undefined));
-    } catch (error) {
-      const message = typeof error === "string" ? error : "Couldn't register. Please try again.";
-      // Already registered counts as success.
-      if (/already/i.test(message)) {
-        setRegistered((current) => new Set(current).add(quest.id));
-      } else {
-        Alert.alert(quest.title, message);
-      }
-    } finally {
-      setBusyId(null);
-    }
+    if (registered.has(quest.id)) router.push("/tickets" as any);
+    else setTicketQuest(quest);
   };
 
   // Tapping a card (not its button): the quest's details page.
   const openQuest = (quest: Quest) => {
-    if (quest.id.startsWith("sample_")) return;
     router.push({ pathname: "/quests/[id]", params: { id: quest.id } } as any);
   };
 
   const firstLoad = questsLoading && !quests.length && !refreshing;
   // "Bigtooth Joined · Wagm Joined" under the big pin.
-  const recentJoins = useRecentJoins(featured && !featured.id.startsWith("sample_") ? featured.id : null);
+  const recentJoins = useRecentJoins(featured ? featured.id : null);
 
   return (
     <View style={styles.screen}>

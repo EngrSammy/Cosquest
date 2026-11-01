@@ -68,8 +68,8 @@ const EMPTY = (): QuestInput => {
     startsAt: start.toISOString(),
     endsAt: new Date(start.getTime() + 3 * 3600e3).toISOString(),
     location: { name: "", address: "", city: "", country: "", lat: NaN, lng: NaN },
-    // Every ticket is paid (Stripe's minimum is $0.50).
-    entryFee: { amount: 10 },
+    // Free (0) or paid (Stripe's minimum is $0.50).
+    entryFee: { amount: 0 },
     prizePool: { amount: 0 },
     maxParticipants: 50,
     requireAtVenue: false,
@@ -175,7 +175,7 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
   };
 
   const hasPin = Number.isFinite(form.location.lat) && Number.isFinite(form.location.lng);
-  const ready = form.title.trim().length >= 3 && form.location.name.trim() && hasPin && form.startsAt && form.endsAt && form.entryFee.amount >= 0.5;
+  const ready = form.title.trim().length >= 3 && form.location.name.trim() && hasPin && form.startsAt && form.endsAt && (form.entryFee.amount === 0 || form.entryFee.amount >= 0.5);
 
   return (
     <Card style={{ marginBottom: 20 }}>
@@ -307,7 +307,7 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
         {(
           [
             ["Places", "maxParticipants"],
-            ["Entry fee (USD, at least 0.50)", "entryFee"],
+            ["Entry fee (USD, 0 = free)", "entryFee"],
             ["Prize pool (USD)", "prizePool"],
           ] as const
         ).map(([text, key]) => (
@@ -325,11 +325,17 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
           </View>
         ))}
       </View>
-      {form.entryFee.amount < 0.5 ? (
-        <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12, color: t.amber }}>Every ticket is paid: the entry fee must be at least $0.50.</Text>
+      {form.entryFee.amount > 0 && form.entryFee.amount < 0.5 ? (
+        <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12, color: t.amber }}>Paid tickets must cost at least $0.50 (Stripe's minimum). Use 0 for free.</Text>
       ) : (
         <View style={{ marginTop: 14 }}>
-          <Notice text="People pay by card on Stripe's secure page. You can add more ticket types (e.g. VIP) after saving." />
+          <Notice
+            text={
+              form.entryFee.amount
+                ? "People pay by card on Stripe's secure page. You can add more ticket types (e.g. VIP) after saving."
+                : "Free: people get their ticket (with its QR code) at once. You can add paid ticket types (e.g. VIP) after saving."
+            }
+          />
         </View>
       )}
 
@@ -362,7 +368,7 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
   const [count, setCount] = useState<{ checkedIn: number; tickets: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("10");
+  const [price, setPrice] = useState("0");
   const [quantity, setQuantity] = useState("50");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -402,7 +408,7 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
       await createTicketType(questId, { name: name.trim(), price: { amount: Number(price) || 0 }, quantity: Math.round(Number(quantity) || 0) });
       setAdding(false);
       setName("");
-      setPrice("10");
+      setPrice("0");
       setQuantity("50");
       await load();
     } catch (e: any) {
@@ -450,11 +456,11 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
           <View style={{ marginTop: 12, gap: 8 }}>
             <TextInput value={name} onChangeText={setName} placeholder="Name, e.g. VIP" placeholderTextColor={t.faint} maxLength={60} style={input} />
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput value={price} onChangeText={setPrice} placeholder="Price (USD, at least 0.50)" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
+              <TextInput value={price} onChangeText={setPrice} placeholder="Price (USD, 0 = free)" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
               <TextInput value={quantity} onChangeText={setQuantity} placeholder="How many" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button label="Add ticket type" variant="primary" onPress={add} loading={busy === "add"} disabled={name.trim().length < 2 || (Number(price) || 0) < 0.5} />
+              <Button label="Add ticket type" variant="primary" onPress={add} loading={busy === "add"} disabled={name.trim().length < 2 || ((Number(price) || 0) > 0 && (Number(price) || 0) < 0.5)} />
               <Button label="Cancel" onPress={() => setAdding(false)} />
             </View>
           </View>
@@ -528,7 +534,6 @@ function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (
           <Text style={{ fontFamily: FONTS.medium, fontSize: 17, color: t.text }}>{quest.title}</Text>
           <Text style={{ marginTop: 3, fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>
             {quest.kind === "event" ? "Event" : "Quest"} · {quest.hostName}
-            {quest.isSeedData ? " · test data" : ""}
           </Text>
         </View>
         <StatusPill status={quest.status} />
