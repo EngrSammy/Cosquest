@@ -9,28 +9,46 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import type { Quest } from "@/services/quests";
-import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes } from "@/services/tickets";
+import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes, paymentSheet } from "@/services/tickets";
 import { useAppSelector } from "@/store/hooks";
 
 import { currentPosition } from "./currentPosition";
 import { openPayment } from "./openPayment";
+import StripeRoot from "./StripeRoot";
+import { usePayInApp } from "./usePayInApp";
 
 const PINK = "#C34D9C";
 
-export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Quest | null; onClose: () => void; onTicket: (questId: string, ticketId: string | null) => void }) {
+type SheetProps = { quest: Quest | null; onClose: () => void; onTicket: (questId: string, ticketId: string | null) => void };
+
+// Phones pay inside the app (Stripe's payment sheet: card, Google Pay);
+// the website uses Stripe's page.
+export default function GetTicketSheet(props: SheetProps) {
+  if (!props.quest) return null;
+  return (
+    <StripeRoot>
+      <TicketSheet {...props} />
+    </StripeRoot>
+  );
+}
+
+function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
   // Computers: a centered window instead of a bottom sheet.
   const desktop = useIsDesktop();
   const token = useAppSelector((state) => state.auth.token);
+  const email = useAppSelector((state) => (state.auth.user as any)?.email || null);
+  // null on the website (or without a Stripe key): Stripe's page instead.
+  const payInApp = usePayInApp();
   const [types, setTypes] = useState<TicketType[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,6 +80,33 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
       const now = Date.now();
       const live = !!quest.startsAt && !!quest.endsAt && new Date(quest.startsAt).getTime() <= now && new Date(quest.endsAt).getTime() > now;
       const position = quest.requireAtVenue && live ? await currentPosition() : null;
+
+      // Paid, on a phone: Stripe's payment sheet inside the app.
+      if (payInApp && !type.free) {
+        const sheet = await paymentSheet(quest.id, type.id, token, position);
+        if (sheet.ticket) {
+          onTicket(quest.id, sheet.ticket.id);
+          onClose();
+          router.push({ pathname: "/tickets/[id]", params: { id: sheet.ticket.id } } as any);
+          return;
+        }
+        if (!sheet.paymentIntentClientSecret) throw new TicketError("Couldn't start the payment. Please try again.", 0);
+        const orderId = sheet.order.id;
+        // Stripe's sheet can't open over another pop-up: close this one first.
+        onClose();
+        await new Promise((resolve) => setTimeout(resolve, Platform.OS === "ios" ? 450 : 250));
+        const paid = await payInApp(sheet.paymentIntentClientSecret, type.price.currency, email);
+        if (paid.status === "paid") {
+          // The server confirms it with Stripe; this screen waits for that.
+          router.push({ pathname: "/tickets/return", params: { order: orderId } } as any);
+        } else if (paid.status === "canceled") {
+          Alert.alert("Payment not finished", "Nothing was charged. Your place is held for a few minutes if you want to try again.");
+        } else {
+          Alert.alert("Payment failed", `${paid.message} Nothing was charged.`);
+        }
+        return;
+      }
+
       const result = await checkout(quest.id, type.id, token, position);
       if (result.ticket) {
         // Free: done.

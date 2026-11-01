@@ -6,7 +6,10 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51UWUc9RizCjeYiR7q0yvX3vWSEdcW5tPZVSJrPGKhlA2vMAmoDlLDxZWsAimoW54yS28FaxRhqQJpj0dJexKyEIg00rTnhimQf"
+      }
     },
     "preview": {
       "distribution": "internal",
@@ -16,7 +19,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
         "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app",
-        "EXPO_PUBLIC_SPARKS_ENGINE": "module"
+        "EXPO_PUBLIC_SPARKS_ENGINE": "module",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51UWUc9RizCjeYiR7q0yvX3vWSEdcW5tPZVSJrPGKhlA2vMAmoDlLDxZWsAimoW54yS28FaxRhqQJpj0dJexKyEIg00rTnhimQf"
       }
     },
     "production": {
@@ -24,7 +28,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://cosquest-1.onrender.com",
         "EXPO_PUBLIC_WEB_URL": "https://cosquest.vercel.app",
-        "EXPO_PUBLIC_SPARKS_ENGINE": "module"
+        "EXPO_PUBLIC_SPARKS_ENGINE": "module",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51UWUc9RizCjeYiR7q0yvX3vWSEdcW5tPZVSJrPGKhlA2vMAmoDlLDxZWsAimoW54yS28FaxRhqQJpj0dJexKyEIg00rTnhimQf"
       }
     }
   },

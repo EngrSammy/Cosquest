@@ -93,7 +93,8 @@
           "color": "#C34D9C",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
     "experiments": {
       "typedRoutes": true,
