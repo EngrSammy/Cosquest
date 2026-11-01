@@ -10,6 +10,7 @@
 // app/(tabs)/profile.tsx, so phones keep their own design.
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ActivityIndicator, ImageSourcePropType, Pressable, ScrollView, Text, View } from "react-native";
@@ -258,6 +259,7 @@ export default function DesktopProfile({
                 <Button label="New post" icon="add" primary onPress={onNewPost} />
                 <Button label="Edit profile" icon="create-outline" onPress={onEdit} />
                 <Button label="Share" icon="share-social-outline" onPress={onShare} />
+                <Button label="My tickets" icon="ticket-outline" onPress={() => router.push("/tickets" as any)} />
               </View>
             </View>
 

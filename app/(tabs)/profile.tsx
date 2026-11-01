@@ -794,6 +794,10 @@ export default function Profile() {
           <View style={{ flex: 1 }}>
             <ActionButton label="Share Profile" onPress={handleShareProfile} />
           </View>
+
+          <View style={{ flex: 1 }}>
+            <ActionButton label="My Tickets" onPress={() => router.push("/tickets" as any)} />
+          </View>
         </View>
 
                   </View>
@@ -1135,6 +1139,10 @@ export default function Profile() {
 
           <View style={{ flex: 1 }}>
             <ActionButton label="Share Profile" onPress={handleShareProfile} />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <ActionButton label="My Tickets" onPress={() => router.push("/tickets" as any)} />
           </View>
         </View>
 

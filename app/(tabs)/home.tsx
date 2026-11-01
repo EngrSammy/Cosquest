@@ -3,9 +3,8 @@
 // ==========================================
 // "Hello {name}" with city, quest radius, coins and gems; the featured
 // quest on the big pin (Join); ongoing quests (ENTER); upcoming events
-// (Register). Quests come from GET /api/quests; joining and registering
-// use POST /api/quests/:id/registrations. While USE_SAMPLE_QUESTS is on,
-// it shows the Figma's San Diego quests instead (constants/sampleQuests.ts).
+// (Register). Real quests only, from GET /api/quests (created in the admin
+// dashboard's Quests & Events); every ticket goes through "Get a ticket".
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,6 +15,13 @@ import { Alert, FlatList, Platform, Pressable, RefreshControl, ScrollView, Text,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HeroQuest, { RED_PIN } from "@/components/dashboard/HeroQuest";
+import SeeAllLink from "@/components/dashboard/SeeAllLink";
+import { useRecentJoins } from "@/services/questFeed";
+import { lookupCity } from "@/utils/cityLookup";
+import { useRefreshLocation } from "@/utils/useRefreshLocation";
+import GetTicketSheet from "@/components/tickets/GetTicketSheet";
+import NextTicketCard from "@/components/tickets/NextTicketCard";
+import TicketHeaderButton from "@/components/tickets/TicketHeaderButton";
 import {
   CHARACTER_REACH,
   ONGOING_WIDTH,
@@ -31,7 +37,6 @@ import {
   useThemedStyles,
 } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
-import { makeSampleQuests, SAMPLE_CITY } from "@/constants/sampleQuests";
 import type { Quest } from "@/services/quests";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchQuests, registerQuest } from "@/store/thunks/questThunks";
@@ -42,9 +47,6 @@ const MAP = require("@/assets/images/map-texture.png");
 const COSCOIN = require("@/assets/images/dashboard/coscoin.png");
 const COSXP = require("@/assets/images/dashboard/cosxp.png");
 
-// The backend's quests are three Lagos tests for now: show the design's
-// San Diego set until real nearby quests exist. false = GET /api/quests.
-const USE_SAMPLE_QUESTS = true;
 const DEFAULT_RADIUS_MI = 50;
 
 const formatCount = (value: number) => String(Math.max(0, Math.floor(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -54,11 +56,12 @@ const formatCount = (value: number) => String(Math.max(0, Math.floor(value))).re
 function useCity(lat?: number | null, lng?: number | null) {
   const [city, setCity] = useState<string | null>(null);
   useEffect(() => {
-    if (Platform.OS === "web" || typeof lat !== "number" || typeof lng !== "number") return;
+    if (typeof lat !== "number" || typeof lng !== "number") return;
     let stale = false;
-    Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
-      .then(([place]) => {
-        if (!stale) setCity(place?.city || place?.subregion || place?.region || null);
+    // Phones: the phone's lookup; website: a free browser lookup (utils/cityLookup).
+    lookupCity(lat, lng)
+      .then((name) => {
+        if (!stale) setCity(name);
       })
       .catch(() => {
         // No address lookup: the chip just says "Near you".
@@ -81,20 +84,33 @@ export default function HomeScreen() {
   const user = useAppSelector((state) => state.user.user);
   const apiQuests = useAppSelector((state) => state.quest.quests);
   const apiLoading = useAppSelector((state) => state.quest.loading);
-  const [sampleQuests] = useState(makeSampleQuests);
-  const quests = USE_SAMPLE_QUESTS ? sampleQuests : apiQuests;
-  const questsLoading = USE_SAMPLE_QUESTS ? false : apiLoading;
+  const quests = apiQuests;
+  const questsLoading = apiLoading;
 
   // Quests joined or registered for from here (the list has no "mine" flag yet).
   const [registered, setRegistered] = useState<Set<string>>(() => new Set());
+  // Quests the server says you're registered for (isRegistered).
+  useEffect(() => {
+    const mine = quests.filter((quest) => quest.isRegistered).map((quest) => quest.id);
+    if (mine.length) setRegistered((current) => new Set([...current, ...mine]));
+  }, [quests]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // "Get a ticket" (free at once, paid through Stripe's page).
+  const [ticketQuest, setTicketQuest] = useState<Quest | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = user?.profile || authUser?.profile;
   const firstName = profile?.firstName || profile?.username || "there";
   const radius = user?.preferences?.radiusMiles ?? DEFAULT_RADIUS_MI;
+  // Only quests within your radius (when your location is known).
+  const nearMe =
+    typeof (user as any)?.location?.lat === "number" && typeof (user as any)?.location?.lng === "number"
+      ? { lat: (user as any).location.lat as number, lng: (user as any).location.lng as number, radiusMiles: radius }
+      : undefined;
   const lookedUpCity = useCity(user?.location?.lat, user?.location?.lng);
-  const city = USE_SAMPLE_QUESTS ? SAMPLE_CITY : lookedUpCity;
+  // Your saved location follows you (only if location is already allowed).
+  useRefreshLocation();
+  const city = lookedUpCity;
   // CosCoin and CosXP. The user record only has pointsBalance so far (shown
   // as XP); coins appear once the backend sends coinBalance.
   const coins = Number((user as any)?.coinBalance ?? 0);
@@ -105,7 +121,7 @@ export default function HomeScreen() {
   } as any);
 
   const load = useCallback(async () => {
-    const work: Promise<unknown>[] = USE_SAMPLE_QUESTS ? [] : [dispatch(fetchQuests(undefined))];
+    const work: Promise<unknown>[] = [dispatch(fetchQuests(nearMe))];
     if (authUser?.email && !user) work.push(dispatch(fetchCurrentUser(authUser.email)));
     await Promise.all(work);
   }, [dispatch, authUser?.email, user]);
@@ -139,36 +155,33 @@ export default function HomeScreen() {
     };
   }, [quests, city]);
 
+  // Register / Join / ENTER: "Get a ticket" (paid, through Stripe); once
+  // you have one, My tickets.
   const register = async (quest: Quest) => {
     if (!token) return;
-    if (registered.has(quest.id)) return;
-    // Sample quests don't exist on the backend: just mark them.
-    if (quest.id.startsWith("sample_")) {
-      setRegistered((current) => new Set(current).add(quest.id));
-      return;
-    }
-    setBusyId(quest.id);
-    try {
-      await dispatch(registerQuest({ questId: quest.id, token })).unwrap();
-      setRegistered((current) => new Set(current).add(quest.id));
-      dispatch(fetchQuests(undefined));
-    } catch (error) {
-      const message = typeof error === "string" ? error : "Couldn't register. Please try again.";
-      // Already registered counts as success.
-      if (/already/i.test(message)) {
-        setRegistered((current) => new Set(current).add(quest.id));
-      } else {
-        Alert.alert(quest.title, message);
-      }
-    } finally {
-      setBusyId(null);
-    }
+    if (registered.has(quest.id)) router.push("/tickets" as any);
+    else setTicketQuest(quest);
+  };
+
+  // Tapping a card (not its button): the quest's details page.
+  const openQuest = (quest: Quest) => {
+    router.push({ pathname: "/quests/[id]", params: { id: quest.id } } as any);
   };
 
   const firstLoad = questsLoading && !quests.length && !refreshing;
+  // "Bigtooth Joined · Wagm Joined" under the big pin.
+  const recentJoins = useRecentJoins(featured ? featured.id : null);
 
   return (
     <View style={styles.screen}>
+      <GetTicketSheet
+        quest={ticketQuest}
+        onClose={() => setTicketQuest(null)}
+        onTicket={(questId) => {
+          setRegistered((current) => new Set(current).add(questId));
+          dispatch(fetchQuests(nearMe));
+        }}
+      />
       <LinearGradient
         colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#F4F8FD", "#D5EAFB"]}
         locations={ink.dark ? [0, 0.6] : [0, 0.35, 1]}
@@ -215,6 +228,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
+          <TicketHeaderButton style={[styles.bell, { marginRight: 16 }]} />
           <Pressable
             onPress={() => router.push("/notifications")}
             hitSlop={10}
@@ -224,9 +238,14 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        {/* YOUR NEXT TICKET (within 24 hours) */}
+        <NextTicketCard />
+
         {/* FEATURED QUEST */}
         <HeroQuest
           quest={firstLoad ? null : featured}
+          recentJoins={recentJoins}
+          onOpen={() => featured && openQuest(featured)}
           joined={!!featured && registered.has(featured.id)}
           busy={!!featured && busyId === featured.id}
           dark={ink.dark}
@@ -250,10 +269,12 @@ export default function HomeScreen() {
                 joined={registered.has(item.id)}
                 busy={busyId === item.id}
                 onEnter={() => register(item)}
+                onOpen={() => openQuest(item)}
               />
             )}
           />
         ) : null}
+        {ongoing.length ? <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "live" } } as any)} /> : null}
 
         {/* UPCOMING EVENTS */}
         <Text style={styles.sectionTitle}>UPCOMING EVENTS</Text>
@@ -273,14 +294,20 @@ export default function HomeScreen() {
                 registered={registered.has(item.id)}
                 busy={busyId === item.id}
                 onRegister={() => register(item)}
+                onOpen={() => openQuest(item)}
               />
             )}
           />
         ) : (
           <Text style={styles.empty}>
-            {firstLoad ? "Finding quests near you…" : "No upcoming events yet. Check back soon."}
+            {firstLoad ? "Finding quests near you…" : nearMe ? `No upcoming events within ${radius} miles yet.` : "No upcoming events yet. Check back soon."}
           </Text>
         )}
+        {upcoming.length ? (
+          <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming" } } as any)} />
+        ) : !firstLoad && nearMe ? (
+          <SeeAllLink label="See events anywhere" onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming", radius: "0" } } as any)} />
+        ) : null}
       </ScrollView>
     </View>
   );
