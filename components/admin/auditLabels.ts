@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   "quest.update": "Edited a quest",
   "quest.duplicate": "Duplicated a quest",
   "quest.cancel": "Cancelled a quest",
+  "quest.delete": "Deleted a quest",
   "ticket_type.create": "Added a ticket type",
   "ticket_type.update": "Changed a ticket type",
   "order.refund": "Refunded an order",

@@ -22,6 +22,7 @@ import {
   type QuestStatus,
   cancelQuest,
   createQuest,
+  deleteQuest,
   getAdminQuest,
   getQuestStats,
   listAdminQuests,
@@ -477,11 +478,12 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
 }
 
 // ---------- the details panel ----------
-function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (q: AdminQuest) => void; onChanged: (newId?: string) => void }) {
+function QuestPanel({ questId, onEdit, onChanged, onDeleted }: { questId: string; onEdit: (q: AdminQuest) => void; onChanged: (newId?: string) => void; onDeleted: (message: string) => void }) {
   const t = useAdminTheme();
   const [data, setData] = useState<Awaited<ReturnType<typeof getAdminQuest>> | null>(null);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState("");
@@ -498,6 +500,7 @@ function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (
   useEffect(() => {
     setData(null);
     setCancelling(false);
+    setDeleting(false);
     setReason("");
     setDone("");
     load();
@@ -565,8 +568,33 @@ function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (
           <Button label="Unpublish" loading={busy === "unpublish"} onPress={() => run("unpublish", () => questAction(quest.id, "unpublish"), (r) => `Back to draft. Recorded as ${r.auditEvent}.`)} />
         ) : null}
         <Button label="Duplicate" icon="copy-outline" loading={busy === "duplicate"} onPress={() => run("duplicate", () => questAction(quest.id, "duplicate"), () => "Copied as a new draft.", (r) => r.quest.id)} />
-        {editable && quest.status !== "completed" ? <Button label="Cancel…" onPress={() => { setCancelling(true); setDone(""); }} /> : null}
+        {editable && quest.status !== "completed" ? <Button label="Cancel…" onPress={() => { setCancelling(true); setDeleting(false); setDone(""); }} /> : null}
+        {quest.registrationCount === 0 ? <Button label="Delete…" icon="trash-outline" onPress={() => { setDeleting(true); setCancelling(false); setReason(""); setDone(""); }} /> : null}
       </View>
+      {deleting ? (
+        <>
+          <ReasonBox value={reason} onChange={setReason} placeholder="e.g. Demo data / made by mistake." />
+          <ConfirmBox
+            title={`Delete ${quest.title} for good?`}
+            text="It disappears from CosQuest with its ticket types, and can't be brought back. Only possible while nobody is registered and no payments were made; otherwise cancel it."
+            confirmLabel="Delete for good"
+            onConfirm={async () => {
+              setBusy("delete");
+              setError("");
+              try {
+                const result = await deleteQuest(quest.id, reason.trim());
+                onDeleted(`${quest.title} was deleted. Recorded as ${result.auditEvent}.`);
+              } catch (e: any) {
+                setError(e?.message || "Couldn't delete it.");
+                setBusy(null);
+              }
+            }}
+            onCancel={() => setDeleting(false)}
+            busy={busy === "delete"}
+            disabled={reason.trim().length < 3}
+          />
+        </>
+      ) : null}
       {cancelling ? (
         <>
           <ReasonBox value={reason} onChange={setReason} placeholder="e.g. The venue is closed for repairs. We'll announce a new date soon." />
@@ -774,7 +802,18 @@ export default function AdminQuests() {
 
         <Card style={{ flex: 1, alignSelf: "stretch" }}>
           {selected ? (
-            <QuestPanel key={`${selected}:${panelKey}`} questId={selected} onEdit={(quest) => { setForm({ editing: quest }); setDone(""); }} onChanged={refresh} />
+            <QuestPanel
+              key={`${selected}:${panelKey}`}
+              questId={selected}
+              onEdit={(quest) => { setForm({ editing: quest }); setDone(""); }}
+              onChanged={refresh}
+              onDeleted={(message) => {
+                setDone(message);
+                setSelected(null);
+                loadStats();
+                loadList();
+              }}
+            />
           ) : (
             <Text style={{ paddingVertical: 60, textAlign: "center", fontFamily: FONTS.regular, fontSize: 13, color: t.muted }}>Pick a quest or event to see it.</Text>
           )}

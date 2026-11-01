@@ -74,6 +74,9 @@ export const createQuest = (input: QuestInput) => adminRequest<{ quest: AdminQue
 export const updateQuest = (id: string, input: Partial<QuestInput>) => adminRequest<{ quest: AdminQuest; auditEvent: string | null }>(`/quests/${id}`, { method: "PATCH", body: input });
 export const questAction = (id: string, action: "publish" | "unpublish" | "duplicate") => adminRequest<{ quest: AdminQuest; auditEvent: string | null }>(`/quests/${id}/${action}`, { method: "POST", body: {} });
 export const cancelQuest = (id: string, reason: string) => adminRequest<{ quest: AdminQuest; registrantsNotified: number; auditEvent: string }>(`/quests/${id}/cancel`, { method: "POST", body: { reason } });
+// Deletes for good: only when nobody is registered and no payments were ever made
+// (409 has_registrations / has_orders otherwise: cancel instead).
+export const deleteQuest = (id: string, reason: string) => adminRequest<{ deleted: boolean; auditEvent: string }>(`/quests/${id}`, { method: "DELETE", body: { reason } });
 export const searchPlaces = (q: string) => adminRequest<{ places: Place[]; attribution: string }>(`/geocode${qs({ q })}`);
 
 /** Uploads a cover image (website): opens the file picker, returns the hosted URL. */
