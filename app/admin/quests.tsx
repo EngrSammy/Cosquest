@@ -30,6 +30,8 @@ import {
   searchPlaces,
   updateQuest,
 } from "@/services/adminQuests";
+import { type AdminTicketType, createTicketType, getCheckins, getTicketTypes, money as formatMoney, updateTicketType } from "@/services/adminPayments";
+import { router } from "expo-router";
 
 type Tab = "all" | "live" | "upcoming" | "draft" | "completed" | "cancelled";
 
@@ -324,7 +326,7 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
       </View>
       {form.entryFee.amount > 0 ? (
         <View style={{ marginTop: 14 }}>
-          <Notice text="Paid entry: people can register now, and pay by card once Tickets & Stripe are switched on (next phase)." />
+          <Notice text="Paid entry: people pay by card on Stripe's secure page. You can add more ticket types (e.g. VIP) after saving." />
         </View>
       ) : null}
 
@@ -346,6 +348,122 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
         </Text>
       ) : null}
     </Card>
+  );
+}
+
+// ---------- tickets for one quest ----------
+function QuestTickets({ questId, editable }: { questId: string; editable: boolean }) {
+  const t = useAdminTheme();
+  const [types, setTypes] = useState<AdminTicketType[] | null>(null);
+  const [configured, setConfigured] = useState(true);
+  const [count, setCount] = useState<{ checkedIn: number; tickets: number } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("0");
+  const [quantity, setQuantity] = useState("50");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const [res, c] = await Promise.all([getTicketTypes(questId), getCheckins(questId).catch(() => null)]);
+      setTypes(res.ticketTypes);
+      setConfigured(res.paymentsConfigured);
+      setCount(c);
+      setError("");
+    } catch (e: any) {
+      setError(e?.code === "not_deployed" ? "Tickets aren't deployed on the server yet." : e?.message || "Couldn't load tickets.");
+    }
+  }, [questId]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const input = {
+    height: 40,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: t.border,
+    backgroundColor: t.card,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: t.text,
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+  };
+
+  const add = async () => {
+    setBusy("add");
+    setError("");
+    try {
+      await createTicketType(questId, { name: name.trim(), price: { amount: Number(price) || 0 }, quantity: Math.round(Number(quantity) || 0) });
+      setAdding(false);
+      setName("");
+      setPrice("0");
+      setQuantity("50");
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Couldn't add it.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const toggle = async (tt: AdminTicketType) => {
+    setBusy(tt.id);
+    try {
+      await updateTicketType(tt.id, { active: !tt.active });
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Couldn't change it.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ flex: 1, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Tickets</Text>
+        {count ? <Pill label={`${count.checkedIn}/${count.tickets} checked in`} tone="green" /> : null}
+      </View>
+      {!configured ? <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 11.5, color: t.amber }}>Stripe isn't set up on the server: only free tickets can be issued.</Text> : null}
+      {error ? <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 12, color: t.red }}>{error}</Text> : null}
+      {(types || []).map((tt) => (
+        <View key={tt.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: t.cardSoft, opacity: tt.active ? 1 : 0.6 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>
+              {tt.name} · {formatMoney(tt.price)}
+            </Text>
+            <Text style={{ marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>
+              {tt.sold} sold{tt.held ? ` · ${tt.held} paying now` : ""} · {tt.remaining} left of {tt.quantity}
+              {tt.active ? "" : " · sales stopped"}
+            </Text>
+          </View>
+          {editable ? <Button label={tt.active ? "Stop sales" : "Resume"} loading={busy === tt.id} onPress={() => toggle(tt)} /> : null}
+        </View>
+      ))}
+      {editable ? (
+        adding ? (
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <TextInput value={name} onChangeText={setName} placeholder="Name, e.g. VIP" placeholderTextColor={t.faint} maxLength={60} style={input} />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TextInput value={price} onChangeText={setPrice} placeholder="Price (USD)" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
+              <TextInput value={quantity} onChangeText={setQuantity} placeholder="How many" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button label="Add ticket type" variant="primary" onPress={add} loading={busy === "add"} disabled={name.trim().length < 2} />
+              <Button label="Cancel" onPress={() => setAdding(false)} />
+            </View>
+          </View>
+        ) : (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+            <Button label="Add ticket type" icon="add" onPress={() => setAdding(true)} />
+            <Button label="Check-in" icon="qr-code-outline" onPress={() => router.navigate("/admin/checkin" as any)} />
+            <Button label="Orders" icon="receipt-outline" onPress={() => router.navigate("/admin/payments" as any)} />
+          </View>
+        )
+      ) : null}
+    </View>
   );
 }
 
@@ -446,7 +564,7 @@ function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (
           <ReasonBox value={reason} onChange={setReason} placeholder="e.g. The venue is closed for repairs. We'll announce a new date soon." />
           <ConfirmBox
             title={`Cancel ${quest.title}?`}
-            text={`${counts.registered ? `${counts.registered} registered ${counts.registered === 1 ? "person is" : "people are"} told, with this reason, and their registrations are cancelled. ` : ""}It disappears from the home page. Refunds for paid tickets come with Tickets & Stripe.`}
+            text={`${counts.registered ? `${counts.registered} registered ${counts.registered === 1 ? "person is" : "people are"} told, with this reason, and their registrations are cancelled. ` : ""}It disappears from the home page. Every paid ticket is refunded automatically.`}
             confirmLabel="Confirm cancel"
             onConfirm={() => run("cancel", () => cancelQuest(quest.id, reason.trim()), (r) => `Cancelled. ${r.registrantsNotified} told. Recorded as ${r.auditEvent}.`)}
             onCancel={() => setCancelling(false)}
@@ -458,11 +576,14 @@ function QuestPanel({ questId, onEdit, onChanged }: { questId: string; onEdit: (
       {done ? <DoneNote text={done} /> : null}
 
       <Divider />
+      <QuestTickets questId={quest.id} editable={editable && quest.status !== "completed"} />
+
+      <Divider />
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Text style={{ flex: 1, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Registrations</Text>
         <Pill label={`${counts.registered} registered`} tone="blue" />
       </View>
-      {counts.paymentPending ? <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 11.5, color: t.amber }}>{counts.paymentPending} waiting to pay (payments come with Tickets & Stripe)</Text> : null}
+      
       {registrations.length ? (
         registrations.slice(0, 12).map((r) => (
           <View key={r.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>

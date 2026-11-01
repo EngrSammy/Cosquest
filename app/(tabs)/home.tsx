@@ -16,6 +16,7 @@ import { Alert, FlatList, Platform, Pressable, RefreshControl, ScrollView, Text,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HeroQuest, { RED_PIN } from "@/components/dashboard/HeroQuest";
+import GetTicketSheet from "@/components/tickets/GetTicketSheet";
 import {
   CHARACTER_REACH,
   ONGOING_WIDTH,
@@ -94,6 +95,8 @@ export default function HomeScreen() {
     if (mine.length) setRegistered((current) => new Set([...current, ...mine]));
   }, [quests]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // "Get a ticket" (free at once, paid through Stripe's page).
+  const [ticketQuest, setTicketQuest] = useState<Quest | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = user?.profile || authUser?.profile;
@@ -147,6 +150,12 @@ export default function HomeScreen() {
 
   const register = async (quest: Quest) => {
     if (!token) return;
+    // Tickets: already in -> My tickets; otherwise choose a ticket.
+    if (!quest.id.startsWith("sample_")) {
+      if (registered.has(quest.id)) router.push("/tickets" as any);
+      else setTicketQuest(quest);
+      return;
+    }
     if (registered.has(quest.id)) return;
     // Sample quests don't exist on the backend: just mark them.
     if (quest.id.startsWith("sample_")) {
@@ -175,6 +184,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
+      <GetTicketSheet
+        quest={ticketQuest}
+        onClose={() => setTicketQuest(null)}
+        onTicket={(questId) => {
+          setRegistered((current) => new Set(current).add(questId));
+          dispatch(fetchQuests(undefined));
+        }}
+      />
       <LinearGradient
         colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#FFFFFF", "#F4F8FD", "#D5EAFB"]}
         locations={ink.dark ? [0, 0.6] : [0, 0.35, 1]}
