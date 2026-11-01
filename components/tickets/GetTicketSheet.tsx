@@ -18,6 +18,7 @@ import type { Quest } from "@/services/quests";
 import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes } from "@/services/tickets";
 import { useAppSelector } from "@/store/hooks";
 
+import { currentPosition } from "./currentPosition";
 import { openPayment } from "./openPayment";
 
 const PINK = "#C34D9C";
@@ -54,7 +55,11 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
     setBusy(true);
     setError("");
     try {
-      const result = await checkout(quest.id, type.id, token);
+      // A live quest that needs you at the venue: send where you are now.
+      const now = Date.now();
+      const live = !!quest.startsAt && !!quest.endsAt && new Date(quest.startsAt).getTime() <= now && new Date(quest.endsAt).getTime() > now;
+      const position = quest.requireAtVenue && live ? await currentPosition() : null;
+      const result = await checkout(quest.id, type.id, token, position);
       if (result.ticket) {
         // Free: done.
         onTicket(quest.id, result.ticket.id);
@@ -75,7 +80,11 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
         return;
       }
       setError(
-        err.code === "sold_out"
+        err.code === "location_required"
+          ? `Be at ${quest.location?.name || "the venue"} to join: allow location for CosQuest, then try again.`
+          : err.code === "not_at_venue"
+            ? err.message
+            : err.code === "sold_out"
           ? "Sold out. Places may free up if someone doesn't finish paying - try again in a few minutes."
           : err.code === "payments_unavailable"
             ? "Card payments aren't available right now. Please try again later."
@@ -134,6 +143,9 @@ export default function GetTicketSheet({ quest, onClose, onTicket }: { quest: Qu
           )}
 
           {quest.prizePool?.amount ? <Text style={styles.note}>Prize pool {formatMoney(quest.prizePool as any)}</Text> : null}
+          {quest.requireAtVenue ? (
+            <Text style={styles.sub}>📍 Joining while it's live works at {quest.location?.name || "the venue"} only.</Text>
+          ) : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable style={[styles.button, (!type || busy) && { opacity: 0.5 }]} disabled={!type || busy} onPress={go} accessibilityRole="button">

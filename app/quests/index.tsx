@@ -32,12 +32,13 @@ function whenText(q: Quest) {
 
 export default function AllQuests() {
   const ink = useInk();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; radius?: string }>();
   const user = useAppSelector((state) => state.user.user) as any;
   const token = useAppSelector((state) => state.auth.token);
   const [tab, setTab] = useState<"live" | "upcoming">(params.tab === "upcoming" ? "upcoming" : "live");
   const saved = user?.preferences?.radiusMiles;
-  const [radius, setRadius] = useState<number>(RADII.includes(saved) ? saved : 50);
+  // ?radius=0 (from the home page's "anywhere" link) = Anywhere.
+  const [radius, setRadius] = useState<number>(params.radius === "0" ? 0 : RADII.includes(saved) ? saved : 50);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Quest[] | null>(null);
   const [error, setError] = useState("");

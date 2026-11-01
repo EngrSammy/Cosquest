@@ -102,6 +102,11 @@ export default function HomeScreen() {
   const profile = user?.profile || authUser?.profile;
   const firstName = profile?.firstName || profile?.username || "there";
   const radius = user?.preferences?.radiusMiles ?? DEFAULT_RADIUS_MI;
+  // Only quests within your radius (when your location is known).
+  const nearMe =
+    typeof (user as any)?.location?.lat === "number" && typeof (user as any)?.location?.lng === "number"
+      ? { lat: (user as any).location.lat as number, lng: (user as any).location.lng as number, radiusMiles: radius }
+      : undefined;
   const lookedUpCity = useCity(user?.location?.lat, user?.location?.lng);
   // Your saved location follows you (only if location is already allowed).
   useRefreshLocation();
@@ -116,7 +121,7 @@ export default function HomeScreen() {
   } as any);
 
   const load = useCallback(async () => {
-    const work: Promise<unknown>[] = [dispatch(fetchQuests(undefined))];
+    const work: Promise<unknown>[] = [dispatch(fetchQuests(nearMe))];
     if (authUser?.email && !user) work.push(dispatch(fetchCurrentUser(authUser.email)));
     await Promise.all(work);
   }, [dispatch, authUser?.email, user]);
@@ -174,7 +179,7 @@ export default function HomeScreen() {
         onClose={() => setTicketQuest(null)}
         onTicket={(questId) => {
           setRegistered((current) => new Set(current).add(questId));
-          dispatch(fetchQuests(undefined));
+          dispatch(fetchQuests(nearMe));
         }}
       />
       <LinearGradient
@@ -295,10 +300,14 @@ export default function HomeScreen() {
           />
         ) : (
           <Text style={styles.empty}>
-            {firstLoad ? "Finding quests near you…" : "No upcoming events yet. Check back soon."}
+            {firstLoad ? "Finding quests near you…" : nearMe ? `No upcoming events within ${radius} miles yet.` : "No upcoming events yet. Check back soon."}
           </Text>
         )}
-        {upcoming.length ? <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming" } } as any)} /> : null}
+        {upcoming.length ? (
+          <SeeAllLink onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming" } } as any)} />
+        ) : !firstLoad && nearMe ? (
+          <SeeAllLink label="See events anywhere" onPress={() => router.push({ pathname: "/quests", params: { tab: "upcoming", radius: "0" } } as any)} />
+        ) : null}
       </ScrollView>
     </View>
   );

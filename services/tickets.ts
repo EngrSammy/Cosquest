@@ -87,11 +87,12 @@ export const formatMoney = (m?: Money | null) =>
 
 export const getTicketTypes = (questId: string) => request<{ ticketTypes: TicketType[] }>(`/api/quests/${questId}/ticket-types`);
 
-export const checkout = (questId: string, ticketTypeId: string | null, token: string) =>
+// position: only for joining a LIVE quest that needs you at the venue.
+export const checkout = (questId: string, ticketTypeId: string | null, token: string, position?: { lat: number; lng: number; accuracy: number } | null) =>
   request<{ order: Order; checkoutUrl: string | null; ticket: { id: string } | null; reused: boolean }>(`/api/quests/${questId}/checkout`, {
     method: "POST",
     token,
-    body: ticketTypeId ? { ticketTypeId } : {},
+    body: { ...(ticketTypeId ? { ticketTypeId } : {}), ...(position ? { position } : {}) },
   });
 
 export const getOrder = (orderId: string, token: string) => request<{ order: Order }>(`/api/orders/${orderId}`, { token });
