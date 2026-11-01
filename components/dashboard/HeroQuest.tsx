@@ -56,6 +56,7 @@ export default function HeroQuest({
   dark,
   onJoin,
   recentJoins = [],
+  onOpen,
 }: {
   quest: Quest | null;
   joined: boolean;
@@ -65,6 +66,8 @@ export default function HeroQuest({
   onJoin: () => void;
   // The latest people who joined (newest first), from GET /api/quests/:id/joins.
   recentJoins?: { name: string; you?: boolean }[];
+  // Tapping the venue chip: the quest's details page.
+  onOpen?: () => void;
 }) {
   const live = !!quest && isLiveQuest(quest);
   const target = quest ? new Date((live ? quest.endsAt : quest.startsAt) || 0).getTime() : 0;
@@ -74,12 +77,12 @@ export default function HeroQuest({
 
   return (
     <View style={styles.hero}>
-      <View style={[styles.chip, styles.place]}>
+      <Pressable onPress={onOpen} disabled={!onOpen || !quest} accessibilityRole="button" style={[styles.chip, styles.place]}>
         <Image source={RED_PIN} style={styles.placePin} contentFit="contain" />
         <Text style={styles.placeText} numberOfLines={1}>
           {quest ? questPlace(quest) || quest.title : "No quests nearby yet"}
         </Text>
-      </View>
+      </Pressable>
 
       <View style={styles.stage}>
         {/* Faint pins on the map, like the Figma */}

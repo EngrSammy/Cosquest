@@ -189,6 +189,12 @@ export default function HomeScreen() {
     }
   };
 
+  // Tapping a card (not its button): the quest's details page.
+  const openQuest = (quest: Quest) => {
+    if (quest.id.startsWith("sample_")) return;
+    router.push({ pathname: "/quests/[id]", params: { id: quest.id } } as any);
+  };
+
   const firstLoad = questsLoading && !quests.length && !refreshing;
   // "Bigtooth Joined · Wagm Joined" under the big pin.
   const recentJoins = useRecentJoins(featured && !featured.id.startsWith("sample_") ? featured.id : null);
@@ -266,6 +272,7 @@ export default function HomeScreen() {
         <HeroQuest
           quest={firstLoad ? null : featured}
           recentJoins={recentJoins}
+          onOpen={() => featured && openQuest(featured)}
           joined={!!featured && registered.has(featured.id)}
           busy={!!featured && busyId === featured.id}
           dark={ink.dark}
@@ -289,6 +296,7 @@ export default function HomeScreen() {
                 joined={registered.has(item.id)}
                 busy={busyId === item.id}
                 onEnter={() => register(item)}
+                onOpen={() => openQuest(item)}
               />
             )}
           />
@@ -313,6 +321,7 @@ export default function HomeScreen() {
                 registered={registered.has(item.id)}
                 busy={busyId === item.id}
                 onRegister={() => register(item)}
+                onOpen={() => openQuest(item)}
               />
             )}
           />

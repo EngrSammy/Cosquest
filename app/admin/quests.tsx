@@ -68,7 +68,8 @@ const EMPTY = (): QuestInput => {
     startsAt: start.toISOString(),
     endsAt: new Date(start.getTime() + 3 * 3600e3).toISOString(),
     location: { name: "", address: "", city: "", country: "", lat: NaN, lng: NaN },
-    entryFee: { amount: 0 },
+    // Every ticket is paid (Stripe's minimum is $0.50).
+    entryFee: { amount: 10 },
     prizePool: { amount: 0 },
     maxParticipants: 50,
     requireAtVenue: false,
@@ -174,7 +175,7 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
   };
 
   const hasPin = Number.isFinite(form.location.lat) && Number.isFinite(form.location.lng);
-  const ready = form.title.trim().length >= 3 && form.location.name.trim() && hasPin && form.startsAt && form.endsAt;
+  const ready = form.title.trim().length >= 3 && form.location.name.trim() && hasPin && form.startsAt && form.endsAt && form.entryFee.amount >= 0.5;
 
   return (
     <Card style={{ marginBottom: 20 }}>
@@ -306,7 +307,7 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
         {(
           [
             ["Places", "maxParticipants"],
-            ["Entry fee (USD, 0 = free)", "entryFee"],
+            ["Entry fee (USD, at least 0.50)", "entryFee"],
             ["Prize pool (USD)", "prizePool"],
           ] as const
         ).map(([text, key]) => (
@@ -324,11 +325,13 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
           </View>
         ))}
       </View>
-      {form.entryFee.amount > 0 ? (
+      {form.entryFee.amount < 0.5 ? (
+        <Text style={{ marginTop: 10, fontFamily: FONTS.regular, fontSize: 12, color: t.amber }}>Every ticket is paid: the entry fee must be at least $0.50.</Text>
+      ) : (
         <View style={{ marginTop: 14 }}>
-          <Notice text="Paid entry: people pay by card on Stripe's secure page. You can add more ticket types (e.g. VIP) after saving." />
+          <Notice text="People pay by card on Stripe's secure page. You can add more ticket types (e.g. VIP) after saving." />
         </View>
-      ) : null}
+      )}
 
       {error ? <Text style={{ marginTop: 14, fontFamily: FONTS.regular, fontSize: 12.5, color: t.red }}>{error}</Text> : null}
       <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
@@ -359,7 +362,7 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
   const [count, setCount] = useState<{ checkedIn: number; tickets: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("0");
+  const [price, setPrice] = useState("10");
   const [quantity, setQuantity] = useState("50");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -399,7 +402,7 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
       await createTicketType(questId, { name: name.trim(), price: { amount: Number(price) || 0 }, quantity: Math.round(Number(quantity) || 0) });
       setAdding(false);
       setName("");
-      setPrice("0");
+      setPrice("10");
       setQuantity("50");
       await load();
     } catch (e: any) {
@@ -447,11 +450,11 @@ function QuestTickets({ questId, editable }: { questId: string; editable: boolea
           <View style={{ marginTop: 12, gap: 8 }}>
             <TextInput value={name} onChangeText={setName} placeholder="Name, e.g. VIP" placeholderTextColor={t.faint} maxLength={60} style={input} />
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput value={price} onChangeText={setPrice} placeholder="Price (USD)" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
+              <TextInput value={price} onChangeText={setPrice} placeholder="Price (USD, at least 0.50)" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
               <TextInput value={quantity} onChangeText={setQuantity} placeholder="How many" placeholderTextColor={t.faint} style={[input, { flex: 1 }]} />
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button label="Add ticket type" variant="primary" onPress={add} loading={busy === "add"} disabled={name.trim().length < 2} />
+              <Button label="Add ticket type" variant="primary" onPress={add} loading={busy === "add"} disabled={name.trim().length < 2 || (Number(price) || 0) < 0.5} />
               <Button label="Cancel" onPress={() => setAdding(false)} />
             </View>
           </View>

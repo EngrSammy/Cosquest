@@ -108,15 +108,18 @@ export function OngoingCard({
   joined,
   busy,
   onEnter,
+  onOpen,
 }: {
   quest: Quest;
   index: number;
   joined: boolean;
   busy: boolean;
   onEnter: () => void;
+  // Tapping the card (not ENTER): the quest's details page.
+  onOpen?: () => void;
 }) {
   return (
-    <View style={[styles.slot, { width: ONGOING_WIDTH, height: ONGOING_H * (1 + RISE) }]}>
+    <Pressable onPress={onOpen} disabled={!onOpen} accessibilityRole="button" accessibilityLabel={`${quest.title}, details`} style={[styles.slot, { width: ONGOING_WIDTH, height: ONGOING_H * (1 + RISE) }]}>
       <View style={[styles.body, bodySize(ONGOING_H), { backgroundColor: ONGOING_COLORS[index % ONGOING_COLORS.length] }]}>
         <View style={styles.statusRow}>
           <View style={styles.dot} />
@@ -126,7 +129,7 @@ export function OngoingCard({
         <CardButton label={joined ? "ENTERED" : "ENTER"} onPress={onEnter} busy={busy} />
       </View>
       <Badge index={index} height={ONGOING_H} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -136,15 +139,18 @@ export function UpcomingCard({
   registered,
   busy,
   onRegister,
+  onOpen,
 }: {
   quest: Quest;
   index: number;
   registered: boolean;
   busy: boolean;
   onRegister: () => void;
+  // Tapping the card (not Register): the quest's details page.
+  onOpen?: () => void;
 }) {
   return (
-    <View style={[styles.slot, { width: UPCOMING_WIDTH, height: UPCOMING_H * (1 + RISE) }]}>
+    <Pressable onPress={onOpen} disabled={!onOpen} accessibilityRole="button" accessibilityLabel={`${quest.title}, details`} style={[styles.slot, { width: UPCOMING_WIDTH, height: UPCOMING_H * (1 + RISE) }]}>
       <View style={[styles.body, bodySize(UPCOMING_H), { backgroundColor: UPCOMING_COLORS[index % UPCOMING_COLORS.length] }]}>
         <View style={styles.statusRow}>
           <View style={styles.dot} />
@@ -170,7 +176,7 @@ export function UpcomingCard({
         <CardButton label={registered ? "Registered" : "Register"} onPress={onRegister} busy={busy} />
       </View>
       <Badge index={index + 2} height={UPCOMING_H} grey />
-    </View>
+    </Pressable>
   );
 }
 
