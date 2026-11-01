@@ -13,6 +13,7 @@ import QRCode from "react-native-qrcode-svg";
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
 import { useInk } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import { saveTicket, savedTicket, useTicketOwner } from "@/services/ticketCache";
 import { type MyTicket, formatMoney, getMyTicket, giveBackTicket } from "@/services/tickets";
 import { useAppSelector } from "@/store/hooks";
 
@@ -25,16 +26,27 @@ export default function TicketScreen() {
   const [ticket, setTicket] = useState<MyTicket | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Shown from the phone's saved copy (no connection at the venue).
+  const [offline, setOffline] = useState(false);
+  const owner = useTicketOwner();
 
   const load = useCallback(async () => {
     if (!token || typeof id !== "string") return;
+    // The saved copy first (instant, and works offline)...
+    const saved = await savedTicket(owner, id);
+    if (saved) setTicket((current) => current ?? saved);
+    // ...then the server's.
     try {
-      setTicket((await getMyTicket(id, token)).ticket);
+      const fresh = (await getMyTicket(id, token)).ticket;
+      setTicket(fresh);
+      setOffline(false);
       setError("");
+      saveTicket(owner, fresh);
     } catch (e: any) {
-      setError(e?.message || "Couldn't load this ticket.");
+      if (saved) setOffline(true);
+      else setError(e?.status ? e?.message || "Couldn't load this ticket." : "No connection, and this ticket isn't saved on this phone yet.");
     }
-  }, [token, id]);
+  }, [token, id, owner]);
 
   useEffect(() => {
     load();
@@ -92,6 +104,12 @@ export default function TicketScreen() {
                 </View>
               )}
             </View>
+            {offline ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
+                <Ionicons name="cloud-offline-outline" size={14} color={ink.text("#7A8296")} />
+                <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: ink.text("#7A8296") }}>Saved copy · you're offline. It still works at the door.</Text>
+              </View>
+            ) : null}
             {ticket.status === "valid" ? (
               <Text style={{ marginTop: 12, textAlign: "center", fontFamily: FONTS.regular, fontSize: 12.5, color: ink.text("#66738A") }}>Show this at the entrance. It works once.</Text>
             ) : ticket.checkedInAt ? (

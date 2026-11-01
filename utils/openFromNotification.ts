@@ -36,6 +36,11 @@ export function openFromNotification(data: any, actor?: { username?: string | nu
     router.push({ pathname: "/chat/[id]", params: { id: String(data.chatId) } });
     return;
   }
+  // "Your ticket is ready" / "Starts in about an hour": straight to the ticket.
+  if (type === "ticket" && data.ticketId) {
+    router.push({ pathname: "/tickets/[id]", params: { id: String(data.ticketId) } } as any);
+    return;
+  }
   if (data.postId) {
     router.push({
       pathname: "/post/[id]",

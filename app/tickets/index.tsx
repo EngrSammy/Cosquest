@@ -10,6 +10,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
 import { useInk } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import { loadSaved, saveTickets, useTicketOwner } from "@/services/ticketCache";
 import { type MyTicket, getMyTickets } from "@/services/tickets";
 import { useAppSelector } from "@/store/hooks";
 
@@ -22,16 +23,25 @@ export default function MyTickets() {
   const [items, setItems] = useState<MyTicket[] | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const owner = useTicketOwner();
 
   const load = useCallback(async () => {
     if (!token) return;
-    try {
-      setItems((await getMyTickets(scope, token)).tickets);
-      setError("");
-    } catch (e: any) {
-      setError(e?.message || "Couldn't load your tickets.");
+    // Upcoming: the saved copy at once (works offline).
+    if (scope === "upcoming") {
+      const saved = await loadSaved(owner);
+      if (saved.length) setItems((current) => current ?? saved);
     }
-  }, [token, scope]);
+    try {
+      const fresh = (await getMyTickets(scope, token)).tickets;
+      setItems(fresh);
+      setError("");
+      if (scope === "upcoming") saveTickets(owner, fresh);
+    } catch (e: any) {
+      setItems((current) => current ?? []);
+      setError(e?.status ? e?.message || "Couldn't load your tickets." : "You're offline: showing the tickets saved on this phone.");
+    }
+  }, [token, scope, owner]);
 
   useFocusEffect(
     useCallback(() => {

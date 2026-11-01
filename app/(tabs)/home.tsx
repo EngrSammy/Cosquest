@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HeroQuest, { RED_PIN } from "@/components/dashboard/HeroQuest";
 import GetTicketSheet from "@/components/tickets/GetTicketSheet";
+import NextTicketCard from "@/components/tickets/NextTicketCard";
+import TicketHeaderButton from "@/components/tickets/TicketHeaderButton";
 import {
   CHARACTER_REACH,
   ONGOING_WIDTH,
@@ -238,6 +240,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
+          <TicketHeaderButton style={[styles.bell, { marginRight: 16 }]} />
           <Pressable
             onPress={() => router.push("/notifications")}
             hitSlop={10}
@@ -246,6 +249,9 @@ export default function HomeScreen() {
             <Ionicons name="notifications" size={30} color="#B63D91" />
           </Pressable>
         </View>
+
+        {/* YOUR NEXT TICKET (within 24 hours) */}
+        <NextTicketCard />
 
         {/* FEATURED QUEST */}
         <HeroQuest
