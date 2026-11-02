@@ -1,6 +1,9 @@
 // ==========================================
 // "TURN ON NOTIFICATIONS" POPUP (phones)
 // ==========================================
+// On first launch (and whenever they're off), BEFORE Android / iOS asks:
+// people see why first, then "Turn on" shows the phone's own question.
+// (The app no longer asks the phone by itself at startup.)
 // Shows after sign-in (once the home page has loaded) when either:
 //   - the account's notifications are off (preferences.notificationsEnabled
 //     false: often tapped "Not now" at sign-up), or
@@ -19,6 +22,8 @@ import { updateNotificationSettings } from "@/services/settings";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { getPref, setPref } from "@/utils/prefsStorage";
+
+import { pushAllowed } from "./pushPermission";
 
 const PINK = "#C34D9C";
 const SNOOZE_DAYS = 3;
@@ -74,8 +79,9 @@ export default function NotificationPrompt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // The account's switch on (PushRegistration then registers this phone).
+  // The account's switch on, and this phone registered for push.
   const finish = async () => {
+    pushAllowed();
     try {
       if (token && user?.preferences?.notificationsEnabled === false) {
         await updateNotificationSettings(token, { notificationsEnabled: true });

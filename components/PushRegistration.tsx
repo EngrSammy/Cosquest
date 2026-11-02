@@ -14,6 +14,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { useAppSelector } from "@/store/hooks";
+import { onPushAllowed } from "@/components/pushPermission";
 import { registerThisPhone } from "@/utils/pushDevice";
 
 const PROJECT_ID =
@@ -42,11 +43,10 @@ async function createChannels() {
   );
 }
 
+// Only when already allowed: the "Turn on notifications" popup asks the
+// phone (people see why first), not this.
 async function pushTokenIfAllowed(): Promise<string | null> {
-  let { status, canAskAgain } = await Notifications.getPermissionsAsync();
-  if (status !== "granted" && canAskAgain) {
-    ({ status } = await Notifications.requestPermissionsAsync());
-  }
+  const { status } = await Notifications.getPermissionsAsync();
   if (status !== "granted") return null;
   const { data } = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
   return data || null;
@@ -72,6 +72,13 @@ export default function PushRegistration() {
         console.warn("Push registration skipped:", (error as any)?.message || error);
       }
     })();
+    // Just allowed in the popup: register now.
+    const offAllowed = onPushAllowed(async () => {
+      try {
+        const pushToken = await pushTokenIfAllowed();
+        if (pushToken && !cancelled) await registerThisPhone(pushToken, token);
+      } catch {}
+    });
     // A new token (rare): register it too.
     const subscription = Notifications.addPushTokenListener(async () => {
       try {
@@ -81,6 +88,7 @@ export default function PushRegistration() {
     });
     return () => {
       cancelled = true;
+      offAllowed();
       subscription.remove();
     };
   }, [token, notificationsOn]);
