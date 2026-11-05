@@ -91,7 +91,10 @@
         "expo-notifications",
         {
           "color": "#C34D9C",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/sounds/ringtone.wav"
+          ]
         }
       ],
       [

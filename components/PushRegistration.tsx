@@ -15,13 +15,22 @@ import { Platform } from "react-native";
 
 import { useAppSelector } from "@/store/hooks";
 import { onPushAllowed } from "@/components/pushPermission";
+import { setupNotificationActions } from "@/components/pushActions";
+import { getPref, setPref } from "@/utils/prefsStorage";
 import { registerThisPhone } from "@/utils/pushDevice";
 
 const PROJECT_ID =
   (Constants.expoConfig as any)?.extra?.eas?.projectId || (Constants as any).easConfig?.projectId || "4cb596a0-3a90-4c2d-b8f7-2e090efcd80f";
 
 async function createChannels() {
+  setupNotificationActions();
   if (Platform.OS !== "android") return;
+  // Calls ring with CosQuest's ringtone. Android can't change a channel's
+  // sound, so the old Calls channel is replaced once.
+  if ((await getPref("calls_channel_ringtone").catch(() => null)) !== "1") {
+    await Notifications.deleteNotificationChannelAsync("calls").catch(() => {});
+    await setPref("calls_channel_ringtone", "1").catch(() => {});
+  }
   const channels: [string, string, Notifications.AndroidImportance][] = [
     ["default", "Activity", Notifications.AndroidImportance.HIGH],
     ["messages", "Messages", Notifications.AndroidImportance.HIGH],
@@ -34,7 +43,7 @@ async function createChannels() {
       Notifications.setNotificationChannelAsync(id, {
         name,
         importance,
-        sound: "default",
+        sound: id === "calls" ? "ringtone.wav" : "default",
         vibrationPattern: id === "alerts" ? [0, 500, 250, 500, 250, 900] : [0, 250, 150, 250],
         lightColor: "#C34D9C",
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
