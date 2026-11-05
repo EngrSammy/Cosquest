@@ -7,6 +7,7 @@ import VoiceRoomOverlay from "@/components/voice/VoiceRoomOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import DesktopShell from "@/components/desktop/DesktopShell";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
+import NativeCalls from "@/components/calls/NativeCalls";
 import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
 import PushTapHandler from "@/components/PushTapHandler";
 import PushRegistration from "@/components/PushRegistration";
@@ -109,6 +110,8 @@ export default function RootLayout() {
 
             {/* Ringing screen — shows on top of any screen when someone calls */}
             <IncomingCallListener />
+            {/* The phone's own call screen (Answer / Decline, lock screen) */}
+            <NativeCalls />
 
             {/* Private call on top: its ringing card and sheet */}
             <PrivateCallLayer />

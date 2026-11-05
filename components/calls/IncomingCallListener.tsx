@@ -34,6 +34,7 @@ import {
 } from "./CallVisuals";
 import { CallAvatarStack } from "./GroupCallMembers";
 import { useCallTone } from "./useCallTone";
+import { useNativeCallIds } from "./nativeCallState";
 
 // Shows full screen whenever state.call.incoming is set. That happens
 // through the call:incoming socket event (useSocketConnection), or the
@@ -48,6 +49,9 @@ export default function IncomingCallListener() {
   const myUserId = useAppSelector((state) => state.call.myUserId);
 
   const [answering, setAnswering] = useState(false);
+  // Ringing on the phone's own call screen (NativeCalls): one ring only.
+  const nativeIds = useNativeCallIds();
+  const ringsNatively = !!incoming && nativeIds.has(incoming.id);
 
   // Tell the call slice who "you" are (from your sign-in token), so in a
   // group call it rings only while YOU are ringing.
@@ -58,7 +62,7 @@ export default function IncomingCallListener() {
   // Vibrate while ringing; stops automatically when the call is
   // answered, declined, cancelled or missed (incoming becomes null).
   useEffect(() => {
-    if (!incoming) {
+    if (!incoming || ringsNatively) {
       return;
     }
 
@@ -67,12 +71,12 @@ export default function IncomingCallListener() {
     return () => {
       Vibration.cancel();
     };
-  }, [incoming]);
+  }, [incoming, ringsNatively]);
 
   // Ringtone while it rings (stops once you tap Accept, or the call ends).
-  useCallTone("ringtone", !!incoming && !answering);
+  useCallTone("ringtone", !!incoming && !answering && !ringsNatively);
 
-  if (!incoming || !token) {
+  if (!incoming || !token || ringsNatively) {
     return null;
   }
 
