@@ -8,10 +8,12 @@
 // Invited to be a super admin? Signed in to CosQuest here, the invitation
 // shows on this page: accept it (then the dashboard opens) or decline it.
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 
+import { COSQUEST_LOGO, LOGO_RATIO } from "@/components/admin/AdminShell";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Notice } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
@@ -135,10 +137,7 @@ export default function AdminLogin() {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: t.page }}>
       <View style={{ width: "100%", maxWidth: 420, padding: 32, borderRadius: 20, borderWidth: 1, borderColor: t.border, backgroundColor: t.card }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons name="sparkles-outline" size={24} color={t.pink} />
-          <Text style={{ fontFamily: FONTS.regular, fontSize: 21, color: t.text }}>CosQuest</Text>
-        </View>
+        <Image source={COSQUEST_LOGO} style={{ width: 170, height: 170 / LOGO_RATIO }} contentFit="contain" accessibilityLabel="CosQuest" />
         <Text style={{ marginTop: 22, fontFamily: FONTS.regular, fontSize: 24, color: t.text }}>Admin dashboard</Text>
         <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 13, color: t.muted }}>For CosQuest super admins. Signing in here keeps your phone signed in.</Text>
 
@@ -146,7 +145,7 @@ export default function AdminLogin() {
           <View key={invitation.id} style={{ marginTop: 22, padding: 16, borderRadius: 14, backgroundColor: t.pinkSoft }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="key-outline" size={18} color={t.pinkText} />
-              <Text style={{ fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>You're invited to be a super admin</Text>
+              <Text style={{ fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>You&apos;re invited to be a super admin</Text>
             </View>
             <Text style={{ marginTop: 8, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: t.muted }}>
               {invitation.invitedBy?.name || "A super admin"} invited you{invitation.reason ? `: “${invitation.reason}”` : "."} Super admins can review reports, moderate
