@@ -95,6 +95,14 @@ export const checkout = (questId: string, ticketTypeId: string | null, token: st
     body: { ...(ticketTypeId ? { ticketTypeId } : {}), ...(position ? { position } : {}) },
   });
 
+// The app: Stripe's payment sheet (card, Google Pay) inside CosQuest.
+export const paymentSheet = (questId: string, ticketTypeId: string | null, token: string, position?: { lat: number; lng: number; accuracy: number } | null) =>
+  request<{ order: Order; paymentIntentClientSecret: string | null; ticket: { id: string } | null; reused: boolean }>(`/api/quests/${questId}/payment-sheet`, {
+    method: "POST",
+    token,
+    body: { ...(ticketTypeId ? { ticketTypeId } : {}), ...(position ? { position } : {}) },
+  });
+
 export const getOrder = (orderId: string, token: string) => request<{ order: Order }>(`/api/orders/${orderId}`, { token });
 export const getMyTickets = (scope: "upcoming" | "past", token: string) => request<{ tickets: MyTicket[] }>(`/api/me/tickets?scope=${scope}`, { token });
 export const getMyTicket = (ticketId: string, token: string) => request<{ ticket: MyTicket }>(`/api/me/tickets/${ticketId}`, { token });

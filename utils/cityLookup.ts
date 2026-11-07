@@ -11,17 +11,25 @@ export async function lookupCity(lat: number, lng: number): Promise<string | nul
   const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
   if (cache.has(key)) return cache.get(key)!;
   let city: string | null = null;
-  try {
-    if (Platform.OS === "web") {
+  // Phones: the phone's own lookup first (it can fail, e.g. without
+  // location permission on Android)...
+  if (Platform.OS !== "web") {
+    try {
+      const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      city = place?.city || place?.subregion || place?.region || null;
+    } catch {
+      city = null;
+    }
+  }
+  // ...then (and on the website) BigDataCloud's free lookup.
+  if (!city) {
+    try {
       const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
       const data = await response.json();
       city = data?.city || data?.locality || data?.principalSubdivision || null;
-    } else {
-      const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-      city = place?.city || place?.subregion || place?.region || null;
+    } catch {
+      city = null;
     }
-  } catch {
-    city = null;
   }
   cache.set(key, city);
   return city;

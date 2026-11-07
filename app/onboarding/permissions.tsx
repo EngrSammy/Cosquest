@@ -451,7 +451,8 @@ export default function Permissions() {
         saveNotificationPreference({
           email: data.email.trim(),
           // Always off on the website (no push notifications there).
-          notificationsEnabled: IS_WEB ? false : data.notificationsEnabled,
+          // website sign-up: on (their phone gets notifications once the app is installed)
+          notificationsEnabled: IS_WEB ? true : data.notificationsEnabled,
         }),
       ).unwrap(),
       dispatch(

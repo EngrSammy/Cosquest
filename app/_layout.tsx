@@ -7,9 +7,11 @@ import VoiceRoomOverlay from "@/components/voice/VoiceRoomOverlay";
 import CallBannerFrame from "@/components/calls/CallBannerFrame";
 import DesktopShell from "@/components/desktop/DesktopShell";
 import IncomingCallListener from "@/components/calls/IncomingCallListener";
+import NativeCalls from "@/components/calls/NativeCalls";
 import PrivateCallLayer from "@/components/calls/PrivateCallLayer";
 import PushTapHandler from "@/components/PushTapHandler";
 import PushRegistration from "@/components/PushRegistration";
+import NotificationPrompt from "@/components/NotificationPrompt";
 import InAppBanner from "@/components/notifications/InAppBanner";
 import ReportLayer from "@/components/report/ReportLayer";
 import FactionAlertLayer from "@/components/alerts/FactionAlertLayer";
@@ -108,6 +110,8 @@ export default function RootLayout() {
 
             {/* Ringing screen — shows on top of any screen when someone calls */}
             <IncomingCallListener />
+            {/* The phone's own call screen (Answer / Decline, lock screen) */}
+            <NativeCalls />
 
             {/* Private call on top: its ringing card and sheet */}
             <PrivateCallLayer />
@@ -115,6 +119,8 @@ export default function RootLayout() {
             {/* Tapping a push notification opens what it's about */}
             <PushTapHandler />
             <PushRegistration />
+            {/* "Turn on notifications" when they're off (phones) */}
+            <NotificationPrompt />
 
             {/* Pop-up banners while the app is open */}
             <InAppBanner />

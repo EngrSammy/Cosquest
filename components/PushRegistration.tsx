@@ -14,13 +14,23 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { useAppSelector } from "@/store/hooks";
+import { onPushAllowed } from "@/components/pushPermission";
+import { setupNotificationActions } from "@/components/pushActions";
+import { getPref, setPref } from "@/utils/prefsStorage";
 import { registerThisPhone } from "@/utils/pushDevice";
 
 const PROJECT_ID =
   (Constants.expoConfig as any)?.extra?.eas?.projectId || (Constants as any).easConfig?.projectId || "4cb596a0-3a90-4c2d-b8f7-2e090efcd80f";
 
 async function createChannels() {
+  setupNotificationActions();
   if (Platform.OS !== "android") return;
+  // Calls ring with CosQuest's ringtone. Android can't change a channel's
+  // sound, so the old Calls channel is replaced once.
+  if ((await getPref("calls_channel_ringtone").catch(() => null)) !== "1") {
+    await Notifications.deleteNotificationChannelAsync("calls").catch(() => {});
+    await setPref("calls_channel_ringtone", "1").catch(() => {});
+  }
   const channels: [string, string, Notifications.AndroidImportance][] = [
     ["default", "Activity", Notifications.AndroidImportance.HIGH],
     ["messages", "Messages", Notifications.AndroidImportance.HIGH],
@@ -33,7 +43,7 @@ async function createChannels() {
       Notifications.setNotificationChannelAsync(id, {
         name,
         importance,
-        sound: "default",
+        sound: id === "calls" ? "ringtone.wav" : "default",
         vibrationPattern: id === "alerts" ? [0, 500, 250, 500, 250, 900] : [0, 250, 150, 250],
         lightColor: "#C34D9C",
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -42,11 +52,10 @@ async function createChannels() {
   );
 }
 
+// Only when already allowed: the "Turn on notifications" popup asks the
+// phone (people see why first), not this.
 async function pushTokenIfAllowed(): Promise<string | null> {
-  let { status, canAskAgain } = await Notifications.getPermissionsAsync();
-  if (status !== "granted" && canAskAgain) {
-    ({ status } = await Notifications.requestPermissionsAsync());
-  }
+  const { status } = await Notifications.getPermissionsAsync();
   if (status !== "granted") return null;
   const { data } = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
   return data || null;
@@ -72,6 +81,13 @@ export default function PushRegistration() {
         console.warn("Push registration skipped:", (error as any)?.message || error);
       }
     })();
+    // Just allowed in the popup: register now.
+    const offAllowed = onPushAllowed(async () => {
+      try {
+        const pushToken = await pushTokenIfAllowed();
+        if (pushToken && !cancelled) await registerThisPhone(pushToken, token);
+      } catch {}
+    });
     // A new token (rare): register it too.
     const subscription = Notifications.addPushTokenListener(async () => {
       try {
@@ -81,6 +97,7 @@ export default function PushRegistration() {
     });
     return () => {
       cancelled = true;
+      offAllowed();
       subscription.remove();
     };
   }, [token, notificationsOn]);

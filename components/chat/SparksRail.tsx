@@ -35,9 +35,9 @@ const INK = "#24283C";
 const MUTED = "#66738A";
 const LILAC = "#F0EDF9";
 
-// Circles shown on the rail (active and pinned first, then quiet); the
-// rest are under "All".
-const MAX_CIRCLES = 3;
+// One circle on the rail: the latest Spark (live or pinned first, then the
+// most recent message); the rest are under "All". Plus Create Spark.
+const MAX_CIRCLES = 1;
 
 const SPARKLE = require("@/assets/images/magenta-sparkles.png");
 const SPARKLE_WHITE = require("@/assets/images/white-sparkles.png");
@@ -190,8 +190,9 @@ export default function SparksRail({
     return null;
   }
 
-  const lit = sparks.filter((spark) => spark.active || spark.pinned);
-  const quiet = sparks.filter((spark) => !spark.active && !spark.pinned);
+  const newest = (a: Spark, b: Spark) => new Date(b.lastActivityAt || 0).getTime() - new Date(a.lastActivityAt || 0).getTime();
+  const lit = sparks.filter((spark) => spark.active || spark.pinned).sort(newest);
+  const quiet = sparks.filter((spark) => !spark.active && !spark.pinned).sort(newest);
   const circles = [...lit, ...quiet].slice(0, MAX_CIRCLES);
   const hidden = sparks.length - circles.length;
 
