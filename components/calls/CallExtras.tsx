@@ -52,7 +52,7 @@ export function SharePanel({ share, name, onStop }: { share: ShareInfo; name: st
           {share.isLocal ? "You are sharing your screen" : `${name} is sharing`}
         </Text>
         {share.isLocal ? (
-          <Pressable style={styles.stop} onPress={onStop} accessibilityRole="button">
+          <Pressable accessibilityLabel="Stop" style={styles.stop} onPress={onStop} accessibilityRole="button">
             <Text style={styles.stopText}>Stop</Text>
           </Pressable>
         ) : null}
@@ -90,8 +90,8 @@ export function EveryoneSheet({
   );
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]} onPress={() => {}}>
+      <Pressable accessible={false} style={styles.backdrop} onPress={onClose}>
+        <Pressable accessible={false} style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]} onPress={() => {}}>
           <View style={styles.sheetHead}>
             <Text style={styles.sheetTitle}>In this call · {people.length}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">

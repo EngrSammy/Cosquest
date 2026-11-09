@@ -1,0 +1,23 @@
+--- a/Game/Warden/VoiceAnswer.swift
++++ b/Game/Warden/VoiceAnswer.swift
+@@ -189,7 +189,6 @@ final class VoiceAnswer {
+     static func match(_ said: String, choices: [String], strict: Bool) -> Int? {
+         let heard = words(said)
+         guard !heard.isEmpty else { return nil }
+-        let heardSet = Set(heard)
+         let joined = heard.joined(separator: " ")
+ 
+         // "the second one", "B", "the green one".
+@@ -197,8 +196,11 @@ final class VoiceAnswer {
+         let meaningful = heard.filter { !fillers.contains($0) }
+         if meaningful.count <= 2 {
+             for (i, forms) in ordinals.enumerated() where i < choices.count {
++                // [merged-app] Another choice's own words block the ordinal,
++                // but fillers do not: "the" in "The Shard" must not block
++                // "the second one".
+                 if forms.contains(where: { f in f.contains(" ") ? joined.contains(f) : meaningful.contains(f) }),
+-                   !choices.enumerated().contains(where: { j, c in j != i && words(c).contains(where: { heardSet.contains($0) && $0.count > 2 }) }) {
++                   !choices.enumerated().contains(where: { j, c in j != i && words(c).contains(where: { meaningful.contains($0) && $0.count > 2 }) }) {
+                     return i
+                 }
+             }

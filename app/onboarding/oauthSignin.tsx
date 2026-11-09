@@ -1,11 +1,12 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
+import { useAppleAuth } from "@/utils/appleAuth";
 import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -13,25 +14,22 @@ WebBrowser.maybeCompleteAuthSession();
 export default function AuthSignin() {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
-  const insets = useSafeAreaInsets();
 
   // Real Google sign-in (was a "Coming soon" placeholder). Same flow as
   // sign-up: existing accounts go straight to home.
   const { continueWithGoogle, googleLoading } = useGoogleAuth();
 
-  function handleApple() {
-    Alert.alert("Apple sign-in", "Coming soon — we're wiring this up.");
-  }
+  // Apple: behind EXPO_PUBLIC_APPLE_SIGNIN (utils/appleAuth.ts), never a dead button.
+  const { continueWithApple, appleLoading, appleEnabled } = useAppleAuth();
 
   return (
-    <AppBackground variant="gradient">
-      <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
+    <OnboardingScreen background="gradient" contentStyle={styles.screen}>
         <Text style={styles.headline}>
           One Place for{"\n"}Everything you{"\n"}Love
         </Text>
 
         <Text style={styles.sub}>
-          CosQuest turns your city into a fandom playground — real-world quests,
+          CosQuest turns your city into a fandom playground: real-world quests,
           your people, one leaderboard. Let&apos;s get you set up.
         </Text>
 
@@ -46,11 +44,14 @@ export default function AuthSignin() {
             disabled={googleLoading}
           />
 
-          <Button
-            label="Sign in with Apple"
-            onPress={handleApple}
-            variant="dark"
-          />
+          {appleEnabled ? (
+            <Button
+              label={appleLoading ? "Connecting to Apple…" : "Sign in with Apple"}
+              onPress={continueWithApple}
+              variant="dark"
+              disabled={appleLoading}
+            />
+          ) : null}
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
@@ -78,13 +79,12 @@ export default function AuthSignin() {
         <Text style={styles.sub}>
           Don&apos;t have an account?{" "}
           <Text
-            style={{ color: "#C5399A", fontWeight: "700" }}
+            style={{ color: C.brand, fontWeight: "700" }}
             onPress={() => router.push("/onboarding/signup")}>
             Sign-up
           </Text>
         </Text>
-      </View>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -99,12 +99,12 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     lineHeight: 20,

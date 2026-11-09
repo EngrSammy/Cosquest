@@ -1,17 +1,16 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { requestPasswordReset } from "@/services/auth";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, Text, View } from "react-native";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function ForgotPassword() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
     email: "",
   });
@@ -69,9 +68,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
+    <OnboardingScreen background="gradient" contentStyle={styles.screen}>
           <Text style={styles.headline}>Forgot Your Password?</Text>
           <Text style={styles.sub}>
             Enter your email address and we&apos;ll send you a 6-digit code to
@@ -92,9 +89,7 @@ export default function ForgotPassword() {
               disabled={submitting}
             />
           </View>
-        </View>
-      </ScrollView>
-    </AppBackground>
+        </OnboardingScreen>
   );
 }
 
@@ -109,12 +104,12 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     marginBottom: 50,

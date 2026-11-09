@@ -266,7 +266,7 @@ export default function CallNotesSheet({
               </View>
               <Text style={styles.pendingText}>This updates by itself.</Text>
               {phoneHasAI ? null : (
-                <Pressable
+                <Pressable accessibilityLabel="Set up Sparks on this phone ›"
                   onPress={() => {
                     onClose();
                     router.push("/sparks-model");

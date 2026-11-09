@@ -6,10 +6,12 @@ import {
   forwardMessage,
   getChatShare,
   getChats,
+  getChatsByIds,
   getConversation,
   getMessageSeen,
   getMessageShare,
   getMessages,
+  getMessagesPage,
   markConversationRead,
   pinMessage,
   reactToMessage,
@@ -22,6 +24,7 @@ import {
 } from "@/services/chats";
 
 import type { ChatMedia, ChatMessageFile } from "@/services/chats";
+import { MESSAGE_PAGE_SIZE } from "@/services/messagePaging";
 
 // ==========================================
 // FETCH CHATS
@@ -143,6 +146,47 @@ export const fetchMessages = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error instanceof Error ? error.message : "Failed to load messages",
+      );
+    }
+  },
+);
+
+// ==========================================
+// SOME CHATS AT ONCE (reconnect catch-up, preview bursts; audit B5)
+// ==========================================
+
+export const refreshConversations = createAsyncThunk(
+  "chat/refreshConversations",
+  async ({ ids, token }: { ids: string[]; token: string }, { rejectWithValue }) => {
+    try {
+      return await getChatsByIds(ids, token);
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : "Failed to refresh chats");
+    }
+  },
+);
+
+// ==========================================
+// OLDER MESSAGES (scrolling up; services/messagePaging.ts, audit B4)
+// ==========================================
+
+export const fetchOlderMessages = createAsyncThunk(
+  "chat/fetchOlderMessages",
+  async (
+    { conversationId, token, before, page }: { conversationId: string; token: string; before?: string; page: number },
+    { rejectWithValue },
+  ) => {
+    try {
+      const { messages, hasMore } = await getMessagesPage(conversationId, token, {
+        before,
+        page,
+        limit: MESSAGE_PAGE_SIZE,
+      });
+
+      return { conversationId, messages, hasMore };
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to load older messages",
       );
     }
   },

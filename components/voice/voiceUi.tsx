@@ -14,10 +14,11 @@ import { getSocket } from "@/services/socket";
 import { getVoiceRoom, joinVoiceRoom, normalizeVoiceRoom, type VoiceJoinInfo, type VoiceRoom } from "@/services/voiceRooms";
 import { useAppSelector } from "@/store/hooks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
 
 // ---------------------------------------------------------------------
 // Session state (one voice chat at a time, app-wide)
@@ -179,7 +180,7 @@ export function VoiceLiveCard({ conversationId, title }: { conversationId: strin
         <Text style={styles.count}>
           {room.memberCount} on call
         </Text>
-        <Pressable style={[styles.join, joining && styles.off]} onPress={join} disabled={joining}>
+        <Pressable accessibilityRole="button" accessibilityLabel={mine ? "Return to call" : "Join call"} style={[styles.join, joining && styles.off]} onPress={join} disabled={joining}>
           {joining ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
@@ -352,7 +353,7 @@ function VoiceEndedCard({ conversationId }: { conversationId: string }) {
             Started {when}
             {people ? ` · ${people} ${people === 1 ? "person" : "people"}` : ""}
           </Text>
-          <Pressable onPress={() => setOpen(true)} hitSlop={8} style={ended.link} accessibilityRole="button">
+          <Pressable accessibilityLabel="Sparks from this voice chat" onPress={() => setOpen(true)} hitSlop={8} style={ended.link} accessibilityRole="button">
             <Ionicons name="sparkles" size={13} color={ink.text(PINK)} />
             <Text style={ended.linkText}>Sparks from this voice chat</Text>
             <Ionicons name="chevron-forward" size={14} color={ink.text(PINK)} />

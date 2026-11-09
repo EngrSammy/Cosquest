@@ -8,7 +8,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -16,6 +15,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -190,7 +190,7 @@ export default function PollCreator({
               ))}
 
               {options.length < MAX_OPTIONS ? (
-                <Pressable style={styles.addRow} onPress={addOption}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Add another option" style={styles.addRow} onPress={addOption}>
                   <Text style={styles.addText}>Add another option</Text>
                   <Ionicons name="add" size={22} color={ink.text(UI.MUTED)} />
                 </Pressable>

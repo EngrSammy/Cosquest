@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function FeedEmptyState() {
@@ -36,7 +37,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: "#777780",
+    color: C.grey5,
     textAlign: "center",
   },
 });

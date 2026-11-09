@@ -144,7 +144,7 @@ export default function ManageSparks() {
   if (!loading && !canManage) {
     return (
       <AdminScreen title="Manage Sparks" subtitle={group ? `${group.name} · Admin only` : "Admin only"}>
-        <ConceptBanner title="Concept — requirements pending" text="Panel requirements to be specified by Mark Jones." />
+        <ConceptBanner title="Concept: requirements pending" text="Panel requirements to be specified by Mark Jones." />
         <Note>Only group admins can pin, delete or merge Sparks.</Note>
       </AdminScreen>
     );
@@ -152,7 +152,7 @@ export default function ManageSparks() {
 
   return (
     <AdminScreen title="Manage Sparks" subtitle={group ? `${group.name} · Admin only` : "Admin only"} loading={loading}>
-      <ConceptBanner title="Concept — requirements pending" text="Panel requirements to be specified by Mark Jones." />
+      <ConceptBanner title="Concept: requirements pending" text="Panel requirements to be specified by Mark Jones." />
 
       {sparks.length === 0 ? <Note>No Sparks in this group yet.</Note> : null}
 
@@ -163,7 +163,7 @@ export default function ManageSparks() {
           <Text style={styles.sparkTitle}>{spark.subject}</Text>
           <Text style={styles.sparkState}>{stateLabel(spark)}</Text>
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Keep visible through quiet periods"
             style={styles.actionRow}
             disabled={busy === `pin-${spark.id}`}
             onPress={() => togglePin(spark)}>
@@ -174,7 +174,7 @@ export default function ManageSparks() {
             <Ionicons name={spark.pinned ? "pin" : "pin-outline"} size={22} color={ink.text(spark.pinned ? A.pink : A.muted)} />
           </Pressable>
 
-          <Pressable style={[styles.actionRow, styles.actionLast]} onPress={() => remove(spark)}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Delete Spark" style={[styles.actionRow, styles.actionLast]} onPress={() => remove(spark)}>
             <Text style={[styles.actionTitle, styles.danger, styles.flex]}>Delete Spark</Text>
             <Ionicons name="trash-outline" size={22} color={ink.text(A.pink)} />
           </Pressable>
@@ -192,7 +192,7 @@ export default function ManageSparks() {
               // With two ticked: the first is kept, the second merges into it.
               const tag = picked.length === 2 ? (spark.id === picked[0] ? "Kept" : spark.id === picked[1] ? "Merges in" : null) : null;
               return (
-                <Pressable key={spark.id} style={styles.pickRow} onPress={() => togglePick(spark)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Done" key={spark.id} style={styles.pickRow} onPress={() => togglePick(spark)}>
                   <View style={[styles.checkbox, on && styles.checkboxOn]}>
                     {on ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
                   </View>

@@ -1,5 +1,7 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
+import { getWebBaseUrl } from "@/utils/shareLinks";
+
 import { apiRequest } from "./api";
 import type { Rank } from "./ranks";
 
@@ -170,11 +172,11 @@ export function inviteLinkFor(group: Pick<Group, "inviteCode" | "inviteLink">) {
     return null;
   }
 
-  const base = (
-    process.env.EXPO_PUBLIC_WEB_URL || "https://cosquest.vercel.app"
-  ).replace(/\/$/, "");
+  // Task 059: the website when the build knows it (EXPO_PUBLIC_WEB_URL),
+  // else the app's own link (app/+native-intent.tsx opens both).
+  const base = getWebBaseUrl();
 
-  return `${base}/group/join/${group.inviteCode}`;
+  return base ? `${base}/group/join/${group.inviteCode}` : `cosquest://group/join/${group.inviteCode}`;
 }
 
 // Accepts a full invite link or just the code.

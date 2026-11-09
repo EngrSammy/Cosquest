@@ -28,7 +28,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -37,14 +36,16 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import MapView, { MapPressEvent, Marker, Region } from "react-native-maps";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 import { useContext as usePaneContext } from "react";
 import { PaneClose } from "@/components/desktop/DesktopEditProfile";
@@ -521,7 +522,7 @@ export default function ContactOptions() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        behavior="padding">
         {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <Pressable
@@ -600,7 +601,7 @@ export default function ContactOptions() {
                     onSelect={handleCountrySelect}
                     theme={{
                       backgroundColor: "#FFFFFF",
-                      onBackgroundTextColor: "#191922",
+                      onBackgroundTextColor: C.ink,
                       fontSize: 14,
                       fontFamily: FONTS.regular,
                     }}
@@ -854,7 +855,7 @@ const STYLE_PAIR = themedStyles({
     marginBottom: 8,
     fontFamily: FONTS.medium,
     fontSize: 12,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   field: MILKY_FIELD,
@@ -878,7 +879,7 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 0,
     fontFamily: FONTS.regular,
     fontSize: 14.5,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
@@ -921,7 +922,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 6,
     fontFamily: FONTS.regular,
     fontSize: 11.5,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   mapActions: {
@@ -973,7 +974,7 @@ const STYLE_PAIR = themedStyles({
   mapTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
   },
 
   mapSubtitle: {
@@ -982,7 +983,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 12,
     lineHeight: 18,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   mapContainer: {
@@ -1020,7 +1021,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 12.5,
     lineHeight: 18,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   marker: {

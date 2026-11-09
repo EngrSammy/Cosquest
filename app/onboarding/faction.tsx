@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
@@ -13,7 +12,9 @@ import { useAppDispatch } from "@/store/hooks";
 import { saveUserFaction } from "@/store/thunks/userThunks";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const POPUP_DELAY = 2000;
@@ -267,14 +268,13 @@ export default function Faction() {
   const selectedFaction = FACTIONS.find((f) => f.id === selectedFactionId);
 
   return (
-    <AppBackground variant="blueGradient">
-      <ScrollView contentContainerStyle={styles.scroll}>
+    <OnboardingScreen background="blueGradient" insetTop={false} topGap={0} contentStyle={styles.scroll}>
         <OnboardingProgress step={STEP.faction} total={ONBOARDING_TOTAL} />
 
         <Text style={styles.headline}>Start or Join Faction</Text>
 
         <Text style={styles.sub}>
-          Your faction is your people — a badge you carry into every CosQuest.
+          Your faction is your people: a badge you carry into every CosQuest.
         </Text>
 
         <View style={styles.list}>
@@ -317,8 +317,7 @@ export default function Faction() {
             disabled={saving}
           />
         </View>
-      </ScrollView>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -332,7 +331,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
     marginTop: 20,
   },
@@ -340,7 +339,7 @@ const STYLE_PAIR = themedStyles({
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 10,
     marginBottom: 20,

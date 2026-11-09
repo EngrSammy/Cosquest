@@ -6,6 +6,7 @@ import { AVATARS } from "@/constants/avatars";
 import { FONTS } from "@/constants/fonts";
 import { CommentAudio } from "./CommentAudio";
 import { ReplyItem } from "./ReplyItem";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatar(author: any) {
@@ -190,12 +191,12 @@ export function CommentItem({
 
           {/* ACTIONS: Reply (pink) + view replies */}
           <View style={styles.actions}>
-            <Pressable onPress={onReply} hitSlop={6}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Reply" onPress={onReply} hitSlop={6}>
               <Text style={styles.replyText}>Reply</Text>
             </Pressable>
 
             {Number(comment?.replyCount || 0) > 0 ? (
-              <Pressable onPress={onToggleReplies} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Show or hide replies" onPress={onToggleReplies} hitSlop={6}>
                 <Text style={styles.viewReplies}>
                   {repliesOpen
                     ? "Hide replies"
@@ -208,7 +209,7 @@ export function CommentItem({
 
             {/* Delete your own comment */}
             {isMine ? (
-              <Pressable onPress={onDelete} hitSlop={8}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={onDelete} hitSlop={8}>
                 <Text style={styles.deleteText}>Delete</Text>
               </Pressable>
             ) : null}
@@ -305,7 +306,7 @@ const STYLE_PAIR = themedStyles({
   username: {
     fontFamily: FONTS.semibold,
     fontSize: 13,
-    color: "#191922",
+    color: C.ink,
   },
 
   time: {
@@ -323,7 +324,7 @@ const STYLE_PAIR = themedStyles({
   authorBadgeText: {
     fontFamily: FONTS.medium,
     fontSize: 10.5,
-    color: "#C5399A",
+    color: C.brand,
   },
 
   text: {
@@ -331,7 +332,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 13,
     lineHeight: 19,
-    color: "#3B3B42",
+    color: C.ink2,
   },
 
   actions: {
@@ -344,7 +345,7 @@ const STYLE_PAIR = themedStyles({
   replyText: {
     fontFamily: FONTS.medium,
     fontSize: 12,
-    color: "#C5399A",
+    color: C.brand,
   },
 
   viewReplies: {
@@ -370,11 +371,11 @@ const STYLE_PAIR = themedStyles({
     marginTop: 2,
     fontFamily: FONTS.medium,
     fontSize: 11,
-    color: "#9C9CAA",
+    color: C.muted,
   },
 
   likedCount: {
-    color: "#C5399A",
+    color: C.brand,
   },
 
   replies: {

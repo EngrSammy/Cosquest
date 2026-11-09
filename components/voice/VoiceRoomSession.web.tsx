@@ -13,6 +13,7 @@ import { endVoiceSession, setVoiceMinimized, updateVoiceRoom, type VoiceSession 
 import { leaveVoiceRoom, pingVoiceRoom, VOICE_PING_MS } from "@/services/voiceRooms";
 import { useAppSelector } from "@/store/hooks";
 import { getAvatarSource } from "@/utils/callHelpers";
+import { C } from "@/theme/tokens";
 
 function nowMs() {
   return Date.now();
@@ -294,6 +295,6 @@ export default function VoiceRoomSession({ session }: { session: VoiceSession })
 
 const styles = StyleSheet.create({
   tapRow: { alignItems: "center", marginTop: 4 },
-  tap: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: "#B63D91" },
+  tap: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: C.brandDeep },
   tapText: { color: "#FFFFFF", fontWeight: "800", fontSize: 14 },
 });

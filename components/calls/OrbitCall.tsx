@@ -20,6 +20,7 @@ import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "reac
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
+import { C } from "@/theme/tokens";
 import {
   DECAY,
   MOVE_MS,
@@ -39,9 +40,9 @@ import { CAN_SHARE_SCREEN, useCallTools } from "./useCallTools";
 import { useModeration, type ModerationSource, type PersonAction } from "./useModeration";
 import SendAlertSheet from "@/components/alerts/SendAlertSheet";
 
-const INK = "#24283C";
-const MUTED = "#66738A";
-const PINK = "#B63D91";
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const PINK = C.brandDeep;
 const BLUE = "#2E9BF0";
 const GREEN = "#22C55E";
 const GREY = "#B9C0CC";
@@ -184,6 +185,10 @@ const OrbitCircle = memo(function OrbitCircle({
       pulse.setValue(0);
       return;
     }
+    // The pulse runs for as long as someone speaks: on the native driver
+    // (opacity and scale only), so it never waits on the JS thread (audit
+    // B10). The circle's own move and resize animate layout (left, top,
+    // width, height), which the native driver can't, and run once per change.
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
@@ -225,7 +230,8 @@ const OrbitCircle = memo(function OrbitCircle({
 
       <Pressable
         onPress={() => onTap(person)}
-        accessibilityLabel={person.name}
+        accessibilityRole="button"
+        accessibilityLabel={`${person.name}${person.speaking ? ", speaking" : ""}${person.micOff ? ", muted" : ""}`}
         style={[
           styles.circle,
           {
@@ -484,7 +490,7 @@ export default function OrbitCallScreen({
     <LinearGradient colors={ink.dark ? [...DARK_SCREEN_GRADIENT] : ["#F4F8FD", "#E3F0FC"]} style={styles.screen}>
       {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Pressable style={styles.roundBtn} onPress={onMinimize} accessibilityLabel="Minimize call">
+        <Pressable style={styles.roundBtn} onPress={onMinimize} accessibilityRole="button" accessibilityLabel="Minimize call">
           <Ionicons name="chevron-back" size={22} color={ink.text(INK)} />
         </Pressable>
         <View style={styles.headerText}>
@@ -516,7 +522,7 @@ export default function OrbitCallScreen({
             <Ionicons name={tools.speakerOn ? "volume-high-outline" : "ear-outline"} size={20} color={ink.text(INK)} />
           </Pressable>
         ) : null}
-        <Pressable style={[styles.roundBtn, styles.roundBtnPink]} onPress={onPeople} accessibilityLabel="Add people">
+        <Pressable style={[styles.roundBtn, styles.roundBtnPink]} onPress={onPeople} accessibilityRole="button" accessibilityLabel="Add people">
           <Ionicons name="people-outline" size={20} color={ink.text(PINK)} />
         </Pressable>
       </View>
@@ -537,7 +543,7 @@ export default function OrbitCallScreen({
             <Text style={styles.focusTitle}>Focus mode on</Text>
             <Text style={styles.focusText}>Faction voices are off</Text>
           </View>
-          <Pressable style={styles.focusBtn} onPress={onToggleFocus}>
+          <Pressable style={styles.focusBtn} onPress={onToggleFocus} accessibilityRole="button" accessibilityLabel={focusOn ? "Focus on" : "Focus off"}>
             <Text style={styles.focusBtnText}>Hear faction</Text>
           </Pressable>
         </View>
@@ -716,12 +722,12 @@ function IdentitySheet({
 
             <View style={styles.cardButtons}>
               {!person.isMe ? (
-                <Pressable style={[styles.cardButton, styles.cardButtonPink]} onPress={onPrivateCall}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Private call" style={[styles.cardButton, styles.cardButtonPink]} onPress={onPrivateCall}>
                   <Ionicons name="call-outline" size={16} color="#FFFFFF" />
                   <Text style={styles.cardButtonPinkText}>Private call</Text>
                 </Pressable>
               ) : null}
-              <Pressable style={[styles.cardButton, styles.cardButtonOutline]} onPress={onProgress}>
+              <Pressable accessibilityRole="button" accessibilityLabel="View progress" style={[styles.cardButton, styles.cardButtonOutline]} onPress={onProgress}>
                 <Ionicons name="star-outline" size={16} color={ink.text(PINK)} />
                 <Text style={styles.cardButtonOutlineText}>View progress</Text>
               </Pressable>
@@ -942,7 +948,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 18,
-    backgroundColor: "#24283C",
+    backgroundColor: C.inkNavy,
   },
   focusTitle: { fontFamily: FONTS.semibold, fontSize: 14, color: "#FFFFFF" },
   focusText: { fontFamily: FONTS.regular, fontSize: 12, color: "rgba(255,255,255,0.7)" },

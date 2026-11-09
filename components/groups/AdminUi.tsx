@@ -12,16 +12,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
 import { ScreenGradient, SheetHeader, UI } from "@/components/chat/ui";
+import { KeyboardAwareScrollView } from "@/components/ui/keyboard";
 import { AVATARS } from "@/constants/avatars";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import type { GroupMember, GroupPerson } from "@/services/groups";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 
 // Light-mode colours (pass through ink.text()/ink.surface() outside styles).
 export const A = {
@@ -31,10 +33,10 @@ export const A = {
   lilac: UI.LILAC,
   pinkSoft: "#F3DDED",
   line: "rgba(36,40,60,0.08)",
-  danger: "#C0394B",
+  danger: C.dangerDeep,
 };
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function avatarTint(name?: string) {
   let hash = 0;
@@ -103,12 +105,14 @@ export function AdminScreen({
       {loading ? (
         <ActivityIndicator color={ink.text(A.pink)} style={styles.loading} />
       ) : (
-        <ScrollView
+        // Keeps the "Find a member" fields (admins, moderation) above the keyboard.
+        <KeyboardAwareScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
           keyboardShouldPersistTaps="handled"
+          bottomOffset={24}
           showsVerticalScrollIndicator={false}>
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
     </View>
   );
@@ -166,7 +170,7 @@ export function SettingsRow({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const row = (
-    <Pressable onPress={onPress} disabled={!onPress} style={[styles.settingsRow, last && !children && styles.rowLast]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} disabled={!onPress} style={[styles.settingsRow, last && !children && styles.rowLast]}>
       <View style={styles.flex}>
         <Text style={[styles.settingsTitle, danger && styles.dangerText]}>{title}</Text>
         {hint ? <Text style={styles.settingsHint}>{hint}</Text> : null}
@@ -235,7 +239,7 @@ export function PersonRow({
   const name = person.name || person.username;
   const shownRole = role ?? (person as GroupMember).role;
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityLabel={name}
       onPress={onPress}
       disabled={!onPress}
       style={[styles.row, last && styles.rowLast, selected && styles.rowSelected]}>
@@ -280,7 +284,7 @@ export function PrimaryButton({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityLabel={label}
       style={[styles.primary, danger && styles.primaryDanger, (disabled || busy) && styles.off]}
       disabled={disabled || busy}
       onPress={onPress}>
@@ -304,7 +308,7 @@ export function SoftButton({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable style={[styles.soft, flex && styles.flex, disabled && styles.off]} onPress={onPress} disabled={disabled}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={[styles.soft, flex && styles.flex, disabled && styles.off]} onPress={onPress} disabled={disabled}>
       <Text style={[styles.softText, danger && styles.dangerText]} numberOfLines={1}>
         {label}
       </Text>
@@ -347,7 +351,7 @@ export function ConfirmCard({
       {extraText ? <Text style={styles.extraText}>{extraText}</Text> : null}
       {children}
       <PrimaryButton label={confirmLabel} onPress={onConfirm} busy={busy} danger={danger} />
-      <Pressable onPress={onCancel} style={styles.cancel} hitSlop={6}>
+      <Pressable accessibilityRole="button" accessibilityLabel={cancelLabel} onPress={onCancel} style={styles.cancel} hitSlop={6}>
         <Text style={styles.cancelText}>{cancelLabel}</Text>
       </Pressable>
     </View>
@@ -381,7 +385,7 @@ export function Pills<T extends string>({
       {options.map((option) => {
         const on = option.value === value;
         return (
-          <Pressable key={option.value} onPress={() => onChange(option.value)} style={[styles.pill, on && styles.pillOn]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={option.label} key={option.value} onPress={() => onChange(option.value)} style={[styles.pill, on && styles.pillOn]}>
             <Text style={[styles.pillText, on && styles.pillTextOn]}>{option.label}</Text>
           </Pressable>
         );

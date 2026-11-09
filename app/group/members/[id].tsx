@@ -31,13 +31,17 @@ import { canActOn, getGroup, getGroupMembers, type Group, type GroupMember } fro
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { createChat } from "@/store/thunks/chatThunks";
 import { safeBack } from "@/utils/safeBack";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
+import { C } from "@/theme/tokens";
+import { openReport } from "@/components/report/reportStore";
+import { confirmBlock } from "@/components/safety/block";
 import { ScreenGradient } from "@/components/chat/ui";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 const LINE = "rgba(36,40,60,0.08)";
 
 const STATUS: Record<string, string> = {
@@ -71,7 +75,7 @@ const MemberRow = memo(function MemberRow({
   const base = expertise || (member.rank ? null : `@${member.username}`);
   const detail = member.mutedUntil ? (base ? `${base} · muted` : "Muted") : base;
   return (
-    <Pressable style={[styles.row, selected && styles.rowOn]} onPress={() => onPress(member)}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open" style={[styles.row, selected && styles.rowOn]} onPress={() => onPress(member)}>
       <PersonAvatar person={member} size={44} />
       <View style={styles.flex}>
         <View style={styles.nameRow}>
@@ -244,17 +248,39 @@ export default function GroupMembers() {
         <Text style={styles.status}>{STATUS[selected.role] || STATUS.member}</Text>
 
         {selected.id !== myUserId ? (
-          <Pressable style={[styles.soft, messaging && styles.off]} disabled={messaging} onPress={() => message(selected)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Message ${firstName(selected)}`} style={[styles.soft, messaging && styles.off]} disabled={messaging} onPress={() => message(selected)}>
             {messaging ? <ActivityIndicator color={ink.text(PINK)} /> : <Text style={styles.softText}>Message {firstName(selected)}</Text>}
           </Pressable>
         ) : null}
 
         {canManage(selected) ? (
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={`Manage ${firstName(selected)}`}
             style={styles.soft}
             onPress={() => router.push({ pathname: "/group/moderation/[id]", params: { id: groupId, userId: selected.id } })}>
             <Text style={styles.softText}>Manage {firstName(selected)}</Text>
           </Pressable>
+        ) : null}
+
+        {/* Task 059: block (and report) someone from the member list. */}
+        {selected.id !== myUserId ? (
+          <View style={styles.safetyRow}>
+            <Pressable
+              style={styles.safetyButton}
+              onPress={() => confirmBlock({ username: selected.username, userId: selected.id }, () => setSelected(null))}
+              accessibilityRole="button"
+              accessibilityLabel={`Block ${firstName(selected)}`}>
+              <Ionicons name="ban-outline" size={16} color={ink.text(C.danger)} />
+              <Text style={styles.safetyText}>Block</Text>
+            </Pressable>
+            <Pressable
+              style={styles.safetyButton}
+              onPress={() => openReport({ targetType: "profile", targetId: String(selected.id), what: `@${selected.username}` })}
+              accessibilityRole="button"
+              accessibilityLabel={`Report ${firstName(selected)}`}>
+              <Ionicons name="flag-outline" size={16} color={ink.text(C.danger)} />
+              <Text style={styles.safetyText}>Report</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
     </>
@@ -265,7 +291,7 @@ export default function GroupMembers() {
       {!embedded ? <ScreenGradient /> : null}
       {!embedded ? (
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityLabel="Back">
+        <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
           <Ionicons name="chevron-back" size={26} color={ink.text(INK)} />
         </Pressable>
         <View style={styles.flex}>
@@ -299,44 +325,47 @@ export default function GroupMembers() {
         </View>
       </View>
 
-      <FlatList
-        scrollEnabled={embedded !== "inline"}
-        ref={listRef}
-        style={styles.flex}
-        contentContainerStyle={[styles.content, { paddingBottom: detailInList ? insets.bottom + 30 : 16 }]}
-        data={members}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ItemSeparatorComponent={Separator}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        initialNumToRender={12}
-        maxToRenderPerBatch={12}
-        windowSize={9}
-        removeClippedSubviews={Platform.OS === "android"}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          loadingPage ? (
-            <ActivityIndicator color={ink.text(PINK)} style={styles.loading} />
-          ) : (
-            <Text style={styles.empty}>No members found.</Text>
-          )
-        }
-        ListFooterComponent={
-          <>
-            {loadingPage > 1 ? <ActivityIndicator color={ink.text(PINK)} style={styles.loading} /> : null}
-            {detailInList ? detailCard : null}
-            {detailInList ? (
-              <Text style={styles.footnote}>
-                Faction rank is visual identity. Admin status alone grants chat powers; a Private can be an admin and a
-                Sergeant can be a member.
-              </Text>
-            ) : null}
-          </>
-        }
-      />
+      {/* The list ends above the keyboard while searching. */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <FlatList
+          scrollEnabled={embedded !== "inline"}
+          ref={listRef}
+          style={styles.flex}
+          contentContainerStyle={[styles.content, { paddingBottom: detailInList ? insets.bottom + 30 : 16 }]}
+          data={members}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          ItemSeparatorComponent={Separator}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS === "android"}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            loadingPage ? (
+              <ActivityIndicator color={ink.text(PINK)} style={styles.loading} />
+            ) : (
+              <Text style={styles.empty}>No members found.</Text>
+            )
+          }
+          ListFooterComponent={
+            <>
+              {loadingPage > 1 ? <ActivityIndicator color={ink.text(PINK)} style={styles.loading} /> : null}
+              {detailInList ? detailCard : null}
+              {detailInList ? (
+                <Text style={styles.footnote}>
+                  Faction rank is visual identity. Admin status alone grants chat powers; a Private can be an admin and a
+                  Sergeant can be a member.
+                </Text>
+              ) : null}
+            </>
+          }
+        />
+      </KeyboardAvoidingView>
 
       {/* Big groups: the detail stays on screen under the list. */}
       {!detailInList && selected ? (
@@ -347,6 +376,9 @@ export default function GroupMembers() {
 }
 
 const STYLE_PAIR = themedStyles({
+  safetyRow: { flexDirection: "row", justifyContent: "center", gap: 24, marginTop: 10 },
+  safetyButton: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, paddingHorizontal: 6 },
+  safetyText: { fontFamily: FONTS.medium, fontSize: 13, color: C.danger },
   screen: { flex: 1 },
 
   flex: { flex: 1, minWidth: 0 },

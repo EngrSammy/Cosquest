@@ -17,16 +17,18 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "@/components/ui/keyboard";
+import { C } from "@/theme/tokens";
+import { useCapabilities } from "@/services/capabilities";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 type AccountInfoRowProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -82,6 +84,7 @@ export default function AccountInformation() {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
+  const caps = useCapabilities();
   const dispatch = useAppDispatch();
 
   const authUser = useAppSelector((state) => state.auth.user);
@@ -345,7 +348,8 @@ export default function AccountInformation() {
         style={StyleSheet.absoluteFill}
       />
 
-      <ScrollView
+      <KeyboardAwareScrollView
+        bottomOffset={24}
         contentContainerStyle={[
           styles.scroll,
           {
@@ -452,12 +456,26 @@ export default function AccountInformation() {
             <Text style={styles.saveButtonText}>Save Changes</Text>
           )}
         </Pressable>
-      </ScrollView>
+
+        {/* Task 059: account deletion (where the server supports it). */}
+        {caps.deleteAccount ? (
+          <Pressable
+            onPress={() => router.push("/delete-account")}
+            style={({ pressed }) => [styles.deleteRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+            testID="delete-account-row">
+            <Text style={styles.deleteText}>Delete account</Text>
+          </Pressable>
+        ) : null}
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 const STYLE_PAIR = themedStyles({
+  deleteRow: { alignSelf: "center", paddingVertical: 14, paddingHorizontal: 20, marginTop: 8, marginBottom: 24 },
+  deleteText: { fontFamily: FONTS.semibold, fontSize: 14, color: C.danger },
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -494,7 +512,7 @@ const STYLE_PAIR = themedStyles({
     textAlign: "center",
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
   },
 
   headerSpacer: {
@@ -580,14 +598,14 @@ const STYLE_PAIR = themedStyles({
   infoLabel: {
     fontFamily: FONTS.regular,
     fontSize: 11.5,
-    color: "#7A7A84",
+    color: C.grey4,
     marginBottom: 1,
   },
 
   infoValue: {
     fontFamily: FONTS.semibold,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
   },
 
   infoInput: {
@@ -595,7 +613,7 @@ const STYLE_PAIR = themedStyles({
     margin: 0,
     fontFamily: FONTS.semibold,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 

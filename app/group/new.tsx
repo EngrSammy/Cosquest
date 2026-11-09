@@ -18,7 +18,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -26,6 +25,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
@@ -62,6 +62,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 
 type Step = 1 | 2 | 3 | 4;
 type NotifyChoice = "all" | "sparks" | "mute";
@@ -105,7 +106,7 @@ const STEP_TITLE: Record<Step, string> = {
   4: "Set the ground rules",
 };
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function avatarTint(name?: string) {
   let hash = 0;
@@ -164,7 +165,7 @@ function ChoiceRow({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable
+    <Pressable accessibilityLabel={title}
       onPress={onPress}
       disabled={disabled}
       style={[styles.row, last && styles.rowLast, disabled && styles.off]}
@@ -193,7 +194,7 @@ function LinkRow({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   return (
-    <Pressable onPress={onPress} style={[styles.row, last && styles.rowLast]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open" onPress={onPress} style={[styles.row, last && styles.rowLast]}>
       <View style={styles.flex}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowHint}>{value}</Text>
@@ -214,7 +215,7 @@ function MemberLine({
   const ink = useInk();
   const name = member.name || member.username;
   return (
-    <Pressable onPress={onPress} style={styles.memberRow}>
+    <Pressable accessibilityRole="button" accessibilityLabel={name} onPress={onPress} style={styles.memberRow}>
       {member.avatarPhotoUrl ? (
         <Image
           source={{ uri: member.avatarPhotoUrl }}
@@ -613,7 +614,7 @@ export default function NewGroup() {
               {KINDS.map((item) => {
                 const on = kind === item.value;
                 return (
-                  <Pressable
+                  <Pressable accessibilityLabel="Done"
                     key={item.value}
                     onPress={() => changeKind(item.value)}
                     style={[styles.typeCard, on && styles.typeCardOn]}
@@ -744,7 +745,7 @@ export default function NewGroup() {
                 </Text>
               ) : null}
 
-              <Pressable style={styles.inviteRow} onPress={() => setStep(4)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Use an invitation link instead" style={styles.inviteRow} onPress={() => setStep(4)}>
                 <View style={styles.flex}>
                   <Text style={styles.rowTitle}>
                     Use an invitation link instead
@@ -897,12 +898,16 @@ export default function NewGroup() {
                 </Text>
                 <View style={styles.twoButtons}>
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy link"
                     style={styles.softButton}
                     onPress={copyLink}
                     disabled={!link}>
                     <Text style={styles.softButtonText}>Copy link</Text>
                   </Pressable>
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Share invite"
                     style={styles.softButton}
                     onPress={shareLink}
                     disabled={!link}>
@@ -933,6 +938,8 @@ export default function NewGroup() {
                   />
                 ))}
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="View all members"
                   style={[styles.row, styles.rowLast]}
                   onPress={() =>
                     router.push({

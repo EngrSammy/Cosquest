@@ -1,0 +1,30 @@
+{
+ "_doc": "Scripted landmarks for make_skeleton.py (cq 014). Per joint: seed = a point in the model's glTF frame (x = the character's left, y up, z = front), r = move it to the centroid of the mesh points within r m (the middle of the limb there), keep = axes held at the seed, offset = added after. Read from front/side renders of the mesh (evidence/rig/hoof_skeleton.png).",
+ "hoof": {"joints": {
+  "Hips": {"seed": [-0.12, 0.88, 0.10]},
+  "Spine": {"seed": [-0.14, 0.99, 0.11]},
+  "Spine1": {"seed": [-0.15, 1.12, 0.10]},
+  "Spine2": {"seed": [-0.16, 1.27, 0.09]},
+  "Neck": {"seed": [-0.19, 1.41, 0.10]},
+  "Head": {"seed": [-0.21, 1.49, 0.12]},
+  "HeadTop_End": {"seed": [-0.21, 1.74, 0.12]},
+  "RightShoulder": {"seed": [-0.23, 1.36, 0.09]},
+  "RightArm": {"seed": [-0.36, 1.32, 0.08], "r": 0.06},
+  "RightForeArm": {"seed": [-0.45, 1.06, 0.06], "r": 0.06},
+  "RightHand": {"seed": [-0.50, 0.87, 0.12], "r": 0.05},
+  "LeftShoulder": {"seed": [-0.08, 1.37, 0.12]},
+  "LeftArm": {"seed": [0.01, 1.37, 0.18], "r": 0.06},
+  "LeftForeArm": {"seed": [0.12, 1.47, 0.30], "r": 0.06},
+  "LeftHand": {"seed": [-0.04, 1.61, 0.38], "r": 0.05},
+  "RightUpLeg": {"seed": [-0.24, 0.83, 0.07]},
+  "RightLeg": {"seed": [-0.31, 0.45, 0.04], "r": 0.07},
+  "RightFoot": {"seed": [-0.33, 0.10, 0.03], "r": 0.06},
+  "RightToeBase": {"seed": [-0.45, 0.03, 0.09]},
+  "RightToe_End": {"seed": [-0.55, 0.02, 0.13]},
+  "LeftUpLeg": {"seed": [0.02, 0.83, 0.10]},
+  "LeftLeg": {"seed": [0.10, 0.45, 0.13], "r": 0.07},
+  "LeftFoot": {"seed": [0.12, 0.13, 0.27], "r": 0.06},
+  "LeftToeBase": {"seed": [0.12, 0.03, 0.35]},
+  "LeftToe_End": {"seed": [0.12, 0.01, 0.43]}
+ }}
+}

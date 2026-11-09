@@ -5,7 +5,8 @@
 // person isn't told who reported them. CosQuest's admins review them.
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
@@ -80,7 +81,7 @@ export default function ReportLayer() {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={closeReport}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <Pressable style={styles.backdrop} onPress={closeReport}>
           <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
             <View style={styles.handle} />

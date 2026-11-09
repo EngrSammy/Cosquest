@@ -9,13 +9,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, usePathname } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { forgetPushToken } from "@/services/push";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 const RED = "#E24D4D";
 
 // Figma row: icon, label, (value), then the ">" right AFTER the text.
@@ -76,6 +78,8 @@ export default function Settings() {
       // This phone stops getting this account's pushes (before the session ends).
       await unregisterThisPhone(token);
       if (token) {
+        // This phone stops getting the account's pushes (task 059).
+        await forgetPushToken(token);
         await logoutApi(token);
       }
     } catch (error) {
@@ -256,7 +260,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 12,
     letterSpacing: 0.3,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   // Milky pressed-in row: #0000000D, radius 14, soft shadow, white rim.
@@ -282,13 +286,13 @@ const STYLE_PAIR = themedStyles({
   rowLabel: {
     fontFamily: FONTS.regular,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
   },
 
   rowValue: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   logoutSection: {

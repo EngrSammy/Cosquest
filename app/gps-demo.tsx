@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { C } from "@/theme/tokens";
 
 // Standalone demo screen — reachable at /gps-demo (web: /Cosquest/gps-demo).
 // Purpose: show a non-technical viewer that a browser/PWA STOPS tracking
@@ -19,7 +20,7 @@ import {
 type Fix = { time: string; lat: number; lng: number };
 
 export default function GpsDemo() {
-  const [status, setStatus] = useState("Idle — tap Start");
+  const [status, setStatus] = useState("Idle: tap Start");
   const [running, setRunning] = useState(false);
   const [count, setCount] = useState(0);
   const [log, setLog] = useState<Fix[]>([]);
@@ -44,7 +45,7 @@ export default function GpsDemo() {
       setStatus("Location permission denied");
       return;
     }
-    setStatus("Tracking — now lock your screen for ~30s, then unlock");
+    setStatus("Tracking: now lock your screen for ~30s, then unlock");
     setRunning(true);
     lastFixAt.current = Date.now();
 
@@ -99,7 +100,7 @@ export default function GpsDemo() {
         </View>
         <View style={styles.stat}>
           <Text style={[styles.statValue, stale && styles.statStale]}>
-            {running ? `${sinceSec}s` : "—"}
+            {running ? `${sinceSec}s` : "-"}
           </Text>
           <Text style={styles.statLabel}>since last fix</Text>
         </View>
@@ -107,7 +108,7 @@ export default function GpsDemo() {
 
       {stale ? (
         <Text style={styles.frozen}>
-          ⚠️ No location update for {sinceSec}s — tracking is frozen.
+          ⚠️ No location update for {sinceSec}s, tracking is frozen.
         </Text>
       ) : null}
 
@@ -127,7 +128,7 @@ export default function GpsDemo() {
         ) : (
           log.map((f, i) => (
             <Text key={i} style={styles.logLine}>
-              {f.time} — {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
+              {f.time}: {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
             </Text>
           ))
         )}
@@ -144,11 +145,11 @@ export default function GpsDemo() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFFFFF", padding: 24, paddingTop: 64 },
-  title: { fontSize: 28, fontWeight: "800", color: "#191922", textAlign: "center" },
+  title: { fontSize: 28, fontWeight: "800", color: C.ink, textAlign: "center" },
   platform: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
     textAlign: "center",
     marginTop: 4,
     letterSpacing: 1,
@@ -161,11 +162,11 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: "center",
   },
-  statValue: { fontSize: 40, fontWeight: "900", color: "#191922", fontVariant: ["tabular-nums"] },
+  statValue: { fontSize: 40, fontWeight: "900", color: C.ink, fontVariant: ["tabular-nums"] },
   statStale: { color: "#E24D4D" },
-  statLabel: { fontSize: 12, color: "#6b6b72", marginTop: 4 },
+  statLabel: { fontSize: 12, color: C.grey3, marginTop: 4 },
   frozen: { color: "#E24D4D", fontWeight: "700", textAlign: "center", marginTop: 14 },
-  status: { fontSize: 14, color: "#2b2b2c", textAlign: "center", marginTop: 14, lineHeight: 20 },
+  status: { fontSize: 14, color: C.inkSoft, textAlign: "center", marginTop: 14, lineHeight: 20 },
   btn: {
     backgroundColor: "#34C759",
     borderRadius: 30,
@@ -175,9 +176,9 @@ const styles = StyleSheet.create({
   },
   btnStop: { backgroundColor: "#E24D4D" },
   btnText: { color: "#fff", fontWeight: "800", fontSize: 17 },
-  logHeader: { fontSize: 12, fontWeight: "700", color: "#6b6b72", marginTop: 24, marginBottom: 8, letterSpacing: 0.5 },
+  logHeader: { fontSize: 12, fontWeight: "700", color: C.grey3, marginTop: 24, marginBottom: 8, letterSpacing: 0.5 },
   logBox: { flex: 1, backgroundColor: "#0F0F14", borderRadius: 14 },
-  logEmpty: { color: "#9C9CAA", fontSize: 13 },
+  logEmpty: { color: C.muted, fontSize: 13 },
   logLine: { color: "#8FE39B", fontSize: 13, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", marginBottom: 4 },
-  hint: { fontSize: 12, color: "#9C9CAA", textAlign: "center", marginTop: 14, lineHeight: 18 },
+  hint: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 14, lineHeight: 18 },
 });

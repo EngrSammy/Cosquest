@@ -5,7 +5,12 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    ignores: ["dist/*", "modules/*/android/build/*"],
+  },
+  {
+    // Expo config plugins run in Node (CommonJS).
+    files: ["modules/*/plugin/**/*.js"],
+    languageOptions: { globals: { __dirname: "readonly", __filename: "readonly" } },
   },
   {
     rules: {

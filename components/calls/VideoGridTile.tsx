@@ -14,6 +14,7 @@ import type { CallPerson } from "@/services/calls";
 import { getAvatarSource } from "@/utils/callHelpers";
 
 import { CALL_COLORS } from "./CallVisuals";
+import { C } from "@/theme/tokens";
 
 // How big each tile is, depending on how many people are on screen:
 //   1 → full screen        2 → one on top of the other
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: "transparent",
-    backgroundColor: "#2A1030",
+    backgroundColor: C.plumDark,
   },
 
   // Talking right now.

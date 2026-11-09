@@ -8,7 +8,6 @@ import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import { VideoPreviewFrame } from "@/components/VideoPreviewFrame";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -28,6 +28,7 @@ import {
   createReelPostThunk,
   fetchPosts,
 } from "@/store/thunks/postThunks";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type SelectedFile = {
@@ -395,7 +396,7 @@ export function CreatePost({
         onRequestClose={close}>
         <KeyboardAvoidingView
           style={styles.modalRoot}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          behavior="padding">
           <Pressable style={styles.modalOverlay} onPress={close} />
 
           <View style={styles.sheet}>
@@ -414,7 +415,7 @@ export function CreatePost({
                 </View>
               </View>
 
-              <Pressable style={styles.closeButton} onPress={close}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton} onPress={close}>
                 <Ionicons name="close" size={23} color={ink.text("#191922")} />
               </Pressable>
             </View>
@@ -439,7 +440,7 @@ export function CreatePost({
               style={styles.hashtagScroll}
               contentContainerStyle={styles.hashtagContent}>
               {HASHTAGS.map((tag) => (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel={tag}
                   key={tag}
                   style={styles.hashtagChip}
                   onPress={() => addHashtag(tag)}>
@@ -496,7 +497,7 @@ export function CreatePost({
               <PostOption
                 icon="videocam"
                 label="Video"
-                color="#C5399A"
+                color={C.brand}
                 onPress={pickVideo}
               />
 
@@ -520,7 +521,7 @@ export function CreatePost({
 
             {/* POST BUTTON */}
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Post"
               style={styles.postButton}
               onPress={handlePost}
               disabled={posting}>
@@ -554,7 +555,7 @@ function PostOption({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable style={styles.option} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.option} onPress={onPress}>
       <View
         style={[
           styles.optionIcon,
@@ -611,7 +612,7 @@ const STYLE_PAIR = themedStyles({
     minWidth: 0,
     fontSize: 12,
     fontFamily: FONTS.medium,
-    color: "#777780",
+    color: C.grey5,
   },
 
   // Figma: width 22, height 18, radius 4, background #C34D9C29
@@ -679,7 +680,7 @@ const STYLE_PAIR = themedStyles({
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   username: {
@@ -707,7 +708,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 15,
     paddingVertical: 14,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
   },
 
   hashtagScroll: {
@@ -730,7 +731,7 @@ const STYLE_PAIR = themedStyles({
   hashtagText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   mediaPreview: {
@@ -799,7 +800,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   postButtonText: {

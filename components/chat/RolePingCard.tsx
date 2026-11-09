@@ -18,12 +18,13 @@ import { RankLine } from "@/components/chat/RankBadge";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { listSparkMembers, type SparkMember, type SparkRolePing } from "@/services/sparks";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const TEAL = "#2A8A92";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const PINK = C.brandDeep;
+const TEAL = C.teal;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -100,7 +101,7 @@ function RolePingCard({
           const name = member?.displayName || "Member";
           return (
             <View key={userId}>
-              <Pressable
+              <Pressable accessibilityLabel={name}
                 style={styles.person}
                 onPress={onOpenMember ? () => onOpenMember(userId) : undefined}
                 accessibilityRole={onOpenMember ? "button" : undefined}>
@@ -132,7 +133,7 @@ function RolePingCard({
       </View>
 
       <View style={styles.pending}>
-        <Text style={styles.pendingTitle}>Concept — requirements pending</Text>
+        <Text style={styles.pendingTitle}>Concept: requirements pending</Text>
         <Text style={styles.pendingText}>Earlier-message retrieval · Mark Jones to specify the requirements.</Text>
       </View>
     </View>
@@ -166,7 +167,7 @@ const STYLE_PAIR = themedStyles({
   lead: { marginTop: 8, fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: INK },
   person: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontFamily: FONTS.semibold, fontSize: 13, color: "#7D356D" },
+  avatarText: { fontFamily: FONTS.semibold, fontSize: 13, color: C.plum },
   personText: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 14, color: INK },

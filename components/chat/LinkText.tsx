@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import { Linking, Platform, StyleSheet, Text } from "react-native";
 
 import { getWebBaseUrl } from "@/utils/shareLinks";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // http(s):// or cosquest:// up to the next space.
@@ -115,5 +116,5 @@ const STYLE_PAIR = themedStyles({
   // White on your own (pink) bubbles, pink on theirs (white).
   linkMine: { color: "#FFFFFF" },
 
-  linkTheirs: { color: "#C5399A" },
+  linkTheirs: { color: C.brand },
 });

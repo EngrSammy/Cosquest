@@ -6,7 +6,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChoiceSheet, useChatTitle, useMyPerson, type Choice } from "@/components/calls/scheduled/ChoiceSheet";
@@ -85,11 +86,11 @@ export default function NewProject() {
 
   return (
     <GroupScreen title={chatTitle || "Group"} onBack={back}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
           <View style={styles.titleRow}>
             <Text style={styles.title}>New project</Text>
-            <Pressable onPress={back} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={back} hitSlop={10}>
               <Text style={styles.cancel}>Cancel</Text>
             </Pressable>
           </View>

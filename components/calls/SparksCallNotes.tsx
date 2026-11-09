@@ -13,9 +13,10 @@ import { CALL_COLORS } from "@/components/calls/CallVisuals";
 import { speakerLabel } from "@/services/callTranscriptCopy";
 import type { Call } from "@/services/calls";
 import type { CallNotes } from "@/services/sparksCallNotes";
+import { C } from "@/theme/tokens";
 
 // Topic colours; a topic that comes back keeps its colour (colorIndex).
-export const TOPIC_COLORS = ["#3FD3E0", "#F5A524", "#C5399A", "#2FB36B", "#8B7CF6", "#FF7A59", "#4C9AFF", "#E5D04B"];
+export const TOPIC_COLORS = ["#3FD3E0", "#F5A524", C.brand, "#2FB36B", "#8B7CF6", "#FF7A59", "#4C9AFF", "#E5D04B"];
 
 /** Everyone by name; the viewer's own lines get "(you)" (as in the transcript). */
 export function nameOf(call: Call, userId: string, myUserId: string | null) {
@@ -56,10 +57,10 @@ export default memo(function SparksCallNotes({
         </View>
         <Text style={styles.cardBody}>{notice.body}</Text>
         <View style={styles.cardButtons}>
-          <Pressable style={[styles.button, styles.buttonGhost]} onPress={notes.decline} accessibilityRole="button">
+          <Pressable accessibilityLabel={notice.declineLabel} style={[styles.button, styles.buttonGhost]} onPress={notes.decline} accessibilityRole="button">
             <Text style={styles.buttonGhostText}>{notice.declineLabel}</Text>
           </Pressable>
-          <Pressable style={[styles.button, styles.buttonMain]} onPress={notes.accept} accessibilityRole="button">
+          <Pressable accessibilityLabel={notice.acceptLabel} style={[styles.button, styles.buttonMain]} onPress={notes.accept} accessibilityRole="button">
             <Text style={styles.buttonMainText}>{notice.acceptLabel}</Text>
           </Pressable>
         </View>

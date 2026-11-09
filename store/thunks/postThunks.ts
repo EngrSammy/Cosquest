@@ -38,6 +38,23 @@ export const fetchPosts = createAsyncThunk(
 );
 
 /* =========================================================
+   THE NEXT PAGE OF THE FEED (audit B2)
+========================================================= */
+
+export const fetchMorePosts = createAsyncThunk(
+  "post/fetchMorePosts",
+  async ({ token, page }: { token: string; page: number }, { rejectWithValue }) => {
+    try {
+      return await getPosts(token, page);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to load posts",
+      );
+    }
+  },
+);
+
+/* =========================================================
    CREATE THOUGHT
 ========================================================= */
 

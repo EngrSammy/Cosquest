@@ -15,7 +15,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -23,6 +22,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -172,7 +172,7 @@ export default function ShareMediaSheet({
             showsVerticalScrollIndicator={false}>
             {/* TILES */}
             <View style={styles.tiles}>
-              <Pressable style={styles.tile} onPress={() => pick(false)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Photo" style={styles.tile} onPress={() => pick(false)}>
                 <Ionicons
                   name="image-outline"
                   size={24}
@@ -180,7 +180,7 @@ export default function ShareMediaSheet({
                 />
                 <Text style={styles.tileText}>Photo</Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Voice note"
                 style={styles.tile}
                 onPress={() => {
                   onClose();
@@ -193,7 +193,7 @@ export default function ShareMediaSheet({
                 />
                 <Text style={styles.tileText}>Voice note</Text>
               </Pressable>
-              <Pressable style={styles.tile} onPress={() => pick(true)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Short video" style={styles.tile} onPress={() => pick(true)}>
                 <Ionicons
                   name="film-outline"
                   size={24}

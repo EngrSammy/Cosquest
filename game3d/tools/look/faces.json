@@ -1,0 +1,9 @@
+{
+ "_doc": "cq 239 face landmarks, read off face.py's landmark sheets. model: mm in the head frame (x right of the head's centre line, y down from the model's top), concept: px in cq 060's pose/<key>/concept.png. Order: viewer-left eye, viewer-right eye, nose tip, mouth centre (+ extra points). affine: the lift changed face proportions (faces up to ~40 % longer than the concept), so a full affine, not a similarity. Hoof (arm over his face in the deck pose) and Cat-Boy (visor) have none.",
+ "armstrong": {"model": [[-60, 200], [36, 200], [-8, 235], [-6, 248]], "concept": [[486, 159], [551, 158], [518, 174], [519, 187]], "affine": true},
+ "bobo": {"model": [[-40, 154], [40, 154], [0, 189], [-2, 217]], "concept": [[492, 139], [541, 139], [518, 156], [518, 170]], "affine": true},
+ "crystalz": {"model": [[-134, 231], [-66, 231], [-100, 256], [-102, 288]], "concept": [[491, 151], [534, 149], [512, 162], [514, 173]], "affine": true, "box": [-240, 80, 40, 420]},
+ "elvis": {"model": [[-29, 152], [26, 152], [0, 190], [0, 205]], "concept": [[496, 134], [540, 134], [520, 151], [520, 161]], "affine": true, "ry": 55, "_why_ry": "the lift's face is longer than the concept's: a taller ellipse paints the concept's jaw line on his neck"},
+ "nebulx": {"model": [[-26, 148], [40, 148], [8, 180], [8, 212], [20, 118]], "concept": [[496, 136], [546, 135], [523, 150], [523, 162], [521, 116]], "affine": true},
+ "vanessa": {"model": [[-10, 163], [74, 163], [30, 216], [30, 238]], "concept": [[492, 141], [546, 140], [518, 157], [521, 172]], "affine": true}
+}

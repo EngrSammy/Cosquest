@@ -6,8 +6,11 @@ import { apiRequest } from "./api";
    POSTS
 ========================================================= */
 
-export async function getPosts(token: string) {
-  return apiRequest("/api/posts?page=1&limit=20", {
+// A page of the feed (20 posts; the feed asks for the next as you scroll, audit B2).
+export const POSTS_PAGE_SIZE = 20;
+
+export async function getPosts(token: string, page = 1) {
+  return apiRequest(`/api/posts?page=${page}&limit=${POSTS_PAGE_SIZE}`, {
     token,
   });
 }

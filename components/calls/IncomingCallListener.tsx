@@ -189,25 +189,26 @@ export default function IncomingCallListener() {
 
         <View style={[styles.card, { marginBottom: insets.bottom + 20 }]}>
           <View style={styles.actions}>
-            <View style={styles.actionItem}>
-              <Pressable
-                style={[styles.actionButton, styles.decline]}
-                onPress={decline}
-                disabled={answering}
-                accessibilityRole="button"
-                accessibilityLabel="Decline call">
+            {/* The caption under the round button is part of the target too. */}
+            <Pressable
+              style={styles.actionItem}
+              onPress={decline}
+              disabled={answering}
+              accessibilityRole="button"
+              accessibilityLabel="Decline call">
+              <View style={[styles.actionButton, styles.decline]}>
                 <MaterialIcons name="call-end" size={32} color="#FFFFFF" />
-              </Pressable>
+              </View>
               <Text style={styles.actionLabel}>Decline</Text>
-            </View>
+            </Pressable>
 
-            <View style={styles.actionItem}>
-              <Pressable
-                style={[styles.actionButton, styles.accept]}
-                onPress={accept}
-                disabled={answering}
-                accessibilityRole="button"
-                accessibilityLabel="Accept call">
+            <Pressable
+              style={styles.actionItem}
+              onPress={accept}
+              disabled={answering}
+              accessibilityRole="button"
+              accessibilityLabel="Accept call">
+              <View style={[styles.actionButton, styles.accept]}>
                 {answering ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
@@ -217,9 +218,9 @@ export default function IncomingCallListener() {
                     color="#FFFFFF"
                   />
                 )}
-              </Pressable>
+              </View>
               <Text style={styles.actionLabel}>Accept</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
       </CallBackground>

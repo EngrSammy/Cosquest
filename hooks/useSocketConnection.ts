@@ -20,14 +20,17 @@ import {
       socketCallIncoming,
       socketCallUpdated,
 } from "@/store/slices/callSlice";
+import { previewSummary } from "@/services/idBatcher";
+import { normalizeChat } from "@/services/chats";
 import {
+      socketChatSummaries,
       socketPresenceChanged,
       socketTypingStarted,
       socketTypingStopped,
 } from "@/store/slices/chatSlice";
 import { socketFollowerAdded } from "@/store/slices/followSlice";
 import { fetchIncomingCall } from "@/store/thunks/callThunks";
-import { fetchConversation } from "@/store/thunks/chatThunks";
+import { fetchConversation, refreshConversations } from "@/store/thunks/chatThunks";
 
 // How long someone stays showing as "online" after their connection
 // actually drops — covers a brief app-background/network-blip without
@@ -227,8 +230,16 @@ export function useSocketConnection() {
         });
     };
 
-    const handleChatPreview = (payload: { conversationId: string }) => {
+    const handleChatPreview = (payload: { conversationId: string; chat?: unknown }) => {
       if (!payload?.conversationId) {
+        return;
+      }
+
+      // A preview that already carries the chat's summary (the backend change
+      // in docs/polish/BACKEND-PORT.md) is used as is, with no fetch.
+      const summary = previewSummary(payload);
+      if (summary) {
+        dispatch(socketChatSummaries([normalizeChat(summary)]));
         return;
       }
 
@@ -299,10 +310,9 @@ export function useSocketConnection() {
     const handleConnect = () => {
       checkForMissedRinging();
 
-      if (hasConnectedBefore) {
-        dmIdsRef.current.forEach((conversationId) => {
-          dispatch(fetchConversation({ conversationId, token }));
-        });
+      // One request for every DM, not one per DM (audit B5).
+      if (hasConnectedBefore && dmIdsRef.current.length > 0) {
+        dispatch(refreshConversations({ ids: dmIdsRef.current, token }));
       }
 
       hasConnectedBefore = true;

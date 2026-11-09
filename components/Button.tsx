@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text } from "react-native";
+import { C } from "@/theme/tokens";
 
 type Variant = "light" | "dark" | "brand";
 
@@ -47,7 +48,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   ssoLight: { backgroundColor: "#FFFFFF" },
-  ssoDark: { backgroundColor: "#191922" },
+  ssoDark: { backgroundColor: C.ink },
   ssoBrand: {
     backgroundColor: "rgba(255,255,255,0.15)",
     borderWidth: 0.5,
@@ -55,9 +56,9 @@ const styles = StyleSheet.create({
   },
 
   ssoLabel: { fontSize: 16, fontWeight: "700" },
-  labelDark: { color: "#191922" },
+  labelDark: { color: C.ink },
   labelLight: { color: "#FFFFFF" },
-  labelBrand: { color: "#C5399A" },
+  labelBrand: { color: C.brand },
   prefix: { fontSize: 20, fontWeight: "800", color: "#4285F4" }, // Google blue
 });
 

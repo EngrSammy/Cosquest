@@ -24,13 +24,14 @@ import {
   type ModelStatus,
 } from "@/services/sparksSdk";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { ScreenGradient } from "@/components/chat/ui";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 
 const REASONS: Record<string, string> = {
   ram: "This phone has less memory than the AI needs (about 6 GB).",
@@ -128,17 +129,17 @@ export default function SparksModel() {
 
   let body;
   if (!sparksEnabled()) {
-    body = <Text style={styles.text}>The Sparks AI isn't switched on yet. Sparks keep working as they do today.</Text>;
+    body = <Text style={styles.text}>The Sparks AI isn&apos;t switched on yet. Sparks keep working as they do today.</Text>;
   } else if (Platform.OS === "web") {
     body = (
       <Text style={styles.text}>
-        The Sparks AI runs on phones. On the website you still see every Spark: members' phones do the AI work for the group.
+        The Sparks AI runs on phones. On the website you still see every Spark: members&apos; phones do the AI work for the group.
       </Text>
     );
   } else if (waiting) {
     body = <ActivityIndicator color={ink.text(PINK)} style={styles.loading} />;
   } else if (!getSparksSdk()) {
-    body = <Text style={styles.text}>The Sparks AI couldn't start. Check your connection and open this screen again.</Text>;
+    body = <Text style={styles.text}>The Sparks AI couldn&apos;t start. Check your connection and open this screen again.</Text>;
   } else {
     body = (
       <>
@@ -163,7 +164,7 @@ export default function SparksModel() {
           {!capable ? (
             <Text style={styles.note}>
               {REASONS[caps?.tierReason || ""] || "A smaller version for more phones is planned."} You still see every
-              Spark: other members' phones do the AI work for the group.
+              Spark: other members&apos; phones do the AI work for the group.
             </Text>
           ) : null}
         </View>
@@ -213,7 +214,7 @@ export default function SparksModel() {
 
         <Text style={styles.footnote}>
           The AI runs on your phone, not on a server. It works out Spark subjects and summaries for your chats, only while
-          you're not busy in the game.
+          you&apos;re not busy in the game.
         </Text>
       </>
     );
@@ -254,13 +255,13 @@ const STYLE_PAIR = themedStyles({
   cardTitle: { fontFamily: FONTS.semibold, fontSize: 16, color: INK },
   cardText: { marginTop: 3, fontFamily: FONTS.regular, fontSize: 13, color: MUTED },
   note: { marginTop: 12, fontFamily: FONTS.regular, fontSize: 13, lineHeight: 19, color: MUTED },
-  error: { marginTop: 10, fontFamily: FONTS.regular, fontSize: 13, color: "#C0394B" },
+  error: { marginTop: 10, fontFamily: FONTS.regular, fontSize: 13, color: C.dangerDeep },
   track: { marginTop: 14, height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: "#E3E7EF" },
   bar: { height: 8, borderRadius: 4, backgroundColor: PINK },
   primary: { marginTop: 16, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: PINK },
   primaryText: { fontFamily: FONTS.semibold, fontSize: 16, color: "#FFFFFF" },
   secondary: { marginTop: 10, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: LILAC },
   secondaryText: { fontFamily: FONTS.semibold, fontSize: 15, color: PINK },
-  danger: { color: "#C0394B" },
+  danger: { color: C.dangerDeep },
   footnote: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 12.5, lineHeight: 18, color: MUTED },
 });

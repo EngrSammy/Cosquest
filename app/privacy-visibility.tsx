@@ -22,9 +22,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 type Visibility = PrivacySettings["profileVisibility"];
 type ToggleKey = Exclude<keyof PrivacySettings, "profileVisibility">;
@@ -336,7 +337,7 @@ const STYLE_PAIR = themedStyles({
     backgroundColor: "#0000000A",
   },
 
-  headerTitle: { fontFamily: FONTS.semibold, fontSize: 17, color: "#191922" },
+  headerTitle: { fontFamily: FONTS.semibold, fontSize: 17, color: C.ink },
 
   section: { paddingTop: 18, gap: 12 },
 
@@ -344,7 +345,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   visibilitySelector: {
@@ -396,24 +397,24 @@ const STYLE_PAIR = themedStyles({
 
   rowTextWrap: { flex: 1, minWidth: 0 },
 
-  rowLabel: { fontFamily: FONTS.regular, fontSize: 13.5, color: "#3B3B42" },
+  rowLabel: { fontFamily: FONTS.regular, fontSize: 13.5, color: C.ink2 },
 
   rowHint: {
     marginTop: 2,
     fontFamily: FONTS.regular,
     fontSize: 11,
     lineHeight: 15,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   blockedRow: { minHeight: 62 },
 
-  blockedTitle: { fontFamily: FONTS.regular, fontSize: 11.5, color: "#7A7A84" },
+  blockedTitle: { fontFamily: FONTS.regular, fontSize: 11.5, color: C.grey4 },
 
   blockedSubtitle: {
     fontFamily: FONTS.semibold,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
   },
 
   pressed: { opacity: 0.75 },

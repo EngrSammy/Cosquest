@@ -25,6 +25,7 @@ import { PostCard } from "@/components/community/feed/PostCard";
 import { getPost } from "@/services/posts";
 import { useAppSelector } from "@/store/hooks";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // The backend's single-post answer may be { post: {...} } or the post
@@ -133,7 +134,7 @@ export default function PostDetailScreen() {
           Join CosQuest to see posts from the community.
         </Text>
 
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Log in"
           style={styles.button}
           onPress={() => router.push("/onboarding/signin")}>
           <Text style={styles.buttonText}>Log in</Text>
@@ -161,7 +162,7 @@ export default function PostDetailScreen() {
           {error || "It may have been deleted."}
         </Text>
 
-        <Pressable style={styles.button} onPress={load}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Try again" style={styles.button} onPress={load}>
           <Text style={styles.buttonText}>Try again</Text>
         </Pressable>
       </View>
@@ -173,7 +174,7 @@ export default function PostDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={goBack} hitSlop={10} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
         </Pressable>
 
@@ -213,7 +214,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   scroll: {
@@ -239,7 +240,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 12,
     fontSize: 17,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
   },
 
@@ -247,7 +248,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: "#6B6B72",
+    color: C.grey3,
     textAlign: "center",
   },
 
@@ -256,7 +257,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 24,
     paddingVertical: 11,
     borderRadius: 20,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   buttonText: {

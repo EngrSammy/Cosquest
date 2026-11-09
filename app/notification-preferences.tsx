@@ -18,9 +18,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 type NotificationSettings = {
   notificationsEnabled?: boolean;
@@ -395,7 +396,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
   },
 
   section: {
@@ -407,7 +408,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   // Milky pressed-in row.
@@ -450,6 +451,6 @@ const STYLE_PAIR = themedStyles({
     flex: 1,
     fontFamily: FONTS.regular,
     fontSize: 13.5,
-    color: "#3B3B42",
+    color: C.ink2,
   },
 });

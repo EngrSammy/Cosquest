@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   Share as NativeShare,
@@ -15,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import { sharePost } from "@/services/posts";
 import {
@@ -29,6 +29,7 @@ import { getPostShareLink } from "@/utils/shareLinks";
 
 import { ShareAction } from "./ShareAction";
 import { SharePerson } from "./SharePerson";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useIsDesktop } from "@/hooks/useDesktop";
 
@@ -387,7 +388,7 @@ export function ShareSheet({
           <View style={styles.header}>
             <Text style={styles.title}>Share</Text>
 
-            <Pressable style={styles.close} onPress={onClose}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.close} onPress={onClose}>
               <Ionicons name="close" size={23} color={ink.text("#191922")} />
             </Pressable>
           </View>
@@ -408,7 +409,7 @@ export function ShareSheet({
               />
             </View>
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Add"
               style={styles.plus}
               onPress={() => {
                 setSearchText("");
@@ -520,14 +521,14 @@ export function ShareSheet({
               ) : null}
 
               <View style={styles.composerButtons}>
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Cancel"
                   style={[styles.composerButton, styles.composerCancel]}
                   onPress={() => setComposerOpen(false)}
                   disabled={sharingToFeed}>
                   <Text style={styles.composerCancelText}>Cancel</Text>
                 </Pressable>
 
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Share"
                   style={[styles.composerButton, styles.composerShare]}
                   onPress={shareToFeed}
                   disabled={sharingToFeed}>
@@ -573,7 +574,7 @@ const STYLE_PAIR = themedStyles({
   composerTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
   },
 
   composerInput: {
@@ -583,7 +584,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 14,
     backgroundColor: "#F5F3F8",
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
     textAlignVertical: "top",
   },
 
@@ -591,9 +592,9 @@ const STYLE_PAIR = themedStyles({
     marginTop: 10,
     paddingLeft: 10,
     borderLeftWidth: 3,
-    borderLeftColor: "#C5399A",
+    borderLeftColor: C.brand,
     fontSize: 13,
-    color: "#6B6B72",
+    color: C.grey3,
   },
 
   composerButtons: {
@@ -621,7 +622,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   composerShare: {
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   composerShareText: {
@@ -675,7 +676,7 @@ const STYLE_PAIR = themedStyles({
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   close: {
@@ -707,7 +708,7 @@ const STYLE_PAIR = themedStyles({
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: "#191922",
+    color: C.ink,
   },
 
   plus: {
@@ -716,7 +717,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   peopleArea: {

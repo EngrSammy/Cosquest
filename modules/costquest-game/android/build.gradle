@@ -1,0 +1,52 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.cosquest'
+version = '0.2.0'
+
+// The Android side of the CostQuest game module. The game itself is the
+// React Native one (src/rnGame.ts + components/game); this module supplies
+// what only the platform knows (RAM, NFC, speech, UWB availability, system
+// gesture exclusion) and, when the app is built with Unity, the Unity bridge.
+//
+// Unity: everything that references com.unity3d.* lives in src/unity/java
+// and is compiled ONLY when the app's settings.gradle includes :unityLibrary.
+// The config plugin (plugin/withCostQuestGame.js) does that with
+// { "unityAndroid": true } and an export in unity-android/export/unityLibrary
+// (scripts/export-unity-android.sh). Without it (the normal case) the module
+// compiles without Unity and reports hasUnity = false.
+def unityLibrary = rootProject.findProject(':unityLibrary')
+
+android {
+  namespace "expo.modules.costquestgame"
+  defaultConfig {
+    versionCode 2
+    versionName '0.2.0'
+    // Unity calls CQUnityEvents by name from C# (AndroidJavaClass), so R8
+    // must keep it in minified release builds.
+    consumerProguardFiles 'proguard-rules.pro'
+  }
+  if (unityLibrary != null) {
+    sourceSets {
+      main {
+        java.srcDirs += 'src/unity/java'
+      }
+    }
+  }
+}
+
+dependencies {
+  if (unityLibrary != null) {
+    implementation project(':unityLibrary')
+    // Unity's unityLibrary/build.gradle declares libs/unity-classes.jar as
+    // `implementation`, which does not reach a consumer's compile classpath.
+    // Compile against it directly; at runtime it comes with :unityLibrary.
+    compileOnly fileTree(dir: "${unityLibrary.projectDir}/libs", include: ['*.jar'])
+  }
+}
+
+if (unityLibrary != null) {
+  logger.lifecycle("[costquest-game] Unity found (${unityLibrary.projectDir}): compiling the Unity bridge")
+}

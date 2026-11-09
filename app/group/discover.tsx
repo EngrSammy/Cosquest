@@ -7,15 +7,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-      ActivityIndicator,
-      Alert,
-      Platform,
-      Pressable,
-      ScrollView,
-      StyleSheet,
-      Text,
-      TextInput,
-      View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -38,6 +37,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { safeBack } from "@/utils/safeBack";
+import { KeyboardAwareScrollView } from "@/components/ui/keyboard";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const KIND_LABEL = {
@@ -122,7 +122,8 @@ export default function DiscoverGroups() {
 
   return (
     <GroupScreen title="Discover groups" onBack={() => safeBack()}>
-      <ScrollView
+      <KeyboardAwareScrollView
+        bottomOffset={24}
         contentContainerStyle={[
           styles.scroll,
           { paddingBottom: insets.bottom + 40 },
@@ -143,7 +144,7 @@ export default function DiscoverGroups() {
             style={styles.input}
             onSubmitEditing={openLink}
           />
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Open the invitation link"
             onPress={openLink}
             disabled={!link.trim()}
             style={[styles.goButton, !link.trim() && styles.off]}>
@@ -180,7 +181,7 @@ export default function DiscoverGroups() {
 
         <View style={styles.list}>
           {groups.map((group) => (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={group.name}
               key={group.id}
               style={styles.card}
               onPress={() =>
@@ -210,7 +211,7 @@ export default function DiscoverGroups() {
                 ) : null}
               </View>
 
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Join"
                 style={[
                   styles.joinButton,
                   (group.requestPending || joiningId === group.id) &&
@@ -233,7 +234,7 @@ export default function DiscoverGroups() {
             </Pressable>
           ))}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </GroupScreen>
   );
 }

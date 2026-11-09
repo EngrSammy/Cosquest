@@ -8,7 +8,7 @@
     "scheme": "cosquest",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.dammy0227.cosquest",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -25,6 +25,7 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
@@ -46,14 +47,23 @@
     "plugins": [
       "expo-router",
       [
+        "./modules/costquest-game/plugin/withCostQuestGame",
+        {
+          "nfc": false,
+          "serverUrl": "",
+          "unityAndroid": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/cosquest-logo.png",
-          "imageWidth": 200,
+          "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#C5399A",
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/images/cosquest-logo.png",
+            "backgroundColor": "#191922"
           }
         }
       ],
@@ -64,7 +74,18 @@
           "cameraPermission": "CosQuest needs access to your camera so you can take a profile picture."
         }
       ],
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/poppins/400Regular/Poppins_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/poppins/500Medium/Poppins_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/poppins/600SemiBold/Poppins_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/poppins/700Bold/Poppins_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/poppins/800ExtraBold/Poppins_800ExtraBold.ttf"
+          ]
+        }
+      ],
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
@@ -81,12 +102,13 @@
             "ndkVersion": "27.1.12297006"
           },
           "ios": {
-            "deploymentTarget": "16.4"
+            "deploymentTarget": "18.0"
           }
         }
       ],
       "expo-asset",
       "./plugins/withSceneLifecycle",
+      "./plugins/withGodot",
       [
         "expo-notifications",
         {

@@ -26,10 +26,11 @@ import {
   useThemedStyles,
 } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import { C } from "@/theme/tokens";
 
-export const PINK = "#C34D9C";
-export const INK = "#191922";
-export const MUTED = "#7A7A84";
+export const PINK = C.brandSoft;
+export const INK = C.ink;
+export const MUTED = C.grey4;
 
 // The milky, pressed-in box used across the app's Figma screens.
 export const MILKY = {
@@ -178,7 +179,7 @@ export function OptionSelector<T extends string>({
         const selected = option.value === value;
 
         return (
-          <Pressable
+          <Pressable accessibilityLabel={option.label}
             key={option.value}
             disabled={disabled}
             onPress={() => onChange(option.value)}
@@ -216,7 +217,7 @@ export function GroupRow({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityLabel="Open"
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [

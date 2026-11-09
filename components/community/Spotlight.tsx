@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DraggableAvatar } from "./DraggableAvatar";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatar(entry: any) {
@@ -226,7 +227,7 @@ const STYLE_PAIR = themedStyles({
 
   loadingText: {
     fontSize: 13,
-    color: "#777780",
+    color: C.grey5,
   },
 
   empty: {
@@ -238,7 +239,7 @@ const STYLE_PAIR = themedStyles({
 
   emptyText: {
     fontSize: 14,
-    color: "#777780",
+    color: C.grey5,
     textAlign: "center",
   },
 
@@ -302,7 +303,7 @@ const STYLE_PAIR = themedStyles({
   podiumScore: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
     textAlign: "center",
     marginTop: -6,
   },
@@ -344,18 +345,18 @@ const STYLE_PAIR = themedStyles({
   name: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#191922",
+    color: C.ink,
   },
 
   meta: {
     fontSize: 12,
-    color: "#6b6b72",
+    color: C.grey3,
     marginTop: 2,
   },
 
   rank: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#9C9CAA",
+    color: C.muted,
   },
 });

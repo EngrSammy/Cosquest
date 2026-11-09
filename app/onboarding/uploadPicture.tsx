@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
@@ -12,8 +11,10 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function UploadPicture() {
@@ -166,10 +167,26 @@ export default function UploadPicture() {
   const isSaving = loading || saving;
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled">
+    <OnboardingScreen
+      background="gradient"
+      insetTop={false}
+      topGap={0}
+      contentStyle={styles.scroll}
+      // Pinned under the 100 avatars, so moving on needs no scrolling; the
+      // photo error shows here too (the one at the top is off screen).
+      footerStyle={styles.footer}
+      footer={
+        <>
+          <ErrorText>{errors.avatar || errors.photo}</ErrorText>
+
+          <Button
+            label={isSaving ? "Saving..." : "Continue"}
+            variant="brand"
+            onPress={handleContinue}
+            disabled={isSaving}
+          />
+        </>
+      }>
         <OnboardingProgress
           step={STEP.uploadPicture}
           total={ONBOARDING_TOTAL}
@@ -249,19 +266,7 @@ export default function UploadPicture() {
             </Pressable>
           ))}
         </View>
-
-        <ErrorText>{errors.avatar}</ErrorText>
-
-        <View style={styles.buttonContainer}>
-          <Button
-            label={isSaving ? "Saving..." : "Continue"}
-            variant="brand"
-            onPress={handleContinue}
-            disabled={isSaving}
-          />
-        </View>
-      </ScrollView>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -276,7 +281,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
     marginTop: 20,
   },
 
@@ -365,7 +370,7 @@ const STYLE_PAIR = themedStyles({
     padding: 3,
     borderRadius: 110,
     borderWidth: 2,
-    borderColor: "#C5399A",
+    borderColor: C.brand,
     marginBottom: 30,
   },
 
@@ -395,7 +400,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   avatarActive: {
-    borderColor: "#C5399A",
+    borderColor: C.brand,
     borderWidth: 2,
   },
 
@@ -405,7 +410,8 @@ const STYLE_PAIR = themedStyles({
     transform: [{ scale: 1.12 }],
   },
 
-  buttonContainer: {
-    marginTop: 80,
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
   },
 });

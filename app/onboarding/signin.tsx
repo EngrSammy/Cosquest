@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
@@ -9,16 +8,16 @@ import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function Signin() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const insets = useSafeAreaInsets();
 
   const dispatch = useAppDispatch();
 
@@ -64,6 +63,8 @@ export default function Signin() {
   }
 
   async function handleSignin() {
+    // The keyboard goes with the form (it followed focus onto the feed).
+    Keyboard.dismiss();
     if (!validate()) return;
 
     const result = await dispatch(
@@ -104,15 +105,7 @@ export default function Signin() {
   }
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <View
-          style={[
-            styles.screen,
-            {
-              paddingTop: insets.top + 35,
-            },
-          ]}>
+    <OnboardingScreen background="gradient" contentStyle={styles.screen}>
           <Text style={styles.headline}>Welcome back!</Text>
 
           <Text style={styles.sub}>
@@ -183,9 +176,7 @@ export default function Signin() {
               <Text style={styles.signupLink}>Sign up</Text>
             </Pressable>
           </View>
-        </View>
-      </ScrollView>
-    </AppBackground>
+        </OnboardingScreen>
   );
 }
 
@@ -201,13 +192,13 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
 
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     marginBottom: 36,

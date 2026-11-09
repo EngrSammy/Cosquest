@@ -13,10 +13,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -25,6 +24,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import { CommentsModal } from "./CommentsModal";
 import { PostActions } from "./PostActions";
@@ -33,6 +33,11 @@ import { getMediaUrls, PostMedia } from "./PostMedia";
 import { PostMenu } from "./PostMenu";
 import { SharedPostEmbed } from "./SharedPostEmbed";
 import { ShareSheet } from "./ShareSheet";
+import { useRenderCount } from "@/utils/perfMarks";
+import { C } from "@/theme/tokens";
+import { confirmBlock } from "@/components/safety/block";
+import { hidePostsBy } from "@/store/slices/postSlice";
+import { haptic } from "@/utils/haptics";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { openReport } from "@/components/report/reportStore";
 
@@ -166,7 +171,7 @@ function factionColor(faction: string) {
   const key = faction.toLowerCase();
 
   if (!key) {
-    return "#C5399A";
+    return C.brand;
   }
 
   if (FACTION_COLORS[key]) {
@@ -182,7 +187,10 @@ function factionColor(faction: string) {
   return RING_PALETTE[hash % RING_PALETTE.length];
 }
 
-export function PostCard({ post, token }: { post: any; token: string }) {
+// Memoised (audit B2): the feed list re-renders its mounted rows as its
+// window moves; a card whose post hasn't changed skips that.
+export const PostCard = memo(function PostCard({ post, token }: { post: any; token: string }) {
+  useRenderCount("PostCard");
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const dispatch = useAppDispatch();
@@ -350,6 +358,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
     if (!post?.id) {
       return;
     }
+    haptic.tap();
 
     if (post.liked) {
       dispatch(unlikePostThunk({ postId: post.id, token }));
@@ -659,7 +668,9 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         onClose={() => setMenuVisible(false)}
         onEdit={startEdit}
         onDelete={deletePost}
+        authorName={postUsername ? `@${postUsername}` : undefined}
         onReport={() => post?.id && openReport({ targetType: "post", targetId: String(post.id), what: "post" })}
+        onBlock={postUsername ? () => confirmBlock({ username: postUsername }, () => dispatch(hidePostsBy(postUsername))) : undefined}
       />
 
       {/* EDIT POST MODAL */}
@@ -674,7 +685,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
         }}>
         <KeyboardAvoidingView
           style={styles.editRoot}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          behavior="padding">
           <Pressable
             style={styles.editOverlay}
             onPress={() => {
@@ -690,7 +701,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
             <View style={styles.editHeader}>
               <Text style={styles.editTitle}>Edit post</Text>
 
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Close"
                 onPress={() => {
                   if (!savingEdit) {
                     setEditing(false);
@@ -712,7 +723,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
               placeholderTextColor={ink.text("#9C9CAA")}
             />
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={savingEdit ? "Saving..." : "Save Changes"}
               style={[
                 styles.saveButton,
                 savingEdit && styles.saveButtonDisabled,
@@ -759,7 +770,7 @@ export function PostCard({ post, token }: { post: any; token: string }) {
       ) : null}
     </View>
   );
-}
+});
 
 /* =========================================================
    STYLES
@@ -832,7 +843,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.semibold,
     fontSize: 13.5,
     lineHeight: 18,
-    color: "#191922",
+    color: C.ink,
   },
 
   meta: {
@@ -930,7 +941,7 @@ const STYLE_PAIR = themedStyles({
   editTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   editClose: {
@@ -944,7 +955,7 @@ const STYLE_PAIR = themedStyles({
 
   editCloseText: {
     fontSize: 26,
-    color: "#191922",
+    color: C.ink,
     lineHeight: 28,
   },
 
@@ -957,7 +968,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 15,
     paddingVertical: 14,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
     marginBottom: 15,
   },
 
@@ -966,7 +977,7 @@ const STYLE_PAIR = themedStyles({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   saveButtonDisabled: {

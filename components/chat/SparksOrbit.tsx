@@ -16,12 +16,13 @@ import { DormantSparkCard } from "@/components/chat/SparksRail";
 import { FONTS } from "@/constants/fonts";
 import { type Spark } from "@/services/sparks";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const TEAL = "#2A8A92";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const TEAL = C.teal;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 
 function people(spark: Spark) {
   return `${spark.participantCount} ${spark.participantCount === 1 ? "person" : "people"}`;
@@ -104,7 +105,7 @@ export default function SparksOrbit({
         ))}
 
         {quiet.map((spark) => (
-          <Pressable key={spark.id} style={styles.quiet} onPress={() => onOpen(spark)}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Quiet" key={spark.id} style={styles.quiet} onPress={() => onOpen(spark)}>
             <Text style={styles.quietTitle} numberOfLines={2}>
               {spark.subject}
             </Text>
@@ -114,7 +115,7 @@ export default function SparksOrbit({
         ))}
 
         {hidden > 0 ? (
-          <Pressable style={styles.all} onPress={onShowAll}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Show all Sparks" style={styles.all} onPress={onShowAll}>
             <Text style={styles.allText}>All · {sparks.length}</Text>
           </Pressable>
         ) : null}

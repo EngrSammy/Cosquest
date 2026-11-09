@@ -12,6 +12,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
+
+import { setChatFocus } from "@/services/chatFocus";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,11 +37,13 @@ import { useAppSelector } from "@/store/hooks";
 import { getPref, setPref } from "@/utils/prefsStorage";
 import { safeBack } from "@/utils/safeBack";
 import { DARK_SCREEN_GRADIENT, LIGHT_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 const LINE = "rgba(36,40,60,0.08)";
 
 const RECENT_LIMIT = 3;
@@ -131,7 +135,7 @@ const ResultCard = memo(function ResultCard({
           <Text style={styles.contextText}>{result.context.label}</Text>
         </View>
       ) : null}
-      <Pressable style={styles.jump} onPress={() => onJump(result)}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Jump to message" style={styles.jump} onPress={() => onJump(result)}>
         <Text style={styles.jumpText}>Jump to message ↗</Text>
       </Pressable>
     </View>
@@ -361,7 +365,7 @@ export default function SearchInChat({ chatId, onClose }: { chatId?: string; onC
           {loadingPage === 1 ? <ActivityIndicator size="small" color={PINK} /> : null}
           {query ? (
             <Pressable onPress={() => setQuery("")} hitSlop={8} accessibilityLabel="Clear search">
-              <Ionicons name="close-circle" size={17} color="#9AA3B5" />
+              <Ionicons name="close-circle" size={17} color={C.placeholder} />
             </Pressable>
           ) : null}
         </View>
@@ -389,7 +393,7 @@ export default function SearchInChat({ chatId, onClose }: { chatId?: string; onC
         {showDates ? (
           <View style={styles.menu}>
             {DATE_OPTIONS.map((option, index) => (
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Done"
                 key={option.value}
                 style={[styles.menuRow, index === DATE_OPTIONS.length - 1 && styles.menuRowLast]}
                 onPress={() => {
@@ -423,44 +427,47 @@ export default function SearchInChat({ chatId, onClose }: { chatId?: string; onC
       </View>
 
       {/* RESULTS */}
-      <FlatList
-        style={styles.flex}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
-        data={ready ? results : []}
-        keyExtractor={(item) => item.message.id}
-        renderItem={renderItem}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={7}
-        removeClippedSubviews={Platform.OS === "android"}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          !ready ? (
-            <Text style={styles.empty}>Type at least 2 letters to search this chat.</Text>
-          ) : error ? (
-            <Text style={styles.empty}>{error}</Text>
-          ) : loadingPage ? null : (
-            <Text style={styles.empty}>
-              No messages match “{text}”{range !== "all" ? ` in the ${dateLabel.toLowerCase()}` : ""}.
-            </Text>
-          )
-        }
-        ListFooterComponent={
-          <>
-            {loadingPage > 1 ? <ActivityIndicator color={PINK} style={styles.moreSpinner} /> : null}
-            {error && results.length ? (
-              <Pressable style={styles.more} onPress={() => run(text, page + 1, range)}>
-                <Text style={styles.moreText}>Couldn&apos;t load more · tap to retry</Text>
-              </Pressable>
-            ) : null}
-            <Text style={styles.footnote}>Results open with the surrounding conversation.</Text>
-          </>
-        }
-      />
+      {/* The list ends above the keyboard while searching. */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <FlatList
+          style={styles.flex}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
+          data={ready ? results : []}
+          keyExtractor={(item) => item.message.id}
+          renderItem={renderItem}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === "android"}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            !ready ? (
+              <Text style={styles.empty}>Type at least 2 letters to search this chat.</Text>
+            ) : error ? (
+              <Text style={styles.empty}>{error}</Text>
+            ) : loadingPage ? null : (
+              <Text style={styles.empty}>
+                No messages match “{text}”{range !== "all" ? ` in the ${dateLabel.toLowerCase()}` : ""}.
+              </Text>
+            )
+          }
+          ListFooterComponent={
+            <>
+              {loadingPage > 1 ? <ActivityIndicator color={PINK} style={styles.moreSpinner} /> : null}
+              {error && results.length ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Couldn't load more, tap to try again" style={styles.more} onPress={() => run(text, page + 1, range)}>
+                  <Text style={styles.moreText}>Couldn&apos;t load more · tap to retry</Text>
+                </Pressable>
+              ) : null}
+              <Text style={styles.footnote}>Results open with the surrounding conversation.</Text>
+            </>
+          }
+        />
+      </KeyboardAvoidingView>
 
       {/* SURROUNDING CONVERSATION */}
       <Modal visible={!!context} animationType="slide" onRequestClose={() => setContext(null)}>
@@ -495,12 +502,17 @@ export default function SearchInChat({ chatId, onClose }: { chatId?: string; onC
           )}
 
           <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Open the chat"
               style={styles.primary}
               onPress={() => {
+                const target = context?.targetId;
                 setContext(null);
+                // Back to the chat this search came from, at the message found
+                // (it pushed a second copy of the chat, at the bottom).
+                if (target && conversationId) setChatFocus(conversationId, target);
                 if (onClose) onClose();
-                else router.push({ pathname: "/chat/[id]", params: { id: conversationId } });
+                else if (router.canGoBack()) router.back();
+                else router.replace({ pathname: "/chat/[id]", params: { id: conversationId } });
               }}>
               <Text style={styles.primaryText}>Open the chat</Text>
             </Pressable>
@@ -553,7 +565,7 @@ const STYLE_PAIR = themedStyles({
 
   chip: { paddingHorizontal: 12, height: 28, borderRadius: 14, justifyContent: "center", backgroundColor: "#ECE8F4" },
 
-  chipOn: { backgroundColor: "#F3DDED" },
+  chipOn: { backgroundColor: C.brandTint },
 
   chipText: { fontFamily: FONTS.medium, fontSize: 12, color: MUTED },
 

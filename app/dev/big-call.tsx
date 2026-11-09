@@ -24,11 +24,12 @@ import { createMockBigCall } from "@/components/calls/devMockBigCall";
 import StageLayout, {
   type RenderStageVideo,
 } from "@/components/calls/StageLayout";
+import { C } from "@/theme/tokens";
 
 // A stand-in for a camera picture.
 const renderFakeVideo: RenderStageVideo = () => (
   <LinearGradient
-    colors={["#3FD3E0", "#5B2A86", "#C5399A"]}
+    colors={["#3FD3E0", "#5B2A86", C.brand]}
     start={{ x: 0, y: 0 }}
     end={{ x: 1, y: 1 }}
     style={[StyleSheet.absoluteFill, styles.fakeVideo]}>

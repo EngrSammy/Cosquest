@@ -8,20 +8,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
+
+import { useStableCallback } from "@/hooks/useStableCallback";
 
 import { GroupAvatar } from "@/components/groups/GroupUi";
 import { AVATARS, smallAvatarUrl } from "@/constants/avatars";
@@ -37,6 +39,10 @@ import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useThemedStyles, useInk } from "@/constants/chatTheme";
 import { createChat, fetchChats } from "@/store/thunks/chatThunks";
 import { fetchFollowing, followUserThunk, unfollowUserThunk } from "@/store/thunks/followThunks";
+import { perfStart } from "@/utils/perfMarks";
+import { C } from "@/theme/tokens";
+import { EmptyState, ErrorState, SkeletonRows } from "@/components/kit";
+import { haptic } from "@/utils/haptics";
 
 import { PersonRow, ReadUnread, RoomCard } from "./HubRows";
 
@@ -44,16 +50,16 @@ import { PersonRow, ReadUnread, RoomCard } from "./HubRows";
 // DESIGN TOKENS (from M01)
 // ==========================================
 const COLORS = {
-  ink: "#24283C",
-  muted: "#66738A",
+  ink: C.inkNavy,
+  muted: C.slate,
   soft: "#8A93A6",
-  pink: "#B63D91",
+  pink: C.brandDeep,
   pinkSoft: "#F7E3F0",
   chip: "#ECE8F4",
   line: "rgba(36,40,60,0.10)",
   white: "#FFFFFF",
   online: "#25D366",
-  danger: "#B42318",
+  danger: C.dangerInk,
   dangerSoft: "rgba(255,80,80,0.08)",
   hairlineSoft: "rgba(23,25,34,0.07)",
 };
@@ -132,7 +138,7 @@ function initialsOf(name?: string) {
   return letters.toUpperCase();
 }
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function avatarTint(name?: string) {
   let hash = 0;
@@ -186,9 +192,12 @@ function groupLook(chat: ChatItem): { icon: keyof typeof Ionicons.glyphMap; labe
 // GROUP ROW
 // ==========================================
 
-function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; onPress: () => void }) {
+// Memoised: the group list re-renders as chats update; a row whose chat
+// hasn't changed skips that (onOpen is a stable callback).
+const GroupRow = memo(function GroupRow({ chat, first, onOpen }: { chat: ChatItem; first: boolean; onOpen: (chatId: string) => void }) {
   const styles = useThemedStyles(chatHubStylePair);
   const ink = useInk();
+  const onPress = () => onOpen(chat.id);
   const look = groupLook(chat);
   const unread = chat.unreadCount || 0;
   const muted = !!chat.group?.muted;
@@ -209,7 +218,7 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
   const art = roomArtFor(chat);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.groupRow, first && styles.groupRowCard, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${title}, ${last}${unread ? `, ${unread} unread` : ""}${muted ? ", muted" : ""}`} onPress={onPress} style={({ pressed }) => [styles.groupRow, first && styles.groupRowCard, pressed && styles.pressed]}>
       {chat.type === "group" && chat.group?.photoUrl ? (
         <GroupAvatar name={title} photoUrl={chat.group.photoUrl} size={48} />
       ) : art ? (
@@ -246,11 +255,14 @@ function GroupRow({ chat, first, onPress }: { chat: ChatItem; first: boolean; on
       </View>
     </Pressable>
   );
-}
+});
 
 // ==========================================
 // SCREEN
 // ==========================================
+
+// The DM circles row (a horizontal FlatList, audit B3/B10).
+type DmCell = { key: string; kind: "dm"; chat: ChatItem } | { key: string; kind: "person"; person: FollowUser } | { key: string; kind: "find" };
 
 // The hub's views (new Figma): "chats" = people only (Read / Unread);
 // "community" = Community — General, faction rooms and groups as cards.
@@ -399,6 +411,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
   const visibleNotYet = notYetMessaged.filter((person) => matches(person.name, person.username));
 
   const openChat = (chatId: string) => {
+    perfStart("chat-open");
     const target = { pathname: "/chat/[id]" as const, params: { id: chatId } };
     if (desktop) router.replace(target);
     else router.push(target);
@@ -437,6 +450,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
   // Follow <-> Following, straight away (tap Following to unfollow). The
   // follow list updates at once; it changes back if the server says no.
   async function handleFollow(person: FollowUser) {
+    haptic.tap();
     if (!token) return;
     const isFollowing = followingUsernames.has(person.username.toLowerCase());
     try {
@@ -504,6 +518,8 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
     return () => clearTimeout(timer);
   }, [peopleVisible, search, token, currentUsername]);
 
+  const onOpenChat = useStableCallback(openChat);
+
   if (!token) {
     return null;
   }
@@ -511,6 +527,80 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
   const showGroups = view === "community" || (view === "all" && filter !== "dms");
   const showDms = view === "all" && filter !== "groups";
   const peopleRows = visibleDms.filter((chat) => !unreadOnly || (chat.unreadCount || 0) > 0);
+
+  // The DM circles are a horizontal FlatList (audit B3/B10).
+  const dmCells: DmCell[] = [
+    ...visibleDms.map((chat) => ({ key: `dm-${chat.id}`, kind: "dm" as const, chat })),
+    ...visibleNotYet.map((person) => ({ key: `p-${person.id || person.username}`, kind: "person" as const, person })),
+    { key: "find", kind: "find" as const },
+  ];
+
+  const renderDm = ({ item }: { item: DmCell }) => {
+    if (item.kind === "dm") {
+      const chat = item.chat;
+      const username = chat.otherParticipant?.username || "";
+      const followed = followingByUsername.get(username.toLowerCase());
+      const name = followed?.name || chat.otherParticipant?.name || username || "Someone";
+      const photo = chat.otherParticipant?.avatarPhotoUrl || followed?.avatarPhotoUrl || null;
+      const unread = chat.unreadCount || 0;
+
+      return (
+        <Pressable accessibilityRole="button" accessibilityLabel={unread ? `${name}, ${unread} unread` : name} style={styles.dmItem} onPress={() => openChat(chat.id)}>
+          <View style={[styles.dmCircle, { backgroundColor: avatarTint(name) }]}>
+            {photo ? (
+              <Image source={{ uri: smallAvatarUrl(photo) }} style={styles.dmPhoto} contentFit="cover" />
+            ) : (
+              <Text style={styles.dmInitials}>{initialsOf(name)}</Text>
+            )}
+            {chat.otherParticipant?.isOnline ? <View style={styles.onlineDot} /> : null}
+            {unread > 0 ? (
+              <View style={styles.dmUnread}>
+                <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.dmName} numberOfLines={1}>
+            {name.split(" ")[0]}
+          </Text>
+        </Pressable>
+      );
+    }
+    if (item.kind === "person") {
+      const person = item.person;
+      const busy = startingChatWith === person.username;
+      const name = person.name || person.username;
+
+      return (
+        <Pressable accessibilityRole="button" accessibilityLabel={`${name}, start a chat`} style={styles.dmItem} disabled={busy} onPress={() => openOrCreateChat(person)}>
+          <View style={[styles.dmCircle, { backgroundColor: avatarTint(name) }]}>
+            {person.avatarPhotoUrl ? (
+              <Image source={getAvatarSource(person)} style={styles.dmPhoto} contentFit="cover" />
+            ) : (
+              <Text style={styles.dmInitials}>{initialsOf(name)}</Text>
+            )}
+            {isPersonOnline(person) ? <View style={styles.onlineDot} /> : null}
+            {busy ? (
+              <View style={styles.dmBusy}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.dmName} numberOfLines={1}>
+            {name.split(" ")[0]}
+          </Text>
+        </Pressable>
+      );
+    }
+    // + Find People
+    return (
+      <Pressable style={styles.dmItem} onPress={openPeople} accessibilityRole="button" accessibilityLabel="Find people">
+        <View style={[styles.dmCircle, styles.plusCircle]}>
+          <Ionicons name="add" size={26} color={COLORS.pink} />
+        </View>
+        <Text style={styles.dmName}>Find</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <View
@@ -539,7 +629,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
           autoCorrect={false}
         />
         {query ? (
-          <Pressable onPress={() => setQuery("")} hitSlop={8}>
+          <Pressable onPress={() => setQuery("")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
             <Ionicons name="close-circle" size={17} color={ink.text(COLORS.soft)} />
           </Pressable>
         ) : null}
@@ -564,6 +654,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
         ).map(([value, label]) => (
           <Pressable
             key={value}
+            accessibilityLabel={label}
             onPress={() => setFilter(value)}
             style={[styles.chip, filter === value && styles.chipOn]}
             accessibilityRole="button"
@@ -582,19 +673,23 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
           </View>
 
           {loading && !conversations.length ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="small" color={COLORS.pink} />
-              <Text style={styles.centerText}>Loading chats...</Text>
-            </View>
+            // Task 059: the shape of the list while it loads.
+            <SkeletonRows count={4} label="Loading chats" style={{ marginHorizontal: -16 }} />
           ) : error && !conversations.length ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-              <Pressable style={styles.retry} onPress={() => dispatch(fetchChats(token))}>
-                <Text style={styles.retryText}>Retry</Text>
-              </Pressable>
-            </View>
+            <ErrorState compact title="Couldn't load your chats" message={error} onRetry={() => dispatch(fetchChats(token))} />
           ) : visibleGroups.length === 0 ? (
-            <Text style={styles.empty}>{q ? "No groups match your search." : "No groups yet."}</Text>
+            q ? (
+              <Text style={styles.empty}>No groups match your search.</Text>
+            ) : (
+              <EmptyState
+                compact
+                icon="people-outline"
+                title="No groups yet"
+                message="Find a group for your fandom, or start one."
+                actionLabel="Discover groups"
+                onAction={() => router.push("/group/discover")}
+              />
+            )
           ) : (
             <View style={styles.groupList}>
               {visibleGroups.map((chat, index) => (
@@ -613,7 +708,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                     onPress={() => openChat(chat.id)}
                   />
                 ) : (
-                  <GroupRow key={chat.id} chat={chat} first={index === 0} onPress={() => openChat(chat.id)} />
+                  <GroupRow key={chat.id} chat={chat} first={index === 0} onOpen={onOpenChat} />
                 )
               ))}
             </View>
@@ -626,87 +721,23 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
         <>
           <Text style={[styles.section, styles.dmSection]}>DIRECT MESSAGES</Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dmRow}>
-            {visibleDms.map((chat) => {
-              const username = chat.otherParticipant?.username || "";
-              const followed = followingByUsername.get(username.toLowerCase());
-              const name = followed?.name || chat.otherParticipant?.name || username || "Someone";
-              const photo = chat.otherParticipant?.avatarPhotoUrl || followed?.avatarPhotoUrl || null;
-              const unread = chat.unreadCount || 0;
-
-              return (
-                <Pressable key={chat.id} style={styles.dmItem} onPress={() => openChat(chat.id)}>
-                  <View style={[styles.dmCircle, { backgroundColor: avatarTint(name) }]}>
-                    {photo ? (
-                      <Image source={{ uri: smallAvatarUrl(photo) }} style={styles.dmPhoto} contentFit="cover" />
-                    ) : (
-                      <Text style={styles.dmInitials}>{initialsOf(name)}</Text>
-                    )}
-                    {chat.otherParticipant?.isOnline ? <View style={styles.onlineDot} /> : null}
-                    {unread > 0 ? (
-                      <View style={styles.dmUnread}>
-                        <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.dmName} numberOfLines={1}>
-                    {name.split(" ")[0]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-
-            {visibleNotYet.map((person) => {
-              const busy = startingChatWith === person.username;
-              const name = person.name || person.username;
-
-              return (
-                <Pressable key={person.id || person.username} style={styles.dmItem} disabled={busy} onPress={() => openOrCreateChat(person)}>
-                  <View style={[styles.dmCircle, { backgroundColor: avatarTint(name) }]}>
-                    {person.avatarPhotoUrl ? (
-                      <Image source={getAvatarSource(person)} style={styles.dmPhoto} contentFit="cover" />
-                    ) : (
-                      <Text style={styles.dmInitials}>{initialsOf(name)}</Text>
-                    )}
-                    {isPersonOnline(person) ? <View style={styles.onlineDot} /> : null}
-                    {busy ? (
-                      <View style={styles.dmBusy}>
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.dmName} numberOfLines={1}>
-                    {name.split(" ")[0]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-
-            {/* + Find People */}
-            <Pressable style={styles.dmItem} onPress={openPeople} accessibilityLabel="Find people">
-              <View style={[styles.dmCircle, styles.plusCircle]}>
-                <Ionicons name="add" size={26} color={COLORS.pink} />
-              </View>
-              <Text style={styles.dmName}>Find</Text>
-            </Pressable>
-          </ScrollView>
+          <FlatList
+            horizontal
+            data={dmCells}
+            keyExtractor={(cell) => cell.key}
+            renderItem={renderDm}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dmRow}
+          />
         </>
       ) : null}
 
       {/* CHATS (people): one row per conversation, like WhatsApp */}
       {view === "chats" ? (
         loading && !conversations.length ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="small" color={COLORS.pink} />
-            <Text style={styles.centerText}>Loading chats...</Text>
-          </View>
+          <SkeletonRows count={5} label="Loading chats" style={{ marginHorizontal: -16 }} />
         ) : error && !conversations.length ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retry} onPress={() => dispatch(fetchChats(token))}>
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
-          </View>
+          <ErrorState compact title="Couldn't load your chats" message={error} onRetry={() => dispatch(fetchChats(token))} />
         ) : (
           <View>
             {peopleRows.length === 0 ? (
@@ -737,7 +768,8 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
             <Pressable
               onPress={openPeople}
               style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 }}
-              accessibilityRole="button">
+              accessibilityRole="button"
+              accessibilityLabel="Find people to message">
               <Ionicons name="person-add-outline" size={18} color={COLORS.pink} />
               <Text style={{ fontFamily: FONTS.semibold, fontSize: 14, color: COLORS.pink }}>Find people to message</Text>
             </Pressable>
@@ -750,7 +782,8 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
       <Pressable
         style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
         onPress={() => router.push("/group/new")}
-        accessibilityRole="button">
+        accessibilityRole="button"
+        accessibilityLabel="Create a group">
         <Ionicons name="add" size={20} color="#FFFFFF" />
         <Text style={styles.createText}>Create a group</Text>
       </Pressable>
@@ -765,7 +798,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                 <Text style={styles.modalTitle}>Find People</Text>
                 <Text style={styles.modalSubtitle}>Follow people and start connecting</Text>
               </View>
-              <Pressable onPress={closePeople} hitSlop={10} style={styles.closeButton}>
+              <Pressable onPress={closePeople} hitSlop={10} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
                 <Ionicons name="close" size={21} color={ink.text(COLORS.ink)} />
               </Pressable>
             </View>
@@ -782,7 +815,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                 autoCorrect={false}
               />
               {search.length > 0 ? (
-                <Pressable onPress={() => setSearch("")}>
+                <Pressable onPress={() => setSearch("")} accessibilityRole="button" accessibilityLabel="Clear search">
                   <Ionicons name="close-circle" size={17} color={ink.text(COLORS.soft)} />
                 </Pressable>
               ) : null}
@@ -790,34 +823,27 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
 
             <Text style={styles.peopleTitle}>{search.trim() ? "Search Results" : "People on CosQuest"}</Text>
 
-            {peopleLoading ? (
-              <View style={styles.center}>
-                <ActivityIndicator size="small" color={COLORS.pink} />
-                <Text style={styles.centerText}>Finding people...</Text>
-              </View>
-            ) : null}
+            {peopleLoading ? <SkeletonRows count={5} avatar={44} label="Finding people" /> : null}
 
             {!peopleLoading && peopleError ? (
-              <View style={styles.center}>
-                <Text style={styles.errorText}>{peopleError}</Text>
-                <Pressable style={styles.retry} onPress={() => setSearch((value) => value.trim())}>
-                  <Text style={styles.retryText}>Try Again</Text>
-                </Pressable>
-              </View>
+              <ErrorState compact title="Couldn't load people" message={peopleError} onRetry={() => setSearch((value) => value.trim())} />
             ) : null}
 
             {!peopleLoading && !peopleError ? (
-              <ScrollView style={styles.peopleList} keyboardShouldPersistTaps="handled">
-                {people.length === 0 ? (
-                  <Text style={styles.empty}>{search.trim() ? "No users found." : "No people to show."}</Text>
-                ) : null}
-
-                {people.map((person) => {
+              <FlatList
+                style={styles.peopleList}
+                keyboardShouldPersistTaps="handled"
+                data={people}
+                keyExtractor={(person) => String(person.id || person.username)}
+                ListEmptyComponent={
+                  <EmptyState compact icon="search-outline" title={search.trim() ? "No one by that name" : "No people to show yet"} message={search.trim() ? "Check the spelling, or try part of their username." : undefined} />
+                }
+                renderItem={({ item: person }) => {
                   const isFollowing = followingUsernames.has(person.username.toLowerCase());
                   const busy = processingUsername === person.username || startingChatWith === person.username;
 
                   return (
-                    <View key={person.id} style={styles.personRow}>
+                    <View style={styles.personRow}>
                       <Image source={getAvatarSource(person)} style={styles.personAvatar} contentFit="cover" />
                       <View style={styles.personInfo}>
                         <Text style={styles.personName} numberOfLines={1}>
@@ -831,7 +857,9 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                       <Pressable
                         disabled={busy}
                         style={[styles.followButton, isFollowing ? styles.followingButton : styles.followButtonOn, busy && styles.off]}
-                        onPress={() => handleFollow(person)}>
+                        onPress={() => handleFollow(person)}
+                        accessibilityRole="button"
+                        accessibilityLabel={isFollowing ? `Following @${person.username}, tap to unfollow` : `Follow @${person.username}`}>
                         {processingUsername === person.username ? (
                           <ActivityIndicator size="small" color={isFollowing ? COLORS.ink : "#FFFFFF"} />
                         ) : (
@@ -842,7 +870,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                       </Pressable>
 
                       {isFollowing ? (
-                        <Pressable disabled={busy} style={[styles.messageButton, busy && styles.off]} onPress={() => handleMessage(person)}>
+                        <Pressable disabled={busy} style={[styles.messageButton, busy && styles.off]} onPress={() => handleMessage(person)} accessibilityRole="button" accessibilityLabel={`Message @${person.username}`}>
                           {startingChatWith === person.username ? (
                             <ActivityIndicator size="small" color={ink.text(COLORS.ink)} />
                           ) : (
@@ -852,8 +880,8 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
                       ) : null}
                     </View>
                   );
-                })}
-              </ScrollView>
+                }}
+              />
             ) : null}
           </View>
         </View>
@@ -861,6 +889,7 @@ export function Chats({ view = "all" }: { view?: HubView } = {}) {
     </View>
   );
 }
+
 
 const chatHubStylePair = themedStyles({
   wrap: { marginTop: 8, paddingBottom: 120 },
@@ -994,7 +1023,7 @@ const chatHubStylePair = themedStyles({
 
   dmPhoto: { width: 56, height: 56, borderRadius: 28 },
 
-  dmInitials: { fontFamily: FONTS.bold, fontSize: 14, color: "#7D356D" },
+  dmInitials: { fontFamily: FONTS.bold, fontSize: 14, color: C.plum },
 
   dmName: { marginTop: 6, maxWidth: 64, fontFamily: FONTS.regular, fontSize: 12.5, color: COLORS.ink, textAlign: "center" },
 

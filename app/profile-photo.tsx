@@ -29,6 +29,7 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function ProfilePhoto() {
@@ -229,7 +230,11 @@ export default function ProfilePhoto() {
         ]}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => safeBack()} hitSlop={10}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Back">
             <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
           </Pressable>
 
@@ -287,7 +292,10 @@ export default function ProfilePhoto() {
               <Pressable
                 key={avatar.id}
                 style={[styles.avatarItem, active && styles.avatarItemActive]}
-                onPress={() => chooseAvatar(avatar.id)}>
+                onPress={() => chooseAvatar(avatar.id)}
+                accessibilityRole="button"
+                accessibilityLabel={avatar.label || avatar.id}
+                accessibilityState={{ selected: active }}>
                 <Image
                   source={avatar.source}
                   style={styles.avatarImage}
@@ -349,13 +357,13 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   save: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   previewSection: {
@@ -370,7 +378,7 @@ const STYLE_PAIR = themedStyles({
     padding: 4,
     backgroundColor: "rgba(255,255,255,0.50)",
     borderWidth: 2,
-    borderColor: "#C5399A",
+    borderColor: C.brand,
   },
 
   previewImage: {
@@ -382,7 +390,7 @@ const STYLE_PAIR = themedStyles({
   previewLabel: {
     marginTop: 10,
     fontSize: 13,
-    color: "#777780",
+    color: C.grey5,
   },
 
   uploadButton: {
@@ -393,7 +401,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 13,
     backgroundColor: "rgba(255,255,255,0.25)",
     borderWidth: 1,
-    borderColor: "#C5399A",
+    borderColor: C.brand,
     marginBottom: 28,
   },
 
@@ -401,20 +409,20 @@ const STYLE_PAIR = themedStyles({
     marginLeft: 8,
     fontSize: 14,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
     marginBottom: 5,
   },
 
   sectionSubtitle: {
     fontSize: 12,
     lineHeight: 18,
-    color: "#777780",
+    color: C.grey5,
     marginBottom: 15,
   },
 
@@ -436,7 +444,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   avatarItemActive: {
-    borderColor: "#C5399A",
+    borderColor: C.brand,
   },
 
   avatarImage: {
@@ -454,7 +462,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   bottomSave: {
@@ -464,7 +472,7 @@ const STYLE_PAIR = themedStyles({
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   bottomSaveDisabled: {

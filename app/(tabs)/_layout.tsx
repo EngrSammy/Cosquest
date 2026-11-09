@@ -1,4 +1,5 @@
 import { HapticTab } from "@/components/haptic-tab";
+import WorldPager from "@/components/world/WorldPager";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { FONTS } from "@/constants/fonts";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,8 +8,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import { SparksSetupPrompt } from "@/components/sparks/SparksSetupPrompt";
 import { useIsDesktop } from "@/hooks/useDesktop";
+import { TAB_BAR_HEIGHT, tabBarBottom } from "@/constants/tabBar";
 import { ReactNode } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Open tab: pink in both themes. The rest: grey on the light bar, white on
@@ -47,7 +50,24 @@ function TabIcon({
   );
 }
 
+// Merged app: the tabs are page 0 of the world; the game is page 1, one
+// swipe to the right (components/world/WorldPager.tsx). Team sync (3 Nov
+// 2026): the Home tab is the team's Home dashboard again (quests near you,
+// tickets); the game is the swipe and the world handle, not the Home tab.
 export default function TabLayout() {
+  return (
+    <WorldPager>
+      <ChatTabs />
+    </WorldPager>
+  );
+}
+
+// Tab labels grow with the phone's text size only a little: the bar has a
+// fixed height and four labels side by side.
+const TAB_LABEL_MAX_SCALE = 1.15;
+
+function ChatTabs() {
+  const insets = useSafeAreaInsets();
   // Computer: the left rail replaces the bottom tab bar.
   const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
@@ -56,17 +76,25 @@ export default function TabLayout() {
     <>
     <SparksSetupPrompt />
     <Tabs
+      // The bar floats above the bottom inset (tabBarBottom), so React
+      // Navigation must not also pad the inset inside the bar's height.
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={{
         tabBarActiveTintColor: dark ? ACTIVE : ACTIVE_LIGHT,
         tabBarInactiveTintColor: dark ? INACTIVE_DARK : INACTIVE_LIGHT,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarLabelStyle: styles.label,
+        tabBarLabel: ({ color, children }) => (
+          // Shrinks to fit rather than "Cosqu…" at the largest display size.
+          <Text style={[styles.label, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={TAB_LABEL_MAX_SCALE}>
+            {children}
+          </Text>
+        ),
         tabBarStyle: desktop ? { display: "none" } : {
           position: "absolute",
           marginHorizontal: 16,
-          bottom: 24,
-          height: 68,
+          bottom: tabBarBottom(insets.bottom),
+          height: TAB_BAR_HEIGHT,
           paddingTop: 8,
           borderTopWidth: 0,
           backgroundColor: "transparent",

@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -21,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
@@ -33,6 +33,7 @@ import {
 import { FONTS } from "@/constants/fonts";
 import type { Rank } from "@/services/ranks";
 import { addToSpark, startSpark, type Spark } from "@/services/sparks";
+import { C } from "@/theme/tokens";
 
 const PINK = "#C34D9C"; // Figma Action fill
 const INK = "#24283C";
@@ -42,7 +43,7 @@ const PLACEHOLDER = "#9AA3B5";
 // Figma M12 screen gradient: #FFFFFF -> #D5F1FF (the shared chat gradient is a different blue)
 const LIGHT_MATCH_GRADIENT = ["#FFFFFF", "#D5F1FF"] as const;
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function avatarTint(name?: string) {
   let hash = 0;
@@ -268,6 +269,7 @@ export default function StartSparkSheet({
                 <View style={styles.header}>
                   <Text style={styles.title}>Start a Spark</Text>
                   <Pressable
+                    accessibilityRole="button"
                     onPress={onClose}
                     hitSlop={10}
                     accessibilityLabel="Close">
@@ -300,6 +302,7 @@ export default function StartSparkSheet({
                 </Text>
 
                 <Pressable
+                  accessibilityRole="button" accessibilityLabel="Check for matching Sparks"
                   style={[
                     styles.primary,
                     (subject.trim().length < 2 || !!busy) && styles.off,
@@ -314,7 +317,7 @@ export default function StartSparkSheet({
                     </Text>
                   )}
                 </Pressable>
-                <Pressable style={styles.secondary} onPress={onClose}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Cancel" style={styles.secondary} onPress={onClose}>
                   <Text style={styles.secondaryText}>Cancel</Text>
                 </Pressable>
               </>
@@ -328,6 +331,7 @@ export default function StartSparkSheet({
                   keyboardShouldPersistTaps="handled">
                   <View style={styles.header}>
                     <Pressable
+                      accessibilityRole="button"
                       onPress={() => setMatches([])}
                       hitSlop={10}
                       accessibilityLabel="Back">
@@ -346,6 +350,7 @@ export default function StartSparkSheet({
                       ) : null}
                     </View>
                     <Pressable
+                      accessibilityRole="button"
                       onPress={onClose}
                       hitSlop={10}
                       accessibilityLabel="Close">
@@ -398,6 +403,7 @@ export default function StartSparkSheet({
                         </Text>
                       ) : null}
                       <Pressable
+                        accessibilityRole="button" accessibilityLabel={spark.active ? "Add seed to active Spark" : "Add seed to quiet Spark"}
                         style={[
                           spark.active ? styles.primary : styles.secondary,
                           styles.matchButton,
@@ -426,6 +432,7 @@ export default function StartSparkSheet({
                   ))}
 
                   <Pressable
+                    accessibilityRole="button" accessibilityLabel="Start a separate new Spark"
                     style={[
                       styles.secondary,
                       styles.startNew,
@@ -446,6 +453,7 @@ export default function StartSparkSheet({
                   </Text>
 
                   <Pressable
+                    accessibilityRole="button" accessibilityLabel="Cancel"
                     style={[styles.secondary, styles.cancelAfterNote]}
                     onPress={onClose}>
                     <Text style={styles.secondaryText}>Cancel</Text>

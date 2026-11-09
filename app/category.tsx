@@ -15,16 +15,17 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "@/components/ui/keyboard";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 import { useContext as usePaneContext } from "react";
 import { PaneClose } from "@/components/desktop/DesktopEditProfile";
@@ -196,7 +197,8 @@ export default function Category() {
         </Pressable>
       </View>
 
-      <ScrollView
+      <KeyboardAwareScrollView
+        bottomOffset={24}
         contentContainerStyle={[
           styles.scroll,
           { paddingBottom: insets.bottom + 40 },
@@ -296,7 +298,7 @@ export default function Category() {
             })}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -360,7 +362,7 @@ const STYLE_PAIR = themedStyles({
   title: {
     fontFamily: FONTS.bold,
     fontSize: 22,
-    color: "#191922",
+    color: C.ink,
   },
 
   subtitle: {
@@ -411,7 +413,7 @@ const STYLE_PAIR = themedStyles({
   rowLabel: {
     fontFamily: FONTS.regular,
     fontSize: 14.5,
-    color: "#191922",
+    color: C.ink,
   },
 
   searchRow: {
@@ -426,7 +428,7 @@ const STYLE_PAIR = themedStyles({
     height: 50,
     fontFamily: FONTS.regular,
     fontSize: 14.5,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
@@ -436,7 +438,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   list: {

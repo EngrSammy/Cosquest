@@ -1,4 +1,6 @@
 ﻿import { apiRequest } from "./api";
+import { fetchJson, isNetworkFailure, OFFLINE_MESSAGE } from "./networkError";
+import { C } from "@/theme/tokens";
 
 // ==========================================
 // SPARKS (sub-conversations surfaced from a group chat)
@@ -43,7 +45,7 @@ export type MessageSparkTag = { id: string; era: number; postedInSpark?: boolean
 // Figma M07/M09: new Sparks are pink. A revived Spark's history runs on a
 // gradient from purple (past) to teal (today) - "a gradient, not two tones",
 // so a Spark revived many times keeps extending the same scale.
-const PINK = "#B63D91";
+const PINK = C.brandDeep;
 const PAST = [158, 111, 207]; // #9E6FCF
 const TODAY = [42, 138, 146]; // #2A8A92
 
@@ -55,7 +57,7 @@ export function eraColor(era: number, totalEras: number) {
 }
 
 export function sparkColor(spark: Pick<Spark, "revived">) {
-  return spark.revived ? "#2A8A92" : PINK;
+  return spark.revived ? C.teal : PINK;
 }
 
 // "Nov 2025"
@@ -117,12 +119,13 @@ export async function startSpark(
   token: string,
 ): Promise<StartSparkResult> {
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-  const response = await fetch(`${BASE_URL}${base(conversationId)}`, {
+  const { response, data: body } = await fetchJson(`${BASE_URL}${base(conversationId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
+  }).catch((error) => {
+    throw isNetworkFailure(error) ? new Error(OFFLINE_MESSAGE) : error;
   });
-  const body = await response.json().catch(() => null);
 
   if (response.ok) return { ok: true, spark: body?.spark };
   if (response.status === 409 && body?.code === "similar_sparks") {

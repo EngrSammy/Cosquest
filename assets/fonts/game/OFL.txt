@@ -1,0 +1,7 @@
+Lilita One: Copyright 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Names "Lilita One" (used unmodified).
+Fredoka: Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One).
+Fredoka-{Regular,Medium,SemiBold,Bold}.ttf are static instances (wght 400/500/600/700, wdth 100)
+of the Fredoka variable font, cut with fontTools' instancer. Unchanged otherwise.
+
+Both fonts are licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at: https://openfontlicense.org

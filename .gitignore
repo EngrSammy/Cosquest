@@ -46,3 +46,10 @@ app-example
 /ios
 /android
 .idea/
+
+# Merged app: scripts/verify-ios.sh logs and derived data
+build-logs/
+modules/*/android/build/
+
+# Godot (cq 061): the exported 3D fight (scripts/godot-export.sh)
+/godot-export/

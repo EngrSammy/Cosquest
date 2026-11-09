@@ -28,6 +28,7 @@ import {
 } from "@/constants/wallpapers";
 
 import { setAllChatsWallpaper, setChatWallpaper } from "./useChatWallpaper";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function sameWallpaper(a: Wallpaper | null, b: Wallpaper | null) {
@@ -52,7 +53,7 @@ function PresetTile({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   return (
-    <Pressable style={styles.tileWrap} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Wallpaper" style={styles.tileWrap} onPress={onPress}>
       <View style={[styles.tile, selected && styles.tileSelected]}>
         <View
           style={[StyleSheet.absoluteFill, { backgroundColor: preset.color }]}
@@ -233,7 +234,7 @@ export function WallpaperPicker({
         <View style={styles.header}>
           <Text style={styles.title}>Chat wallpaper</Text>
 
-          <Pressable style={styles.close} onPress={cancel} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.close} onPress={cancel} hitSlop={8}>
             <Ionicons name="close" size={22} color={ink.text("#191922")} />
           </Pressable>
         </View>
@@ -247,7 +248,7 @@ export function WallpaperPicker({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tiles}>
           {/* YOUR PHOTO */}
-          <Pressable style={styles.tileWrap} onPress={chooseFromPhotos}>
+          <Pressable accessibilityRole="button" accessibilityLabel={photoSelected ? "Your photo" : "Choose photo"} style={styles.tileWrap} onPress={chooseFromPhotos}>
             <View
               style={[
                 styles.tile,
@@ -290,14 +291,14 @@ export function WallpaperPicker({
         </ScrollView>
 
         <View style={styles.buttons}>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Set for all chats"
             style={[styles.button, styles.buttonSecondary]}
             onPress={() => save("all")}
             disabled={saving}>
             <Text style={styles.buttonSecondaryText}>Set for all chats</Text>
           </Pressable>
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Set for this chat"
             style={[styles.button, styles.buttonPrimary]}
             onPress={() => save("chat")}
             disabled={saving}>
@@ -345,7 +346,7 @@ const STYLE_PAIR = themedStyles({
   title: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
   },
 
   close: {
@@ -361,7 +362,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 4,
     paddingHorizontal: 20,
     fontSize: 12.5,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   tiles: {
@@ -387,7 +388,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   tileSelected: {
-    borderColor: "#C5399A",
+    borderColor: C.brand,
   },
 
   photoTile: {
@@ -411,7 +412,7 @@ const STYLE_PAIR = themedStyles({
     right: 8,
     top: 54,
     width: 30,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   check: {
@@ -423,7 +424,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   tileLabel: {
@@ -448,7 +449,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   buttonPrimary: {
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   buttonPrimaryText: {
@@ -462,7 +463,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   buttonSecondaryText: {
-    color: "#3B3B42",
+    color: C.ink2,
     fontSize: 14.5,
     fontWeight: "700",
   },

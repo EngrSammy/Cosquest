@@ -8,16 +8,25 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
+import { usePostOnScreen } from "./feedVisibility";
+
 export function PostVideo({ uri }: { uri: string }) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const [muted, setMuted] = useState(true);
+  // In the feed, only the videos on screen play (audit B2).
+  const onScreen = usePostOnScreen();
+  const [pausedByTap, setPausedByTap] = useState(false);
 
   const player = useVideoPlayer(uri, (instance) => {
     instance.loop = true;
     instance.muted = true;
-    instance.play();
   });
+
+  useEffect(() => {
+    if (onScreen && !pausedByTap) player.play();
+    else player.pause();
+  }, [player, onScreen, pausedByTap]);
 
   useEffect(() => {
     player.muted = muted;
@@ -42,14 +51,10 @@ export function PostVideo({ uri }: { uri: string }) {
 
   return (
     <View style={styles.container}>
-      <Pressable
+      <Pressable accessibilityRole="button" accessibilityLabel="Play or pause video"
         style={StyleSheet.absoluteFill}
         onPress={() => {
-          if (player.playing) {
-            player.pause();
-          } else {
-            player.play();
-          }
+          setPausedByTap(player.playing);
         }}>
         <VideoView
           player={player}
@@ -70,7 +75,7 @@ export function PostVideo({ uri }: { uri: string }) {
         ) : null}
       </Pressable>
 
-      <Pressable
+      <Pressable accessibilityRole="button" accessibilityLabel={muted ? "Sound on" : "Sound off"}
         style={styles.sound}
         onPress={() => setMuted((value) => !value)}>
         <Ionicons

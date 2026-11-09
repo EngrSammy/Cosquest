@@ -25,9 +25,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 type ThemeMode = "Light" | "Dark" | "System";
 
@@ -45,7 +46,7 @@ type AppearanceSettings = {
 };
 
 const ACCENT_COLORS = [
-  { name: "Pink", value: "#C5399A" },
+  { name: "Pink", value: C.brand },
   { name: "Blue", value: "#29B6E8" },
   { name: "Green", value: "#45D56A" },
   { name: "Orange", value: "#FF9500" },
@@ -523,14 +524,14 @@ const STYLE_PAIR = themedStyles({
     marginTop: 2,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#66738A",
+    color: C.slate,
   },
 
   layoutNote: {
     marginTop: 8,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#66738A",
+    color: C.slate,
   },
 
   screen: {
@@ -581,7 +582,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
   },
 
   section: {
@@ -593,7 +594,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   // Milky selector with a pink pill.
@@ -651,7 +652,7 @@ const STYLE_PAIR = themedStyles({
   // Dark ring around the chosen colour (Figma).
   accentColorSelected: {
     borderWidth: 2,
-    borderColor: "#191922",
+    borderColor: C.ink,
   },
 
   accentColor: {
@@ -699,12 +700,12 @@ const STYLE_PAIR = themedStyles({
 
   fontLabel: {
     fontFamily: FONTS.regular,
-    color: "#6B6B72",
+    color: C.grey3,
   },
 
   fontLabelSelected: {
     fontFamily: FONTS.semibold,
-    color: "#191922",
+    color: C.ink,
   },
 
   // Milky row.
@@ -733,7 +734,7 @@ const STYLE_PAIR = themedStyles({
     flex: 1,
     fontFamily: FONTS.regular,
     fontSize: 13.5,
-    color: "#3B3B42",
+    color: C.ink2,
   },
 
   loadingContainer: {

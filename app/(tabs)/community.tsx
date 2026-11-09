@@ -11,8 +11,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchCurrentUser } from "@/store/thunks/userThunks";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useLocalSearchParams, useScrollToTop } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -20,9 +20,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabBarSpace } from "@/constants/tabBar";
+import { C } from "@/theme/tokens";
 
 type Tab = "Feeds" | "Chats" | "Community";
 
@@ -33,12 +36,25 @@ export default function Community() {
   const chatScheme = useChatScheme();
   const isDark = chatScheme === "dark";
   const styles = useMemo(() => createCommunityStyles(isDark), [isDark]);
+  // Under 360 points wide (the largest display size makes a phone about 320)
+  // the three pills don't fit the Figma padding; tighter padding there only.
+  const narrow = useWindowDimensions().width < 360;
   const dispatch = useAppDispatch();
 
   const [tab, setTab] = useState<Tab>("Feeds");
+  // /community?tab=Chats opens on that pill (the Live tab's "Go to your chats").
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  useEffect(() => {
+    if (tabParam === "Feeds" || tabParam === "Chats" || tabParam === "Community") setTab(tabParam);
+  }, [tabParam]);
   // Computer: the top bar has the avatar and bell, and Chats has its own
   // workspace (D1: list | chat | Sparks).
   const desktop = useIsDesktop();
+
+  // Task 059: tapping the Community tab again scrolls back to the top (the
+  // feed's own list does this itself).
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
 
   const authUser = useAppSelector((state) => state.auth.user);
 
@@ -69,26 +85,25 @@ export default function Community() {
     [avatarFromList],
   );
 
-  const feedScreen = (
-    <AppBackground variant="blueGradient">
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            // Figma: the header starts 52 from the top on phones (that
-            // includes the status bar). In a browser there's no status bar
-            // and the browser has its own top bar, so only a small gap.
-            paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 52),
-          },
-        ]}
-        showsVerticalScrollIndicator={false}>
-        {/* Keeps everything a comfortable width on big computer screens.
-            Full width on phones. */}
-        <View style={styles.column}>
+  // Figma: the header starts 52 from the top on phones (that includes the
+  // status bar). In a browser there's no status bar and the browser has its
+  // own top bar, so only a small gap. The bottom leaves room for the
+  // floating tab bar above the home indicator.
+  const scrollPad = {
+    paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 52),
+    paddingBottom: tabBarSpace(insets.bottom),
+  };
+
+  const top = (
+    <>
           {/* HEADER - avatar in a soft pink circle, title, pink bell (phones) */}
           {!desktop ? (
           <View style={[styles.header, styles.padded]}>
-            <Pressable onPress={() => router.push("/profile")} hitSlop={10}>
+            <Pressable
+              onPress={() => router.push("/profile")}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Your profile">
               <View style={styles.avatarWrap}>
                 <Image
                   source={selectedAvatar}
@@ -102,14 +117,18 @@ export default function Community() {
               <Text style={styles.headerTitle}>Community</Text>
               {/* Figma M01 (chat hub) */}
               {tab === "Chats" ? (
-                <Text style={styles.headerSubtitle}>Your people. Your next adventure.</Text>
+                <Text style={styles.headerSubtitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  Your people. Your next adventure.
+                </Text>
               ) : null}
             </View>
 
             <Pressable
               onPress={() => router.push("/notifications")}
-              hitSlop={10}>
-              <Ionicons name="notifications" size={28} color="#C5399A" />
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications">
+              <Ionicons name="notifications" size={28} color={C.brand} />
             </Pressable>
           </View>
           ) : null}{/* end of the phone header */}
@@ -117,21 +136,22 @@ export default function Community() {
           {/* LOADING */}
           {loading && !user ? (
             <View style={styles.loading}>
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={C.brand} />
             </View>
           ) : null}
 
           {/* COMMUNITY TABS - the open one is filled pink, the others are
               raised white pills with a soft shadow (Figma) */}
-          <View style={styles.tabs}>
+          <View style={[styles.tabs, narrow && styles.tabsNarrow]}>
             {TABS.map((key) => {
               const active = tab === key;
 
               return (
-                <Pressable
+                <Pressable accessibilityRole="tab" accessibilityLabel={key}
                   key={key}
                   style={[
                     styles.tab,
+                    narrow && styles.tabNarrow,
                     active ? styles.tabActive : styles.tabInactive,
                   ]}
                   hitSlop={6}
@@ -143,6 +163,10 @@ export default function Community() {
                     } else setTab(key);
                   }}>
                   <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                    maxFontSizeMultiplier={1.15}
                     style={[styles.tabText, active && styles.tabTextActive]}>
                     {key}
                   </Text>
@@ -150,22 +174,37 @@ export default function Community() {
               );
             })}
           </View>
+    </>
+  );
 
-          {/* CONTENT - the feed is full width; chats and spotlight keep
-              their side padding. */}
-          {tab === "Feeds" ? (
-            <Feeds />
-          ) : tab === "Chats" ? (
-            <View style={styles.padded}>
-              <Chats view="chats" />
-            </View>
-          ) : (
-            <View style={styles.padded}>
-              <Chats view="community" />
-            </View>
-          )}
-        </View>
-      </ScrollView>
+  const feedScreen = (
+    <AppBackground variant="blueGradient">
+      {/* The feed is a list of its own (audit B2), the header scrolling with
+          it; a comfortable width on big computer screens, full width on
+          phones. Chats and Community keep their side padding. */}
+      {tab === "Feeds" ? (
+        <Feeds header={top} contentContainerStyle={[styles.column, scrollPad]} />
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.scroll, scrollPad]}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.column}>
+            {top}
+
+            {/* CONTENT */}
+            {tab === "Chats" ? (
+              <View style={styles.padded}>
+                <Chats view="chats" />
+              </View>
+            ) : (
+              <View style={styles.padded}>
+                <Chats view="community" />
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      )}
     </AppBackground>
   );
 
@@ -175,12 +214,11 @@ export default function Community() {
   return <DesktopFeed />;
 }
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 function createCommunityStyles(isDark: boolean) { return StyleSheet.create({
-  scroll: {
-    paddingBottom: 140,
-  },
+  // The bottom padding (room for the tab bar) comes from the safe area.
+  scroll: {},
 
   column: {
     width: "100%",
@@ -206,7 +244,8 @@ function createCommunityStyles(isDark: boolean) { return StyleSheet.create({
     color: isDark ? "#F5F5FA" : "#000000",
   },
 
-  headerTitleWrap: { alignItems: "center" },
+  // flexShrink: between the avatar and the bell at the largest sizes.
+  headerTitleWrap: { alignItems: "center", flexShrink: 1 },
 
   headerSubtitle: {
     marginTop: 1,
@@ -257,12 +296,20 @@ function createCommunityStyles(isDark: boolean) { return StyleSheet.create({
 
   tab: {
     minWidth: 82,
-    height: 26,
+    // minHeight and flexShrink: at the largest text and display size the
+    // three pills no longer fit a 320-point row; they shrink (and their text
+    // with them) instead of the last one being cut off.
+    minHeight: 26,
+    flexShrink: 1,
     paddingHorizontal: 18,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
+
+  tabsNarrow: { paddingHorizontal: 12 },
+
+  tabNarrow: { minWidth: 0, paddingHorizontal: 10 },
 
   tabActive: {
     backgroundColor: PINK,

@@ -57,6 +57,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions, getAvatarSource } from "@/utils/callHelpers";
+import { C } from "@/theme/tokens";
 
 // The backend marks an unanswered call "missed" after 45s and tells both
 // phones over the socket. This local timer is only a backup.
@@ -737,7 +738,9 @@ function CallStage({
         ? "Requesting"
         : "Connecting";
 
-  // Hooks before any early return (React needs the same order every render).
+  // Hooks for the big-call stage below. They must run on every render, before
+  // the group call's early return: called after it, a 1:1 call that became a
+  // group call (someone added) rendered fewer hooks and crashed the app.
   const room = useRoomContext();
   // More than 8 people: Subomi's speaker stage (below) instead of the orbit.
   const stageMode = useStageMode(remoteCount + 1);
@@ -1313,7 +1316,7 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#2A1030",
+    backgroundColor: C.plumDark,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },

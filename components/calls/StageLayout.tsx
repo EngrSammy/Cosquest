@@ -48,6 +48,7 @@ import {
   useStage,
 } from "./stageModel";
 import VideoGridTile from "./VideoGridTile";
+import { C } from "@/theme/tokens";
 
 // Draws one person's camera. Phones pass a <VideoTrack>, the website a
 // <video> element. Must be a stable function (useCallback) so the
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2A1030",
+    backgroundColor: C.plumDark,
     borderWidth: 2,
     borderColor: "transparent",
   },

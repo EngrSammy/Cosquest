@@ -2,7 +2,7 @@ import { Button } from "@/components/Button";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-  Dimensions,
+  useWindowDimensions,
   Modal,
   Pressable,
   StyleSheet,
@@ -21,6 +21,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { C } from "@/theme/tokens";
+import { SHEET_EASE_OUT, SHEET_OPEN_MS, SHEET_SNAP_BACK } from "@/components/game/sheetMotion";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { useIsDesktop } from "@/hooks/useDesktop";
@@ -44,7 +46,6 @@ type Props = {
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 800;
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // ==========================================
 // COMPONENT
@@ -58,6 +59,8 @@ export function FactionModal({
   onClose,
 }: Props) {
   const styles = useThemedStyles(STYLE_PAIR);
+  // Read on every render (display size, split screen), not once at load.
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   // Computers: a centred dialog instead of a bottom sheet.
   const desktop = useIsDesktop();
   const ink = useInk();
@@ -83,17 +86,14 @@ export function FactionModal({
       translateY.value = SCREEN_HEIGHT;
 
       // Animate upward.
-      translateY.value = withSpring(0, {
-        damping: 24,
-        stiffness: 150,
-      });
+      translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASE_OUT });
 
       setError("");
     } else {
       // Keep it below the screen while hidden.
       translateY.value = SCREEN_HEIGHT;
     }
-  }, [visible, translateY]);
+  }, [visible, translateY, SCREEN_HEIGHT]);
 
   // ==========================================
   // CLEAR ERROR WHEN CHECKED
@@ -149,10 +149,7 @@ export function FactionModal({
           },
         );
       } else {
-        translateY.value = withSpring(0, {
-          damping: 20,
-          stiffness: 150,
-        });
+        translateY.value = withSpring(0, SHEET_SNAP_BACK);
       }
     });
 
@@ -418,7 +415,7 @@ export function FactionModal({
 
                   <View style={styles.agreeContent}>
                     <Text style={styles.agreeText}>
-                      Got it — I understand my faction shapes my rank, and
+                      Got it, I understand my faction shapes my rank, and
                       switching later has a cost.
                     </Text>
 
@@ -573,7 +570,7 @@ const STYLE_PAIR = themedStyles({
   agreeText: {
     fontFamily: FONTS.regular,
     fontSize: 13,
-    color: "#191922",
+    color: C.ink,
   },
 
   agreedLabel: {
@@ -584,7 +581,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   errorText: {
-    color: "#B42318",
+    color: C.dangerInk,
     fontSize: 12,
     fontFamily: FONTS.semibold,
     textAlign: "center",

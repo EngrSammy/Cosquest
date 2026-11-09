@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { AVATARS } from "@/constants/avatars";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function avatarSource(person: any) {
@@ -46,7 +47,7 @@ export function SharePerson({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   return (
-    <Pressable style={styles.person} onPress={onPress} disabled={sending}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Done" style={styles.person} onPress={onPress} disabled={sending}>
       <View style={styles.avatarWrap}>
         <Image
           source={avatarSource(person)}
@@ -123,7 +124,7 @@ const STYLE_PAIR = themedStyles({
     maxWidth: 85,
     fontSize: 11,
     fontWeight: "600",
-    color: "#3B3B42",
+    color: C.ink2,
     textAlign: "center",
   },
 });

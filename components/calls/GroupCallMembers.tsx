@@ -14,6 +14,7 @@ import { formatCount } from "@/services/calls";
 import { getAvatarSource } from "@/utils/callHelpers";
 
 import { CALL_COLORS } from "./CallVisuals";
+import { C } from "@/theme/tokens";
 
 const MAX_TILES = 8;
 
@@ -163,7 +164,7 @@ export default function GroupCallMembers({
                   width: size,
                   height: size,
                   borderRadius: size / 2,
-                  backgroundColor: "#2A1030",
+                  backgroundColor: C.plumDark,
                 }}
                 contentFit="cover"
                 cachePolicy="memory-disk"
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
 
   stackAvatar: {
     borderWidth: 2,
-    borderColor: "#2A1030",
+    borderColor: C.plumDark,
     backgroundColor: "#3A1A40",
   },
 
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#2A1030",
+    borderColor: C.plumDark,
     backgroundColor: "#4A2450",
   },
 

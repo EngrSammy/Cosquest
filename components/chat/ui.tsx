@@ -139,6 +139,9 @@ export function PrimaryButton({
     <Pressable
       style={[styles.primary, off && styles.off, style]}
       disabled={off}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
       onPress={onPress}>
       {loading ? (
         <ActivityIndicator color="#FFFFFF" />
@@ -162,6 +165,9 @@ export function SecondaryButton({
     <Pressable
       style={[styles.secondary, off && styles.off, style]}
       disabled={off}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
       onPress={onPress}>
       {loading ? (
         <ActivityIndicator color={UI.PINK} />

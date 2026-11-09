@@ -24,18 +24,26 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  ActivityIndicator,
   Dimensions,
+  Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { tabBarSpace } from "@/constants/tabBar";
+import { SkeletonProfile } from "@/components/kit";
+import { GameProgressRow } from "@/components/world/GameProgressRow";
+import { gameStore } from "@/features/game/runtime";
+
+const refreshGame = () => gameStore.refreshMe();
 
 type Tab = "Posts" | "Reels" | "Thoughts" | "Spotlight";
 
@@ -113,6 +121,11 @@ function Stat({
   }
 
   return <View style={[styles.stat, { alignItems: align }]}>{content}</View>;
+}
+
+/** "1 Quest", "0 Quests": the stat pill's word follows its number. */
+function plural(n: number, one: string, many: string): string {
+  return n === 1 ? one : many;
 }
 
 function GameStat({ value, label }: { value: number; label: string }) {
@@ -267,6 +280,9 @@ function FactionProfileCard({
           style={[styles.xpProgress, { width: `${progress * 100}%` }]}
         />
       </View>
+
+      {/* Task 059: the game's level and XP next to the chat's points and rank. */}
+      <GameProgressRow />
     </View>
   );
 }
@@ -329,6 +345,8 @@ export default function Profile() {
   const desktop = useIsDesktop();
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  const { width: windowWidth } = useWindowDimensions();
+  const sizes = useMemo(() => heroSizes(windowWidth), [windowWidth]);
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
@@ -371,6 +389,17 @@ export default function Profile() {
 
     dispatch(fetchPosts(token));
   }, [dispatch, token]);
+
+  // Task 059: pull down to refresh the profile, its posts and game progress.
+  const [pulling, setPulling] = useState(false);
+  const pull = async () => {
+    setPulling(true);
+    try {
+      await Promise.all([email ? dispatch(fetchCurrentUser(email)) : null, token ? dispatch(fetchPosts(token)) : null, refreshGame()]);
+    } finally {
+      setPulling(false);
+    }
+  };
 
   const firstName =
     user?.profile?.firstName ||
@@ -629,11 +658,13 @@ export default function Profile() {
   return (
     <AppBackground variant="blueGradient">
       <ScrollView
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} tintColor={ink.text(PINK)} colors={[PINK]} />}
         contentContainerStyle={[
           styles.scroll,
           desktop && styles.scrollWide,
           {
             paddingTop: insets.top + 8,
+            paddingBottom: tabBarSpace(insets.bottom),
           },
         ]}
         showsVerticalScrollIndicator={false}>
@@ -658,13 +689,7 @@ export default function Profile() {
         </View>
         ) : null}
 
-        {profileLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator size="small" color={ink.text(PINK)} />
-
-            <Text style={styles.loadingText}>Loading profile...</Text>
-          </View>
-        ) : null}
+        {profileLoading ? <SkeletonProfile /> : null}
 
         {profileError && !profileLoading ? (
           <View style={styles.errorBox}>
@@ -680,7 +705,7 @@ export default function Profile() {
                   dispatch(fetchPosts(token));
                 }
               }}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           </View>
         ) : null}
@@ -696,8 +721,8 @@ export default function Profile() {
               <View style={styles.deskPhoto}>
         {/* PHOTO (Figma): a square photo, with a big pink CIRCLE fading in
             at the bottom, and the avatar sitting in that circle. */}
-        <View style={styles.heroWrap}>
-          <View style={styles.hero}>
+        <View style={[styles.heroWrap, sizes.heroWrap]}>
+          <View style={[styles.hero, sizes.hero]}>
             {cloudinaryPhoto ? (
               <Image
                 source={{ uri: cloudinaryPhoto }}
@@ -727,12 +752,12 @@ export default function Profile() {
           {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
               shadow, so it looks like it's coming out of the photo. It sits
               outside the photo's clipping, so the shadow isn't cut off. */}
-          <View style={styles.avatarShadow} pointerEvents="none">
+          <View style={[styles.avatarShadow, sizes.avatarShadow]} pointerEvents="none">
             <LinearGradient
               colors={["#E28BC8", PINK]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
-              style={styles.avatarRing}>
+              style={[styles.avatarRing, sizes.avatarRing]}>
               <Image
                 source={selectedAvatar}
                 style={styles.avatarImg}
@@ -775,9 +800,9 @@ export default function Profile() {
 
         {/* Slim pink pills */}
         <View style={styles.gameStatsRow}>
-          <GameStat value={quests} label="Quest" />
-          <GameStat value={wins} label="Wins" />
-          <GameStat value={points} label="Points" />
+          <GameStat value={quests} label={plural(quests, "Quest", "Quests")} />
+          <GameStat value={wins} label={plural(wins, "Win", "Wins")} />
+          <GameStat value={points} label={plural(points, "Point", "Points")} />
         </View>
 
                 <View style={styles.deskActions}>
@@ -997,8 +1022,8 @@ export default function Profile() {
           <>
         {/* PHOTO (Figma): a square photo, with a big pink CIRCLE fading in
             at the bottom, and the avatar sitting in that circle. */}
-        <View style={styles.heroWrap}>
-          <View style={styles.hero}>
+        <View style={[styles.heroWrap, sizes.heroWrap]}>
+          <View style={[styles.hero, sizes.hero]}>
             {cloudinaryPhoto ? (
               <Image
                 source={{ uri: cloudinaryPhoto }}
@@ -1028,12 +1053,12 @@ export default function Profile() {
           {/* Avatar (Figma: 89 x 89): a strong pink circle with a deep
               shadow, so it looks like it's coming out of the photo. It sits
               outside the photo's clipping, so the shadow isn't cut off. */}
-          <View style={styles.avatarShadow} pointerEvents="none">
+          <View style={[styles.avatarShadow, sizes.avatarShadow]} pointerEvents="none">
             <LinearGradient
               colors={["#E28BC8", PINK]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
-              style={styles.avatarRing}>
+              style={[styles.avatarRing, sizes.avatarRing]}>
               <Image
                 source={selectedAvatar}
                 style={styles.avatarImg}
@@ -1074,9 +1099,9 @@ export default function Profile() {
 
         {/* Slim pink pills */}
         <View style={styles.gameStatsRow}>
-          <GameStat value={quests} label="Quest" />
-          <GameStat value={wins} label="Wins" />
-          <GameStat value={points} label="Points" />
+          <GameStat value={quests} label={plural(quests, "Quest", "Quests")} />
+          <GameStat value={wins} label={plural(wins, "Win", "Wins")} />
+          <GameStat value={points} label={plural(points, "Point", "Points")} />
         </View>
 
         {/* ABOUT */}
@@ -1290,6 +1315,23 @@ const HERO_FADE_DARK = ["rgba(23,24,35,0)", "rgba(23,24,35,0.95)"] as const;
 // Figma avatar: 89.21 x 89.21 on the 316 photo.
 const AVATAR_SIZE = Math.round(HERO_SIZE * (89.21 / 316));
 
+// The hero's sizes follow the window (read when the screen renders, so a
+// display-size change or split screen resizes it; the constants above are
+// only the first-render defaults).
+function heroSizes(windowWidth: number) {
+  const screenW = Math.min(windowWidth, 640);
+  // Figma photo: a 316 x 316 square on a 402 wide screen.
+  const hero = Math.min(316, screenW - 2 * 30);
+  // Figma avatar: 89.21 x 89.21 on the 316 photo.
+  const avatar = Math.round(hero * (89.21 / 316));
+  return {
+    hero: { width: hero, height: hero },
+    heroWrap: { width: hero, height: hero },
+    avatarRing: { width: avatar, height: avatar, borderRadius: avatar / 2 },
+    avatarShadow: { left: (hero - avatar) / 2, width: avatar, height: avatar, borderRadius: avatar / 2 },
+  };
+}
+
 // The "milky", pressed-in glass look (same as the chat bubbles): see-through
 // white with a bright white rim and a soft shadow.
 const MILKY = {
@@ -1299,7 +1341,9 @@ const MILKY = {
   shadowOpacity: 0.1,
   shadowRadius: 4,
   shadowOffset: { width: 0, height: 2 },
-  elevation: 2,
+  // Android draws an elevation shadow through a see-through background: the
+  // cards showed a grey box with a line across the label. iOS keeps it.
+  elevation: Platform.OS === "android" ? 0 : 2,
 } as const;
 
 const STYLE_PAIR = themedStyles({
@@ -1333,7 +1377,6 @@ const STYLE_PAIR = themedStyles({
 
   scroll: {
     paddingHorizontal: H_PAD,
-    paddingBottom: 140,
     width: "100%",
     maxWidth: 640,
     alignSelf: "center",

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, StyleSheet, Text } from "react-native";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type PostMenuProps = {
@@ -8,6 +9,9 @@ type PostMenuProps = {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Someone else's post (task 059): block its author. */
+  onBlock?: () => void;
+  authorName?: string;
   // Other people's posts: report it.
   onReport?: () => void;
 };
@@ -25,9 +29,15 @@ export function PostMenu({
   onEdit,
   onDelete,
   onReport,
+  onBlock,
+  authorName,
 }: PostMenuProps) {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  const later = (fn?: () => void) => () => {
+    onClose();
+    if (fn) setTimeout(fn, MODAL_CLOSE_DELAY);
+  };
   const handleEdit = () => {
     onClose();
     setTimeout(onEdit, MODAL_CLOSE_DELAY);
@@ -49,20 +59,20 @@ export function PostMenu({
       transparent
       animationType="fade"
       onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={styles.overlay} onPress={onClose}>
         {/* Inner Pressable stops taps on the menu from closing it */}
-        <Pressable style={styles.menu} onPress={() => {}}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit post" style={styles.menu} onPress={() => {}}>
           {isMine ? (
             <>
               {/* EDIT */}
-              <Pressable style={styles.item} onPress={handleEdit}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Edit post" style={styles.item} onPress={handleEdit}>
                 <Ionicons name="create-outline" size={21} color={ink.text("#191922")} />
 
                 <Text style={styles.itemText}>Edit post</Text>
               </Pressable>
 
               {/* DELETE */}
-              <Pressable style={styles.item} onPress={handleDelete}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete post" style={styles.item} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={21} color={ink.text("#D9364F")} />
 
                 <Text style={[styles.itemText, styles.deleteText]}>
@@ -70,11 +80,20 @@ export function PostMenu({
                 </Text>
               </Pressable>
             </>
-          ) : null}
+          ) : (
+            <>
+              {onBlock ? (
+                <Pressable style={styles.item} onPress={later(onBlock)} accessibilityRole="button" accessibilityLabel={`Block ${authorName || "this person"}`}>
+                  <Ionicons name="ban-outline" size={21} color={ink.text("#D9364F")} />
+                  <Text style={[styles.itemText, styles.deleteText]}>Block {authorName || "this person"}</Text>
+                </Pressable>
+              ) : null}
+            </>
+          )}
 
           {/* REPORT (someone else's post) */}
           {!isMine && onReport ? (
-            <Pressable style={styles.item} onPress={handleReport}>
+            <Pressable style={styles.item} onPress={handleReport} accessibilityRole="button" accessibilityLabel="Report post">
               <Ionicons name="flag-outline" size={21} color={ink.text("#D9364F")} />
 
               <Text style={[styles.itemText, styles.deleteText]}>Report post</Text>
@@ -83,8 +102,10 @@ export function PostMenu({
 
           {/* CANCEL */}
           <Pressable
-            style={[styles.cancel, !isMine && !onReport && styles.cancelOnly]}
-            onPress={onClose}>
+            style={[styles.cancel, !isMine && !onReport && !onBlock && styles.cancelOnly]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel">
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
         </Pressable>
@@ -121,7 +142,7 @@ const STYLE_PAIR = themedStyles({
     marginLeft: 14,
     fontSize: 16,
     fontWeight: "600",
-    color: "#191922",
+    color: C.ink,
   },
 
   deleteText: {
@@ -144,6 +165,6 @@ const STYLE_PAIR = themedStyles({
   cancelText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#777780",
+    color: C.grey5,
   },
 });

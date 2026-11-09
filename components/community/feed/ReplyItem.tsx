@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AVATARS } from "@/constants/avatars";
 import { CommentAudio } from "./CommentAudio";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function getAvatar(author: any) {
@@ -142,12 +143,12 @@ export function ReplyItem({
         {/* ACTIONS */}
         <View style={styles.actions}>
           {/* REPLY */}
-          <Pressable onPress={onReply} hitSlop={6}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Reply" onPress={onReply} hitSlop={6}>
             <Text style={styles.replyText}>Reply</Text>
           </Pressable>
 
           {/* LIKE */}
-          <Pressable style={styles.likeAction} onPress={onLike} hitSlop={6}>
+          <Pressable accessibilityRole="button" accessibilityLabel={liked ? "Unlike reply" : "Like reply"} style={styles.likeAction} onPress={onLike} hitSlop={6}>
             <Ionicons
               name={liked ? "heart" : "heart-outline"}
               size={16}
@@ -163,7 +164,7 @@ export function ReplyItem({
 
       {/* DELETE */}
       {mine ? (
-        <Pressable onPress={onDelete} hitSlop={8}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={onDelete} hitSlop={8}>
           <Ionicons name="trash-outline" size={17} color={ink.text("#9999A1")} />
         </Pressable>
       ) : null}
@@ -194,7 +195,7 @@ const STYLE_PAIR = themedStyles({
   username: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   time: {
@@ -220,7 +221,7 @@ const STYLE_PAIR = themedStyles({
   replyText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   likeAction: {
@@ -236,6 +237,6 @@ const STYLE_PAIR = themedStyles({
   },
 
   likedCount: {
-    color: "#C5399A",
+    color: C.brand,
   },
 });

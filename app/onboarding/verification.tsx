@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { CodeInput } from "@/components/CodeInputs";
@@ -6,8 +5,9 @@ import { ErrorText } from "@/components/ErrorText";
 import { requestPasswordReset } from "@/services/auth";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, Text, View } from "react-native";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // There is no separate "check this code" endpoint on the backend: the code
@@ -16,7 +16,6 @@ import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 // carries the email + code on to the Reset Password screen.
 export default function Verification() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const insets = useSafeAreaInsets();
 
   // Sent here by the Forgot Password screen.
   const params = useLocalSearchParams<{ email?: string }>();
@@ -88,9 +87,7 @@ export default function Verification() {
   }
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
+    <OnboardingScreen background="gradient" contentStyle={styles.screen}>
           <Text style={styles.headline}>Verification</Text>
           <Text style={styles.sub}>
             Enter the 6-digit code sent to{"\n"}
@@ -125,9 +122,7 @@ export default function Verification() {
           <View style={styles.buttons}>
             <Button label="Verify" onPress={handleVerify} variant="brand" />
           </View>
-        </View>
-      </ScrollView>
-    </AppBackground>
+        </OnboardingScreen>
   );
 }
 
@@ -142,18 +137,18 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     marginBottom: 50,
     lineHeight: 20,
   },
-  email: { fontWeight: "700", color: "#191922" },
+  email: { fontWeight: "700", color: C.ink },
   resendWrap: { alignItems: "center", gap: 6, marginTop: 20, marginBottom: 20 },
   resendPrompt: { fontFamily: FONTS.regular, fontSize: 15, color: "#2b2b2c" },
   resend: { fontFamily: FONTS.bold, color: "#C5399A", fontWeight: "700", fontSize: 16 },

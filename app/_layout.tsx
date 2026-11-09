@@ -15,7 +15,13 @@ import ReportLayer from "@/components/report/ReportLayer";
 import FactionAlertLayer from "@/components/alerts/FactionAlertLayer";
 import ScheduledCallLayer from "@/components/calls/scheduled/ScheduledCallLayer";
 import SessionGate from "@/components/SessionGate";
-import { UserProvider } from "@/context/UserContext";
+import { RootErrorBoundary } from "@/components/ErrorBoundary";
+import ForceUpdateGate from "@/components/ForceUpdateGate";
+import OfflineBanner from "@/components/OfflineBanner";
+import PushBridge from "@/components/PushBridge";
+import { startMonitoring } from "@/services/monitoring";
+import GameBridge from "@/components/world/GameBridge";
+import { KeyboardProvider } from "@/components/ui/keyboard";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { store } from "@/store/store";
 import {
@@ -35,6 +41,7 @@ import "@/utils/webAlert";
 import "@/utils/webGlobalStyles";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -52,9 +59,20 @@ function SocketConnectionGate() {
   return null;
 }
 
+// The phone's splash stays up until the fonts and the saved login are ready
+// (SessionGate hides it), instead of a blank frame and then a second splash
+// (audit B6). If something hangs, it goes after 6 s anyway.
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Crash reporting: only with EXPO_PUBLIC_SENTRY_DSN (services/monitoring.ts).
+startMonitoring();
+setTimeout(() => void SplashScreen.hideAsync().catch(() => {}), 6000);
+
 export default function RootLayout() {
   // Icon fonts (so they resolve on web) + Poppins, the app font (Figma).
-  const [fontsLoaded] = useFonts({
+  // Poppins is also built into the app (the expo-font plugin in app.json), so
+  // on Android this resolves from the APK without a download.
+  const [fontsLoaded, fontsError] = useFonts({
     ...Ionicons.font,
     ...MaterialIcons.font,
     Poppins_400Regular,
@@ -64,9 +82,11 @@ export default function RootLayout() {
     Poppins_800ExtraBold,
   });
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded && !fontsError) return null;
 
   return (
+    <RootErrorBoundary>
+    <ForceUpdateGate>
     <Provider store={store}>
       {/* Stay logged in: loads the saved login before the screens show */}
       <SessionGate>
@@ -76,7 +96,8 @@ export default function RootLayout() {
         <AvatarCatalogLoader />
 
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <UserProvider>
+          {/* The keyboard, the same way everywhere (components/ui/keyboard.tsx) */}
+          <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
             {/* Green "Tap to return to call" bar while a call is minimized */}
             <CallBannerFrame>
               {/* Computer: top bar + left rail around every screen (D1-D8) */}
@@ -92,6 +113,22 @@ export default function RootLayout() {
                 <Stack.Screen name="category" />
                 <Stack.Screen name="settings" />
                 <Stack.Screen name="notifications" />
+
+                {/* cosquest://play?... and cosquest://coins?...: hand the
+                    link to the game and step aside (no flash). */}
+                <Stack.Screen
+                  name="play"
+                  options={{ presentation: "transparentModal", animation: "none" }}
+                />
+                <Stack.Screen
+                  name="coins"
+                  options={{ presentation: "transparentModal", animation: "none" }}
+                />
+                {/* cosquest://fight3d?...: the 3D fight's test link (cq 061), same idea. */}
+                <Stack.Screen
+                  name="fight3d"
+                  options={{ presentation: "transparentModal", animation: "none" }}
+                />
 
                 {/* Audio/video call screen */}
                 <Stack.Screen
@@ -125,12 +162,23 @@ export default function RootLayout() {
 
             {/* Scheduled calls: the waiting room and the call */}
             <ScheduledCallLayer />
+            {/* Merged app: the chat <-> game bridge (one login, unread,
+                calls, invites to chat, notification links) */}
+            <GameBridge />
+
+            {/* Push token, notification taps, waiting links, the badge (task 059) */}
+            <PushBridge />
+
+            {/* "You're offline" and the messages waiting to send */}
+            <OfflineBanner />
 
             {/* Dark icons: most screens are light even when the phone is dark (the chat sets its own). */}
             <StatusBar style="dark" />
-          </UserProvider>
+          </KeyboardProvider>
         </GestureHandlerRootView>
       </SessionGate>
     </Provider>
+    </ForceUpdateGate>
+    </RootErrorBoundary>
   );
 }

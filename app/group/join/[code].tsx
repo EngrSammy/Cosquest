@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -24,6 +23,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONTS } from "@/constants/fonts";
@@ -33,13 +33,14 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats } from "@/store/thunks/chatThunks";
 import { cancelJoinRequest } from "@/services/chatPrefs";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { ScreenGradient } from "@/components/chat/ui";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 const PINK_SOFT = "#F7E3F0";
 
 const KIND_LABEL: Record<GroupKind, string> = {
@@ -169,7 +170,7 @@ export default function GroupInvite() {
           <View style={styles.center}>
             <Ionicons name="link-outline" size={34} color={ink.text(MUTED)} />
             <Text style={styles.errorText}>{error || "This invite link isn't valid anymore."}</Text>
-            <Pressable style={[styles.secondary, styles.errorButton]} onPress={() => safeBack()}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={[styles.secondary, styles.errorButton]} onPress={() => safeBack()}>
               <Text style={styles.secondaryText}>Go back</Text>
             </Pressable>
           </View>
@@ -197,7 +198,7 @@ export default function GroupInvite() {
             {preview.description ? <Text style={styles.description}>{preview.description}</Text> : null}
 
             {preview.isMember ? (
-              <Pressable style={styles.primary} onPress={() => openChat(preview.id)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Open group chat" style={styles.primary} onPress={() => openChat(preview.id)}>
                 <Text style={styles.primaryText}>Open group chat</Text>
               </Pressable>
             ) : pending ? (
@@ -219,7 +220,7 @@ export default function GroupInvite() {
                     The group&apos;s admins will review your request. We&apos;ll notify you when you&apos;re approved.
                   </Text>
                   <Text style={styles.pendingNote}>Chat is available after approval</Text>
-                  <Pressable onPress={cancelRequest} style={styles.cancelLink} hitSlop={6}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Cancel join request" onPress={cancelRequest} style={styles.cancelLink} hitSlop={6}>
                     <Text style={styles.cancelText}>Cancel join request</Text>
                   </Pressable>
                 </View>
@@ -241,7 +242,7 @@ export default function GroupInvite() {
                   </>
                 ) : null}
 
-                <Pressable style={[styles.primary, joining && styles.off]} disabled={joining} onPress={join}>
+                <Pressable accessibilityRole="button" accessibilityLabel={approval ? "Ask to join" : "Join group"} style={[styles.primary, joining && styles.off]} disabled={joining} onPress={join}>
                   {joining ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
@@ -298,7 +299,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: "#F3DDED",
+    backgroundColor: C.brandTint,
   },
 
   chipText: { fontFamily: FONTS.semibold, fontSize: 11, color: PINK },

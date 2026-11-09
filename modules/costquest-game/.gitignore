@@ -1,0 +1,6 @@
+# UnityFramework.framework: build output, ~100+ MB, fetched by
+# scripts/fetch-unity-framework.sh from the pinned release (FRAMEWORK_PIN.md).
+ios/Frameworks/
+
+# Gradle output of the Android module.
+android/build/

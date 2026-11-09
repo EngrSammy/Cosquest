@@ -222,7 +222,7 @@ export default function ScheduledCallDetails() {
         <View style={styles.titleRow}>
           <Text style={styles.title}>Call details</Text>
           {hosting && !cancelled && !over && start > new Date() ? (
-            <Pressable
+            <Pressable accessibilityLabel="Edit"
               hitSlop={10}
               accessibilityRole="button"
               onPress={() => router.push({ pathname: "/group/schedule/[id]", params: { id: call.conversationId, callId: call.id } })}>
@@ -325,7 +325,7 @@ export default function ScheduledCallDetails() {
               Call ID: {call.meetingCode} · Passcode: {call.passcode}
             </Text>
             <View style={styles.inviteButtons}>
-              <Pressable style={[styles.inviteButton, styles.shareButton]} onPress={share}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Share invitation" style={[styles.inviteButton, styles.shareButton]} onPress={share}>
                 <Ionicons name="share-social-outline" size={17} color="#FFFFFF" />
                 <Text style={styles.shareText}>Share invitation</Text>
               </Pressable>
@@ -367,7 +367,7 @@ export default function ScheduledCallDetails() {
         ) : null}
 
         {hosting && !cancelled && !over ? (
-          <Pressable style={styles.cancelCall} onPress={cancelCall} disabled={!!busy}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancel this call" style={styles.cancelCall} onPress={cancelCall} disabled={!!busy}>
             {busy === "cancel" ? (
               <ActivityIndicator size="small" color={UI.MUTED} />
             ) : (

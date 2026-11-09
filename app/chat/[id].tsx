@@ -1,4 +1,7 @@
-﻿import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { replyQuote } from "@/services/replyQuote";
+import { setOpenChat, takeChatFocus } from "@/services/chatFocus";
+import { SkeletonMessages } from "@/components/kit";
 import {
   AudioModule,
   RecordingPresets,
@@ -14,7 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { createContext, memo, type ReactElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, type ReactElement, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -25,7 +28,6 @@ import {
   Image,
   ImageStyle,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -37,9 +39,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useStableCallback } from "@/hooks/useStableCallback";
+import { MESSAGE_PAGE_SIZE, olderPageQuery } from "@/services/messagePaging";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import CallNotesSheet, { callNotesEnabled } from "@/components/calls/CallNotesSheet";
 
@@ -51,6 +56,7 @@ import {
   fetchMessageSeen,
   fetchMessageShare,
   fetchMessages,
+  fetchOlderMessages,
   forwardMessageThunk,
   pinMessageThunk,
   reactToMessageThunk,
@@ -90,6 +96,9 @@ import MentionPicker, {
 } from "@/components/chat/MentionPicker";
 import { MentionText } from "@/components/chat/MentionText";
 import PollBubble from "@/components/chat/PollBubble";
+import GameInviteCard from "@/components/world/GameInviteCard";
+import GameResultCard from "@/components/world/GameResultCard";
+import type { ChatMessage } from "@/services/chats";
 import PollCreator from "@/components/chat/PollCreator";
 import { RankBadge, RankLine, RoleBadge } from "@/components/chat/RankBadge";
 import type { Rank } from "@/services/ranks";
@@ -109,6 +118,7 @@ import SearchInChat from "@/app/chat/search/[id]";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useSparksFeed } from "@/hooks/useSparks";
+import { perfEnd, useRenderCount } from "@/utils/perfMarks";
 import { useJoinVoice, VoiceLiveCard, VoiceStartButton } from "@/components/voice/voiceUi";
 import { voiceChatAllowed } from "@/services/voiceRooms";
 import ShareMediaSheet from "@/components/chat/ShareMediaSheet";
@@ -141,6 +151,9 @@ import {
 import { startCall } from "@/store/thunks/callThunks";
 import { ensureCallPermissions } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
+import { isOfflineError, isOfflineNow, sendQueue } from "@/services/network";
+import { haptic } from "@/utils/haptics";
 import CallsTab from "@/components/calls/scheduled/CallsTab";
 import ProjectsTab from "@/components/projects/ProjectsTab";
 import ScheduledCallMessage, { type ScheduledCallCardData } from "@/components/calls/scheduled/ScheduledCallMessage";
@@ -193,6 +206,10 @@ type Message = {
   // kind "poll": the question, options and results.
   poll?: PollSummary | null;
 
+  // kind "game_invite" (merged app): the raid / shrine / duel card.
+  gameInvite?: ChatMessage["gameInvite"];
+  gameResult?: unknown;
+
   // Groups: "owner" / "admin" badge for the sender (null otherwise).
   senderGroupRole?: "owner" | "admin" | null;
 
@@ -236,6 +253,8 @@ type Message = {
 
   replyTo?: Message | null;
   pending?: boolean;
+  // Sent while offline: waiting in services/offlineQueue.ts.
+  queued?: boolean;
 
   // Set by the backend on YOUR messages in a DM: true once the other
   // person has opened the chat since it was sent (serializeMessage's
@@ -418,7 +437,7 @@ function isInFuture(value?: string | null) {
 }
 
 // Figma M02 avatars: initials on a soft colour picked from the name.
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function initialsOf(name?: string) {
   const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
@@ -794,14 +813,17 @@ function SwipeToReply({
   const enabledRef = useRef(enabled);
   const onReplyRef = useRef(onReply);
 
-  enabledRef.current = enabled;
-  onReplyRef.current = onReply;
+  // After each commit, not during render (audit B3).
+  useLayoutEffect(() => {
+    enabledRef.current = enabled;
+    onReplyRef.current = onReply;
+  });
 
   const springBack = () => {
     Animated.spring(translateX, {
       toValue: 0,
       useNativeDriver: true,
-      bounciness: 6,
+      bounciness: 0,
     }).start();
   };
 
@@ -854,7 +876,7 @@ function SwipeToReply({
           },
         ]}>
         <View style={styles.swipeIcon}>
-          <Ionicons name="arrow-undo" size={17} color="#C5399A" />
+          <Ionicons name="arrow-undo" size={17} color={C.brand} />
         </View>
       </Animated.View>
 
@@ -955,7 +977,7 @@ function MessageMeta({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const color =
-    variant === "overlay" ? "#FFFFFF" : ink.text("#66738A");
+    variant === "overlay" ? "#FFFFFF" : ink.text(C.slate);
 
   // No ticks on call entries (like WhatsApp).
   const tickState =
@@ -980,7 +1002,7 @@ function MessageMeta({
       ) : null}
 
       <Text style={[styles.bubbleTime, { color }]}>
-        {formatMessageTime(msg.createdAt)}
+        {msg.queued ? "Waiting for network" : formatMessageTime(msg.createdAt)}
       </Text>
 
       {tickState ? (
@@ -1055,6 +1077,7 @@ const Bubble = memo(function Bubble({
 
   otherParticipant?: Chat["otherParticipant"];
 }) {
+  useRenderCount("Bubble");
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const onPhoto = useContext(PhotoWallpaperContext);
@@ -1077,7 +1100,10 @@ const Bubble = memo(function Bubble({
       : "🚫 This message was deleted."
     : msg.kind === "poll"
       ? ""
-      : msg.content || "";
+      : msg.kind === "game_result" && msg.gameResult
+        ? // The first line repeats the card (for older apps); the note follows it.
+          (msg.content || "").split("\n").slice(1).join("\n")
+        : msg.content || "";
 
   const mediaUrl = getMediaUrl(msg.media);
 
@@ -1157,6 +1183,9 @@ const Bubble = memo(function Bubble({
         ) : null}
 
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={msg.content ? String(msg.content).slice(0, 200) : "Message"}
+          accessibilityHint="Long press for message options"
           onPress={() => onPress(msg)}
           onLongPress={() => onLongPress(msg)}
           delayLongPress={300}
@@ -1172,7 +1201,7 @@ const Bubble = memo(function Bubble({
 
           {/* SPARK marker: this message is part of a Spark (tap to open) */}
           {msg.spark && !msg.deleted && sparkCtx && metaVariant !== "inline" ? (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Sparks"
               onPress={() => msg.spark && sparkCtx.open(msg.spark.id)}
               hitSlop={6}
               style={[styles.sparkMarker, hasMedia && styles.mediaPad]}>
@@ -1198,7 +1227,7 @@ const Bubble = memo(function Bubble({
               <Ionicons
                 name="arrow-redo-outline"
                 size={12}
-                color={mine ? "#6B6B72" : "#8A8A90"}
+                color={mine ? C.grey3 : C.grey1}
               />
 
               <Text
@@ -1213,7 +1242,7 @@ const Bubble = memo(function Bubble({
 
           {/* REPLY */}
           {msg.replyTo && !msg.deleted ? (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={`Reply to ${replyQuote(msg.replyTo).name}, go to the message`}
               onPress={() => onReplyPress(msg.replyTo!.id)}
               style={[styles.replyPreview, mine && styles.replyPreviewMine]}>
               <View style={[styles.replyBar, mine && styles.replyBarMine]} />
@@ -1225,7 +1254,7 @@ const Bubble = memo(function Bubble({
                     styles.replyPreviewTitle,
                     mine && styles.replyPreviewTitleMine,
                   ]}>
-                  {msg.replyTo.sender?.username || "Reply"}
+                  {replyQuote(msg.replyTo).name}
                 </Text>
 
                 <View style={styles.replyLine}>
@@ -1233,7 +1262,7 @@ const Bubble = memo(function Bubble({
                     <Ionicons
                       name={replyIcon}
                       size={12}
-                      color={mine ? "#6B6B72" : "#777783"}
+                      color={mine ? C.grey3 : "#777783"}
                     />
                   ) : null}
 
@@ -1243,9 +1272,7 @@ const Bubble = memo(function Bubble({
                       styles.replyPreviewText,
                       mine && styles.replyPreviewTextMine,
                     ]}>
-                    {msg.replyTo.content ||
-                      getMessageTypeLabel(msg.replyTo) ||
-                      "Message"}
+                    {replyQuote(msg.replyTo, getMessageTypeLabel(msg.replyTo)).text}
                   </Text>
                 </View>
               </View>
@@ -1254,7 +1281,7 @@ const Bubble = memo(function Bubble({
 
           {/* IMAGE */}
           {!msg.deleted && msg.kind === "image" && mediaUrl ? (
-            <Pressable
+            <Pressable accessibilityRole="imagebutton" accessibilityLabel="Photo, open full screen"
               onPress={() => onMediaPress(msg)}
               onLongPress={() => onLongPress(msg)}
               delayLongPress={300}
@@ -1281,7 +1308,7 @@ const Bubble = memo(function Bubble({
 
           {/* VIDEO */}
           {!msg.deleted && msg.kind === "video" && mediaUrl ? (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Play"
               onPress={() => onMediaPress(msg)}
               onLongPress={() => onLongPress(msg)}
               delayLongPress={300}
@@ -1314,7 +1341,7 @@ const Bubble = memo(function Bubble({
               <AudioBubble mediaUrl={mediaUrl} mine={mine} msg={msg} />
             ) : (
               <View style={styles.audioMessage}>
-                <Ionicons name="mic-outline" size={18} color="#C5399A" />
+                <Ionicons name="mic-outline" size={18} color={C.brand} />
 
                 <View style={styles.audioLine} />
 
@@ -1333,7 +1360,7 @@ const Bubble = memo(function Bubble({
                 mine && styles.documentMessageMine,
               ]}>
               <View style={styles.documentIcon}>
-                <Ionicons name="document-text" size={23} color="#C5399A" />
+                <Ionicons name="document-text" size={23} color={C.brand} />
               </View>
 
               <View style={styles.documentInfo}>
@@ -1372,6 +1399,20 @@ const Bubble = memo(function Bubble({
               conversationId={msg.conversationId || ""}
               poll={msg.poll}
               mine={mine}
+            />
+          ) : null}
+
+          {/* GAME RESULT (task 059: a shared result as a card) */}
+          {!msg.deleted && msg.kind === "game_result" ? (
+            <GameResultCard raw={msg.gameResult} mine={mine} onLongPress={() => onLongPress(msg)} />
+          ) : null}
+
+          {/* GAME INVITE (merged app: a raid / shrine / duel card) */}
+          {!msg.deleted && msg.kind === "game_invite" ? (
+            <GameInviteCard
+              raw={msg.gameInvite}
+              mine={mine}
+              onLongPress={() => onLongPress(msg)}
             />
           ) : null}
 
@@ -1460,7 +1501,7 @@ const Bubble = memo(function Bubble({
               mine ? styles.reactionsMine : styles.reactionsTheirs,
             ]}>
             {getReactionCounts(msg.reactions!).map((reaction) => (
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel={reaction.emoji}
                 key={reaction.emoji}
                 onPress={() => onReaction(msg, reaction.emoji)}
                 style={[
@@ -1480,7 +1521,21 @@ const Bubble = memo(function Bubble({
       </View>
     </View>
   );
-});
+}, sameBubbleProps);
+
+// The chat's other person changes on every presence event (online, last
+// active); a bubble reads only these three fields of it (getTickState), so a
+// presence change no longer re-renders every bubble (audit B3).
+function sameBubbleProps(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
+  for (const key of Object.keys(next)) {
+    if (key === "otherParticipant") continue;
+    if (prev[key] !== next[key]) return false;
+  }
+  if (Object.keys(prev).length !== Object.keys(next).length) return false;
+  const a = prev.otherParticipant as Chat["otherParticipant"] | undefined;
+  const b = next.otherParticipant as Chat["otherParticipant"] | undefined;
+  return a?.lastReadAt === b?.lastReadAt && a?.isOnline === b?.isOnline && a?.lastActiveAt === b?.lastActiveAt;
+}
 
 // ==========================================
 // RECORDING INDICATOR
@@ -1559,7 +1614,7 @@ function RecordingIndicator({
         <Ionicons
           name="chevron-back"
           size={14}
-          color={cancelArmed ? "#D64545" : "#8A8A90"}
+          color={cancelArmed ? C.danger : C.grey1}
         />
 
         <Text
@@ -1793,7 +1848,7 @@ function AudioBubble({
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
 
-  const playedColor = "#C5399A";
+  const playedColor = C.brand;
   const idleColor = mine ? "rgba(25,25,34,0.22)" : "#C9C9D2";
 
   const transcript = msg.media?.transcript;
@@ -1860,7 +1915,7 @@ function AudioBubble({
           hitSlop={8}
           style={[
             styles.audioPlay,
-            { backgroundColor: mine ? "#FFFFFF" : "#C34D9C" },
+            { backgroundColor: mine ? "#FFFFFF" : C.brandSoft },
           ]}
           accessibilityRole="button"
           accessibilityLabel={
@@ -1869,14 +1924,14 @@ function AudioBubble({
           <Ionicons
             name={status.playing ? "pause" : "play"}
             size={16}
-            color={mine ? "#C34D9C" : "#FFFFFF"}
+            color={mine ? C.brandSoft : "#FFFFFF"}
             // Optical centre: a play triangle looks off-centre otherwise.
             style={status.playing ? undefined : { marginLeft: 2 }}
           />
         </Pressable>
 
         <View style={styles.audioBody}>
-          <Pressable
+          <Pressable accessibilityRole="adjustable" accessibilityLabel="Voice note position"
             onLayout={(event) => setWaveWidth(event.nativeEvent.layout.width)}
             onPress={(event) => seekTo(event.nativeEvent.locationX)}
             style={styles.waveRow}>
@@ -1921,7 +1976,7 @@ function AudioBubble({
             <Ionicons
               name={showTranscript ? "chevron-up" : "text-outline"}
               size={16}
-              color={mine ? "#6B6B72" : "#8A8A90"}
+              color={mine ? C.grey3 : C.grey1}
             />
           </Pressable>
         ) : null}
@@ -1931,7 +1986,7 @@ function AudioBubble({
         <View style={styles.transcriptBox}>
           {transcribing && !transcript ? (
             <View style={styles.transcriptLoadingRow}>
-              <ActivityIndicator size="small" color="#C5399A" />
+              <ActivityIndicator size="small" color={C.brand} />
 
               <Text
                 style={[
@@ -1996,7 +2051,7 @@ function AudioBubble({
           )}
 
           {transcriptIsLong && transcript ? (
-            <Pressable
+            <Pressable accessibilityLabel={transcriptExpanded ? "See less" : "See more"}
               onPress={() => setTranscriptExpanded((current) => !current)}
               hitSlop={6}
               accessibilityRole="button">
@@ -2085,9 +2140,9 @@ function CallLogContent({
           : "Cancelled"
       : "Tap to call back";
 
-  const textColor = missedForMe ? "#E5484D" : "#191922";
-  const subColor = mine ? "#6B6B72" : "#8A8A90";
-  const arrowColor = missedForMe ? "#E5484D" : mine ? "#C5399A" : "#2FB36B";
+  const textColor = missedForMe ? "#E5484D" : C.ink;
+  const subColor = mine ? C.grey3 : C.grey1;
+  const arrowColor = missedForMe ? "#E5484D" : mine ? C.brand : "#2FB36B";
 
   // The call's Sparks: answered calls only, opened from the "Sparks" link.
   const [notesOpen, setNotesOpen] = useState(false);
@@ -2131,7 +2186,7 @@ function CallLogContent({
         <Ionicons
           name={voiceChat ? "mic" : video ? "videocam" : "call"}
           size={18}
-          color={missedForMe ? "#E5484D" : "#C5399A"}
+          color={missedForMe ? "#E5484D" : C.brand}
         />
       </View>
 
@@ -2161,7 +2216,7 @@ function CallLogContent({
             hitSlop={8}
             style={styles.callLogNotes}
             accessibilityLabel="Sparks from this call">
-            <Ionicons name="sparkles" size={12} color="#C5399A" />
+            <Ionicons name="sparkles" size={12} color={C.brand} />
             <Text style={styles.callLogNotesText}>Sparks</Text>
           </Pressable>
         ) : null}
@@ -2199,12 +2254,12 @@ function MenuItem({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable style={styles.menuItem} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.menuItem} onPress={onPress}>
       <Text style={[styles.menuItemText, danger && styles.dangerText]}>
         {label}
       </Text>
 
-      <Ionicons name={icon} size={22} color={danger ? "#C0394B" : "#66738A"} />
+      <Ionicons name={icon} size={22} color={danger ? C.dangerDeep : C.slate} />
     </Pressable>
   );
 }
@@ -2244,8 +2299,6 @@ export default function ChatScreen() {
       state.chat.conversations.find((chat) => chat.id === conversationId),
   ) as Chat | undefined;
 
-  const conversations = useAppSelector((state) => state.chat.conversations);
-
   const messages = useAppSelector(
     (state) =>
       (state.chat.messages[conversationId] || EMPTY_MESSAGES) as Message[],
@@ -2254,6 +2307,32 @@ export default function ChatScreen() {
   const messagesLoading = useAppSelector(
     (state) => !!state.chat.messagesLoading[conversationId],
   );
+
+  // Older history, a page at a time, when you scroll up (audit B4).
+  const paging = useAppSelector((state) => state.chat.messagePaging[conversationId]);
+  const loadingOlder = !!paging?.loading;
+  // Only once the person has scrolled: FlatList calls onEndReached at once
+  // when what it has rendered is short, which would page in history on open.
+  const scrolledHistory = useRef(false);
+  const loadOlder = useStableCallback(() => {
+    if (!scrolledHistory.current || !token || !paging || !paging.hasMore || paging.loading || messages.length === 0) return;
+    dispatch(
+      fetchOlderMessages({
+        conversationId,
+        token,
+        ...olderPageQuery(messages[messages.length - 1]?.id, paging),
+      }),
+    );
+  });
+
+  // Test builds: how long from the tap in the chat list to the messages on screen.
+  useRenderCount("ChatScreen");
+  const hasMessages = messages.length > 0;
+  useEffect(() => {
+    if (!hasMessages) return;
+    const frame = requestAnimationFrame(() => perfEnd("chat-open"));
+    return () => cancelAnimationFrame(frame);
+  }, [hasMessages]);
 
   const selectedIds = useAppSelector(
     (state) =>
@@ -2336,7 +2415,9 @@ export default function ChatScreen() {
 
   const recorderStateRef = useRef(recorderState);
 
-  recorderStateRef.current = recorderState;
+  useLayoutEffect(() => {
+    recorderStateRef.current = recorderState;
+  });
 
   const [recordingBusy, setRecordingBusy] = useState(false);
   const recordingPressActive = useRef(false);
@@ -2346,6 +2427,8 @@ export default function ChatScreen() {
   const [voiceHint, setVoiceHint] = useState("");
 
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  // The edit card (M15) shows under the message you just edited, until Done.
+  const [editCardFor, setEditCardFor] = useState<string | null>(null);
 
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
@@ -2656,7 +2739,7 @@ export default function ChatScreen() {
       open: (sparkId: string) => setOpenSparkId(sparkId),
       colorFor: (sparkId: string, era: number) => {
         const spark = sparks.find((item) => item.id === sparkId);
-        return spark ? eraColor(era, spark.eras?.length || 1) : "#C34D9C";
+        return spark ? eraColor(era, spark.eras?.length || 1) : C.brandSoft;
       },
       subjectFor: (sparkId: string) =>
         sparks.find((item) => item.id === sparkId)?.subject || "Spark",
@@ -2877,19 +2960,11 @@ export default function ChatScreen() {
             selected={selected}
             pinned={pinned}
             myReactionEmoji={findMyReaction(item)?.emoji}
-            onPress={handleMessagePress}
-            onLongPress={openMessageActions}
-            onReaction={(message, emoji) => {
-              if (selectionMode) {
-                toggleMessageSelection(message);
-
-                return;
-              }
-
-              reactToMessage(message, emoji);
-            }}
-            onMediaPress={handleMediaPress}
-            onReplyPress={scrollToMessage}
+            onPress={onBubblePress}
+            onLongPress={onBubbleLongPress}
+            onReaction={onBubbleReaction}
+            onMediaPress={onBubbleMediaPress}
+            onReplyPress={onBubbleReplyPress}
             onCallBack={handleCallBack}
             otherParticipant={conversation?.otherParticipant}
           />
@@ -2916,7 +2991,7 @@ export default function ChatScreen() {
         ) : null}
 
         {/* Figma M15: your edited message - edit again or undo */}
-        {isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
+        {editCardFor === item.id && isMyMessage(item) && (item as any).canRollback && !item.deleted && editedRecently(item.editedAt) ? (
           <View style={styles.editCard}>
             <Text style={styles.editSection}>YOUR MESSAGE</Text>
             <View style={styles.editBox}>
@@ -2928,7 +3003,7 @@ export default function ChatScreen() {
                 <Text style={styles.editNoteTitle}>✓ Changes saved · only you see this</Text>
                 <Text style={styles.editNoteText}>Your message has been updated.</Text>
               </View>
-              <Pressable style={styles.editButton} onPress={() => startEditing(item)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Edit again" style={styles.editButton} onPress={() => startEditing(item)}>
                 <Text style={styles.editButtonText}>Edit again</Text>
               </Pressable>
             </View>
@@ -2939,10 +3014,16 @@ export default function ChatScreen() {
               {item.previousContent ? (
                 <Text style={styles.editPrevious}>“{item.previousContent}”</Text>
               ) : null}
-              <Pressable style={styles.editButton} onPress={() => undoEdit(item)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Undo · restore previous message" style={styles.editButton} onPress={() => undoEdit(item)}>
                 <Text style={styles.editButtonText}>Undo · restore previous message</Text>
               </Pressable>
             </View>
+            <Pressable accessibilityLabel="Done"
+              style={styles.editDone}
+              accessibilityRole="button"
+              onPress={() => setEditCardFor(null)}>
+              <Text style={styles.editDoneText}>Done</Text>
+            </Pressable>
           </View>
         ) : null}
       </View>
@@ -2965,6 +3046,7 @@ export default function ChatScreen() {
       conversationId,
       otherParticipant: conversation?.otherParticipant,
       editMinute,
+      editCardFor,
     }),
     [
       listExtraData,
@@ -2976,6 +3058,7 @@ export default function ChatScreen() {
       conversationId,
       conversation?.otherParticipant,
       editMinute,
+      editCardFor,
     ],
   );
 
@@ -2990,6 +3073,10 @@ export default function ChatScreen() {
 
   const removePendingMessage = (id: string) => {
     setPendingMessages((current) => current.filter((item) => item.id !== id));
+  };
+
+  const markPendingQueued = (id: string) => {
+    setPendingMessages((current) => current.map((item) => (item.id === id ? { ...item, queued: true } : item)));
   };
 
   // ========================================
@@ -3148,6 +3235,27 @@ export default function ChatScreen() {
   // switching tabs), leaving and returning wouldn't refetch anything and
   // you'd sit looking at stale/blank content until the next 5s poll tick.
 
+  // Leaving the chat with the keyboard up: put it away first. Otherwise
+  // Android hands focus to the next text field in the window (the chat
+  // list's search) and the keyboard stays up over the tab bar.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        inputRef.current?.blur();
+        Keyboard.dismiss();
+      },
+      [],
+    ),
+  );
+
+  // This chat is on screen: its pushes need no banner (services/push.ts).
+  useFocusEffect(
+    useCallback(() => {
+      setOpenChat(conversationId ?? null);
+      return () => setOpenChat(null);
+    }, [conversationId]),
+  );
+
   useFocusEffect(
     useCallback(() => {
       if (!token || !conversationId) {
@@ -3165,6 +3273,8 @@ export default function ChatScreen() {
         fetchMessages({
           conversationId,
           token,
+          // The newest page; older ones load as you scroll up (audit B4).
+          limit: MESSAGE_PAGE_SIZE,
         }),
       );
 
@@ -3187,10 +3297,11 @@ export default function ChatScreen() {
   // message:edited now delivers a finished transcript live.
 
   const conversationRef = useRef(conversation);
-  conversationRef.current = conversation;
-
   const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  useLayoutEffect(() => {
+    conversationRef.current = conversation;
+    messagesRef.current = messages;
+  });
 
   // True while this screen's socket is connected AND joined to the room
   // (set by the socket effect below). Then message:new / edited / deleted
@@ -3627,6 +3738,30 @@ export default function ChatScreen() {
     }, 1600);
   };
 
+  // A message found in chat search (services/chatFocus.ts): scroll to it once
+  // it is in the list.
+  const [focusMessageId, setFocusMessageId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const messageId = takeChatFocus(conversationId);
+      if (messageId) setFocusMessageId(messageId);
+    }, [conversationId]),
+  );
+
+  useEffect(() => {
+    if (!focusMessageId || !visibleMessages.some((item) => item.id === focusMessageId)) return;
+    // Cleared after the scroll: clearing it first re-ran this effect, whose
+    // cleanup cancelled the timer.
+    const timer = setTimeout(() => {
+      scrollToMessage(focusMessageId);
+      setFocusMessageId(null);
+    }, 300);
+    return () => clearTimeout(timer);
+    // scrollToMessage is recreated every render; the list and the id are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMessageId, visibleMessages]);
+
   // ========================================
   // VOICE MESSAGE
   // ========================================
@@ -4023,9 +4158,10 @@ export default function ChatScreen() {
       content: text,
       createdAt: new Date().toISOString(),
     });
+    haptic.tap();
 
-    try {
-      await dispatch(
+    const send = () =>
+      dispatch(
         createMessage({
           conversationId,
           token,
@@ -4038,12 +4174,42 @@ export default function ChatScreen() {
         }),
       ).unwrap();
 
+    // Offline (task 059): the bubble stays, marked "Waiting for network",
+    // and the queue sends it when the phone is back online.
+    const queueIt = () => {
+      markPendingQueued(pendingId);
+      sendQueue.enqueue({
+        id: pendingId,
+        scope: conversationId,
+        run: async () => {
+          await send();
+          removePendingMessage(pendingId);
+        },
+        onGiveUp: (error) => {
+          removePendingMessage(pendingId);
+          Alert.alert("Message", error instanceof Error ? error.message : "Unable to send message.");
+        },
+      });
+    };
+
+    if (isOfflineNow()) {
+      queueIt();
+      return;
+    }
+
+    try {
+      await send();
+
       removePendingMessage(pendingId);
 
       startSlowTimer();
 
       scrollToLatestIfNeeded();
     } catch (error) {
+      if (isOfflineError(error)) {
+        queueIt();
+        return;
+      }
       removePendingMessage(pendingId);
 
       // Give the text back so nothing is lost on failure.
@@ -4111,6 +4277,7 @@ export default function ChatScreen() {
           },
         }),
       ).unwrap();
+      setEditCardFor(target.id);
     } catch (error) {
       // Put the user back into edit mode with their text so nothing is lost.
       setEditingMessage(target);
@@ -4142,6 +4309,7 @@ export default function ChatScreen() {
           token,
         }),
       ).unwrap();
+      setEditCardFor(null);
     } catch (error) {
       Alert.alert(
         "Undo edit",
@@ -4325,6 +4493,7 @@ export default function ChatScreen() {
     if (!token || !conversationId || message.pending) {
       return;
     }
+    haptic.tap();
 
     setShowActions(false);
 
@@ -4930,6 +5099,7 @@ export default function ChatScreen() {
   // call:incoming socket event.
 
   const beginCall = async (type: "audio" | "video") => {
+    haptic.press();
     if (!token || !conversationId || callStarting) {
       return;
     }
@@ -4964,7 +5134,9 @@ export default function ChatScreen() {
   // Tapping a call entry calls back. Kept stable (same function every
   // render) so the memoised message bubbles don't all re-render.
   const beginCallRef = useRef(beginCall);
-  beginCallRef.current = beginCall;
+  useLayoutEffect(() => {
+    beginCallRef.current = beginCall;
+  });
 
   // "Create Spark" on the rail: a Spark grows from a message, so it starts
   // from the newest one that can seed it (the sheet shows which).
@@ -4992,6 +5164,7 @@ export default function ChatScreen() {
   };
 
   const openMessageActions = (message: Message) => {
+    haptic.press();
     if (message.pending) {
       return;
     }
@@ -5098,6 +5271,22 @@ export default function ChatScreen() {
     setNewMessageCount(0);
   };
 
+  // The bubbles are memoised: hand them the same functions every render
+  // (audit B3), and the list the same extraData until one of its parts changes.
+  const onBubblePress = useStableCallback(handleMessagePress);
+  const onBubbleLongPress = useStableCallback(openMessageActions);
+  const onBubbleMediaPress = useStableCallback(handleMediaPress);
+  const onBubbleReplyPress = useStableCallback(scrollToMessage);
+  const onBubbleReaction = useStableCallback((message: Message, emoji: string) => {
+    if (selectionMode) {
+      toggleMessageSelection(message);
+
+      return;
+    }
+
+    reactToMessage(message, emoji);
+  });
+
   // ========================================
   // NO TOKEN
   // ========================================
@@ -5123,6 +5312,8 @@ export default function ChatScreen() {
 
   const selectedMessageIsMine =
     !!selectedMessage && isMyMessage(selectedMessage);
+
+
 
   return (
     <DesktopChatRow
@@ -5213,37 +5404,37 @@ export default function ChatScreen() {
         <View style={styles.header}>
           {selectionMode ? (
             <>
-              <Pressable onPress={exitSelectionMode} hitSlop={10}>
-                <Ionicons name="close" size={27} color="#191922" />
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={exitSelectionMode} hitSlop={10}>
+                <Ionicons name="close" size={27} color={C.ink} />
               </Pressable>
 
               <Text style={styles.selectionTitle}>{selectedIds.length}</Text>
 
               <View style={styles.selectionActions}>
                 {selectedIds.length === 1 ? (
-                  <Pressable onPress={replyToSelected} hitSlop={8}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Reply" onPress={replyToSelected} hitSlop={8}>
                     <Ionicons
                       name="arrow-undo-outline"
                       size={23}
-                      color="#C5399A"
+                      color={C.brand}
                     />
                   </Pressable>
                 ) : null}
 
-                <Pressable onPress={copySelected} hitSlop={8}>
-                  <Ionicons name="copy-outline" size={22} color="#C5399A" />
+                <Pressable accessibilityRole="button" accessibilityLabel="Copy" onPress={copySelected} hitSlop={8}>
+                  <Ionicons name="copy-outline" size={22} color={C.brand} />
                 </Pressable>
 
-                <Pressable onPress={forwardSelected} hitSlop={8}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Forward" onPress={forwardSelected} hitSlop={8}>
                   <Ionicons
                     name="arrow-redo-outline"
                     size={23}
-                    color="#C5399A"
+                    color={C.brand}
                   />
                 </Pressable>
 
-                <Pressable onPress={deleteSelected} hitSlop={8}>
-                  <Ionicons name="trash-outline" size={23} color="#D64545" />
+                <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={deleteSelected} hitSlop={8}>
+                  <Ionicons name="trash-outline" size={23} color={C.danger} />
                 </Pressable>
               </View>
             </>
@@ -5252,8 +5443,10 @@ export default function ChatScreen() {
               <Pressable
                 onPress={() => safeBack()}
                 hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
                 style={styles.backButton}>
-                <Ionicons name="chevron-back" size={27} color={ink.text("#191922")} />
+                <Ionicons name="chevron-back" size={27} color={ink.text(C.ink)} />
               </Pressable>
 
               {/* Tap their photo or name to see their profile (DMs) */}
@@ -5280,7 +5473,7 @@ export default function ChatScreen() {
                       <Ionicons
                         name={groupChat ? "people-outline" : "person"}
                         size={20}
-                        color="#C5399A"
+                        color={C.brand}
                       />
                     )}
                   </View>
@@ -5313,7 +5506,7 @@ export default function ChatScreen() {
                     disabled={callStarting}
                     accessibilityRole="button"
                     accessibilityLabel="Start voice call">
-                    <Ionicons name="call-outline" size={22} color="#C5399A" />
+                    <Ionicons name="call-outline" size={22} color={C.brand} />
                   </Pressable>
 
                   <Pressable
@@ -5328,7 +5521,7 @@ export default function ChatScreen() {
                     <Ionicons
                       name="videocam-outline"
                       size={25}
-                      color="#C5399A"
+                      color={C.brand}
                     />
                   </Pressable>
                 </>
@@ -5401,10 +5594,10 @@ export default function ChatScreen() {
       {/* ================================== */}
 
       {pinnedMessageId && !selectionMode ? (
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Pinned message, go to it"
           style={styles.pinnedBanner}
           onPress={() => scrollToMessage(pinnedMessageId)}>
-          <MaterialCommunityIcons name="pin-outline" size={21} color={ink.text("#B63D91")} />
+          <MaterialCommunityIcons name="pin-outline" size={21} color={ink.text(C.brandDeep)} />
 
           <View style={styles.pinnedBannerText}>
             <Text style={styles.pinnedBannerTitle}>
@@ -5422,7 +5615,7 @@ export default function ChatScreen() {
             </Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color={ink.text("#B63D91")} />
+          <Ionicons name="chevron-forward" size={18} color={ink.text(C.brandDeep)} />
         </Pressable>
       ) : null}
 
@@ -5445,10 +5638,9 @@ export default function ChatScreen() {
       {/* ================================== */}
 
       {messagesLoading && messages.length === 0 ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#C5399A" />
-
-          <Text style={styles.loadingText}>Loading messages...</Text>
+        // Task 059: bubbles in the shape of a chat while it loads.
+        <View style={styles.messageListWrapper}>
+          <SkeletonMessages count={9} />
         </View>
       ) : (
         <View style={styles.messageListWrapper}>
@@ -5460,6 +5652,16 @@ export default function ChatScreen() {
             onScroll={handleScroll}
             scrollEventThrottle={16}
             extraData={messageListExtraData}
+            onEndReached={loadOlder}
+            onScrollBeginDrag={() => {
+              scrolledHistory.current = true;
+            }}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingOlder ? (
+                <ActivityIndicator style={{ paddingVertical: 12 }} size="small" color={C.brand} />
+              ) : null
+            }
             onScrollToIndexFailed={(info) => {
               listRef.current?.scrollToOffset({
                 offset: info.averageItemLength * info.index,
@@ -5522,8 +5724,8 @@ export default function ChatScreen() {
       {/* ================================== */}
 
       {showJumpButton && !selectionMode ? (
-        <Pressable style={styles.jumpButton} onPress={jumpToLatest}>
-          <Ionicons name="chevron-down" size={20} color="#C34D9C" />
+        <Pressable accessibilityRole="button" accessibilityLabel="Jump to latest" style={styles.jumpButton} onPress={jumpToLatest}>
+          <Ionicons name="chevron-down" size={20} color={C.brandSoft} />
 
           {newMessageCount > 0 ? (
             <View style={styles.newMessageBadge}>
@@ -5562,13 +5764,13 @@ export default function ChatScreen() {
               </Text>
             </View>
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear"
               hitSlop={8}
               onPress={() => {
                 setEditingMessage(null);
                 setDraft("");
               }}>
-              <Ionicons name="close-circle" size={23} color="#8A8A90" />
+              <Ionicons name="close-circle" size={23} color={C.grey1} />
             </Pressable>
           </View>
         </View>
@@ -5592,13 +5794,13 @@ export default function ChatScreen() {
               </Text>
             </View>
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear"
               hitSlop={8}
               onPress={() => {
                 setReplyingTo(null);
                 setDraft("");
               }}>
-              <Ionicons name="close-circle" size={23} color="#8A8A90" />
+              <Ionicons name="close-circle" size={23} color={C.grey1} />
             </Pressable>
           </View>
         </View>
@@ -5611,7 +5813,7 @@ export default function ChatScreen() {
       {/* Figma M14: who your @ mentions will notify */}
       {!selectionMode && (mentionPicks.length > 0 || mentionEveryone) ? (
         <View style={styles.notifyRow}>
-          <Ionicons name="checkmark" size={14} color="#B63D91" />
+          <Ionicons name="checkmark" size={14} color={C.brandDeep} />
           <Text style={styles.notifyText} numberOfLines={1}>
             {mentionEveryone
               ? "Everyone in this chat will be notified"
@@ -5656,7 +5858,7 @@ export default function ChatScreen() {
             You blocked @{otherUsername}. Unblock to send messages.
           </Text>
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Unblock"
             style={styles.blockedButton}
             onPress={doUnblock}
             disabled={blockBusy}>
@@ -5690,7 +5892,7 @@ export default function ChatScreen() {
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Attach">
-              <Ionicons name="add" size={28} color="#B63D91" />
+              <Ionicons name="add" size={28} color={C.brandDeep} />
             </Pressable>
           ) : null}
 
@@ -5711,7 +5913,7 @@ export default function ChatScreen() {
                   placeholder={
                     editingMessage ? "Edit message" : groupChat ? "Message your group" : "Message"
                   }
-                  placeholderTextColor={ink.text("#66738A")}
+                  placeholderTextColor={ink.text(C.slate)}
                   multiline
                   // Browsers make a multi-line box 2 rows tall by default,
                   // which made the input look too tall on the website.
@@ -5730,16 +5932,16 @@ export default function ChatScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Mention people">
-                    <Ionicons name="at" size={24} color="#B63D91" />
+                    <Ionicons name="at" size={24} color={C.brandDeep} />
                   </Pressable>
                 ) : null}
 
                 {!editingMessage && !draft.trim() && !groupChat ? (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityLabel="Camera"
                     hitSlop={6}
                     style={styles.pillIcon}
                     onPress={takePhoto}>
-                    <Ionicons name="camera-outline" size={23} color={ink.text("#8A8A90")} />
+                    <Ionicons name="camera-outline" size={23} color={ink.text(C.grey1)} />
                   </Pressable>
                 ) : null}
               </>
@@ -5754,7 +5956,7 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
-              <Ionicons name="mic-outline" size={24} color={ink.text("#B63D91")} />
+              <Ionicons name="mic-outline" size={24} color={ink.text(C.brandDeep)} />
             </View>
           ) : null}
 
@@ -5779,7 +5981,7 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Hold to record voice message"
               {...micPanResponder.panHandlers}>
-              <Ionicons name="mic-outline" size={24} color="#B63D91" />
+              <Ionicons name="mic-outline" size={24} color={C.brandDeep} />
             </View>
           )}
         </View>
@@ -5819,7 +6021,7 @@ export default function ChatScreen() {
         animationType="fade"
         onRequestClose={() => setMediaViewer(null)}>
         <View style={styles.mediaViewerBackdrop}>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Close"
             style={styles.mediaViewerClose}
             onPress={() => setMediaViewer(null)}>
             <Ionicons name="close" size={28} color="#FFFFFF" />
@@ -5863,7 +6065,9 @@ export default function ChatScreen() {
                   setAttachmentCaption("");
                 }
               }}
-              disabled={attachmentSending}>
+              disabled={attachmentSending}
+              accessibilityRole="button"
+              accessibilityLabel="Close preview">
               <Ionicons name="close" size={28} color="#FFFFFF" />
             </Pressable>
 
@@ -5888,7 +6092,7 @@ export default function ChatScreen() {
             {attachmentDraft?.kind === "document" ? (
               <View style={styles.documentPreviewCard}>
                 <View style={styles.documentPreviewIcon}>
-                  <Ionicons name="document-text" size={48} color="#C5399A" />
+                  <Ionicons name="document-text" size={48} color={C.brand} />
                 </View>
                 <Text style={styles.documentPreviewName} numberOfLines={3}>
                   {attachmentDraft.name}
@@ -5913,7 +6117,9 @@ export default function ChatScreen() {
             <Pressable
               style={styles.attachmentSendButton}
               onPress={sendAttachment}
-              disabled={attachmentSending}>
+              disabled={attachmentSending}
+              accessibilityRole="button"
+              accessibilityLabel="Send attachment">
               {attachmentSending ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
@@ -5929,13 +6135,13 @@ export default function ChatScreen() {
       {/* ================================== */}
 
       <MessageActionsSheet visible={showActions && !!selectedMessage} onRequestClose={closeMenu} backdropStyle={[styles.menuBackdrop, styles.sheetBackdrop]} onBackdropPress={menuTap(closeMenu)}>
-          <Pressable
+          <Pressable accessible={false}
             style={[styles.menuColumn, styles.sheetColumn]}
             onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetTitleRow}>
               <Text style={styles.sheetTitle}>Message actions</Text>
               <Pressable onPress={closeMenu} hitSlop={10} accessibilityLabel="Close">
-                <Ionicons name="close" size={24} color="#66738A" />
+                <Ionicons name="close" size={24} color={C.slate} />
               </Pressable>
             </View>
 
@@ -5964,7 +6170,7 @@ export default function ChatScreen() {
                   style={styles.quickReaction}
                   onPress={() => setShowAllReactions(true)}
                   accessibilityLabel="More reactions">
-                  <Ionicons name="add" size={24} color={ink.text("#24283C")} />
+                  <Ionicons name="add" size={24} color={ink.text(C.inkNavy)} />
                 </Pressable>
               ) : null}
             </View>
@@ -6060,6 +6266,7 @@ export default function ChatScreen() {
                 )}
               />
 
+
               {selectedMessageIsMine && selectedMessage?.canRollback ? (
                 <MenuItem
                   icon="arrow-undo-circle-outline"
@@ -6149,6 +6356,7 @@ export default function ChatScreen() {
                   () => selectedMessage && selectMessage(selectedMessage),
                 )}
               />
+
             </View>
             </ScrollView>
 
@@ -6167,10 +6375,10 @@ export default function ChatScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setDeleteSheet(null)}>
-        <Pressable
+        <Pressable accessible={false}
           style={styles.modalBackdrop}
           onPress={() => setDeleteSheet(null)}>
-          <Pressable
+          <Pressable accessible={false}
             style={styles.actionSheet}
             onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetHandle} />
@@ -6230,13 +6438,13 @@ export default function ChatScreen() {
                       </Text>
 
                       {canEveryone ? (
-                        <Pressable
+                        <Pressable accessibilityRole="button" accessibilityLabel="Delete for everyone"
                           style={styles.deleteOption}
                           onPress={forEveryone}>
                           <Ionicons
                             name="trash-outline"
                             size={20}
-                            color="#D64545"
+                            color={C.danger}
                           />
                           <Text style={styles.deleteOptionText}>
                             Delete for everyone
@@ -6244,18 +6452,18 @@ export default function ChatScreen() {
                         </Pressable>
                       ) : null}
 
-                      <Pressable style={styles.deleteOption} onPress={forMe}>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Delete for me" style={styles.deleteOption} onPress={forMe}>
                         <Ionicons
                           name="trash-bin-outline"
                           size={20}
-                          color="#D64545"
+                          color={C.danger}
                         />
                         <Text style={styles.deleteOptionText}>
                           Delete for me
                         </Text>
                       </Pressable>
 
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityLabel="Cancel"
                         style={styles.cancelButton}
                         onPress={closeSheet}>
                         <Text style={styles.cancelText}>Cancel</Text>
@@ -6277,10 +6485,10 @@ export default function ChatScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setInfoMessage(null)}>
-        <Pressable
+        <Pressable accessible={false}
           style={styles.modalBackdrop}
           onPress={() => setInfoMessage(null)}>
-          <Pressable
+          <Pressable accessible={false}
             style={styles.actionSheet}
             onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetHandle} />
@@ -6289,7 +6497,7 @@ export default function ChatScreen() {
 
             {infoMessage ? (
               <View style={styles.forwardPreview}>
-                <Ionicons name="chatbubble-outline" size={18} color="#C5399A" />
+                <Ionicons name="chatbubble-outline" size={18} color={C.brand} />
 
                 <Text numberOfLines={2} style={styles.forwardPreviewText}>
                   {infoMessage.content ||
@@ -6304,7 +6512,7 @@ export default function ChatScreen() {
             <ScrollView style={styles.sheetScroll}>
               {infoLoading && !seenBy ? (
                 <View style={styles.forwardLoading}>
-                  <ActivityIndicator size="small" color="#C5399A" />
+                  <ActivityIndicator size="small" color={C.brand} />
                 </View>
               ) : !seenBy || seenBy.length === 0 ? (
                 <Text style={styles.noUsersText}>
@@ -6325,7 +6533,7 @@ export default function ChatScreen() {
                           cachePolicy="memory-disk"
                         />
                       ) : (
-                        <Ionicons name="person" size={18} color="#C5399A" />
+                        <Ionicons name="person" size={18} color={C.brand} />
                       )}
                     </View>
 
@@ -6349,7 +6557,7 @@ export default function ChatScreen() {
               )}
             </ScrollView>
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Close"
               style={styles.cancelButton}
               onPress={() => setInfoMessage(null)}>
               <Text style={styles.cancelText}>Close</Text>
@@ -6367,8 +6575,8 @@ export default function ChatScreen() {
         transparent
         animationType="slide"
         onRequestClose={closeForwardModal}>
-        <Pressable style={styles.modalBackdrop} onPress={closeForwardModal}>
-          <Pressable
+        <Pressable accessible={false} style={styles.modalBackdrop} onPress={closeForwardModal}>
+          <Pressable accessible={false}
             style={styles.actionSheet}
             onPress={(event) => event.stopPropagation()}>
             <View style={styles.sheetHandle} />
@@ -6377,7 +6585,7 @@ export default function ChatScreen() {
 
             {forwardMessages.length > 0 ? (
               <View style={styles.forwardPreview}>
-                <Ionicons name="arrow-redo-outline" size={18} color="#C5399A" />
+                <Ionicons name="arrow-redo-outline" size={18} color={C.brand} />
 
                 <Text numberOfLines={2} style={styles.forwardPreviewText}>
                   {forwardPreviewText}
@@ -6389,7 +6597,7 @@ export default function ChatScreen() {
               value={userSearch}
               onChangeText={setUserSearch}
               placeholder="Search people..."
-              placeholderTextColor="#9C9CAA"
+              placeholderTextColor={C.muted}
               style={styles.forwardSearchInput}
               autoCapitalize="none"
               autoCorrect={false}
@@ -6400,38 +6608,10 @@ export default function ChatScreen() {
               keyboardShouldPersistTaps="handled">
               <Text style={styles.forwardSectionTitle}>Your chats</Text>
 
-              {conversations
-                .filter((chat) => chat.id !== conversationId)
-                .map((chat) => {
-                  const name =
-                    chat.type === "dm"
-                      ? chat.title || chat.otherParticipant?.username || "User"
-                      : chat.title ||
-                        (chat.type === "faction" ? "Faction" : "Community");
-
-                  return (
-                    <Pressable
-                      key={chat.id}
-                      style={styles.actionButton}
-                      onPress={() => forwardToConversation(chat.id)}>
-                      <View style={styles.forwardChatIcon}>
-                        <Ionicons
-                          name={
-                            chat.type === "dm"
-                              ? "person-outline"
-                              : "people-outline"
-                          }
-                          size={20}
-                          color="#C5399A"
-                        />
-                      </View>
-
-                      <Text style={styles.actionText} numberOfLines={1}>
-                        {name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              <ForwardChatList
+                conversationId={conversationId}
+                onPick={forwardToConversation}
+              />
 
               {userSearch.trim() ? (
                 <>
@@ -6439,13 +6619,13 @@ export default function ChatScreen() {
 
                   {usersLoading ? (
                     <View style={styles.forwardLoading}>
-                      <ActivityIndicator size="small" color="#C5399A" />
+                      <ActivityIndicator size="small" color={C.brand} />
                     </View>
                   ) : searchedUsers.length === 0 ? (
                     <Text style={styles.noUsersText}>No people found.</Text>
                   ) : (
                     searchedUsers.map((person) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityLabel={`${person.name || person.username || "User"}, forward`}
                         key={person.id}
                         style={styles.actionButton}
                         onPress={() => forwardToUser(person.username || "")}>
@@ -6459,7 +6639,7 @@ export default function ChatScreen() {
                               cachePolicy="memory-disk"
                             />
                           ) : (
-                            <Ionicons name="person" size={18} color="#C5399A" />
+                            <Ionicons name="person" size={18} color={C.brand} />
                           )}
                         </View>
 
@@ -6481,7 +6661,7 @@ export default function ChatScreen() {
               ) : null}
             </ScrollView>
 
-            <Pressable style={styles.cancelButton} onPress={closeForwardModal}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cancel" style={styles.cancelButton} onPress={closeForwardModal}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
           </Pressable>
@@ -6497,7 +6677,7 @@ export default function ChatScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setShowAttachments(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={styles.modalBackdrop}
           onPress={() => setShowAttachments(false)}>
           <View style={styles.attachmentSheet}>
@@ -6553,55 +6733,55 @@ export default function ChatScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setShowChatMenu(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={styles.chatMenuBackdrop}
           onPress={() => setShowChatMenu(false)}>
           <View style={[styles.chatMenu, { top: insets.top + 52 }]}>
             {conversation?.type === "group" ? (
-              <Pressable style={styles.chatMenuItem} onPress={openTheirProfile}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Group info" style={styles.chatMenuItem} onPress={openTheirProfile}>
                 <Ionicons
                   name="information-circle-outline"
                   size={20}
-                  color="#191922"
+                  color={C.ink}
                 />
                 <Text style={styles.chatMenuText}>Group info</Text>
               </Pressable>
             ) : null}
 
             {otherUsername ? (
-              <Pressable style={styles.chatMenuItem} onPress={openTheirProfile}>
+              <Pressable accessibilityRole="button" accessibilityLabel="View profile" style={styles.chatMenuItem} onPress={openTheirProfile}>
                 <Ionicons
                   name="person-circle-outline"
                   size={20}
-                  color="#191922"
+                  color={C.ink}
                 />
                 <Text style={styles.chatMenuText}>View profile</Text>
               </Pressable>
             ) : null}
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Wallpaper"
               style={styles.chatMenuItem}
               onPress={() => {
                 setShowChatMenu(false);
                 setShowWallpaperPicker(true);
               }}>
-              <Ionicons name="image-outline" size={20} color="#191922" />
+              <Ionicons name="image-outline" size={20} color={C.ink} />
               <Text style={styles.chatMenuText}>Wallpaper</Text>
             </Pressable>
 
             {otherUsername ? (
               iBlockedThem ? (
-                <Pressable style={styles.chatMenuItem} onPress={doUnblock}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Unblock" style={styles.chatMenuItem} onPress={doUnblock}>
                   <Ionicons
                     name="checkmark-circle-outline"
                     size={20}
-                    color="#191922"
+                    color={C.ink}
                   />
                   <Text style={styles.chatMenuText}>Unblock</Text>
                 </Pressable>
               ) : (
-                <Pressable style={styles.chatMenuItem} onPress={confirmBlock}>
-                  <Ionicons name="ban-outline" size={20} color="#D64545" />
+                <Pressable accessibilityRole="button" accessibilityLabel="Block" style={styles.chatMenuItem} onPress={confirmBlock}>
+                  <Ionicons name="ban-outline" size={20} color={C.danger} />
                   <Text style={[styles.chatMenuText, styles.dangerText]}>
                     Block
                   </Text>
@@ -6730,9 +6910,9 @@ function AttachmentButton({
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
-    <Pressable style={styles.attachmentButton} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.attachmentButton} onPress={onPress}>
       <View style={styles.attachmentIcon}>
-        <Ionicons name={icon} size={26} color="#C5399A" />
+        <Ionicons name={icon} size={26} color={C.brand} />
       </View>
 
       <Text style={styles.attachmentLabel}>{label}</Text>
@@ -6754,7 +6934,7 @@ const STYLE_PAIR = themedStyles({
     backgroundColor: "#EAF2FB",
   },
 
-  centerText: { fontFamily: FONTS.regular, fontSize: 14, color: "#8A8A90" },
+  centerText: { fontFamily: FONTS.regular, fontSize: 14, color: C.grey1 },
 
   // HEADER
 
@@ -6866,7 +7046,7 @@ const STYLE_PAIR = themedStyles({
   chatMenuText: {
     fontSize: 15,
     fontFamily: FONTS.semibold,
-    color: "#191922",
+    color: C.ink,
   },
 
   blockedBar: {
@@ -6934,13 +7114,13 @@ const STYLE_PAIR = themedStyles({
   slowModeText: {
     fontFamily: FONTS.medium,
     fontSize: 12,
-    color: "#C34D9C",
+    color: C.brandSoft,
   },
 
   blockedText: {
     fontFamily: FONTS.regular,
     fontSize: 13,
-    color: "#6B6B72",
+    color: C.grey3,
     textAlign: "center",
   },
 
@@ -6951,7 +7131,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   blockedButtonText: {
@@ -6974,13 +7154,13 @@ const STYLE_PAIR = themedStyles({
 
   headerText: { flex: 1, marginLeft: 10, marginRight: 12 },
 
-  headerName: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 21, color: "#24283C" },
+  headerName: { fontFamily: FONTS.semibold, fontSize: 16, lineHeight: 21, color: C.inkNavy },
 
   headerStatus: {
     fontFamily: FONTS.regular,
     fontSize: 12,
     lineHeight: 17,
-    color: "#66738A",
+    color: C.slate,
     marginTop: 4,
   },
 
@@ -6989,7 +7169,7 @@ const STYLE_PAIR = themedStyles({
     marginLeft: 18,
     fontSize: 19,
     fontFamily: FONTS.bold,
-    color: "#191922",
+    color: C.ink,
   },
 
   selectionActions: { flexDirection: "row", alignItems: "center", gap: 22 },
@@ -7023,14 +7203,14 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.semibold,
     fontSize: 11,
     lineHeight: 15,
-    color: "#B63D91",
+    color: C.brandDeep,
   },
 
   pinnedBannerBody: {
     fontFamily: FONTS.regular,
     fontSize: 14,
     lineHeight: 20,
-    color: "#24283C",
+    color: C.inkNavy,
     marginTop: 2,
   },
 
@@ -7042,7 +7222,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 10,
     fontFamily: FONTS.regular,
     fontSize: 13,
-    color: "#8A8A90",
+    color: C.grey1,
   },
 
   emptyChat: {
@@ -7051,7 +7231,7 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 40,
   },
 
-  emptyChatText: { fontFamily: FONTS.regular, fontSize: 13, color: "#8A8A90" },
+  emptyChatText: { fontFamily: FONTS.regular, fontSize: 13, color: C.grey1 },
 
   // LIST
 
@@ -7076,7 +7256,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 11,
     lineHeight: 13,
     fontFamily: FONTS.medium,
-    color: "#66738A",
+    color: C.slate,
     letterSpacing: 0.3,
   },
 
@@ -7152,7 +7332,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 16,
     padding: 12,
 
-    shadowColor: "#24283C",
+    shadowColor: C.inkNavy,
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -7199,7 +7379,7 @@ const STYLE_PAIR = themedStyles({
   bubbleMineOnPhoto: { backgroundColor: "#F2C6E3" },
 
   // Someone mentioned you (or everyone): pink edge.
-  bubbleMentionsMe: { borderColor: "#C34D9C", borderWidth: 1.5 },
+  bubbleMentionsMe: { borderColor: C.brandSoft, borderWidth: 1.5 },
 
   tailTheirs: { borderTopLeftRadius: 4 },
 
@@ -7221,10 +7401,12 @@ const STYLE_PAIR = themedStyles({
     backgroundColor: "#FFFFFF",
   },
 
-  notifyText: { flexShrink: 1, fontFamily: FONTS.medium, fontSize: 12.5, color: "#B63D91" },
+  notifyText: { flexShrink: 1, fontFamily: FONTS.medium, fontSize: 12.5, color: C.brandDeep },
 
   // Figma M15: "Your message" / "Restore previous wording" card.
   editCard: { marginTop: 14 },
+  editDone: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 14 },
+  editDoneText: { fontFamily: FONTS.semibold, fontSize: 14, color: C.brandDeep },
 
   editSection: {
     marginTop: 6,
@@ -7232,7 +7414,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.semibold,
     fontSize: 12,
     letterSpacing: 0.4,
-    color: "#66738A",
+    color: C.slate,
   },
 
   editBox: {
@@ -7244,7 +7426,7 @@ const STYLE_PAIR = themedStyles({
     borderColor: "rgba(36,40,60,0.08)",
   },
 
-  editLabel: { marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 13, color: "#24283C" },
+  editLabel: { marginBottom: 8, fontFamily: FONTS.semibold, fontSize: 13, color: C.inkNavy },
 
   editSaved: {
     padding: 12,
@@ -7253,17 +7435,17 @@ const STYLE_PAIR = themedStyles({
     borderColor: "rgba(102,115,138,0.25)",
   },
 
-  editSavedText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+  editSavedText: { fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: C.inkNavy },
 
-  editNote: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "#F0EDF9" },
+  editNote: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: C.lilac },
 
-  editNoteTitle: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" },
+  editNoteTitle: { fontFamily: FONTS.semibold, fontSize: 13, color: C.brandDeep },
 
-  editNoteText: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 13, color: "#66738A" },
+  editNoteText: { marginTop: 4, fontFamily: FONTS.regular, fontSize: 13, color: C.slate },
 
-  editHint: { fontFamily: FONTS.regular, fontSize: 14, color: "#66738A" },
+  editHint: { fontFamily: FONTS.regular, fontSize: 14, color: C.slate },
 
-  editPrevious: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: "#24283C" },
+  editPrevious: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: C.inkNavy },
 
   editButton: {
     marginTop: 12,
@@ -7271,10 +7453,10 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F0EDF9",
+    backgroundColor: C.lilac,
   },
 
-  editButtonText: { fontFamily: FONTS.semibold, fontSize: 15, color: "#B63D91" },
+  editButtonText: { fontFamily: FONTS.semibold, fontSize: 15, color: C.brandDeep },
 
   // Figma M10: "Message actions" as a white bottom sheet.
   sheetBackdrop: {
@@ -7302,12 +7484,12 @@ const STYLE_PAIR = themedStyles({
     marginBottom: 14,
   },
 
-  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 22, lineHeight: 28, color: "#24283C" },
+  sheetTitle: { fontFamily: FONTS.semibold, fontSize: 22, lineHeight: 28, color: C.inkNavy },
 
   sheetReactions: {
     alignSelf: "stretch",
     justifyContent: "space-between",
-    backgroundColor: "#F0EDF9",
+    backgroundColor: C.lilac,
     borderRadius: 28,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -7321,11 +7503,11 @@ const STYLE_PAIR = themedStyles({
 
   msgNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  msgName: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 13, lineHeight: 17, color: "#24283C" },
+  msgName: { flexShrink: 1, fontFamily: FONTS.semibold, fontSize: 13, lineHeight: 17, color: C.inkNavy },
 
-  msgRole: { fontFamily: FONTS.semibold, fontSize: 11, lineHeight: 15, color: "#B63D91" },
+  msgRole: { fontFamily: FONTS.semibold, fontSize: 11, lineHeight: 15, color: C.brandDeep },
 
-  avatarInitials: { fontFamily: FONTS.bold, fontSize: 10, lineHeight: 12, color: "#7D356D" },
+  avatarInitials: { fontFamily: FONTS.bold, fontSize: 10, lineHeight: 12, color: C.plum },
 
   // "••• Someone is typing" (indent 38 = avatar 30 + gap 8).
   typingRow: {
@@ -7337,9 +7519,9 @@ const STYLE_PAIR = themedStyles({
     marginTop: 16,
   },
 
-  typingDots: { fontSize: 15, lineHeight: 18, letterSpacing: 3, color: "#B63D91" },
+  typingDots: { fontSize: 15, lineHeight: 18, letterSpacing: 3, color: C.brandDeep },
 
-  typingText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" },
+  typingText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: C.slate },
 
   // Sender name + rank badge + admin badge (group chats).
   senderRow: {
@@ -7355,7 +7537,7 @@ const STYLE_PAIR = themedStyles({
   senderName: {
     fontSize: 12,
     fontFamily: FONTS.bold,
-    color: "#C5399A",
+    color: C.brand,
     marginBottom: 2,
   },
 
@@ -7372,7 +7554,7 @@ const STYLE_PAIR = themedStyles({
       : null),
   },
 
-  bubbleTextMine: { color: "#191922" },
+  bubbleTextMine: { color: C.ink },
 
   metaSpacer: { opacity: 0 },
 
@@ -7391,10 +7573,10 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 11,
     fontStyle: "italic",
-    color: "#8A8A90",
+    color: C.grey1,
   },
 
-  forwardedTextMine: { color: "#6B6B72" },
+  forwardedTextMine: { color: C.grey3 },
 
   // MESSAGE META
 
@@ -7418,7 +7600,7 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 2,
   },
 
-  bubbleTime: { fontFamily: FONTS.regular, fontSize: 11, lineHeight: 15, color: "#66738A" },
+  bubbleTime: { fontFamily: FONTS.regular, fontSize: 11, lineHeight: 15, color: C.slate },
 
   editedText: { fontFamily: FONTS.regular, fontSize: 10, fontStyle: "italic" },
 
@@ -7431,7 +7613,7 @@ const STYLE_PAIR = themedStyles({
     paddingLeft: 10,
     paddingVertical: 2,
     borderLeftWidth: 2,
-    borderLeftColor: "#B63D91",
+    borderLeftColor: C.brandDeep,
     backgroundColor: "transparent",
   },
 
@@ -7451,13 +7633,13 @@ const STYLE_PAIR = themedStyles({
     marginTop: 1,
   },
 
-  replyPreviewTitle: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
+  replyPreviewTitle: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: C.slate /* M14 */ },
 
-  replyPreviewTitleMine: { color: "#66738A" /* M14 */ },
+  replyPreviewTitleMine: { color: C.slate /* M14 */ },
 
-  replyPreviewText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: "#66738A" /* M14 */ },
+  replyPreviewText: { fontFamily: FONTS.regular, fontSize: 12, lineHeight: 17, color: C.slate /* M14 */ },
 
-  replyPreviewTextMine: { color: "#66738A" /* M14 */ },
+  replyPreviewTextMine: { color: C.slate /* M14 */ },
 
   // MEDIA
 
@@ -7579,7 +7761,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 1,
   },
 
-  audioTextMine: { color: "#6B6B72" },
+  audioTextMine: { color: C.grey3 },
 
   // Outer wrapper so the transcript block can sit below the play/wave
   // row while still being one visual unit inside the bubble.
@@ -7612,21 +7794,21 @@ const STYLE_PAIR = themedStyles({
     marginTop: 4,
     fontSize: 12,
     fontFamily: FONTS.bold,
-    color: "#C5399A",
+    color: C.brand,
   },
 
-  transcriptMoreMine: { color: "#C34D9C" },
+  transcriptMoreMine: { color: C.brandSoft },
 
   // The word currently being spoken, highlighted against the rest of
   // the (already-italic, muted) transcript text.
   transcriptWordActive: {
-    color: "#C5399A",
+    color: C.brand,
     fontFamily: FONTS.bold,
     fontStyle: "normal",
   },
 
   transcriptWordActiveMine: {
-    color: "#C34D9C",
+    color: C.brandSoft,
     fontFamily: FONTS.bold,
     fontStyle: "normal",
     textDecorationLine: "underline",
@@ -7641,7 +7823,7 @@ const STYLE_PAIR = themedStyles({
   transcriptLoadingText: {
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#8A8A90",
+    color: C.grey1,
     fontStyle: "italic",
   },
 
@@ -7698,7 +7880,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 12,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   // DOCUMENT
@@ -7725,18 +7907,18 @@ const STYLE_PAIR = themedStyles({
 
   documentInfo: { flex: 1, marginLeft: 9 },
 
-  documentName: { fontSize: 13, fontFamily: FONTS.bold, color: "#191922" },
+  documentName: { fontSize: 13, fontFamily: FONTS.bold, color: C.ink },
 
-  documentNameMine: { color: "#191922" },
+  documentNameMine: { color: C.ink },
 
   documentLabel: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: "#8A8A90",
+    color: C.grey1,
     marginTop: 2,
   },
 
-  documentLabelMine: { color: "#6B6B72" },
+  documentLabelMine: { color: C.grey3 },
 
   // REACTIONS
 
@@ -7768,7 +7950,7 @@ const STYLE_PAIR = themedStyles({
 
   reactionEmoji: { fontSize: 15 /* M14 */ },
 
-  reactionCount: { fontFamily: FONTS.semibold, fontSize: 13, color: "#B63D91" /* M14 */ },
+  reactionCount: { fontFamily: FONTS.semibold, fontSize: 13, color: C.brandDeep /* M14 */ },
 
   // JUMP BUTTON
 
@@ -7798,7 +7980,7 @@ const STYLE_PAIR = themedStyles({
     height: 20,
     borderRadius: 10,
     paddingHorizontal: 5,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -7833,16 +8015,16 @@ const STYLE_PAIR = themedStyles({
     gap: 10,
     padding: 12,
     borderRadius: 16,
-    backgroundColor: "#F0EDF9",
+    backgroundColor: C.lilac,
   },
 
   editingAccent: { width: 0 /* M14 */ },
 
   editingContent: { flex: 1, marginHorizontal: 10, paddingVertical: 8 },
 
-  editingTitle: { fontFamily: FONTS.semibold, fontSize: 12.5, color: "#B63D91" /* M14 */ },
+  editingTitle: { fontFamily: FONTS.semibold, fontSize: 12.5, color: C.brandDeep /* M14 */ },
 
-  editingText: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 14, color: "#24283C" /* M14 */ },
+  editingText: { marginTop: 2, fontFamily: FONTS.regular, fontSize: 14, color: C.inkNavy /* M14 */ },
 
   // COMPOSER
 
@@ -7885,7 +8067,7 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 8,
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web"
       ? ({ outlineStyle: "none", resize: "none" } as object)
       : null),
@@ -7907,7 +8089,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   // Figma M02: the pink send circle with an up arrow.
-  sendCircle: { backgroundColor: "#B63D91" },
+  sendCircle: { backgroundColor: C.brandDeep },
 
   // The plain mic beside the send circle (groups, Figma M02).
   micBare: { width: 30, marginRight: 4 },
@@ -7937,7 +8119,7 @@ const STYLE_PAIR = themedStyles({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: "#D64545",
+    backgroundColor: C.danger,
     marginRight: 8,
   },
 
@@ -7945,7 +8127,7 @@ const STYLE_PAIR = themedStyles({
     width: 38,
     fontSize: 14,
     fontFamily: FONTS.semibold,
-    color: "#191922",
+    color: C.ink,
   },
 
   recordingWave: {
@@ -7963,7 +8145,7 @@ const STYLE_PAIR = themedStyles({
     minHeight: 4,
     maxHeight: 25,
     borderRadius: 3,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
     marginHorizontal: 1.2,
   },
 
@@ -7976,7 +8158,7 @@ const STYLE_PAIR = themedStyles({
 
   slideCancelText: {
     fontSize: 12,
-    color: "#8A8A90",
+    color: C.grey1,
     fontFamily: FONTS.semibold,
   },
 
@@ -8048,7 +8230,7 @@ const STYLE_PAIR = themedStyles({
     justifyContent: "center",
   },
 
-  menuMessageInitials: { fontFamily: FONTS.semibold, fontSize: 11, color: "#7D356D" },
+  menuMessageInitials: { fontFamily: FONTS.semibold, fontSize: 11, color: C.plum },
 
   menuMessageBody: { flex: 1, minWidth: 0 },
 
@@ -8061,9 +8243,9 @@ const STYLE_PAIR = themedStyles({
     backgroundColor: "#F0F4F9",
   },
 
-  menuMessageText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: "#24283C" },
+  menuMessageText: { fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: C.inkNavy },
 
-  menuMessageTime: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 11, color: "#66738A" },
+  menuMessageTime: { marginTop: 6, fontFamily: FONTS.regular, fontSize: 11, color: C.slate },
 
   menuScroll: { flexGrow: 0, maxHeight: 330 },
 
@@ -8071,14 +8253,14 @@ const STYLE_PAIR = themedStyles({
     marginTop: 10,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#66738A",
+    color: C.slate,
   },
 
   menuPreviewText: {
     flex: 1,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#8A8A90",
+    color: C.grey1,
   },
 
   menuNoticeText: { color: "#1FA855", fontFamily: FONTS.bold },
@@ -8097,7 +8279,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 13,
     lineHeight: 19,
-    color: "#6B6B72",
+    color: C.grey3,
     marginBottom: 6,
   },
 
@@ -8113,7 +8295,7 @@ const STYLE_PAIR = themedStyles({
   deleteOptionText: {
     fontSize: 15.5,
     fontFamily: FONTS.bold,
-    color: "#D64545",
+    color: C.danger,
   },
 
   menuItem: {
@@ -8124,9 +8306,9 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 12,
   },
 
-  menuItemText: { fontSize: 15, color: "#191922", fontFamily: FONTS.semibold },
+  menuItemText: { fontSize: 15, color: C.ink, fontFamily: FONTS.semibold },
 
-  dangerText: { color: "#D64545" },
+  dangerText: { color: C.danger },
 
   // SHEETS
 
@@ -8160,7 +8342,7 @@ const STYLE_PAIR = themedStyles({
   actionTitle: {
     fontSize: 17,
     fontFamily: FONTS.bold,
-    color: "#191922",
+    color: C.ink,
     marginBottom: 8,
   },
 
@@ -8171,7 +8353,7 @@ const STYLE_PAIR = themedStyles({
     gap: 14,
   },
 
-  actionText: { fontSize: 15, color: "#191922", fontFamily: FONTS.semibold },
+  actionText: { fontSize: 15, color: C.ink, fontFamily: FONTS.semibold },
 
   cancelButton: {
     marginTop: 8,
@@ -8210,7 +8392,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 14,
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
     borderWidth: 1,
     borderColor: "#ECECF0",
     marginBottom: 6,
@@ -8250,7 +8432,7 @@ const STYLE_PAIR = themedStyles({
   forwardUsername: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: "#8A8A90",
+    color: C.grey1,
     marginTop: 2,
   },
 
@@ -8259,7 +8441,7 @@ const STYLE_PAIR = themedStyles({
   noUsersText: {
     fontFamily: FONTS.regular,
     fontSize: 13,
-    color: "#8A8A90",
+    color: C.grey1,
     paddingVertical: 12,
   },
 
@@ -8375,14 +8557,14 @@ const STYLE_PAIR = themedStyles({
   },
 
   documentPreviewName: {
-    color: "#191922",
+    color: C.ink,
     fontSize: 15,
     fontFamily: FONTS.bold,
     textAlign: "center",
   },
 
   documentPreviewHint: {
-    color: "#8A8A90",
+    color: C.grey1,
     fontFamily: FONTS.regular,
     fontSize: 12,
     marginTop: 6,
@@ -8407,14 +8589,14 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 11,
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
   },
 
   attachmentSendButton: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -8458,4 +8640,53 @@ const STYLE_PAIR = themedStyles({
   bubbleTextMine: { color: "#F4F5FA" },});
 
 
+// The forward sheet's "Your chats": selects the chat list itself, so the
+// chat screen no longer re-renders on every presence or preview change to
+// any chat (audit B3).
+function ForwardChatList({
+  conversationId,
+  onPick,
+}: {
+  conversationId: string;
+  onPick: (chatId: string) => void;
+}) {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const conversations = useAppSelector((state) => state.chat.conversations);
+  const forwardToConversation = onPick;
+  return (
+    <>
+      {conversations
+                .filter((chat) => chat.id !== conversationId)
+                .map((chat) => {
+                  const name =
+                    chat.type === "dm"
+                      ? chat.title || chat.otherParticipant?.username || "User"
+                      : chat.title ||
+                        (chat.type === "faction" ? "Faction" : "Community");
 
+                  return (
+                    <Pressable accessibilityRole="button" accessibilityLabel={`${name}, forward`}
+                      key={chat.id}
+                      style={styles.actionButton}
+                      onPress={() => forwardToConversation(chat.id)}>
+                      <View style={styles.forwardChatIcon}>
+                        <Ionicons
+                          name={
+                            chat.type === "dm"
+                              ? "person-outline"
+                              : "people-outline"
+                          }
+                          size={20}
+                          color={C.brand}
+                        />
+                      </View>
+
+                      <Text style={styles.actionText} numberOfLines={1}>
+                        {name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+    </>
+  );
+}

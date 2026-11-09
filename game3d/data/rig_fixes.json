@@ -1,0 +1,197 @@
+{
+ "_doc": "cq 014 + cq 239: the cast files cq 060 published to the Forge catalogue (sha256) -> the same model with cq 014's fixed rig (Armstrong, Bobo, Crystal-Z, Elvis, Hoof) and cq 239's cleaned textures and painted faces (all 8), shipped in res://cast/ (char_loader.gd rig_fix). Written by tools/rig/ship.py, then tools/look/ship_look.py; see docs/game3d/RIGS.md and CHARACTERS.md.",
+ "files": {
+  "ea32389e2650378fb4caf8ed054ae170371a4b64f9c443ff5970a452d18cd592": {
+   "key": "armstrong",
+   "lod": 0,
+   "glb": "res://cast/armstrong_lod0.glb",
+   "sha256": "990ee8ced7d73ad2509f7711e9737b7f8233c274c2f179ff7f1c8ba416ab1523",
+   "from": "cq 060 pose/armstrong/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "e1403e94dac33bf28e4e6e978c8d22276ee531a065db8498fca093e0d083dbca": {
+   "key": "armstrong",
+   "lod": 1,
+   "glb": "res://cast/armstrong_lod1.glb",
+   "sha256": "133ba991334c34336ea1fd6bea202e653ed2161f8ca584389ba2c56bfe15f3e7",
+   "from": "cq 060 pose/armstrong/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "b9a10008d9d07f4edf5f58dfe722a314e19cd7f14da6898fc35029ba255f77e0": {
+   "key": "armstrong",
+   "lod": 2,
+   "glb": "res://cast/armstrong_lod2.glb",
+   "sha256": "4b1afb4067ff0852ca8e5bccafbd4e031d0b303b63d139007f56dae9fef9e321",
+   "from": "cq 060 pose/armstrong/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "90d452fa4b70617e996cef73776b39ab68a52b6048b979bd98f27b9e5f6af4d0": {
+   "key": "bobo",
+   "lod": 0,
+   "glb": "res://cast/bobo_lod0.glb",
+   "sha256": "75cb04abb703ae216c5977654a67269030ab97b185ae582b19b90631cb118ddc",
+   "from": "cq 060 pose/bobo/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "1a47c3076f1defd7407730ce48835b7503bd6b0b0dd48c5fe6afa571f670841b": {
+   "key": "bobo",
+   "lod": 1,
+   "glb": "res://cast/bobo_lod1.glb",
+   "sha256": "9ff121198ff284c96c11be607d38b4785767d59b2ca7dccc7f43d43ef607aa32",
+   "from": "cq 060 pose/bobo/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "7552fb71c990af74909d8f3513957f30ca0abcc74655ba137aade00128039865": {
+   "key": "bobo",
+   "lod": 2,
+   "glb": "res://cast/bobo_lod2.glb",
+   "sha256": "fb3f9b274ba5329cf60adbd7ba089d1fc21d140392bef78ab297e483c88a346f",
+   "from": "cq 060 pose/bobo/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "c706d4824721702b018284c0029889d9dac94bc6a568a08d46d30d85c29135b4": {
+   "key": "catboy",
+   "lod": 0,
+   "glb": "res://cast/catboy_lod0.glb",
+   "sha256": "76c3b05ea1f1524dfc469dafea1bc90fd56f3d696756846325f03c05053d2dc0",
+   "from": "cq 060 pose/catboy/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "3305f5728625042411d3386227da11c228062ea0357da0be94230cc17cb2bf7a": {
+   "key": "catboy",
+   "lod": 1,
+   "glb": "res://cast/catboy_lod1.glb",
+   "sha256": "d106cc3c9091efe4199046e1c845cdfca54e4e468f5e83c9d9949c6959e82385",
+   "from": "cq 060 pose/catboy/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "c7473fe06bade92b2cc271c5de130063e060ba6532e48540a6abb3a10c53d1fd": {
+   "key": "catboy",
+   "lod": 2,
+   "glb": "res://cast/catboy_lod2.glb",
+   "sha256": "efd2d840a7d34eac2ddb28c80a93c5e6722d0677485f313f1ad7df885d836f70",
+   "from": "cq 060 pose/catboy/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "7021aa244ebfff861a6faccc662562922a206d9561164dc334d72f2a25b9301e": {
+   "key": "crystalz",
+   "lod": 0,
+   "glb": "res://cast/crystalz_lod0.glb",
+   "sha256": "4877e862990fc5208a85edcd46e7118c37728c06a4b862ca60ddfa181ae86d3e",
+   "from": "cq 060 pose/crystalz/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "0df72ca34b3833c3452085b6b751fc6dd34a3c3fce78c9c6a735ebb4c41618e4": {
+   "key": "crystalz",
+   "lod": 1,
+   "glb": "res://cast/crystalz_lod1.glb",
+   "sha256": "2d0ef3a7ef2f1ecde9536144d68ab638895cef2187647277e8d3adf96bdd58da",
+   "from": "cq 060 pose/crystalz/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "f1c6775a91ff5198d1ba66bdf0afb57f43d014e185f4159da12308c69e7c94f4": {
+   "key": "crystalz",
+   "lod": 2,
+   "glb": "res://cast/crystalz_lod2.glb",
+   "sha256": "37c887253fde00e721c67782964c1a4f49ac8b4db877f62ce7207fef2ec25db6",
+   "from": "cq 060 pose/crystalz/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "30ffdf78fdf4e83501df113fb21fd8a267c9a30207a4c0bc549987b2194c7d99": {
+   "key": "elvis",
+   "lod": 0,
+   "glb": "res://cast/elvis_lod0.glb",
+   "sha256": "3407751486baf118b82cd475104e4bfbb3855d09221fc8b2aee8b251bda92bc5",
+   "from": "cq 060 pose/elvis/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "142894cfc3d6041e33f51b558f9fe3814590b734c9276218c28cc5a8f5a9cce2": {
+   "key": "elvis",
+   "lod": 1,
+   "glb": "res://cast/elvis_lod1.glb",
+   "sha256": "2e791a71d1db77fa099423c40da22f3ae4c3bddf8b98be2ccbdeab632b0c310c",
+   "from": "cq 060 pose/elvis/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "92df81a089df87c822653908d077ffe400e7a641f35094a5e9892900eed54690": {
+   "key": "elvis",
+   "lod": 2,
+   "glb": "res://cast/elvis_lod2.glb",
+   "sha256": "febf2ec8cc68deb9b35745fc4bae3d26a7b0f6b6431a38570e4e9259f394e3c3",
+   "from": "cq 060 pose/elvis/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "6166d535163368c40dcc742f5e60c2648811597b558da61f89477255b1a9c3ab": {
+   "key": "hoof",
+   "lod": 0,
+   "glb": "res://cast/hoof_lod0.glb",
+   "sha256": "b224884aa8dbe842960f11cf5ee90353fa50778894202abede30aab6003bb046",
+   "from": "cq 060 deck/hoof/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "c682f812e3488e2356bc6fe095e83b3f909d510c5bba4c959f00213c471b18f4": {
+   "key": "hoof",
+   "lod": 1,
+   "glb": "res://cast/hoof_lod1.glb",
+   "sha256": "fce7f37bae86fe66441e80477a1c0dc36b885710ea510c3d0c9beeb529d5736c",
+   "from": "cq 060 deck/hoof/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "31e61151ae07c978771d22626c4d36bc1f38d24342c5af12effd7dd1c6b03d4b": {
+   "key": "hoof",
+   "lod": 2,
+   "glb": "res://cast/hoof_lod2.glb",
+   "sha256": "9291aa996c6750aeaf5fd371f64e610e705e808c0f648ce1a35a0cf0ec12335b",
+   "from": "cq 060 deck/hoof/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 014's rig"
+  },
+  "f528d2848bf6bf9d99bc377ad534c9dc47fbc27afe41c72f21cd4f726b29e8ad": {
+   "key": "nebulx",
+   "lod": 0,
+   "glb": "res://cast/nebulx_lod0.glb",
+   "sha256": "a7d9a2ccff115096a704d282e341f51d29f5b4acaa181441c0694839d6637018",
+   "from": "cq 060 pose/nebulx/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "73eb60c3d34cf5967dcad08eacf991cd71515ded014a29a07eb0700e5c92e6b7": {
+   "key": "nebulx",
+   "lod": 1,
+   "glb": "res://cast/nebulx_lod1.glb",
+   "sha256": "11f1522244c1b33b2f039aaa8c28e84b45c80b6e9f1974c9cde6a35030a491f7",
+   "from": "cq 060 pose/nebulx/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "586c049aebe1aca83d15cfc32ae67130c4a64282474ac4d0e930f81fca605a92": {
+   "key": "nebulx",
+   "lod": 2,
+   "glb": "res://cast/nebulx_lod2.glb",
+   "sha256": "5b3cb8c4b9ad9f29324d9a1f6fb48c8ee1d2616c509b5a5cd4cc30bcd2e9320b",
+   "from": "cq 060 pose/nebulx/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "4f161c6ae13d19b4154c8099e386230104bbe3c16e254bdd07833f4c94de443f": {
+   "key": "vanessa",
+   "lod": 0,
+   "glb": "res://cast/vanessa_lod0.glb",
+   "sha256": "10a2688ecfa3deefce383627e1f6f3804ae1c43bfabdd9644cbe4c90c347fc38",
+   "from": "cq 060 pose/vanessa/lod0.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "b8056242e18b09dacaf9a7d07cb8ab1a807381dd0a584116b07e6429e9641d87": {
+   "key": "vanessa",
+   "lod": 1,
+   "glb": "res://cast/vanessa_lod1.glb",
+   "sha256": "1f13774dc7c740d9b2ee3c1996c322a7e5da573325891a88be366a6ca18967dd",
+   "from": "cq 060 pose/vanessa/lod1.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  },
+  "433ab7d7092d4bc014101f699cd81c950c088d9ef54f6cc7b2c11820ee06e3ad": {
+   "key": "vanessa",
+   "lod": 2,
+   "glb": "res://cast/vanessa_lod2.glb",
+   "sha256": "61ffc582559e64c67005ee99b2863db67bc0321b6596c84bbee391297d6b90fc",
+   "from": "cq 060 pose/vanessa/lod2.glb",
+   "look": "cq 239 textures (tools/look) on cq 060's rig"
+  }
+ }
+}

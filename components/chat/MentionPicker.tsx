@@ -34,10 +34,11 @@ import { getGroupMembers } from "@/services/groups";
 import type { Rank } from "@/services/ranks";
 import { useAppSelector } from "@/store/hooks";
 import { DARK_SCREEN_GRADIENT, LIGHT_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const INK = "#24283C";
-const MUTED = "#66738A";
+const PINK = C.brandDeep;
+const INK = C.inkNavy;
+const MUTED = C.slate;
 const LINE = "rgba(36,40,60,0.08)";
 
 const PAGE_SIZE = 50;
@@ -350,7 +351,7 @@ export default function MentionPicker({
               value={query}
               onChangeText={setQuery}
               placeholder="Find a member"
-              placeholderTextColor="#9AA3B5"
+              placeholderTextColor={C.placeholder}
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
@@ -360,7 +361,7 @@ export default function MentionPicker({
 
           {/* EVERYONE */}
           {!searching ? (
-            <Pressable
+            <Pressable accessibilityLabel="Everyone"
               style={styles.everyoneRow}
               onPress={() => setEveryone((value) => !value)}
               accessibilityRole="checkbox"
@@ -404,7 +405,7 @@ export default function MentionPicker({
             loadingPage > 1 ? (
               <ActivityIndicator color={PINK} style={styles.more} />
             ) : error && rows.length ? (
-              <Pressable onPress={() => fetchPage(query.trim(), page + 1)} style={styles.more}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Couldn't load more, tap to try again" onPress={() => fetchPage(query.trim(), page + 1)} style={styles.more}>
                 <Text style={styles.retry}>Couldn&apos;t load more · tap to retry</Text>
               </Pressable>
             ) : null
@@ -421,7 +422,7 @@ export default function MentionPicker({
               <Text style={styles.selectedHint}>They&apos;ll be notified when you send your message.</Text>
             </>
           ) : null}
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel}
             style={[styles.confirm, !everyone && !count && styles.off]}
             disabled={!everyone && !count}
             onPress={() => onDone(everyone ? [] : picked, everyone)}>

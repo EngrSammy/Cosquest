@@ -8,6 +8,8 @@ import {
   fetchChatShare,
   fetchConversation,
   fetchMessages,
+  fetchOlderMessages,
+  refreshConversations,
   fetchMessageSeen,
   fetchMessageShare,
   pinMessageThunk,
@@ -20,7 +22,9 @@ import {
   unpinMessageThunk,
 } from "../thunks/chatThunks";
 
+import { invitePreview, normalizeInvite } from "@/features/world/gameInvite";
 import type { Chat, ChatMessage } from "@/services/chats";
+import { FIRST_PAGE, mergeOlder, type MessagePaging } from "@/services/messagePaging";
 
 type ChatState = {
   conversations: Chat[];
@@ -32,6 +36,9 @@ type ChatState = {
   loading: boolean;
 
   messagesLoading: Record<string, boolean>;
+
+  // Older history, page by page, per conversation (audit B4).
+  messagePaging: Record<string, MessagePaging>;
 
   error: string | null;
 
@@ -75,6 +82,19 @@ type ChatState = {
   typingByConversation: Record<string, boolean>;
 };
 
+/** Chat summaries (list shape) merged into the list and any open details. */
+function mergeChatSummaries(state: ChatState, chats: Chat[]) {
+  for (const chat of chats) {
+    if (!chat?.id) continue;
+    const index = state.conversations.findIndex((item) => item.id === chat.id);
+    if (index >= 0) state.conversations[index] = { ...state.conversations[index], ...chat };
+    else state.conversations.push(chat);
+    if (state.conversationDetails[chat.id]) {
+      state.conversationDetails[chat.id] = { ...state.conversationDetails[chat.id], ...chat };
+    }
+  }
+}
+
 const initialState: ChatState = {
   conversations: [],
 
@@ -85,6 +105,8 @@ const initialState: ChatState = {
   loading: false,
 
   messagesLoading: {},
+
+  messagePaging: {},
 
   error: null,
 
@@ -137,6 +159,11 @@ function getPreview(message: ChatMessage): string {
 
   if (message.kind === "poll") {
     return `📊 ${message.content || "Poll"}`;
+  }
+
+  // Game invite (merged app): same wording as the backend's preview.
+  if (message.kind === "game_invite") {
+    return invitePreview(normalizeInvite(message.gameInvite));
   }
 
   // Call entry. A moment later the backend's chat:preview refresh replaces
@@ -226,6 +253,11 @@ const chatSlice = createSlice({
   initialState,
 
   reducers: {
+    // A chat:preview that carries the chat's summary (no fetch needed).
+    socketChatSummaries: (state, action: PayloadAction<Chat[]>) => {
+      mergeChatSummaries(state, action.payload);
+    },
+
     // ======================================
     // CLEAR ALL
     // ======================================
@@ -238,6 +270,8 @@ const chatSlice = createSlice({
       state.messages = {};
 
       state.messagesLoading = {};
+
+      state.messagePaging = {};
 
       state.hiddenMessageIds = {};
 
@@ -779,7 +813,11 @@ const chatSlice = createSlice({
       })
 
       .addCase(fetchMessages.fulfilled, (state, action) => {
-        const { conversationId, messages, mode } = action.payload;
+        const { conversationId, messages } = action.payload;
+        const paging = state.messagePaging[conversationId];
+        // Older pages loaded: refresh the newest page in place instead of
+        // dropping them (coming back to the chat keeps your place).
+        const mode = action.payload.mode === "replace" && paging && paging.page > 1 ? "append" : action.payload.mode;
 
         state.messagesLoading[conversationId] = false;
 
@@ -841,9 +879,52 @@ const chatSlice = createSlice({
           }
         } else {
           state.messages[conversationId] = incoming;
+          const limit = action.meta.arg.limit;
+          state.messagePaging[conversationId] = {
+            ...FIRST_PAGE,
+            hasMore: limit ? (messages || []).length >= limit : true,
+          };
         }
 
         updateConversationPreview(state, conversationId);
+      })
+
+      // Some chats' summaries at once (audit B5): merged in, never replacing
+      // the list (the answer may be a few chats or all of them).
+      .addCase(refreshConversations.fulfilled, (state, action) => {
+        mergeChatSummaries(state, action.payload);
+      })
+
+      .addCase(fetchOlderMessages.pending, (state, action) => {
+        const { conversationId } = action.meta.arg;
+        state.messagePaging[conversationId] = {
+          ...(state.messagePaging[conversationId] || FIRST_PAGE),
+          loading: true,
+        };
+      })
+
+      .addCase(fetchOlderMessages.fulfilled, (state, action) => {
+        const { conversationId, messages, hasMore } = action.payload;
+        const hiddenIds = state.hiddenMessageIds[conversationId] || [];
+        const older = messages
+          .filter((message) => !hiddenIds.includes(message.id))
+          .map((message) => ({ ...message, conversationId, reactions: message.reactions || [] }));
+        const { merged, added } = mergeOlder(state.messages[conversationId] || [], older);
+        if (added > 0) state.messages[conversationId] = merged;
+        state.messagePaging[conversationId] = {
+          page: action.meta.arg.page,
+          // Nothing new came back (a backend that ignores paging): stop asking.
+          hasMore: hasMore && added > 0,
+          loading: false,
+        };
+      })
+
+      .addCase(fetchOlderMessages.rejected, (state, action) => {
+        const { conversationId } = action.meta.arg;
+        state.messagePaging[conversationId] = {
+          ...(state.messagePaging[conversationId] || FIRST_PAGE),
+          loading: false,
+        };
       })
 
       .addCase(fetchMessages.rejected, (state, action) => {
@@ -1168,6 +1249,7 @@ const chatSlice = createSlice({
 });
 
 export const {
+  socketChatSummaries,
   clearChats,
   clearConversationMessages,
   toggleSelectedMessage,

@@ -1,0 +1,27 @@
+--- a/Game/UI/GameKit.swift
++++ b/Game/UI/GameKit.swift
+@@ -504,6 +504,10 @@
+ 
+     @MainActor static func play() {
+         guard !active else { return }
++        // [merged-app] A CosQuest call owns the session (.playAndRecord):
++        // switching it to .playback would cut the call's microphone. The
++        // effects still play, mixed into the call's session.
++        if GameHost.shared.callActive { return }
+         active = true
+         DispatchQueue.global(qos: .userInitiated).async {
+             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default,
+--- a/Game/Warden/VoiceAnswer.swift
++++ b/Game/Warden/VoiceAnswer.swift
+@@ -71,6 +71,11 @@
+     }
+ 
+     private func start() throws {
++        // [merged-app] The microphone belongs to the ongoing CosQuest call.
++        if GameHost.shared.callActive {
++            state = .unavailable("Your call is using the microphone. Tap your answer instead.")
++            return
++        }
+         guard let recognizer, recognizer.isAvailable else {
+             state = .unavailable("Voice answers aren't available on this phone.")
+             return

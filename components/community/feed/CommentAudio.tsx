@@ -15,6 +15,7 @@ import {
   nextSpeed,
   SpeedPill,
 } from "@/components/chat/VoiceSpeed";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export type CommentMedia = {
@@ -138,7 +139,7 @@ export function CommentAudio({ media }: { media?: CommentMedia | null }) {
                   {
                     height: 4 + bar * 18,
                     backgroundColor:
-                      index / WAVE_BARS < progress ? "#C5399A" : "#D8D8DF",
+                      index / WAVE_BARS < progress ? C.brand : "#D8D8DF",
                   },
                 ]}
               />
@@ -212,7 +213,7 @@ const STYLE_PAIR = themedStyles({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -273,7 +274,7 @@ const STYLE_PAIR = themedStyles({
 
   transcriptLoadingText: {
     fontSize: 12,
-    color: "#8A8A90",
+    color: C.grey1,
     fontStyle: "italic",
   },
 });

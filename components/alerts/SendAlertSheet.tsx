@@ -5,7 +5,8 @@
 // an urgent alert and can join this call for 30 minutes.
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
@@ -51,7 +52,7 @@ export default function SendAlertSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
             <View style={styles.head}>

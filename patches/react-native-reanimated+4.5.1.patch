@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/componentUtils.js b/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/componentUtils.js
+index 3185240..16a0589 100644
+--- a/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/componentUtils.js
++++ b/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/componentUtils.js
+@@ -191,7 +191,11 @@ export function setElementAnimation(element, animationConfig, shouldSavePosition
+   if (!(animationName in Animations)) {
+     scheduleAnimationCleanup(animationName, duration + delay, () => {
+       if (shouldSavePosition) {
+-        setElementPosition(element, getSnapshotForElement(element));
++        // CosQuest patch (5 Nov 2026): record where it is, do not move it. This
++        // runs on the LIVE element after a custom Keyframe entering animation,
++        // and setElementPosition made it position:absolute with a frozen box,
++        // so everything laid out after it overlapped it on the web.
++        saveSnapshot(element);
+       }
+       maybeRunCleanup();
+       maybeCallCallback(false);
+diff --git a/node_modules/react-native-reanimated/src/layoutReanimation/web/componentUtils.ts b/node_modules/react-native-reanimated/src/layoutReanimation/web/componentUtils.ts
+index 5de550a..b3ada06 100644
+--- a/node_modules/react-native-reanimated/src/layoutReanimation/web/componentUtils.ts
++++ b/node_modules/react-native-reanimated/src/layoutReanimation/web/componentUtils.ts
+@@ -280,7 +280,11 @@ export function setElementAnimation(
+   if (!(animationName in Animations)) {
+     scheduleAnimationCleanup(animationName, duration + delay, () => {
+       if (shouldSavePosition) {
+-        setElementPosition(element, getSnapshotForElement(element));
++        // CosQuest patch (5 Nov 2026): record where it is, do not move it. This
++        // runs on the LIVE element after a custom Keyframe entering animation,
++        // and setElementPosition made it position:absolute with a frozen box,
++        // so everything laid out after it overlapped it on the web.
++        saveSnapshot(element);
+       }
+ 
+       maybeRunCleanup();

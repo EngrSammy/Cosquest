@@ -21,6 +21,10 @@ export type AppNotificationItem = {
   // @ mention notifications: the chat (and message) to open.
   conversationId?: string | null;
   messageId?: string | null;
+  // Task 059: game events (type "game"): the cosquest://play link and the
+  // kind (raid_started, boss_appeared, duel_challenge, ...).
+  link?: string | null;
+  gameKind?: string | null;
   // Scheduled-call invitations, changes, cancellations and reminders.
   scheduledCallId?: string | null;
   // like / comment / repost / post: the post (and comment) to open.
@@ -61,6 +65,8 @@ function normalizeNotification(item: any): AppNotificationItem {
     scheduledCallId: item?.scheduledCallId ?? null,
     postId: item?.postId ?? null,
     commentId: item?.commentId ?? null,
+    link: item?.link ?? null,
+    gameKind: item?.gameKind ?? null,
   };
 }
 

@@ -16,6 +16,8 @@ import {
   useThemedStyles,
 } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
+import { tabBarSpace } from "@/constants/tabBar";
+import { world } from "@/features/world/worldState";
 
 export default function LiveScreen() {
   const styles = useThemedStyles(STYLE_PAIR);
@@ -30,8 +32,10 @@ export default function LiveScreen() {
         style={styles.fill}
       />
 
-      <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 120 }]}>
-        <Text style={styles.title}>Live</Text>
+      <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: tabBarSpace(insets.bottom) }]}>
+        <Text style={styles.title} accessibilityRole="header">
+          Live
+        </Text>
 
         <View style={styles.center}>
           <View style={styles.iconRing}>
@@ -44,6 +48,14 @@ export default function LiveScreen() {
           </Text>
           <Pressable style={styles.button} onPress={() => router.navigate("/home")} accessibilityRole="button">
             <Text style={styles.buttonText}>Explore quests</Text>
+          </Pressable>
+          {/* Quest Hours, raid bosses and duels near you are live in the game today. */}
+          <Pressable
+            style={styles.linkButton}
+            onPress={() => world.openGame(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Quest Hours and raids. Open the game">
+            <Text style={styles.linkText}>Quest Hours and raids are in the game</Text>
           </Pressable>
         </View>
       </View>
@@ -94,6 +106,8 @@ const STYLE_PAIR = themedStyles(
       backgroundColor: "#B63D91",
     },
     buttonText: { fontFamily: FONTS.semibold, fontSize: 15, color: "#FFFFFF" },
+    linkButton: { marginTop: 14, paddingVertical: 8, paddingHorizontal: 12 },
+    linkText: { fontFamily: FONTS.medium, fontSize: 14, color: "#B63D91" },
   },
   {
     screen: { backgroundColor: "#171823" },

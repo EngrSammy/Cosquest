@@ -14,6 +14,7 @@ import { FONTS } from "@/constants/fonts";
 
 import VoiceRoomSession from "./VoiceRoomSession";
 import { setVoiceMinimized, useVoiceMinimized, useVoiceSession } from "./voiceUi";
+import { C } from "@/theme/tokens";
 
 export default function VoiceRoomOverlay() {
   const insets = useSafeAreaInsets();
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#B63D91",
+    backgroundColor: C.brandDeep,
     shadowColor: "#000000",
     shadowOpacity: 0.2,
     shadowRadius: 6,

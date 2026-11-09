@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { useOnboarding } from "@/context/OnboardingContext";
@@ -7,23 +6,24 @@ import { finishOnboarding } from "@/store/thunks/userThunks";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function Ready() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const insets = useSafeAreaInsets();
+  // Read on every render (rotation, split screen, display size), not once at load.
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
 
   const { data } = useOnboarding();
 
@@ -176,7 +176,7 @@ export default function Ready() {
     // logged-in flows use it.
     if (!token) {
       console.log(
-        "No auth token yet — continuing with email-based identification, same as every prior onboarding step.",
+        "No auth token yet; continuing with email-based identification, same as every prior onboarding step.",
       );
     }
 
@@ -269,14 +269,7 @@ export default function Ready() {
   // ============================================
 
   return (
-    <AppBackground variant="blueMap">
-      <View
-        style={[
-          styles.screen,
-          {
-            paddingTop: insets.top + 24,
-          },
-        ]}>
+    <OnboardingScreen background="blueMap" topGap={24} contentStyle={styles.screen}>
         {/* TITLE */}
 
         <View style={styles.titleWrap}>
@@ -341,8 +334,7 @@ export default function Ready() {
             disabled={saving}
           />
         </View>
-      </View>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -365,7 +357,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
   },
 
@@ -373,7 +365,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 44,
     fontWeight: "900",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
     letterSpacing: 1,
   },

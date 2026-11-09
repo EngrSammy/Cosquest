@@ -28,12 +28,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONTS } from "@/constants/fonts";
 import { type Spark } from "@/services/sparks";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const TEAL = "#2A8A92";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const TEAL = C.teal;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 
 // Circles shown on the rail (active and pinned first, then quiet); the
 // rest are under "All".
@@ -233,7 +234,7 @@ export function DormantSparkCard({ spark, onOpen }: { spark: Spark; onOpen: (spa
           {spark.summary}
         </Text>
       ) : null}
-      <Pressable style={({ pressed }) => [styles.dormantButton, pressed && styles.pressed]} onPress={() => onOpen(spark)}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Open conversation" style={({ pressed }) => [styles.dormantButton, pressed && styles.pressed]} onPress={() => onOpen(spark)}>
         <Text style={styles.dormantButtonText}>Open conversation</Text>
       </Pressable>
     </View>
@@ -263,14 +264,14 @@ export function SparksList({
   return (
     <>
       <View style={styles.filterRow}>
-        <Pressable
+        <Pressable accessibilityLabel="All Sparks"
           accessibilityRole="button"
           accessibilityState={{ selected: filter === "all" }}
           onPress={() => setFilter("all")}
           style={[styles.filterTab, filter === "all" && styles.filterTabSelected]}>
           <Text style={[styles.filterText, filter === "all" && styles.filterTextSelected]}>All Sparks</Text>
         </Pressable>
-        <Pressable
+        <Pressable accessibilityLabel="History"
           accessibilityRole="button"
           accessibilityState={{ selected: filter === "history" }}
           onPress={() => setFilter("history")}
@@ -287,7 +288,7 @@ export function SparksList({
           </Text>
         ) : null}
         {filteredSparks.map((spark) => (
-          <Pressable key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={spark.subject} key={spark.id} style={styles.card} onPress={() => onOpen(spark)}>
             <View style={[styles.cardIcon, spark.revived && styles.circleRevived]}>
               <Ionicons
                 name={spark.active ? "sparkles-outline" : "time-outline"}
@@ -507,7 +508,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3DDED",
+    backgroundColor: C.brandTint,
   },
 
   cardText: { flex: 1, minWidth: 0 },

@@ -12,8 +12,9 @@ import { Text, View } from "react-native";
 import { FONTS } from "@/constants/fonts";
 import type { Rank } from "@/services/ranks";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 function Insignia({ rank, scale }: { rank: Rank; scale: number }) {
   const styles = useThemedStyles(STYLE_PAIR);
@@ -93,7 +94,7 @@ export function RankBadge({
 
 // Figma M02: the rank on its own line under the name - teal "V" chevrons
 // (1 for Private, 2 for Corporal, 3 for Sergeant and up) + the rank name.
-const TEAL = "#2A8A92";
+const TEAL = C.teal;
 
 export function RankLine({
   rank,
@@ -192,6 +193,6 @@ const STYLE_PAIR = themedStyles({
 
   rankChevrons: { width: 13, height: 12, alignItems: "center", justifyContent: "flex-start", overflow: "visible" },
 
-  rankLineText: { fontFamily: FONTS.regular, fontSize: 11, lineHeight: 14, color: "#66738A" },
+  rankLineText: { fontFamily: FONTS.regular, fontSize: 11, lineHeight: 14, color: C.slate },
 });
 

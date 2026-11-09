@@ -6,6 +6,7 @@ import {
   createReelPostThunk,
   editPost,
   fetchPost,
+  fetchMorePosts,
   fetchPosts,
   likePostThunk,
   removeBookmarkThunk,
@@ -14,6 +15,7 @@ import {
   unlikePostThunk,
 } from "../thunks/postThunks";
 import { shareToFeedThunk } from "../thunks/shareToFeedThunk";
+import { POSTS_PAGE_SIZE } from "@/services/posts";
 
 // The author as the backend sends it (kept so cards can show the real name,
 // avatar and faction).
@@ -95,6 +97,10 @@ type PostState = {
   selectedPost: Post | null;
   loading: boolean;
   error: string | null;
+  // The feed's pages (audit B2): the last one loaded, whether there are more.
+  page: number;
+  hasMore: boolean;
+  loadingMore: boolean;
 };
 
 const initialState: PostState = {
@@ -102,7 +108,16 @@ const initialState: PostState = {
   selectedPost: null,
   loading: false,
   error: null,
+  page: 1,
+  hasMore: true,
+  loadingMore: false,
 };
+
+/** pagination.hasMore if the server says, else a full page means maybe. */
+function feedHasMore(payload: unknown, received: number): boolean {
+  const more = isObject(payload) ? payload.pagination?.hasMore : undefined;
+  return typeof more === "boolean" ? more : received >= POSTS_PAGE_SIZE;
+}
 
 function isObject(value: unknown): value is Record<string, any> {
   return typeof value === "object" && value !== null;
@@ -463,6 +478,18 @@ const postSlice = createSlice({
       state.selectedPost = null;
       state.error = null;
     },
+
+    // Task 059: after blocking someone, their posts leave the feed at once
+    // (the server leaves them out from the next fetch).
+    hidePostsBy(state, action: PayloadAction<string>) {
+      const name = action.payload.trim().toLowerCase();
+      if (!name) return;
+      const by = (p: any) =>
+        String(p?.author?.username || p?.author?.profile?.username || p?.user?.username || p?.user?.profile?.username || p?.handle || "")
+          .replace(/^@/, "")
+          .toLowerCase();
+      state.posts = state.posts.filter((p) => by(p) !== name);
+    },
   },
 
   extraReducers: (builder) => {
@@ -479,6 +506,27 @@ const postSlice = createSlice({
         state.error = null;
 
         state.posts = normalizePosts(action.payload);
+        state.page = 1;
+        state.hasMore = feedHasMore(action.payload, state.posts.length);
+      })
+
+      .addCase(fetchMorePosts.pending, (state) => {
+        state.loadingMore = true;
+      })
+
+      .addCase(fetchMorePosts.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        const more = normalizePosts(action.payload);
+        const have = new Set(state.posts.map((post) => post.id));
+        const fresh = more.filter((post) => !have.has(post.id));
+        state.posts.push(...fresh);
+        state.page = action.meta.arg.page;
+        // Nothing new (a server that ignores the page): stop asking.
+        state.hasMore = fresh.length > 0 && feedHasMore(action.payload, more.length);
+      })
+
+      .addCase(fetchMorePosts.rejected, (state) => {
+        state.loadingMore = false;
       })
 
       .addCase(fetchPosts.rejected, (state, action) => {
@@ -637,7 +685,7 @@ const postSlice = createSlice({
   },
 });
 
-export const { setSelectedPost, clearSelectedPost, clearPosts } =
+export const { setSelectedPost, clearSelectedPost, clearPosts, hidePostsBy } =
   postSlice.actions;
 
 export default postSlice.reducer;

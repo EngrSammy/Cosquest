@@ -1,6 +1,7 @@
 import { appendFileToFormData } from "@/utils/appendFileToFormData";
 
 import { apiRequest } from "./api";
+import { pageHasMore } from "./messagePaging";
 import type { PollSummary } from "./polls";
 import type { Rank } from "./ranks";
 import type { MessageSparkTag } from "./sparks";
@@ -107,6 +108,17 @@ export type ChatMessage = {
 
   // Only on YOUR messages: true when an edit can be undone.
   canRollback?: boolean;
+
+  // kind "game_invite": a raid / shrine / duel card from the game (merged
+  // app; features/world/gameInvite.ts reads it). null on other kinds.
+  gameInvite?: {
+    type: string;
+    targetId: string;
+    place?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    startsAt?: string | null;
+  } | null;
 };
 
 export type ChatLastMessage = {
@@ -227,6 +239,8 @@ export type GetMessagesOptions = {
   before?: string;
   // Cap the page size on the initial load.
   limit?: number;
+  // Offset page (today's backend pages this way; services/messagePaging.ts).
+  page?: number;
 };
 
 /* =========================================================
@@ -237,7 +251,7 @@ function getConversationId(chat: Chat): string {
   return String(chat.id || chat._id || "");
 }
 
-function normalizeChat(raw: any): Chat {
+export function normalizeChat(raw: any): Chat {
   return {
     ...raw,
     id: String(raw?.id ?? raw?._id ?? ""),
@@ -261,6 +275,27 @@ export async function getChats(token: string): Promise<Chat[]> {
     method: "GET",
     token,
   });
+
+  const data = Array.isArray(response)
+    ? response
+    : (response?.chats ?? response?.conversations ?? response?.data ?? []);
+
+  return data.map(normalizeChat);
+}
+
+/* =========================================================
+   SOME CHATS, ONE REQUEST (audit B5)
+   GET /api/chats?ids=a,b,c
+   The cursor backend (docs/polish/BACKEND-PORT.md) answers only those chats;
+   today's ignores `ids` and answers the whole list, which is just as right
+   to merge (useSocketConnection: reconnect catch-up, preview bursts).
+========================================================= */
+
+export async function getChatsByIds(ids: string[], token: string): Promise<Chat[]> {
+  const response = await apiRequest<any>(
+    `/api/chats?ids=${ids.map(encodeURIComponent).join(",")}`,
+    { method: "GET", token },
+  );
 
   const data = Array.isArray(response)
     ? response
@@ -331,6 +366,14 @@ export async function getMessages(
   token: string,
   options?: GetMessagesOptions,
 ): Promise<ChatMessage[]> {
+  return (await requestMessages(conversationId, token, options)).messages;
+}
+
+async function requestMessages(
+  conversationId: string,
+  token: string,
+  options?: GetMessagesOptions,
+): Promise<{ response: unknown; messages: ChatMessage[] }> {
   const params = new URLSearchParams();
 
   if (options?.after) {
@@ -343,6 +386,10 @@ export async function getMessages(
 
   if (options?.limit) {
     params.set("limit", String(options.limit));
+  }
+
+  if (options?.page) {
+    params.set("page", String(options.page));
   }
 
   const query = params.toString();
@@ -361,7 +408,17 @@ export async function getMessages(
     ? response
     : (response?.messages ?? response?.data ?? []);
 
-  return data.map(normalizeMessage);
+  return { response, messages: data.map(normalizeMessage) };
+}
+
+/** One page of history and whether there is more (services/messagePaging.ts). */
+export async function getMessagesPage(
+  conversationId: string,
+  token: string,
+  options: GetMessagesOptions & { limit: number },
+): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+  const { response, messages } = await requestMessages(conversationId, token, options);
+  return { messages, hasMore: pageHasMore(response, messages.length, options.limit) };
 }
 
 /* =========================================================

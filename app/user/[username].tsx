@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
       ActivityIndicator,
       Alert,
-      Dimensions,
+      useWindowDimensions,
       Modal,
       Pressable,
       ScrollView,
@@ -41,14 +41,18 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchFollowing } from "@/store/thunks/followThunks";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
+import { haptic } from "@/utils/haptics";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { openReport } from "@/components/report/reportStore";
 
 type Tab = "Posts" | "Reels" | "Thoughts";
 
 const GRID_GAP = 2;
-const COLUMN =
-  (Math.min(Dimensions.get("window").width, 640) - 40 - GRID_GAP * 2) / 3;
+// Three posts a row; the tile size follows the window when the screen renders.
+function gridColumn(windowWidth: number) {
+  return (Math.min(windowWidth, 640) - 40 - GRID_GAP * 2) / 3;
+}
 
 function capitalize(value?: string | null) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
@@ -76,6 +80,7 @@ function Stat({ value, label }: { value?: number; label: string }) {
 }
 
 export default function UserProfileScreen() {
+  const column = gridColumn(useWindowDimensions().width);
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const insets = useSafeAreaInsets();
@@ -219,6 +224,7 @@ export default function UserProfileScreen() {
     if (!token || busy) {
       return;
     }
+    haptic.tap();
 
     const wasFollowing = iFollow;
 
@@ -367,7 +373,7 @@ export default function UserProfileScreen() {
 
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <Pressable onPress={goBack} hitSlop={10} style={styles.headerButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} hitSlop={10} style={styles.headerButton}>
         <Ionicons name="chevron-back" size={26} color={ink.text("#191922")} />
       </Pressable>
 
@@ -380,6 +386,7 @@ export default function UserProfileScreen() {
           onPress={() => setMenuVisible(true)}
           hitSlop={10}
           style={styles.headerButton}
+          accessibilityRole="button"
           accessibilityLabel="More options">
           <Ionicons name="ellipsis-vertical" size={20} color={ink.text("#191922")} />
         </Pressable>
@@ -405,7 +412,7 @@ export default function UserProfileScreen() {
         <Text style={styles.centerText}>
           Unblock them to see their profile and message each other again.
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Unblock"
           style={styles.primaryButton}
           onPress={unblock}
           disabled={!!busy}>
@@ -472,7 +479,7 @@ export default function UserProfileScreen() {
         {/* ACTIONS */}
         {!isMe ? (
           <View style={styles.actions}>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={iFollow ? "Following" : "Follow"}
               style={[
                 styles.actionButton,
                 iFollow ? styles.actionGhost : styles.actionPrimary,
@@ -495,7 +502,7 @@ export default function UserProfileScreen() {
               )}
             </Pressable>
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Message"
               style={[styles.actionButton, styles.actionGhost]}
               onPress={openMessage}
               disabled={!!busy}>
@@ -514,7 +521,7 @@ export default function UserProfileScreen() {
             const active = tab === key;
 
             return (
-              <Pressable
+              <Pressable accessibilityRole="tab" accessibilityLabel={key}
                 key={key}
                 style={styles.tab}
                 onPress={() => setTab(key)}>
@@ -542,9 +549,9 @@ export default function UserProfileScreen() {
           imagePosts.length ? (
             <View style={styles.grid}>
               {imagePosts.map((post) => (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Open post"
                   key={post.id}
-                  style={styles.thumbWrap}
+                  style={[styles.thumbWrap, { width: column, height: column }]}
                   onPress={() => openPost(post.id)}>
                   <Image
                     source={{ uri: post.media![0].url }}
@@ -578,9 +585,9 @@ export default function UserProfileScreen() {
                 );
 
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityLabel="Open reel"
                     key={post.id}
-                    style={[styles.thumbWrap, styles.reelThumb]}
+                    style={[styles.thumbWrap, styles.reelThumb, { width: column, height: column * 1.4 }]}
                     onPress={() => openPost(post.id)}>
                     {poster ? (
                       <Image
@@ -609,7 +616,7 @@ export default function UserProfileScreen() {
           thoughtPosts.length ? (
             <View style={styles.thoughts}>
               {thoughtPosts.map((post) => (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Open post"
                   key={post.id}
                   style={styles.thought}
                   onPress={() => openPost(post.id)}>
@@ -646,12 +653,12 @@ export default function UserProfileScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setMenuVisible(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={styles.menuBackdrop}
           onPress={() => setMenuVisible(false)}>
           <View style={styles.menu}>
             {blockedByMe ? (
-              <Pressable style={styles.menuItem} onPress={unblock}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Unblock @${username}`} style={styles.menuItem} onPress={unblock}>
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={20}
@@ -660,7 +667,7 @@ export default function UserProfileScreen() {
                 <Text style={styles.menuText}>Unblock @{username}</Text>
               </Pressable>
             ) : (
-              <Pressable style={styles.menuItem} onPress={block}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Block" style={styles.menuItem} onPress={block}>
                 <Ionicons name="ban-outline" size={20} color={ink.text("#D9364F")} />
                 <Text style={[styles.menuText, styles.menuDanger]}>
                   Block @{username}
@@ -675,7 +682,9 @@ export default function UserProfileScreen() {
                   setMenuVisible(false);
                   // After the menu closes (iOS drops a modal opened mid-animation).
                   setTimeout(() => openReport({ targetType: "profile", targetId: String(profile.id), what: `@${username}` }), 300);
-                }}>
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Report @${username}`}>
                 <Ionicons name="flag-outline" size={20} color={ink.text("#191922")} />
                 <Text style={styles.menuText}>Report @{username}</Text>
               </Pressable>
@@ -683,7 +692,9 @@ export default function UserProfileScreen() {
 
             <Pressable
               style={[styles.menuItem, styles.menuCancel]}
-              onPress={() => setMenuVisible(false)}>
+              onPress={() => setMenuVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel">
               <Text style={styles.menuCancelText}>Cancel</Text>
             </Pressable>
           </View>
@@ -713,7 +724,7 @@ const STYLE_PAIR = themedStyles({
     textAlign: "center",
     fontSize: 17,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
   },
 
   scroll: {
@@ -736,7 +747,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 12,
     fontSize: 17,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
   },
 
@@ -744,7 +755,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: "#6B6B72",
+    color: C.grey3,
     textAlign: "center",
   },
 
@@ -753,7 +764,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 26,
     paddingVertical: 11,
     borderRadius: 20,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   primaryButtonText: {
@@ -771,7 +782,7 @@ const STYLE_PAIR = themedStyles({
     padding: 3,
     borderRadius: 64,
     borderWidth: 2,
-    borderColor: "#C5399A",
+    borderColor: C.brand,
   },
 
   avatar: {
@@ -785,7 +796,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 12,
     fontSize: 22,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
   },
 
@@ -845,7 +856,7 @@ const STYLE_PAIR = themedStyles({
   statValue: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
   },
 
   statLabel: {
@@ -869,7 +880,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   actionPrimary: {
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   actionPrimaryText: {
@@ -885,7 +896,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   actionGhostText: {
-    color: "#C5399A",
+    color: C.brand,
     fontWeight: "700",
     fontSize: 14,
   },
@@ -909,11 +920,11 @@ const STYLE_PAIR = themedStyles({
   tabText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#9C9CAA",
+    color: C.muted,
   },
 
   tabTextActive: {
-    color: "#C5399A",
+    color: C.brand,
     fontWeight: "800",
   },
 
@@ -924,14 +935,11 @@ const STYLE_PAIR = themedStyles({
   },
 
   thumbWrap: {
-    width: COLUMN,
-    height: COLUMN,
     backgroundColor: "#E9E9ED",
     overflow: "hidden",
   },
 
   reelThumb: {
-    height: COLUMN * 1.4,
     backgroundColor: "#2C2C2A",
   },
 
@@ -972,7 +980,7 @@ const STYLE_PAIR = themedStyles({
     textAlign: "center",
     marginTop: 30,
     fontSize: 13,
-    color: "#9C9CAA",
+    color: C.muted,
   },
 
   menuBackdrop: {
@@ -1003,7 +1011,7 @@ const STYLE_PAIR = themedStyles({
   menuText: {
     fontSize: 15.5,
     fontWeight: "600",
-    color: "#191922",
+    color: C.ink,
   },
 
   menuDanger: {
@@ -1019,6 +1027,6 @@ const STYLE_PAIR = themedStyles({
   menuCancelText: {
     fontSize: 15.5,
     fontWeight: "600",
-    color: "#777780",
+    color: C.grey5,
   },
 });

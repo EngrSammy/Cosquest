@@ -13,7 +13,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -22,6 +21,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RankLine } from "@/components/chat/RankBadge";
@@ -42,14 +42,15 @@ import { useAppSelector } from "@/store/hooks";
 import { apiRequest } from "@/services/api";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
-const PINK = "#B63D91";
-const TEAL = "#2A8A92";
-const INK = "#24283C";
-const MUTED = "#66738A";
-const LILAC = "#F0EDF9";
+const PINK = C.brandDeep;
+const TEAL = C.teal;
+const INK = C.inkNavy;
+const MUTED = C.slate;
+const LILAC = C.lilac;
 
-const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", "#F3DDED", "#E2F0E8", "#F5E6D8"];
+const AVATAR_TINTS = ["#E9E1F5", "#DCE8EF", C.brandTint, "#E2F0E8", "#F5E6D8"];
 
 function avatarTint(name?: string) {
   let hash = 0;
@@ -349,14 +350,14 @@ export default function SparkPanel({
           {/* ADMIN MENU (M31 powers) */}
           {showMenu ? (
             <View style={styles.menu}>
-              <Pressable style={styles.menuItem} onPress={togglePin}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Keep visible through quiet periods" style={styles.menuItem} onPress={togglePin}>
                 <View style={styles.menuText}>
                   <Text style={styles.menuLabel}>{spark?.pinned ? "Unpin Spark" : "Pin Spark"}</Text>
                   <Text style={styles.menuHint}>Keep visible through quiet periods</Text>
                 </View>
                 <Ionicons name={spark?.pinned ? "pin" : "pin-outline"} size={20} color={MUTED} />
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Merge into another Spark…"
                 style={styles.menuItem}
                 onPress={() => {
                   setShowMenu(false);
@@ -365,9 +366,9 @@ export default function SparkPanel({
                 <Text style={[styles.menuLabel, styles.menuText]}>Merge into another Spark…</Text>
                 <Ionicons name="git-merge-outline" size={20} color={MUTED} />
               </Pressable>
-              <Pressable style={[styles.menuItem, styles.menuLast]} onPress={confirmDelete}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete Spark" style={[styles.menuItem, styles.menuLast]} onPress={confirmDelete}>
                 <Text style={[styles.menuLabel, styles.menuText, styles.danger]}>Delete Spark</Text>
-                <Ionicons name="trash-outline" size={20} color="#C0394B" />
+                <Ionicons name="trash-outline" size={20} color={C.dangerDeep} />
               </Pressable>
             </View>
           ) : null}
@@ -377,7 +378,7 @@ export default function SparkPanel({
               <Text style={styles.mergeTitle}>Merge into…</Text>
               {mergeTargets.length === 0 ? <Text style={styles.empty}>No other Sparks in this chat.</Text> : null}
               {mergeTargets.map((target) => (
-                <Pressable key={target.id} style={styles.menuItem} onPress={() => mergeInto(target)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Open" key={target.id} style={styles.menuItem} onPress={() => mergeInto(target)}>
                   <View style={styles.menuText}>
                     <Text style={styles.menuLabel} numberOfLines={1}>
                       {target.subject}
@@ -389,7 +390,7 @@ export default function SparkPanel({
                   <Ionicons name="chevron-forward" size={18} color={MUTED} />
                 </Pressable>
               ))}
-              <Pressable style={[styles.menuItem, styles.menuLast]} onPress={() => setShowMerge(false)}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancel" style={[styles.menuItem, styles.menuLast]} onPress={() => setShowMerge(false)}>
                 <Text style={[styles.menuLabel, styles.muted]}>Cancel</Text>
               </Pressable>
             </View>
@@ -502,7 +503,7 @@ export default function SparkPanel({
               <Ionicons
                 name={recording ? "stop-circle" : "mic-outline"}
                 size={recording ? 30 : 24}
-                color={recording ? "#C0394B" : PINK}
+                color={recording ? C.dangerDeep : PINK}
               />
             </Pressable>
             <Pressable
@@ -517,7 +518,7 @@ export default function SparkPanel({
           {spark?.active && !revived ? (
             <Text style={styles.footer}>Also visible in the main conversation</Text>
           ) : (
-            <Pressable onPress={onClose} hitSlop={6}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Return to main conversation" onPress={onClose} hitSlop={6}>
               <Text style={styles.footerLink}>← Return to main conversation</Text>
             </Pressable>
           )}
@@ -602,7 +603,7 @@ const STYLE_PAIR = themedStyles({
 
   mergeTitle: { paddingTop: 12, fontFamily: FONTS.semibold, fontSize: 12, color: MUTED },
 
-  danger: { color: "#C0394B" },
+  danger: { color: C.dangerDeep },
 
   muted: { color: MUTED },
 
@@ -644,7 +645,7 @@ const STYLE_PAIR = themedStyles({
 
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
 
-  avatarText: { fontFamily: FONTS.bold, fontSize: 10, color: "#7D356D" },
+  avatarText: { fontFamily: FONTS.bold, fontSize: 10, color: C.plum },
 
   senderText: { flex: 1, minWidth: 0, gap: 3 },
 

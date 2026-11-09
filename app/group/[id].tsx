@@ -84,6 +84,9 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchChats, fetchConversation } from "@/store/thunks/chatThunks";
 import { getAvatarSource } from "@/utils/callHelpers";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
+import { openReport } from "@/components/report/reportStore";
+import { confirmBlock } from "@/components/safety/block";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 const KIND_LABEL = {
@@ -591,7 +594,7 @@ export default function GroupInfo() {
     return (
       <GroupScreen title="Group info" onBack={() => safeBack()}>
         <View style={styles.center}>
-          <Ionicons name="alert-circle-outline" size={34} color="#9C9CAA" />
+          <Ionicons name="alert-circle-outline" size={34} color={C.muted} />
           <Text style={styles.centerText}>
             {loadError || "This group isn't available."}
           </Text>
@@ -625,7 +628,7 @@ export default function GroupInfo() {
             ) : null}
           </View>
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Join group"
             style={[
               gs.primaryButton,
               (preview.requestPending || busy === "join") &&
@@ -676,7 +679,7 @@ export default function GroupInfo() {
       right={
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
           {g.canEdit ? (
-            <Pressable onPress={openEdit} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Edit" onPress={openEdit} hitSlop={10}>
               <Text style={styles.editText}>Edit</Text>
             </Pressable>
           ) : null}
@@ -700,7 +703,7 @@ export default function GroupInfo() {
         <View style={desktop ? styles.wideLeft : undefined}>
         {/* HERO */}
         <View style={styles.hero}>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Camera"
             onPress={g.canEdit ? changePhoto : undefined}
             disabled={!g.canEdit}
             style={styles.photoWrap}>
@@ -737,7 +740,7 @@ export default function GroupInfo() {
             </View>
           ) : null}
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Open chat"
             style={styles.messagePill}
             onPress={() =>
               router.push({ pathname: "/chat/[id]", params: { id: g.id } })
@@ -781,16 +784,16 @@ export default function GroupInfo() {
               </Text>
             </View>
             <View style={styles.linkActions}>
-              <Pressable style={styles.linkButton} onPress={copyLink}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Copy" style={styles.linkButton} onPress={copyLink}>
                 <Ionicons name="copy-outline" size={16} color={ink.text(PINK)} />
                 <Text style={styles.linkButtonText}>Copy</Text>
               </Pressable>
-              <Pressable style={styles.linkButton} onPress={shareLink}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Share" style={styles.linkButton} onPress={shareLink}>
                 <Ionicons name="share-social-outline" size={16} color={ink.text(PINK)} />
                 <Text style={styles.linkButtonText}>Share</Text>
               </Pressable>
               {g.canEdit ? (
-                <Pressable style={styles.linkButton} onPress={confirmResetLink}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Reset" style={styles.linkButton} onPress={confirmResetLink}>
                   <Ionicons name="refresh" size={16} color={ink.text(PINK)} />
                   <Text style={styles.linkButtonText}>Reset</Text>
                 </Pressable>
@@ -824,10 +827,12 @@ export default function GroupInfo() {
         {g.canSeeMembers ? (
           <View style={styles.memberCard}>
             {members.map((member) => (
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel={`${member.name || member.username}, member options`}
                 key={member.id}
                 style={styles.memberRow}
-                disabled={!g.canEdit || member.id === myUserId}
+                // Task 059: everyone can open a member (view, block, report); the
+                // admin actions inside stay admin-only.
+                disabled={member.id === myUserId}
                 onPress={() => openMemberActions(member)}>
                 <Image
                   source={getAvatarSource(member)}
@@ -856,7 +861,7 @@ export default function GroupInfo() {
                   <Ionicons
                     name="volume-mute"
                     size={15}
-                    color="#9C9CAA"
+                    color={C.muted}
                     style={styles.mutedIcon}
                   />
                 ) : null}
@@ -879,7 +884,7 @@ export default function GroupInfo() {
             ))}
 
             {membersHasMore ? (
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel="Show more"
                 style={styles.moreButton}
                 onPress={() => loadMembers(memberPage + 1)}>
                 <Text style={styles.moreText}>
@@ -1036,7 +1041,7 @@ export default function GroupInfo() {
               }
             />
           </ScrollView>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Add people"
             style={[
               gs.primaryButton,
               (!Object.keys(toAdd).length || busy === "add") &&
@@ -1098,7 +1103,7 @@ export default function GroupInfo() {
                       style={styles.declineButton}
                       onPress={() => answer(request, false)}
                       accessibilityLabel="Decline">
-                      <Ionicons name="close" size={18} color="#D64545" />
+                      <Ionicons name="close" size={18} color={C.danger} />
                     </Pressable>
                     <Pressable
                       style={styles.approveButton}
@@ -1199,6 +1204,31 @@ export default function GroupInfo() {
                     }}
                   />
 
+                  {/* Task 059: block (and report) from the group, not only DMs. */}
+                  <GroupRow
+                    icon="ban-outline"
+                    label={`Block ${actingOn.name || actingOn.username}`}
+                    danger
+                    onPress={() => {
+                      const who = { username: actingOn.username, userId: actingOn.id, name: actingOn.name || undefined };
+                      setActingOn(null);
+                      setTimeout(() => confirmBlock(who), 300);
+                    }}
+                  />
+                  <GroupRow
+                    icon="flag-outline"
+                    label={`Report ${actingOn.name || actingOn.username}`}
+                    danger
+                    onPress={() => {
+                      const m = actingOn;
+                      setActingOn(null);
+                      setTimeout(
+                        () => openReport({ targetType: "profile", targetId: String(m.id), what: `@${m.username}` }),
+                        300,
+                      );
+                    }}
+                  />
+
                   {actingOn.role === "member" &&
                   (myRole === "owner" || myRole === "admin") ? (
                     <GroupRow
@@ -1264,7 +1294,7 @@ export default function GroupInfo() {
                     />
                   ) : null}
 
-                  {!canAct && actingOn.role !== "member" ? (
+                  {g.canEdit && !canAct && actingOn.role !== "member" ? (
                     <Text style={styles.sheetHint}>
                       {actingOn.role === "owner"
                         ? "The group's owner can't be changed by admins."
@@ -1308,7 +1338,7 @@ export default function GroupInfo() {
                     {entry.bannedBy ? ` · by @${entry.bannedBy.username}` : ""}
                   </Text>
                 </View>
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Unban"
                   style={styles.unbanButton}
                   disabled={busy === `unban-${entry.user.id}`}
                   onPress={() => unban(entry)}>
@@ -1368,14 +1398,14 @@ export default function GroupInfo() {
           ) : null}
 
           {g.photoUrl ? (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Remove group photo"
               style={styles.removePhoto}
               onPress={() => save({ removePhoto: true })}>
               <Text style={styles.removePhotoText}>Remove group photo</Text>
             </Pressable>
           ) : null}
 
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel="Save"
             style={[
               gs.primaryButton,
               styles.saveButton,
@@ -1468,7 +1498,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.regular,
     fontSize: 13.5,
     lineHeight: 20,
-    color: "#3B3B42",
+    color: C.ink2,
     textAlign: "center",
   },
 
@@ -1680,7 +1710,7 @@ const STYLE_PAIR = themedStyles({
   removePhotoText: {
     fontFamily: FONTS.medium,
     fontSize: 13.5,
-    color: "#D64545",
+    color: C.danger,
   },
 
   saveButton: { marginTop: 16 },

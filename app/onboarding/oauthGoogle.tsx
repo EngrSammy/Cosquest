@@ -14,14 +14,12 @@ import { FONTS } from "@/constants/fonts";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import {
-      ActivityIndicator,
-      Pressable,
-      StyleSheet,
-      Text,
-      View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
 } from "react-native";
 
-import { AppBackground } from "@/components/AppBackground";
 import { useOnboarding } from "@/context/OnboardingContext";
 import { useAppDispatch } from "@/store/hooks";
 import {
@@ -30,6 +28,8 @@ import {
       readOAuthCode,
 } from "@/utils/googleAuth";
 import { safeBack } from "@/utils/safeBack";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Lets a popup-style sign-in (if the browser used one) hand the result
@@ -87,8 +87,7 @@ export default function GoogleOAuthReturn() {
   }, [params, dispatch, update]);
 
   return (
-    <AppBackground variant="gradient">
-      <View style={styles.center}>
+    <OnboardingScreen background="gradient" topGap={0} contentStyle={styles.center}>
         {error ? (
           <>
             <Text style={styles.title}>Google sign-in didn&apos;t work</Text>
@@ -108,8 +107,7 @@ export default function GoogleOAuthReturn() {
             <Text style={styles.text}>Signing you in with Google...</Text>
           </>
         )}
-      </View>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -125,7 +123,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 20,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
   },
 
@@ -143,7 +141,7 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 28,
     paddingVertical: 12,
     borderRadius: 22,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   buttonText: {

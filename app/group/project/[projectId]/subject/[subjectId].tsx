@@ -188,7 +188,7 @@ export default function SubjectScreen() {
               <Ionicons name="cloud-upload-outline" size={26} color={ink.text(UI.PINK)} />
             </View>
             <Text style={styles.dropTitle}>Add something for the group</Text>
-            <Pressable style={styles.uploadButton} onPress={upload} disabled={uploading > 0} accessibilityRole="button">
+            <Pressable accessibilityLabel="Upload files" style={styles.uploadButton} onPress={upload} disabled={uploading > 0} accessibilityRole="button">
               {uploading > 0 ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (

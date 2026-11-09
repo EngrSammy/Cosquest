@@ -76,7 +76,7 @@ export default function ExpertisePicker({
             {roles.map((role) => {
               const on = role.label === current;
               return (
-                <Pressable key={role.key} style={styles.row} onPress={() => choose(role)} disabled={!!saving}>
+                <Pressable accessibilityRole="button" accessibilityLabel={role.label} key={role.key} style={styles.row} onPress={() => choose(role)} disabled={!!saving}>
                   <Text style={styles.rowText}>{role.label}</Text>
                   {saving === role.key ? (
                     <ActivityIndicator size="small" color={ink.text(UI.PINK)} />
@@ -91,7 +91,7 @@ export default function ExpertisePicker({
               );
             })}
             {current ? (
-              <Pressable style={styles.row} onPress={() => choose(null)} disabled={!!saving}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Remove my expertise role" style={styles.row} onPress={() => choose(null)} disabled={!!saving}>
                 <Text style={[styles.rowText, styles.clear]}>Remove my expertise role</Text>
               </Pressable>
             ) : null}

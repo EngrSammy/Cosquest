@@ -5,7 +5,8 @@
 // same style as the Calls screens (UI colours, white cards, Poppins).
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PersonAvatar, personName } from "@/components/calls/scheduled/ChoiceSheet";
@@ -293,7 +294,7 @@ export function AddSubjectSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
             <View style={styles.sheetHead}>

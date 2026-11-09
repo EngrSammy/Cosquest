@@ -266,7 +266,7 @@ export default function CallTranscriptView({
           <Text style={styles.stateTitle}>{copy.title}</Text>
           <Text style={styles.stateBody}>{copy.body}</Text>
           {copy.retry ? (
-            <Pressable style={styles.retry} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
+            <Pressable accessibilityLabel="Try again" style={styles.retry} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           ) : null}

@@ -43,7 +43,7 @@ export const FACTIONS: Faction[] = [
     glowColour: "rgba(200, 216, 0, 1)",
   },
   {
-    id: "everborn",
+    id: "everborns", // the backend's key (factionModel.js); "everborn" was refused with a 400
     label: require("@/assets/images/factions/everborn-label.png"),
     image: require("@/assets/images/factions/everborn.png"),
     caption: "Fantasy Fans",

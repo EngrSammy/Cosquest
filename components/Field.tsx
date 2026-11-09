@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ErrorText } from "./ErrorText";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -64,6 +65,8 @@ export function Field({
         ) : null}
         <TextInput
           style={styles.input}
+          accessibilityLabel={label}
+          testID={`field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -78,7 +81,11 @@ export function Field({
           multiline={multiline}
         />
         {secureTextEntry ? (
-          <Pressable onPress={() => setHidden((h) => !h)} hitSlop={10}>
+          <Pressable
+            onPress={() => setHidden((h) => !h)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? `Show ${label.toLowerCase()}` : `Hide ${label.toLowerCase()}`}>
             <Ionicons
               name={hidden ? "eye-off-outline" : "eye-outline"}
               size={20}
@@ -106,13 +113,13 @@ const STYLE_PAIR = themedStyles({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 5 },
   },
   inputRowError: { borderColor: "#E24D4D", borderWidth: 1 },
-  inputRowFocused: { borderColor: "#C5399A", borderWidth: 1 },
-  input: { flex: 1, fontSize: 15, color: "#191922" },
+  inputRowFocused: { borderColor: C.brand, borderWidth: 1 },
+  input: { flex: 1, fontSize: 15, color: C.ink },
 });

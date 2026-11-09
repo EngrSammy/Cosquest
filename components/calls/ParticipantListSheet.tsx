@@ -26,6 +26,7 @@ import { getAvatarSource } from "@/utils/callHelpers";
 import { CALL_COLORS } from "./CallVisuals";
 import type { RosterEntry } from "./stageModel";
 import { formatCount, useRoster } from "./stageModel";
+import { C } from "@/theme/tokens";
 
 const ROW_HEIGHT = 60;
 
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#2A1030",
+    backgroundColor: C.plumDark,
   },
 
   rowText: { flex: 1, minWidth: 0 },

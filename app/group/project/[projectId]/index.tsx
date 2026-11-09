@@ -123,7 +123,7 @@ export default function ProjectWorkspace() {
         </View>
 
         {linkedCall ? (
-          <Pressable
+          <Pressable accessibilityLabel="Video call"
             style={styles.call}
             onPress={() => router.push({ pathname: "/group/scheduled-call/[callId]", params: { callId: linkedCall.id } })}
             accessibilityRole="button">
@@ -171,7 +171,7 @@ export default function ProjectWorkspace() {
 
       {!project.archived ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
-          <Pressable style={styles.sparkButton} onPress={startSpark} accessibilityRole="button">
+          <Pressable accessibilityLabel="Start a project Spark" style={styles.sparkButton} onPress={startSpark} accessibilityRole="button">
             <Ionicons name="sparkles-outline" size={22} color="#FFFFFF" />
             <Text style={styles.sparkButtonText}>Start a project Spark</Text>
           </Pressable>

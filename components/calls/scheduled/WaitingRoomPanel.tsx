@@ -29,7 +29,7 @@ export function WaitingPill({ count, onPress }: { count: number; onPress: () => 
   if (!count) return null;
   return (
     <View style={styles.pillRow}>
-      <Pressable style={styles.pill} onPress={onPress} accessibilityRole="button">
+      <Pressable accessibilityLabel="People" style={styles.pill} onPress={onPress} accessibilityRole="button">
         <Ionicons name="people-outline" size={15} color="#FFFFFF" />
         <Text style={styles.pillText}>{count} waiting · Review</Text>
       </Pressable>
@@ -55,12 +55,12 @@ export function WaitingRoomSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Admit all" style={styles.backdrop} onPress={onClose}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Admit all" style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]} onPress={() => {}}>
           <View style={styles.head}>
             <Text style={styles.title}>Waiting room · {ids.length}</Text>
             {ids.length > 1 ? (
-              <Pressable onPress={() => admitEveryone(call.id)} hitSlop={8}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Admit all" onPress={() => admitEveryone(call.id)} hitSlop={8}>
                 <Text style={styles.all}>Admit all</Text>
               </Pressable>
             ) : null}
@@ -79,10 +79,10 @@ export function WaitingRoomSheet({
                     <Text style={styles.name} numberOfLines={1}>
                       {name}
                     </Text>
-                    <Pressable style={styles.deny} onPress={() => admitPerson(call.id, id, "denied")}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Deny" style={styles.deny} onPress={() => admitPerson(call.id, id, "denied")}>
                       <Text style={styles.denyText}>Deny</Text>
                     </Pressable>
-                    <Pressable style={styles.admit} onPress={() => admitPerson(call.id, id, "admitted")}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Admit" style={styles.admit} onPress={() => admitPerson(call.id, id, "admitted")}>
                       <Text style={styles.admitText}>Admit</Text>
                     </Pressable>
                   </View>

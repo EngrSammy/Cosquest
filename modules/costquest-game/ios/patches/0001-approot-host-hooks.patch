@@ -1,0 +1,14 @@
+--- a/Game/CostQuestApp.swift
++++ b/Game/CostQuestApp.swift
+@@ -156,6 +156,11 @@
+         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+             Task { await CoinsModel.shared.refresh(roam) }
+         }
++        // [merged-app] Driven by the CosQuest app around it (Embed/GameHost).
++        // An invite opens on the world home; a game in progress is not left.
++        .modifier(GameHostHooks(roam: roam) {
++            if playing == nil { chosen = nil; showEvents = false }
++        })
+         .sheet(isPresented: $coinsSheet) { CoinsSheet(store: roam) }
+         .animation(.smooth(duration: 0.35), value: playing == nil)
+         .animation(.smooth(duration: 0.45), value: arrived)

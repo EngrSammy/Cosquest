@@ -75,7 +75,7 @@ export default function WaitingRoomScreen({
           </View>
         </View>
 
-        <Pressable style={styles.leave} onPress={onLeave} accessibilityRole="button">
+        <Pressable accessibilityLabel="Leave waiting room" style={styles.leave} onPress={onLeave} accessibilityRole="button">
           <Text style={styles.leaveText}>Leave waiting room</Text>
         </Pressable>
       </View>

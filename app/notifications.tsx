@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   Pressable,
   StyleSheet,
   Text,
@@ -24,6 +25,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
+import { EmptyState, ErrorState, SkeletonRows } from "@/components/kit";
+import { routeForUrl } from "@/features/world/links";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import DesktopNotifications from "@/components/desktop/DesktopNotifications";
 import { ScreenGradient } from "@/components/chat/ui";
@@ -95,17 +99,27 @@ function NotificationRow({
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
   const isFollowNotification = item.type === "follow" && !!item.actor;
+  const isGame = item.type === "game";
 
   return (
     <Pressable
       onPress={onOpen}
       disabled={!onOpen}
+      accessibilityRole={onOpen ? "button" : undefined}
+      accessibilityLabel={`${item.actor?.username ? `@${item.actor.username} ` : ""}${item.message || ""}, ${getTimeAgo(item.createdAt)}`}
       style={[styles.row, !item.read && styles.rowUnread]}>
-      <Image
-        source={getAvatarSource(item.actor)}
-        style={styles.avatar}
-        contentFit="cover"
-      />
+      {isGame ? (
+        // Task 059: game events wear the game's colours.
+        <View style={[styles.avatar, styles.gameBadge]}>
+          <Ionicons name={GAME_ICONS[item.gameKind ?? ""] ?? "game-controller"} size={22} color="#FFFFFF" />
+        </View>
+      ) : (
+        <Image
+          source={getAvatarSource(item.actor)}
+          style={styles.avatar}
+          contentFit="cover"
+        />
+      )}
 
       <View style={styles.rowText}>
         <Text style={styles.body}>
@@ -126,7 +140,9 @@ function NotificationRow({
             followBusy && styles.followBtnDisabled,
           ]}
           disabled={followBusy}
-          onPress={onToggleFollow}>
+          onPress={onToggleFollow}
+          accessibilityRole="button"
+          accessibilityLabel={following ? "Following" : "Follow"}>
           {followBusy ? (
             <ActivityIndicator size="small" color={ink.text("#FFFFFF")} />
           ) : (
@@ -155,6 +171,16 @@ export default function Notifications() {
   );
 
   const loading = useAppSelector((state) => state.notification.loading);
+  const [pulling, setPulling] = useState(false);
+  const pull = async () => {
+    if (!token) return;
+    setPulling(true);
+    try {
+      await dispatch(fetchNotifications(token));
+    } finally {
+      setPulling(false);
+    }
+  };
 
   const error = useAppSelector((state) => state.notification.error);
 
@@ -230,7 +256,7 @@ export default function Notifications() {
       <ScreenGradient />
       <View style={[styles.column, desktop && styles.columnDesktop]}>
       <View style={styles.header}>
-        <Pressable onPress={() => safeBack()} hitSlop={10}>
+        <Pressable onPress={() => safeBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
           <Ionicons name="arrow-back" size={24} color={ink.text("#191922")} />
         </Pressable>
 
@@ -239,31 +265,16 @@ export default function Notifications() {
         <View style={{ width: 24 }} />
       </View>
 
-      {loading && notifications.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="small" color={ink.text("#C5399A")} />
-
-          <Text style={styles.centerText}>Loading notifications...</Text>
-        </View>
+      {loading && notifications.length === 0 && !pulling ? (
+        <SkeletonRows count={7} label="Loading notifications" style={{ marginHorizontal: -16 }} />
       ) : null}
 
       {error && notifications.length === 0 && !loading ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-
-          <Pressable
-            onPress={() => token && dispatch(fetchNotifications(token))}>
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
+        <ErrorState title="Couldn't load notifications" message={error} onRetry={() => token && dispatch(fetchNotifications(token))} />
       ) : null}
 
       {!loading && !error && notifications.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="notifications-outline" size={38} color={ink.text("#9C9CAA")} />
-
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
-        </View>
+        <EmptyState icon="notifications-outline" title="No notifications yet" message="New followers, mentions, group news and game events show up here." />
       ) : null}
 
       <FlatList
@@ -281,7 +292,12 @@ export default function Notifications() {
             }
             onToggleFollow={() => handleToggleFollow(item.actor?.username)}
             onOpen={
-              item.postId
+              // Game rows open their play/world link (ours); everything else
+              // routes as the team's list does (post, scheduled call, chat),
+              // then a follow opens that person's profile.
+              item.type === "game" && item.link && routeForUrl(item.link)
+                ? () => router.push(routeForUrl(item.link) as any)
+                : item.postId
                 ? () =>
                     router.push({
                       pathname: "/post/[id]",
@@ -299,20 +315,35 @@ export default function Notifications() {
                       pathname: "/chat/[id]",
                       params: { id: item.conversationId! },
                     })
+                : item.type === "follow" && item.actor?.username
+                ? () => router.push({ pathname: "/user/[username]", params: { username: item.actor!.username! } })
                 : undefined
             }
           />
         )}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 10 }}
         showsVerticalScrollIndicator={false}
+        // Task 059: pull down to refresh.
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} tintColor={C.brand} colors={[C.brand]} />}
       />
       </View>
     </View>
   );
 }
 
+const GAME_ICONS: Record<string, any> = {
+  raid_started: "flame",
+  boss_appeared: "skull",
+  duel_challenge: "flash",
+  friend_joined: "people",
+  reward_ready: "gift",
+  live_event: "radio",
+  invite_accepted: "checkmark-circle",
+};
+
 const STYLE_PAIR = themedStyles(
   {
+    gameBadge: { alignItems: "center", justifyContent: "center", backgroundColor: C.gameSkyDeep },
     screen: { flex: 1 },
     column: { flex: 1, width: "100%", paddingHorizontal: 16 },
     // Computers: a readable column in the middle.

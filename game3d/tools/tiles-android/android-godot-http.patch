@@ -1,0 +1,79 @@
+diff -ru a/Implementations/DocumentContainer.h b/Implementations/DocumentContainer.h
+--- a/cesium_godot/Implementations/DocumentContainer.h	2026-10-21 16:58:25.253667727 +0000
++++ b/cesium_godot/Implementations/DocumentContainer.h	2026-10-21 16:58:25.259142311 +0000
+@@ -1,7 +1,7 @@
+ #ifndef DOCUMENT_CONTAINER_H
+ #define DOCUMENT_CONTAINER_H
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+ #include "Utils/GodotHttpClient.h"
+ #else
+ #include "Utils/CurlHttpClient.h"
+@@ -72,7 +72,7 @@
+ private:
+ 	// We use a hash here bc we do not want to keep a copy of the string
+ 	std::unordered_map<uint32_t, Ref<ImageTexture>> m_imageCache;
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+ 	GodotHttpClient<2> m_httpClient;
+ #else
+ 	CurlHttpClient<2> m_httpClient;
+diff -ru a/Implementations/NetworkAssetAccessor.h b/Implementations/NetworkAssetAccessor.h
+--- a/cesium_godot/Implementations/NetworkAssetAccessor.h	2026-10-21 16:58:25.253725826 +0000
++++ b/cesium_godot/Implementations/NetworkAssetAccessor.h	2026-10-21 16:58:25.255384669 +0000
+@@ -13,7 +13,7 @@
+ 
+ // Use Godot's native HTTPClient on macOS for better compatibility
+ // (curl has DNS/SSL issues with macOS's network stack)
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+ #include "../Utils/GodotHttpClient.h"
+ #else
+ #include "../Utils/CurlHttpClient.h"
+@@ -44,7 +44,7 @@
+ private:
+ 	CesiumAsync::Future<std::shared_ptr<CesiumAsync::IAssetRequest>> process_request(HTTPClient::Method method, const CesiumAsync::AsyncSystem &asyncSystem, const std::string &url, const std::vector<THeader> &headers = {});
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+ 	GodotHttpClient<100> m_httpClient{};
+ #else
+ 	CurlHttpClient<100> m_httpClient{};
+diff -ru a/Utils/NetworkUtils.h b/Utils/NetworkUtils.h
+--- a/cesium_godot/Utils/NetworkUtils.h	2026-10-21 16:58:25.253889072 +0000
++++ b/cesium_godot/Utils/NetworkUtils.h	2026-10-21 16:58:25.266064761 +0000
+@@ -26,6 +26,12 @@
+ 		const char* cmd = CompileTimeConcat("xdg-open ", url).data();
+ 		return system(cmd);
+ 	}
++#elif defined(__ANDROID__)
++	static constexpr auto SystemOpenURL(const char(&url)[N])
++	{
++		(void)url; // no shell on Android; editor-only helper
++		return 0;
++	}
+ #else
+ #error "Unknown compiler"
+ #endif
+diff -ru a/Utils/TokenTroubleShooting.h b/Utils/TokenTroubleShooting.h
+--- a/cesium_godot/Utils/TokenTroubleShooting.h	2026-10-21 16:58:25.253906245 +0000
++++ b/cesium_godot/Utils/TokenTroubleShooting.h	2026-10-21 16:58:25.257401293 +0000
+@@ -1,7 +1,7 @@
+ #ifndef TOKEN_TROBLESHOOTING_H
+ #define TOKEN_TROBLESHOOTING_H
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+ #include "Utils/GodotHttpClient.h"
+ #else
+ #include "Utils/CurlHttpClient.h"
+@@ -34,7 +34,7 @@
+     static void _bind_methods();
+ 
+   private:
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(CESIUM_GD_USE_GODOT_HTTP)
+     GodotHttpClient<1> m_httpClient{};
+ #else
+     CurlHttpClient<1> m_httpClient{};

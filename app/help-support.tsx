@@ -1,9 +1,11 @@
 import { FONTS } from "@/constants/fonts";
+import { appConfig } from "@/services/appConfig";
 import { safeBack } from "@/utils/safeBack";
+import * as Application from "expo-application";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,9 +13,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 // Figma row: milky card, pink icon on a soft pink chip, a small grey title
 // and (for the support rows) a bold line underneath.
@@ -56,12 +59,8 @@ export default function HelpSupport() {
   const ink = useInk();
   const insets = useSafeAreaInsets();
 
-  function handleComingSoon(feature: string) {
-    Alert.alert(
-      "Coming Soon",
-      `${feature} will be connected when the required support functionality is available.`,
-    );
-  }
+  // Task 059: every row works (the FAQ shows once it has a URL).
+  const open = (path: string) => router.push(path as any);
 
   return (
     <View style={styles.screen}>
@@ -109,25 +108,27 @@ export default function HelpSupport() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>SUPPORT CENTER</Text>
 
-          <SupportRow
-            icon="book-outline"
-            title="FAQ / Knowledge Base"
-            description="Read guides & helpful answers"
-            onPress={() => handleComingSoon("FAQ / Knowledge Base")}
-          />
+          {appConfig.faqUrl ? (
+            <SupportRow
+              icon="book-outline"
+              title="FAQ / Knowledge Base"
+              description="Read guides & helpful answers"
+              onPress={() => open("/legal/faq")}
+            />
+          ) : null}
 
           <SupportRow
             icon="chatbubble-ellipses-outline"
             title="Contact Support"
             description="Chat with our customer team"
-            onPress={() => handleComingSoon("Contact Support")}
+            onPress={() => open("/support?type=support")}
           />
 
           <SupportRow
             icon="bug-outline"
             title="Report a Bug"
             description="Help us improve your experience"
-            onPress={() => handleComingSoon("Report a Bug")}
+            onPress={() => open("/support?type=bug")}
           />
         </View>
 
@@ -138,21 +139,30 @@ export default function HelpSupport() {
           <SupportRow
             icon="document-text-outline"
             title="Terms of Service"
-            onPress={() => handleComingSoon("Terms of Service")}
+            onPress={() => open("/legal/terms")}
           />
 
           <SupportRow
             icon="shield-checkmark-outline"
             title="Privacy Policy"
-            onPress={() => handleComingSoon("Privacy Policy")}
+            onPress={() => open("/legal/privacy")}
+          />
+
+          <SupportRow
+            icon="people-outline"
+            title="Community Guidelines"
+            onPress={() => open("/legal/guidelines")}
           />
         </View>
 
         {/* APP VERSION */}
         <View style={styles.versionContainer}>
-          <Text style={styles.appName}>Cosquest App</Text>
+          <Text style={styles.appName}>CosQuest</Text>
 
-          <Text style={styles.versionText}>v2.4.0 (Build 512)</Text>
+          <Text style={styles.versionText}>
+            v{appConfig.appVersion}
+            {Application.nativeBuildVersion ? ` (Build ${Application.nativeBuildVersion})` : ""}
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -208,7 +218,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
   },
 
   section: {
@@ -220,7 +230,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   // Milky pressed-in row.
@@ -269,7 +279,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.semibold,
     fontSize: 14.5,
     lineHeight: 20,
-    color: "#191922",
+    color: C.ink,
   },
 
   versionContainer: {
@@ -280,14 +290,14 @@ const STYLE_PAIR = themedStyles({
   appName: {
     fontFamily: FONTS.semibold,
     fontSize: 13.5,
-    color: "#191922",
+    color: C.ink,
   },
 
   versionText: {
     marginTop: 3,
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   pressed: {

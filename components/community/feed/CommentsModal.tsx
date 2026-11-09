@@ -13,7 +13,6 @@ import {
   Alert,
   Animated,
   Easing,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -24,6 +23,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 
 import { FONTS } from "@/constants/fonts";
 import { useAppDispatch } from "@/store/hooks";
@@ -39,6 +39,7 @@ import {
 import { CommentItem } from "./CommentItem";
 
 import { getSocket, joinPost, leavePost } from "@/services/socket";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { useIsDesktop } from "@/hooks/useDesktop";
 
@@ -1293,7 +1294,7 @@ export function CommentsModal({
               </Text>
             </View>
 
-            <Pressable style={styles.close} onPress={onClose}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.close} onPress={onClose}>
               <Ionicons name="close" size={23} color={ink.text("#191922")} />
             </Pressable>
           </View>
@@ -1391,7 +1392,7 @@ export function CommentsModal({
                   Replying to @{replyingTo?.author?.username || "user"}
                 </Text>
 
-                <Pressable onPress={() => setReplyingTo(null)}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Cancel reply" onPress={() => setReplyingTo(null)}>
                   <Ionicons name="close-circle" size={21} color={ink.text("#9C9CAA")} />
                 </Pressable>
               </View>
@@ -1408,7 +1409,7 @@ export function CommentsModal({
             {!isRecording ? (
               <View style={styles.reactions}>
                 {QUICK_EMOJIS.map((emoji) => (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityLabel={emoji}
                     key={emoji}
                     style={styles.reaction}
                     hitSlop={6}
@@ -1470,7 +1471,7 @@ export function CommentsModal({
                   )}
                 </View>
               ) : (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityLabel="Send"
                   style={[
                     styles.send,
                     !commentText.trim() && styles.sendDisabled,
@@ -1540,7 +1541,7 @@ const STYLE_PAIR = themedStyles({
   title: {
     fontFamily: FONTS.semibold,
     fontSize: 18,
-    color: "#191922",
+    color: C.ink,
   },
 
   count: {
@@ -1618,7 +1619,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   replyBannerText: {
-    color: "#C5399A",
+    color: C.brand,
     fontFamily: FONTS.semibold,
     fontSize: 12,
   },
@@ -1694,7 +1695,7 @@ const STYLE_PAIR = themedStyles({
     paddingBottom: 8,
     fontFamily: FONTS.regular,
     fontSize: 13.5,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web"
       ? ({ outlineStyle: "none", resize: "none" } as object)
       : null),
@@ -1706,7 +1707,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
   },
 
   sendDisabled: {
@@ -1743,7 +1744,7 @@ const STYLE_PAIR = themedStyles({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: "#D64545",
+    backgroundColor: C.danger,
     marginRight: 8,
   },
 
@@ -1751,7 +1752,7 @@ const STYLE_PAIR = themedStyles({
     width: 38,
     fontFamily: FONTS.semibold,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
   },
 
   recordingWave: {
@@ -1769,7 +1770,7 @@ const STYLE_PAIR = themedStyles({
     minHeight: 4,
     maxHeight: 25,
     borderRadius: 3,
-    backgroundColor: "#C5399A",
+    backgroundColor: C.brand,
     marginHorizontal: 1.2,
   },
 
@@ -1783,10 +1784,10 @@ const STYLE_PAIR = themedStyles({
   slideCancelText: {
     fontFamily: FONTS.medium,
     fontSize: 12,
-    color: "#8A8A90",
+    color: C.grey1,
   },
 
   dangerText: {
-    color: "#D64545",
+    color: C.danger,
   },
 });

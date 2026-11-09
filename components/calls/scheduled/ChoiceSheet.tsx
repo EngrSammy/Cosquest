@@ -96,7 +96,7 @@ export function ChoiceSheet<T>({
         renderItem={({ item }) => {
           const on = isSame(item.value, selected);
           return (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Done"
               style={[styles.row, on && styles.rowOn]}
               onPress={() => {
                 onSelect(item.value);

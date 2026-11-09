@@ -7,6 +7,7 @@
 import type { AudioPlayer } from "expo-audio";
 import { Pressable, Text } from "react-native";
 import { themedStyles, useThemedStyles } from "@/constants/chatTheme";
+import { C } from "@/theme/tokens";
 
 export const VOICE_SPEEDS = [1, 1.5, 2] as const;
 
@@ -94,7 +95,7 @@ const STYLE_PAIR = themedStyles({
   text: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#C5399A",
+    color: C.brand,
     fontVariant: ["tabular-nums"],
   },
 

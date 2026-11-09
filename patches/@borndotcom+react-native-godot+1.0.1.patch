@@ -1,0 +1,110 @@
+diff --git a/node_modules/@borndotcom/react-native-godot/android/build.gradle b/node_modules/@borndotcom/react-native-godot/android/build.gradle
+index 0832e5d..8ff3038 100644
+--- a/node_modules/@borndotcom/react-native-godot/android/build.gradle
++++ b/node_modules/@borndotcom/react-native-godot/android/build.gradle
+@@ -133,7 +133,12 @@ android {
+     }
+     externalNativeBuild {
+         cmake {
++            // The native host uses API 29 calls (AChoreographer_postFrameCallback64).
++            // Built with the app's lower minSdk, they are weak symbols (the app
++            // must not start Godot below Android 10; it checks the version, and
++            // the calls are guarded with __builtin_available).
+             arguments "-DANDROID_STL=c++_shared",
++                    "-DANDROID_WEAK_API_DEFS=ON",
+                     "-DREACT_NATIVE_MINOR_VERSION=${REACT_NATIVE_MINOR_VERSION}",
+                     "-DANDROID_TOOLCHAIN=clang",
+                     "-DREACT_NATIVE_DIR=${toPlatformFileString(reactNativeRootDir.path)}",
+diff --git a/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/GodotModule.cpp b/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/GodotModule.cpp
+index 44f70de..eff6ab0 100644
+--- a/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/GodotModule.cpp
++++ b/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/GodotModule.cpp
+@@ -241,7 +241,10 @@ static void frameCallback64(int64_t frameTimeNanos, void *data) {
+ 			instance->iteration();
+ 		}
+ 		AChoreographer *choreographer = AChoreographer_getInstance();
+-		AChoreographer_postFrameCallback64(choreographer, frameCallback64, data);
++		// API 29+ (weak symbol below the app's minSdk; Godot is never started there).
++		if (__builtin_available(android 29, *)) {
++			AChoreographer_postFrameCallback64(choreographer, frameCallback64, data);
++		}
+ 	}
+ }
+ 
+@@ -348,7 +351,10 @@ godot::GodotInstance *GodotModule::get_or_create_instance(std::vector<std::strin
+ 
+ 	if (instance->start()) {
+ 		AChoreographer *choreographer = AChoreographer_getInstance();
+-		AChoreographer_postFrameCallback64(choreographer, frameCallback64, this);
++		// API 29+ (weak symbol below the app's minSdk; Godot is never started there).
++		if (__builtin_available(android 29, *)) {
++			AChoreographer_postFrameCallback64(choreographer, frameCallback64, this);
++		}
+ 	}
+ 
+ 	{
+@@ -523,7 +529,10 @@ void GodotModule::updateState() {
+ 		// Register the frame callback again
+ 		data->thread.enqueue([this]() {
+ 			AChoreographer *choreographer = AChoreographer_getInstance();
+-			AChoreographer_postFrameCallback64(choreographer, frameCallback64, this);
++			// API 29+ (weak symbol below the app's minSdk; Godot is never started there).
++			if (__builtin_available(android 29, *)) {
++				AChoreographer_postFrameCallback64(choreographer, frameCallback64, this);
++			}
+ 		});
+ 	}
+ }
+diff --git a/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/native_godot_module_jni.h b/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/native_godot_module_jni.h
+index 36a34e7..101f5d5 100644
+--- a/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/native_godot_module_jni.h
++++ b/node_modules/@borndotcom/react-native-godot/android/src/main/cpp/native_godot_module_jni.h
+@@ -26,7 +26,7 @@
+ #include <ReactCommon/CallInvokerHolder.h>
+ #include <fbjni/fbjni.h>
+ #include <jsi/jsi.h>
+-#include <react/jni/CxxModuleWrapper.h>
++// react/jni/CxxModuleWrapper.h (unused here) is gone from React Native 0.82+.
+ 
+ using namespace facebook;
+ 
+diff --git a/node_modules/@borndotcom/react-native-godot/android/src/main/java/com/rtngodot/NativeGodotModule.java b/node_modules/@borndotcom/react-native-godot/android/src/main/java/com/rtngodot/NativeGodotModule.java
+index 3f66edc..b790465 100644
+--- a/node_modules/@borndotcom/react-native-godot/android/src/main/java/com/rtngodot/NativeGodotModule.java
++++ b/node_modules/@borndotcom/react-native-godot/android/src/main/java/com/rtngodot/NativeGodotModule.java
+@@ -49,8 +49,11 @@ public class NativeGodotModule extends NativeGodotModuleSpec {
+ 
+ 	public NativeGodotModule(ReactApplicationContext context) {
+ 		super(context);
++		// The context's own holder: getCatalystInstance() is a legacy-architecture
++		// shim under bridgeless React Native (0.82+) and throws when the legacy
++		// architecture is minified away.
+ 		CallInvokerHolderImpl holder =
+-				(CallInvokerHolderImpl)context.getCatalystInstance().getJSCallInvokerHolder();
++				(CallInvokerHolderImpl)Objects.requireNonNull(context.getJSCallInvokerHolder());
+ 		mHybridData = initHybrid(
+ 				Objects.requireNonNull(context.getJavaScriptContextHolder()).get(),
+ 				holder);
+diff --git a/node_modules/@borndotcom/react-native-godot/scripts/download-prebuilt.js b/node_modules/@borndotcom/react-native-godot/scripts/download-prebuilt.js
+index bb318fb..bbb2984 100755
+--- a/node_modules/@borndotcom/react-native-godot/scripts/download-prebuilt.js
++++ b/node_modules/@borndotcom/react-native-godot/scripts/download-prebuilt.js
+@@ -150,7 +150,18 @@ function resolveRepoRelative(relativePath) {
+     process.env.REPLACE_EXISTING &&
+     process.env.REPLACE_EXISTING.toLowerCase() === "true";
+ 
++  // PREBUILT_ONLY=name1,name2 limits the run to those entries (e.g. the two
++  // Android ones on a Linux build machine, which cannot use the iOS ones).
++  const only = (process.env.PREBUILT_ONLY || "")
++    .split(",")
++    .map((s) => s.trim())
++    .filter(Boolean);
++
+   for (const entry of libPackage.prebuiltFiles) {
++    if (only.length && !only.includes(entry.name)) {
++      console.log(`\nSkipping ${entry.name} (not in PREBUILT_ONLY).`);
++      continue;
++    }
+     const {
+       name,
+       filename,

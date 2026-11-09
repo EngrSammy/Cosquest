@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { safeBack } from "@/utils/safeBack";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 type User = {
@@ -226,34 +228,36 @@ export default function Following() {
                 );
               }
             }}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
       ) : null}
 
       {!loading || following.length > 0 ? (
-        <FlatList
-          data={following}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <FollowingRow
-              item={item}
-              onUnfollow={() => handleUnfollow(item)}
-              disabled={processingUsername === item.username}
-            />
-          )}
-          contentContainerStyle={{
-            paddingBottom: insets.bottom + 24,
-          }}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              {query.trim()
-                ? `No following match “${query}”.`
-                : "You are not following anyone yet."}
-            </Text>
-          }
-        />
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <FlatList
+            data={following}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <FollowingRow
+                item={item}
+                onUnfollow={() => handleUnfollow(item)}
+                disabled={processingUsername === item.username}
+              />
+            )}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + 24,
+            }}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <Text style={styles.empty}>
+                {query.trim()
+                  ? `No following match “${query}”.`
+                  : "You are not following anyone yet."}
+              </Text>
+            }
+          />
+        </KeyboardAvoidingView>
       ) : null}
     </View>
   );
@@ -276,7 +280,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   searchRow: {
@@ -293,7 +297,7 @@ const STYLE_PAIR = themedStyles({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
     padding: 0,
   },
 
@@ -324,12 +328,12 @@ const STYLE_PAIR = themedStyles({
   name: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#191922",
+    color: C.ink,
   },
 
   handle: {
     fontSize: 13,
-    color: "#9C9CAA",
+    color: C.muted,
     marginTop: 1,
   },
 
@@ -339,7 +343,7 @@ const STYLE_PAIR = themedStyles({
     borderRadius: 10,
     minWidth: 96,
     alignItems: "center",
-    backgroundColor: "#191922",
+    backgroundColor: C.ink,
   },
 
   unfollowText: {
@@ -375,7 +379,7 @@ const STYLE_PAIR = themedStyles({
 
   errorText: {
     fontSize: 12,
-    color: "#B42318",
+    color: C.dangerInk,
     textAlign: "center",
   },
 
@@ -383,12 +387,12 @@ const STYLE_PAIR = themedStyles({
     marginTop: 7,
     fontSize: 13,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   empty: {
     textAlign: "center",
-    color: "#9C9CAA",
+    color: C.muted,
     marginTop: 40,
     fontSize: 13,
   },

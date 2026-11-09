@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { SHEET_SNAP_BACK } from "@/components/game/sheetMotion";
 
 // How far (px) the avatar can stray from its original position.
 const MAX_DISTANCE = 26;
@@ -35,9 +36,9 @@ export function DraggableAvatar({
       }
     })
     .onEnd(() => {
-      // Bounce back home.
-      tx.value = withSpring(0, { damping: 12, stiffness: 180 });
-      ty.value = withSpring(0, { damping: 12, stiffness: 180 });
+      // Back home, settling without a wobble.
+      tx.value = withSpring(0, SHEET_SNAP_BACK);
+      ty.value = withSpring(0, SHEET_SNAP_BACK);
     });
 
   const animatedStyle = useAnimatedStyle(() => ({

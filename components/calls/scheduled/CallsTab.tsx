@@ -104,14 +104,14 @@ export default function CallsTab({
         <Text style={styles.subtitle}>A little planning. More time together.</Text>
 
         <View style={styles.actions}>
-          <Pressable
+          <Pressable accessibilityLabel="Schedule a call"
             style={[styles.action, styles.schedule]}
             onPress={() => router.push({ pathname: "/group/schedule/[id]", params: { id: conversationId } })}
             accessibilityRole="button">
             <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
             <Text style={styles.scheduleText}>Schedule a call</Text>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityLabel="Meet now"
             style={[styles.action, styles.meet, joining && styles.off]}
             onPress={join}
             disabled={joining}
@@ -133,7 +133,7 @@ export default function CallsTab({
               Upcoming{upcoming.length ? ` · ${upcoming.length}` : ""}
             </Text>
           </Pressable>
-          <Pressable onPress={() => setView("past")} hitSlop={6}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Past" onPress={() => setView("past")} hitSlop={6}>
             <Text style={[styles.filter, view === "past" && styles.filterOn]}>Past</Text>
           </Pressable>
         </View>

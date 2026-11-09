@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native-filament/android/src/main/java/com/margelo/filament/FilamentChoreographer.java b/node_modules/react-native-filament/android/src/main/java/com/margelo/filament/FilamentChoreographer.java
+index 9067059..863e14c 100644
+--- a/node_modules/react-native-filament/android/src/main/java/com/margelo/filament/FilamentChoreographer.java
++++ b/node_modules/react-native-filament/android/src/main/java/com/margelo/filament/FilamentChoreographer.java
+@@ -8,8 +8,6 @@ import androidx.annotation.Keep;
+ import com.facebook.jni.HybridData;
+ import com.facebook.proguard.annotations.DoNotStrip;
+ 
+-import dalvik.annotation.optimization.FastNative;
+-
+ /**
+  * @noinspection JavaJniMissingFunction
+  */
+@@ -62,6 +60,11 @@ public class FilamentChoreographer {
+ 
+     private native HybridData initHybrid();
+ 
+-    @FastNative
++    // Not @FastNative (patched): a @FastNative call keeps the thread Runnable
++    // for the whole frame, and the frame blocks on the TextureView's Surface
++    // lock (eglGetCompositorTimingANDROID) while Filament's driver thread holds
++    // that lock in queueBuffer and waits to enter Java (onFrameAvailable). If a
++    // GC starts then, it cannot suspend this thread and ART aborts the app
++    // ("SuspendAll timeout: Unsuspended threads: FilamentRenderer").
+     private native void onFrame(long timestamp);
+ }

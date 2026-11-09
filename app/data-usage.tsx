@@ -22,9 +22,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 type ImageQuality = "low" | "medium" | "high" | "auto";
 
@@ -620,7 +621,7 @@ const STYLE_PAIR = themedStyles({
   headerTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
   },
 
   section: {
@@ -632,7 +633,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.medium,
     fontSize: 11,
     letterSpacing: 0.4,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   storageCard: {
@@ -650,13 +651,13 @@ const STYLE_PAIR = themedStyles({
   storageTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 13.5,
-    color: "#191922",
+    color: C.ink,
   },
 
   storageValue: {
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#6B6B72",
+    color: C.grey3,
   },
 
   progressBackground: {
@@ -690,7 +691,7 @@ const STYLE_PAIR = themedStyles({
   cacheText: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   // Milky row.
@@ -733,7 +734,7 @@ const STYLE_PAIR = themedStyles({
     marginTop: 1,
     fontFamily: FONTS.semibold,
     fontSize: 14,
-    color: "#191922",
+    color: C.ink,
   },
 
   pressed: {
@@ -774,7 +775,7 @@ const STYLE_PAIR = themedStyles({
   sheetTitle: {
     fontFamily: FONTS.semibold,
     fontSize: 17,
-    color: "#191922",
+    color: C.ink,
     marginBottom: 4,
   },
 
@@ -793,13 +794,13 @@ const STYLE_PAIR = themedStyles({
   sheetOptionLabel: {
     fontFamily: FONTS.semibold,
     fontSize: 14.5,
-    color: "#191922",
+    color: C.ink,
   },
 
   sheetOptionHint: {
     marginTop: 1,
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 });

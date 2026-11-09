@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
@@ -18,18 +17,18 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const SCREEN_H = Dimensions.get("window").height;
 
 const IS_WEB = Platform.OS === "web";
 
@@ -47,14 +46,19 @@ function Toggle({
   on,
   disabled,
   onToggle,
+  label,
 }: {
   on: boolean;
   disabled?: boolean;
   onToggle: () => void;
+  label: string;
 }) {
   const styles = useThemedStyles(STYLE_PAIR);
   return (
     <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: on, disabled: !!disabled }}
       style={[
         styles.toggle,
         on && styles.toggleOn,
@@ -119,6 +123,7 @@ function getWebPosition(): Promise<{ lat: number; lng: number }> {
 export default function Permissions() {
   const styles = useThemedStyles(STYLE_PAIR);
   const ink = useInk();
+  const { height: windowHeight } = useWindowDimensions();
   const { data, update } = useOnboarding();
 
   const dispatch = useAppDispatch();
@@ -292,12 +297,27 @@ export default function Permissions() {
         return;
       }
 
-      position = await withTimeout(
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-        }),
-        6000,
-      );
+      // Low accuracy is a network fix only; with no network location (Wi-Fi
+      // off, no Google location services, an emulator) none ever came and
+      // sign-up stopped here with "could not get your location quickly
+      // enough". If it hasn't come in 8 s, ask the GPS too (the switch keeps
+      // its spinner meanwhile).
+      try {
+        position = await withTimeout(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+          }),
+          8000,
+        );
+      } catch (error) {
+        if (!(error instanceof Error && error.message === "LOCATION_TIMEOUT")) throw error;
+        position = await withTimeout(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          }),
+          15000,
+        );
+      }
 
       if (!isMountedRef.current) {
         return;
@@ -508,13 +528,12 @@ export default function Permissions() {
   }
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView contentContainerStyle={styles.scroll}>
+    <OnboardingScreen background="gradient" insetTop={false} topGap={0} contentStyle={styles.scroll}>
         <OnboardingProgress step={STEP.permissions} total={ONBOARDING_TOTAL} />
 
         <Image
           source={require("@/assets/images/permissions.png")}
-          style={styles.hero}
+          style={[styles.hero, { height: windowHeight / 3 }]}
           contentFit="cover"
         />
 
@@ -548,6 +567,7 @@ export default function Permissions() {
             </View>
 
             <Toggle
+              label="Enable Location"
               on={data.locationGranted}
               onToggle={toggleLocation}
               disabled={locationLoading || saving}
@@ -581,9 +601,9 @@ export default function Permissions() {
                   radiusMi: value,
                 })
               }
-              minimumTrackTintColor="#C5399A"
+              minimumTrackTintColor={C.brand}
               maximumTrackTintColor="#D5D5DC"
-              thumbTintColor="#C5399A"
+              thumbTintColor={C.brand}
               disabled={saving}
             />
           </View>
@@ -604,6 +624,7 @@ export default function Permissions() {
             </View>
 
             <Toggle
+              label="Allow Notifications"
               on={!IS_WEB && data.notificationsEnabled}
               onToggle={toggleNotifications}
               disabled={IS_WEB || notificationLoading || saving}
@@ -631,8 +652,7 @@ export default function Permissions() {
             disabled={saving}
           />
         </View>
-      </ScrollView>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -646,7 +666,6 @@ const STYLE_PAIR = themedStyles({
   hero: {
     alignSelf: "stretch",
     marginHorizontal: -24,
-    height: SCREEN_H / 3,
     marginTop: 8,
   },
 
@@ -654,7 +673,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 35,
     fontWeight: "800",
-    color: "#191922",
+    color: C.ink,
     textAlign: "center",
     marginTop: 8,
   },
@@ -662,7 +681,7 @@ const STYLE_PAIR = themedStyles({
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 8,
     marginBottom: 24,
@@ -710,13 +729,13 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 15,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   rowDetail: {
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: "#6b6b72",
+    color: C.grey3,
     marginTop: 2,
   },
 
@@ -738,7 +757,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 14,
     fontWeight: "700",
-    color: "#C5399A",
+    color: C.brand,
   },
 
   toggle: {
@@ -777,7 +796,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   settingsLink: {
-    color: "#C5399A",
+    color: C.brand,
     fontWeight: "500",
     textAlign: "center",
     marginTop: 5,

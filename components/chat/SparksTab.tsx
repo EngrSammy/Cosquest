@@ -40,7 +40,7 @@ export default function SparksTab({
             : "The topics your group keeps coming back to."}
         </Text>
 
-        <Pressable style={styles.create} onPress={onCreate} accessibilityRole="button">
+        <Pressable accessibilityLabel="Create Spark" style={styles.create} onPress={onCreate} accessibilityRole="button">
           <Image source={SPARKLE_WHITE} style={styles.createIcon} contentFit="contain" />
           <Text style={styles.createText}>Create Spark</Text>
         </Pressable>

@@ -56,6 +56,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearActiveCall } from "@/store/slices/callSlice";
 import { endCall, refreshCall } from "@/store/thunks/callThunks";
 import { getAvatarSource } from "@/utils/callHelpers";
+import { C } from "@/theme/tokens";
 
 // Same timings as the phone version.
 const RING_TIMEOUT_MS = 47_000;
@@ -1161,7 +1162,7 @@ const styles = StyleSheet.create({
     height: 170,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#2A1030",
+    backgroundColor: C.plumDark,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },

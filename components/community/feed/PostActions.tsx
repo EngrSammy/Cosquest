@@ -1,8 +1,10 @@
 import { FONTS } from "@/constants/fonts";
 import { Ionicons } from "@expo/vector-icons";
 import { useId, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, type StyleProp, StyleSheet, Text, type TextStyle, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import { useFeedClock } from "./feedVisibility";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // ==========================================
@@ -55,6 +57,12 @@ function getRelativeTime(createdAt?: string) {
   const weeks = Math.floor(days / 7);
 
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+}
+
+/** "5 mins ago", kept current by the feed's one clock; only this label re-renders (audit B2). */
+function TimeAgo({ createdAt, style }: { createdAt?: string; style: StyleProp<TextStyle> }) {
+  useFeedClock();
+  return <Text style={style}>{getRelativeTime(createdAt)}</Text>;
 }
 
 function formatCount(value: number) {
@@ -186,10 +194,9 @@ export function PostActions({
   const styles = useThemedStyles(STYLE_PAIR);
   const [panelWidth, setPanelWidth] = useState(0);
 
-  const baseColor = overlay ? "#FFFFFF" : "#3B3B42";
+  const baseColor = overlay ? "#FFFFFF" : C.ink2;
   const likeColor = liked ? "#FF3B30" : baseColor;
-  const saveColor = bookmarked ? "#C5399A" : baseColor;
-  const time = getRelativeTime(createdAt);
+  const saveColor = bookmarked ? C.brand : baseColor;
 
   const stats = (
     <>
@@ -222,8 +229,8 @@ export function PostActions({
         />
       </View>
 
-      {time ? (
-        <Text style={[styles.time, !overlay && styles.timeInline]}>{time}</Text>
+      {getRelativeTime(createdAt) ? (
+        <TimeAgo createdAt={createdAt} style={[styles.time, !overlay && styles.timeInline]} />
       ) : null}
     </>
   );
@@ -333,7 +340,7 @@ const STYLE_PAIR = themedStyles({
 
   timeInline: {
     marginLeft: 0,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   // Save (and its count) on its own at the bottom right.

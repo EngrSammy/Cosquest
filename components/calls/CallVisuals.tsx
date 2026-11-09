@@ -11,13 +11,14 @@ import {
       Text,
       View,
 } from "react-native";
+import { C } from "@/theme/tokens";
 
 // Shared pieces for the ringing screen and the call screen, so both look
 // like the Figma "Requesting" design: dark purple → teal background,
 // glowing halo behind the avatar, teal/pink avatar ring, glass controls.
 
 export const CALL_COLORS = {
-  pink: "#C5399A",
+  pink: C.brand,
   teal: "#3FD3E0",
   red: "#FF2D55",
   green: "#2FB36B",
@@ -35,7 +36,7 @@ export function CallBackground({ children }: { children: React.ReactNode }) {
   return (
     <View style={styles.background}>
       <LinearGradient
-        colors={["#1B0714", "#2A1030", "#12303A"]}
+        colors={["#1B0714", C.plumDark, "#12303A"]}
         locations={[0, 0.55, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -115,7 +116,7 @@ export function CallAvatar({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: "#2A1030",
+            backgroundColor: C.plumDark,
           }}
           contentFit="cover"
           cachePolicy="memory-disk"

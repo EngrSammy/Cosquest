@@ -1,0 +1,44 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.cosquest'
+version = '0.1.0'
+
+// The Warden's on-device model for the React Native game on Android: the
+// mote engine (plain C, the SAME sources iOS compiles, in
+// ../costquest-game/ios/Game/Engine) built with the NDK, behind a small JNI
+// bridge. Built at -O3 in every configuration, as on iOS: at -O0 the model
+// runs at a few tokens a second, which is not slower but unusable.
+//
+// 64-bit ABIs only: mote's NEON path uses AArch64 intrinsics, and a phone
+// that runs 32-bit code has too little memory for the model anyway. On other
+// ABIs the library is absent and MoteNative.ready is false (the Warden speaks
+// its scripted lines). The app's reactNativeArchitectures narrows it further.
+def wardenAbis = (findProperty('reactNativeArchitectures') ?: 'arm64-v8a,x86_64')
+  .toString().split(',').collect { it.trim() }
+  .findAll { it == 'arm64-v8a' || it == 'x86_64' }
+if (wardenAbis.isEmpty()) wardenAbis = ['arm64-v8a']
+
+android {
+  namespace "expo.modules.costquestwarden"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+    ndk {
+      abiFilters(*wardenAbis)
+    }
+    externalNativeBuild {
+      cmake {
+        arguments "-DANDROID_STL=none"
+      }
+    }
+  }
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
+      version "3.22.1"
+    }
+  }
+}

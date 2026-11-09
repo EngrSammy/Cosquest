@@ -1,0 +1,79 @@
+{
+ "_doc": "Secondary motion for the cast's robes, coats, skirts, wings and flames (cq 014), see docs/game3d/RIGS.md. A chain is any run of bones named <Prefix><n>_0 .. _k plus <Prefix><n>_end (or <Prefix>_<L|R>_0 ..) under the hips or spine, added by app/game3d/tools/rig. The retargeted clips never animate them; secondary_motion.gd does, every frame, and tools/rig/rigcheck.py runs the same maths for the tear gate. Per group: follow = how much of the thighs' swing (relative to the hips) the chain's target takes, split left/right by where the chain hangs; stiffness = the share of the way to the target each 1/60 s step; damping = velocity lost per step; max_deg = the most a bone may turn away from its target; legs = collide with capsules on the thighs and shins (radius = r_thigh / r_shin, m, plus the joint's radius).",
+ "step_s": 0.0166667,
+ "groups": {
+  "robe": {
+   "follow": 0.4,
+   "stiffness": 0.35,
+   "damping": 0.25,
+   "max_deg": 35,
+   "legs": true,
+   "joint_r": 0.07,
+   "spin_carry": true,
+   "flare_deg_per_rad_s": 2.5,
+   "flare_max_deg": 0.0
+  },
+  "coat": {
+   "follow": 0.4,
+   "stiffness": 0.3,
+   "damping": 0.25,
+   "max_deg": 40,
+   "legs": true,
+   "joint_r": 0.07,
+   "spin_carry": true,
+   "flare_deg_per_rad_s": 2.5,
+   "flare_max_deg": 0.0
+  },
+  "skirt": {
+   "follow": 0.4,
+   "stiffness": 0.35,
+   "damping": 0.25,
+   "max_deg": 35,
+   "legs": true,
+   "joint_r": 0.07,
+   "spin_carry": true,
+   "flare_deg_per_rad_s": 2.5,
+   "flare_max_deg": 0.0
+  },
+  "wing": {
+   "follow": 0.0,
+   "stiffness": 0.25,
+   "damping": 0.3,
+   "max_deg": 20,
+   "legs": false,
+   "joint_r": 0.02,
+   "spin_carry": true,
+   "flare_deg_per_rad_s": 0.0,
+   "flare_max_deg": 0
+  },
+  "flame": {
+   "follow": 0.0,
+   "stiffness": 0.2,
+   "damping": 0.2,
+   "max_deg": 30,
+   "legs": false,
+   "joint_r": 0.01,
+   "spin_carry": true,
+   "flare_deg_per_rad_s": 0.0,
+   "flare_max_deg": 0
+  }
+ },
+ "prefixes": {
+  "Robe": "robe",
+  "Coat": "coat",
+  "Skirt": "skirt",
+  "Wing": "wing",
+  "Flame": "flame"
+ },
+ "legs": {
+  "r_thigh": 0.09,
+  "r_shin": 0.065
+ },
+ "characters": {},
+ "_doc_spin": "cq 016: spin_carry = the chain is carried round by the hips' turn since the last frame (a WHIRL turns the hips a full circle in half a second; spring lag behind that stretched the robes past the tear gate); flare_deg_per_rad_s / flare_max_deg = the chain's target swings out from the hips by this much per rad/s of turn (the robe flares in a spin), capped. Flare is off (0): even 12 deg took Elvis's LOD0 spin from 0.42 % to 0.57 % torn (gate 0.5 %).",
+ "cloth_push": {
+  "r_thigh": 0.11,
+  "r_shin": 0.09
+ },
+ "_doc_cloth_push": "cq 016: the fighters' vertex shader (char_lit.gdshader) pushes every robe/coat/skirt vertex out of capsules of these radii (m) on the thighs and shins, every frame (secondary_motion.gd feeds the capsules): the chain joints keep 7 cm off the legs, this keeps every cloth vertex off them. Radii: about the legs' own fitted capsules (tools/anim/reports/<key>.json capsules: thighs 0.096-0.11, shins 0.09)."
+}

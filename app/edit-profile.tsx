@@ -12,7 +12,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "@/components/ui/keyboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import DesktopEditProfile from "@/components/desktop/DesktopEditProfile";
@@ -34,9 +34,10 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateAuthUser } from "@/store/slices/authSlice";
 import { updateUser } from "@/store/slices/userSlice";
 import { safeBack } from "@/utils/safeBack";
+import { C } from "@/theme/tokens";
 import { DARK_SCREEN_GRADIENT, themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
-const PINK = "#C34D9C";
+const PINK = C.brandSoft;
 
 // "digital-creator" -> "Digital creator"
 function humanize(value?: string | null) {
@@ -209,7 +210,7 @@ export default function EditProfile() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        behavior="padding">
         {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <Pressable
@@ -485,7 +486,7 @@ const STYLE_PAIR = themedStyles({
     marginBottom: 8,
     fontFamily: FONTS.medium,
     fontSize: 12,
-    color: "#7A7A84",
+    color: C.grey4,
   },
 
   sectionLabel: {
@@ -497,7 +498,7 @@ const STYLE_PAIR = themedStyles({
   input: {
     fontFamily: FONTS.regular,
     fontSize: 14.5,
-    color: "#191922",
+    color: C.ink,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   },
 
@@ -523,7 +524,7 @@ const STYLE_PAIR = themedStyles({
   rowTitle: {
     fontFamily: FONTS.medium,
     fontSize: 15,
-    color: "#191922",
+    color: C.ink,
   },
 
   rowRight: {
@@ -537,7 +538,7 @@ const STYLE_PAIR = themedStyles({
   rowValue: {
     fontFamily: FONTS.regular,
     fontSize: 13.5,
-    color: "#8A8A93",
+    color: C.grey2,
     flexShrink: 1,
   },
 });

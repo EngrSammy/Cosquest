@@ -6,6 +6,7 @@ import {
   signUp,
 } from "@/services/auth";
 import { createAsyncThunk } from "@reduxjs/toolkit";
+import { setSignupToken } from "@/services/signupSession";
 
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
@@ -22,6 +23,8 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await signIn(emailOrUsername, password);
 
+      // A real session now: the sign-up token is done with.
+      setSignupToken(null);
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login failed";
@@ -48,6 +51,8 @@ export const registerUser = createAsyncThunk(
     try {
       const response = await signUp(email, password, confirmPassword);
 
+      // Onboarding's calls authenticate with this (services/signupSession.ts).
+      setSignupToken(response?.token);
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Signup failed";
@@ -79,6 +84,7 @@ export const exchangeGoogleCode = createAsyncThunk(
   async (oauthCode: string, { rejectWithValue }) => {
     try {
       const oauthResponse = await exchangeGoogleOAuthCode(oauthCode);
+      setSignupToken(null);
 
       const userResponse = await apiRequest<{ user: GoogleUser }>(
         "/api/users/me",

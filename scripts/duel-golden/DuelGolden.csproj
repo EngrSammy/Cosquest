@@ -1,0 +1,69 @@
+<Project>
+  <!--
+    Golden vectors for the TypeScript port of the Guardian Duel (features/game/duel).
+
+    The C# engine is compiled from its sources, so the vectors are always those
+    of the engine checkout you point at:
+      - MSBuild property  -p:DuelEngineDir=/path/to/costquest-duel
+      - or env var        COSQUEST_DUEL_DIR=/path/to/costquest-duel
+      - default           ../../../../costquest-duel from this folder
+                          (the cosquest-merge workspace layout: cosquest/app/scripts/duel-golden).
+
+    Build output never lands in the app checkout: bin/ and obj/ go under the
+    system temp folder (override with -p:DuelGoldenOut=/some/dir/).
+  -->
+  <PropertyGroup>
+    <DuelGoldenOut Condition="'$(DuelGoldenOut)' == ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetTempPath()), 'cosquest-duel-golden'))/</DuelGoldenOut>
+    <BaseIntermediateOutputPath>$(DuelGoldenOut)obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(DuelGoldenOut)bin/</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>DuelGolden</RootNamespace>
+    <AssemblyName>DuelGolden</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSharedCompilation>false</UseSharedCompilation>
+
+    <DuelEngineDir Condition="'$(DuelEngineDir)' == '' and '$(COSQUEST_DUEL_DIR)' != ''">$(COSQUEST_DUEL_DIR)</DuelEngineDir>
+    <DuelEngineDir Condition="'$(DuelEngineDir)' == ''">$(MSBuildThisFileDirectory)../../../../costquest-duel</DuelEngineDir>
+    <DuelEngineRuntime>$([System.IO.Path]::GetFullPath('$(DuelEngineDir)/src/CosQuest.Duel/Runtime'))</DuelEngineRuntime>
+    <!-- The Unity bridge's setup mapping: the vendored copy unless a live file is given. -->
+    <UnityDuelWire Condition="'$(UnityDuelWire)' == ''">$(MSBuildThisFileDirectory)UnityDuelWire.cs</UnityDuelWire>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(DuelEngineRuntime)/**/*.cs" />
+    <Compile Include="$(UnityDuelWire)" />
+    <Compile Include="$(MSBuildThisFileDirectory)Program.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Scripts.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Where the engine came from, recorded in golden.json. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>DuelEngineRuntime</_Parameter1>
+      <_Parameter2>$(DuelEngineRuntime)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unity's com.unity.nuget.newtonsoft-json 3.2.1 is Newtonsoft.Json 13.0.2. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+  </ItemGroup>
+
+  <Target Name="CheckDuelEngine" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(DuelEngineRuntime)/DuelSim.cs')"
+           Text="The duel engine was not found at '$(DuelEngineRuntime)'. Pass -p:DuelEngineDir=/path/to/costquest-duel or set COSQUEST_DUEL_DIR." />
+    <Message Importance="high" Text="DuelGolden: engine sources from $(DuelEngineRuntime)" />
+  </Target>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

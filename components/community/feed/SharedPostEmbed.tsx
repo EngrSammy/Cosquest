@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AVATARS } from "@/constants/avatars";
 import type { SharedPost } from "@/store/slices/postSlice";
 import { getCloudinaryVideoPoster } from "@/utils/videoPoster";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 function avatarFor(author?: {
@@ -147,7 +148,7 @@ const STYLE_PAIR = themedStyles({
 
   unavailableText: {
     fontSize: 13,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   authorRow: {
@@ -172,13 +173,13 @@ const STYLE_PAIR = themedStyles({
   name: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   meta: {
     marginTop: 1,
     fontSize: 12,
-    color: "#8A8A93",
+    color: C.grey2,
   },
 
   mediaWrap: {
@@ -224,6 +225,6 @@ const STYLE_PAIR = themedStyles({
     paddingVertical: 10,
     fontSize: 13.5,
     lineHeight: 19,
-    color: "#3B3B42",
+    color: C.ink2,
   },
 });

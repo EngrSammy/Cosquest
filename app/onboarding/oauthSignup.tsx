@@ -1,14 +1,16 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { Terms } from "@/components/Terms";
 import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useAppleAuth } from "@/utils/appleAuth";
 import { useGoogleAuth } from "@/utils/googleAuth";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useAppSelector } from "../../store/hooks";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -21,10 +23,10 @@ export default function AuthSignup() {
   // Same Google flow as the Sign in screen — the backend decides whether
   // it's a new account (-> onboarding) or an existing one (-> home).
   const { continueWithGoogle, googleLoading } = useGoogleAuth();
+  const { continueWithApple, appleLoading, appleEnabled } = useAppleAuth();
 
   return (
-    <AppBackground variant="gradient">
-      <View style={styles.screen}>
+    <OnboardingScreen background="gradient" insetTop={false} topGap={0} contentStyle={styles.screen}>
         <OnboardingProgress step={STEP.account} total={ONBOARDING_TOTAL} />
 
         <View style={styles.body}>
@@ -33,7 +35,7 @@ export default function AuthSignup() {
           </Text>
 
           <Text style={styles.sub}>
-            CosQuest turns your city into a fandom playground — real-world
+            CosQuest turns your city into a fandom playground: real-world
             quests, your people, one leaderboard. Let&apos;s get you set up.
           </Text>
 
@@ -48,11 +50,15 @@ export default function AuthSignup() {
               disabled={googleLoading || loading}
             />
 
-            <Button
-              label="Sign up with Apple"
-              onPress={() => {}}
-              variant="dark"
-            />
+            {/* Apple: behind EXPO_PUBLIC_APPLE_SIGNIN (utils/appleAuth.ts). */}
+            {appleEnabled ? (
+              <Button
+                label={appleLoading ? "Connecting to Apple…" : "Sign up with Apple"}
+                onPress={continueWithApple}
+                variant="dark"
+                disabled={appleLoading || loading}
+              />
+            ) : null}
 
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
@@ -90,8 +96,7 @@ export default function AuthSignup() {
 
           <Terms />
         </View>
-      </View>
-    </AppBackground>
+      </OnboardingScreen>
   );
 }
 
@@ -107,7 +112,7 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
 
   body: {
@@ -118,7 +123,7 @@ const STYLE_PAIR = themedStyles({
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     lineHeight: 20,
@@ -165,13 +170,13 @@ const STYLE_PAIR = themedStyles({
   accountText: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 22,
   },
 
   signinLink: {
-    color: "#C5399A",
+    color: C.brand,
     fontWeight: "700",
   },
 });

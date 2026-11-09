@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-svg/apple/Elements/RNSVGSvgView.mm b/node_modules/react-native-svg/apple/Elements/RNSVGSvgView.mm
+index d03d5c0..365c5f3 100644
+--- a/node_modules/react-native-svg/apple/Elements/RNSVGSvgView.mm
++++ b/node_modules/react-native-svg/apple/Elements/RNSVGSvgView.mm
+@@ -95,11 +95,16 @@ using namespace facebook::react;
+     self.color = RCTUIColorFromSharedColor(newProps.color);
+   }
+   [super updateProps:props oldProps:oldProps];
++  // CosQuest: an <Svg nativeID="svg-async..."> (the world map's ground tiles)
++  // rasterises its drawing on a background thread instead of the main one, so
++  // a big tile landing mid-gesture does not stall the frame.
++  self.layer.drawsAsynchronously = [self.nativeId hasPrefix:@"svg-async"];
+ }
+ 
+ - (void)prepareForRecycle
+ {
+   [super prepareForRecycle];
++  self.layer.drawsAsynchronously = NO;
+   _minX = 0;
+   _minY = 0;
+   _vbWidth = 0;

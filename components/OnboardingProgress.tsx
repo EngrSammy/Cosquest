@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export function OnboardingProgress({
@@ -27,6 +28,6 @@ export function OnboardingProgress({
 const STYLE_PAIR = themedStyles({
   row: { flexDirection: "row", gap: 4, paddingHorizontal: 24 },
   segment: { flex: 1, height: 6, borderRadius: 5 },
-  filled: { backgroundColor: "#C5399A" },
+  filled: { backgroundColor: C.brand },
   empty: { backgroundColor: "#cccccc" },
 });

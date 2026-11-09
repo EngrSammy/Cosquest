@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { ErrorText } from "@/components/ErrorText";
@@ -11,15 +10,14 @@ import { saveUserProfile } from "@/store/thunks/userThunks";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 export default function CreateProfile() {
@@ -309,13 +307,7 @@ export default function CreateProfile() {
   const isSaving = loading || checkingUsername;
 
   return (
-    <AppBackground variant="gradient">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled">
+    <OnboardingScreen background="gradient" insetTop={false} topGap={0} contentStyle={styles.scroll}>
           <OnboardingProgress step={STEP.profile} total={ONBOARDING_TOTAL} />
 
           <Text style={styles.headline}>Create Your Profile</Text>
@@ -449,9 +441,7 @@ export default function CreateProfile() {
               disabled={isSaving}
             />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </AppBackground>
+        </OnboardingScreen>
   );
 }
 
@@ -466,14 +456,14 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
     marginTop: 20,
   },
 
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 10,
     marginBottom: 50,
@@ -489,7 +479,7 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.semibold,
     fontSize: 13,
     fontWeight: "600",
-    color: "#191922",
+    color: C.ink,
     marginBottom: 6,
   },
 
@@ -516,7 +506,7 @@ const STYLE_PAIR = themedStyles({
   },
 
   segActive: {
-    borderColor: "#C5399A",
+    borderColor: C.brand,
     backgroundColor: "#fff",
   },
 
@@ -524,11 +514,11 @@ const STYLE_PAIR = themedStyles({
     fontFamily: FONTS.bold,
     fontSize: 14,
     fontWeight: "700",
-    color: "#191922",
+    color: C.ink,
   },
 
   segTextActive: {
-    color: "#C5399A",
+    color: C.brand,
   },
 
   usernameChecking: {

@@ -32,7 +32,8 @@ const ENABLED = ["module", "qlm"].includes(String(process.env.EXPO_PUBLIC_SPARKS
 
 // Our backend (it redirects /v1/model to the model list Subomi publishes, so
 // moving the model to our own domain later needs no app update).
-const API = (process.env.EXPO_PUBLIC_API_URL || "https://cosquest-1.onrender.com").replace(/\/$/, "");
+// Task 059: from the build's env only (no Render fallback in the code).
+const API = (process.env.EXPO_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 // The model list, through our backend (override with EXPO_PUBLIC_SPARKS_MODEL_MANIFEST).
 export const SPARKS_MODEL_MANIFEST = process.env.EXPO_PUBLIC_SPARKS_MODEL_MANIFEST || `${API}/v1/model`;

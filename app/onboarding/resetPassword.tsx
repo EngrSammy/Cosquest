@@ -1,4 +1,3 @@
-import { AppBackground } from "@/components/AppBackground";
 import { FONTS } from "@/constants/fonts";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
@@ -6,9 +5,10 @@ import { useAppDispatch } from "@/store/hooks";
 import { resetPasswordThunk } from "@/store/thunks/authThunks";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { safeBack } from "@/utils/safeBack";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
 import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 
 // Backend errors that need a special button (exact texts from the API doc).
@@ -18,7 +18,6 @@ const TOO_MANY_ATTEMPTS_ERROR =
 
 export default function ResetPassword() {
   const styles = useThemedStyles(STYLE_PAIR);
-  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
   // Passed along from Forgot Password → Verification → here.
@@ -115,9 +114,7 @@ export default function ResetPassword() {
     serverError === TOO_MANY_ATTEMPTS_ERROR;
 
   return (
-    <AppBackground variant="gradient">
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <View style={[styles.screen, { paddingTop: insets.top + 35 }]}>
+    <OnboardingScreen background="gradient" contentStyle={styles.screen}>
           <Text style={styles.headline}>Reset Password</Text>
           <Text style={styles.sub}>Enter your new password</Text>
           <Field
@@ -167,9 +164,7 @@ export default function ResetPassword() {
               disabled={submitting}
             />
           </View>
-        </View>
-      </ScrollView>
-    </AppBackground>
+        </OnboardingScreen>
   );
 }
 
@@ -184,12 +179,12 @@ const STYLE_PAIR = themedStyles({
     fontSize: 35,
     fontWeight: "800",
     textAlign: "center",
-    color: "#191922",
+    color: C.ink,
   },
   sub: {
     fontFamily: FONTS.regular,
     fontSize: 14,
-    color: "#2b2b2c",
+    color: C.inkSoft,
     textAlign: "center",
     marginTop: 20,
     marginBottom: 50,
