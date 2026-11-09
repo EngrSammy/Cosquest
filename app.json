@@ -113,9 +113,37 @@
         "expo-notifications",
         {
           "color": "#C34D9C",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/sounds/ringtone.wav"
+          ]
         }
-      ]
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.dammy0227.cosquest",
+          "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-callkit-telecom",
+        {
+          "sounds": [
+            "./assets/sounds/ringtone.wav",
+            "./assets/sounds/ringback.wav"
+          ],
+          "defaultRingtoneIos": "ringtone.wav",
+          "defaultRingtoneAndroid": "ringtone.wav",
+          "defaultDialtone": "ringback.wav",
+          "incomingCallTimeout": 60,
+          "supportsVideo": true,
+          "includesCallsInRecents": true,
+          "androidEventReceiver": ".CallDeclineReceiver",
+          "microphonePermission": "CosQuest needs the microphone for calls."
+        }
+      ],
+      "./plugins/withCallDeclineReceiver"
     ],
     "experiments": {
       "typedRoutes": true,

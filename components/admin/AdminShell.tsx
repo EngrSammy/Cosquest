@@ -6,6 +6,7 @@
 // top bar (breadcrumb, search, notifications, the signed-in admin).
 // Narrow windows: the sidebar opens from a menu button.
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
 import { type ReactNode, useState, useSyncExternalStore } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
@@ -17,6 +18,10 @@ import AdminAlerts from "./AdminAlerts";
 import AdminSearch from "./AdminSearch";
 import { useAdminTheme } from "./theme";
 import { initials } from "./ui";
+
+// The CosQuest logo (429 x 173), as on the app's splash screen.
+export const COSQUEST_LOGO = require("@/assets/images/cosquest-logo.png");
+export const LOGO_RATIO = 429 / 173;
 
 type Item = { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; path: string };
 
@@ -102,9 +107,8 @@ function Sidebar({ onPick }: { onPick?: () => void }) {
 
   return (
     <View style={{ width: 216, height: "100%", paddingHorizontal: 16, paddingTop: 22, paddingBottom: 18, borderRightWidth: 1, borderRightColor: t.border, backgroundColor: t.sidebar }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 6 }}>
-        <Ionicons name="sparkles-outline" size={24} color={t.pink} />
-        <Text style={{ fontFamily: FONTS.regular, fontSize: 21, color: t.text }}>CosQuest</Text>
+      <View style={{ paddingHorizontal: 6 }}>
+        <Image source={COSQUEST_LOGO} style={{ width: 150, height: 150 / LOGO_RATIO }} contentFit="contain" accessibilityLabel="CosQuest" />
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 22, padding: 12, borderRadius: 12, backgroundColor: t.pinkSoft }}>

@@ -97,6 +97,8 @@ export default function HomeScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   // "Get a ticket" (free at once, paid through Stripe's page).
   const [ticketQuest, setTicketQuest] = useState<Quest | null>(null);
+  // Nothing within your radius: the nearest quests anywhere are shown.
+  const [anywhere, setAnywhere] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = user?.profile || authUser?.profile;
@@ -121,10 +123,22 @@ export default function HomeScreen() {
   } as any);
 
   const load = useCallback(async () => {
-    const work: Promise<unknown>[] = [dispatch(fetchQuests(nearMe))];
+    const work: Promise<unknown>[] = [
+      (async () => {
+        const result: any = await dispatch(fetchQuests(nearMe));
+        const list = Array.isArray(result?.payload) ? result.payload : Array.isArray(result?.payload?.quests) ? result.payload.quests : null;
+        // Nothing near: the nearest anywhere (the server sorts by distance).
+        if (nearMe && list && !list.length) {
+          setAnywhere(true);
+          await dispatch(fetchQuests({ ...nearMe, radiusMiles: 13000 }));
+        } else {
+          setAnywhere(false);
+        }
+      })(),
+    ];
     if (authUser?.email && !user) work.push(dispatch(fetchCurrentUser(authUser.email)));
     await Promise.all(work);
-  }, [dispatch, authUser?.email, user]);
+  }, [dispatch, authUser?.email, user, radius]);
 
   // Fresh quests each time the tab comes into view.
   useFocusEffect(
@@ -179,7 +193,7 @@ export default function HomeScreen() {
         onClose={() => setTicketQuest(null)}
         onTicket={(questId) => {
           setRegistered((current) => new Set(current).add(questId));
-          dispatch(fetchQuests(nearMe));
+          load();
         }}
       />
       <LinearGradient
@@ -278,6 +292,11 @@ export default function HomeScreen() {
 
         {/* UPCOMING EVENTS */}
         <Text style={styles.sectionTitle}>UPCOMING EVENTS</Text>
+        {anywhere && (upcoming.length || ongoing.length || featured) ? (
+          <Text style={{ textAlign: "center", fontSize: 12.5, color: "#5F6170", marginTop: -4, marginBottom: 8 }}>
+            Nothing within {radius} mi · showing the nearest
+          </Text>
+        ) : null}
         {upcoming.length ? (
           <FlatList
             horizontal

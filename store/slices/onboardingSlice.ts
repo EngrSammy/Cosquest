@@ -46,7 +46,8 @@ const initialState: OnboardingState = {
     locationGranted: false,
     lat: null,
     lng: null,
-    notificationsEnabled: false,
+    // Notifications start ON (people can switch them off).
+    notificationsEnabled: true,
   },
   loading: false,
   error: null,

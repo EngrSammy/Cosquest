@@ -242,12 +242,13 @@ export default function StartSparkSheet({
       <View style={styles.modalRoot}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <KeyboardAvoidingView
-          style={styles.modalContent}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          style={[styles.modalContent, !deciding && { paddingTop: insets.top + 8 }]}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View
             style={[
               styles.sheet,
               deciding && styles.sheetTall,
+              !deciding && styles.sheetFit,
               {
                 paddingTop: deciding ? insets.top + 12 : 22,
                 paddingBottom: insets.bottom + 16,
@@ -264,7 +265,7 @@ export default function StartSparkSheet({
             ) : null}
 
             {!deciding ? (
-              <>
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false} style={{ flexGrow: 0 }}>
                 {/* ---------- M11 · Start a Spark ---------- */}
                 <View style={styles.header}>
                   <Text style={styles.title}>Start a Spark</Text>
@@ -289,7 +290,6 @@ export default function StartSparkSheet({
                   placeholder="e.g. Spider-Man uniform"
                   placeholderTextColor={ink.text(PLACEHOLDER)}
                   maxLength={60}
-                  autoFocus
                   style={styles.input}
                   onSubmitEditing={() => check(false)}
                 />
@@ -320,7 +320,7 @@ export default function StartSparkSheet({
                 <Pressable accessibilityRole="button" accessibilityLabel="Cancel" style={styles.secondary} onPress={onClose}>
                   <Text style={styles.secondaryText}>Cancel</Text>
                 </Pressable>
-              </>
+              </ScrollView>
             ) : (
               <>
                 {/* ---------- M12 · Topic match decision ---------- */}
@@ -493,6 +493,8 @@ const STYLE_PAIR = themedStyles(
       backgroundColor: "#FFFFFF",
     },
 
+    // Start a Spark: fits between the status bar and the keyboard; scrolls inside.
+    sheetFit: { flexShrink: 1 },
     cancelAfterNote: { marginTop: 16 },
     startNew: { marginTop: 20 },
     matchScroll: { flex: 1 },

@@ -13,6 +13,10 @@ import { openChatId } from "@/services/chatFocus";
 import { useAppSelector } from "@/store/hooks";
 import { openFromNotification } from "@/utils/openFromNotification";
 import { getPref, setPref } from "@/utils/prefsStorage";
+import { handleNotificationAction, registerNotificationActionsTask } from "@/components/pushActions";
+
+// Reply / Mark as read also work when CosQuest is closed (a background task).
+registerNotificationActionsTask();
 import { ensureAlertChannel } from "@/components/alerts/alertSound";
 
 // Faction alerts: their own high-importance channel on Android.
@@ -51,6 +55,12 @@ export default function PushTapHandler() {
     if (handled.current.has(id)) return;
     handled.current.add(id);
     void setPref(HANDLED_PREF, id);
+    // Reply / Mark as read: done in the background, nothing to open.
+    const action = (response as any).actionIdentifier;
+    if (action === "reply" || action === "read") {
+      handleNotificationAction(response as any);
+      return;
+    }
     const data = response.notification.request.content.data;
     // Not signed in yet (app just launched): open it once login is restored.
     if (!token) pending.current = data;
