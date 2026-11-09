@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p .",
     "eas-build-pre-install": "node scripts/check-release-env.js",
     "check:a11y": "node scripts/a11y-buttons.js --check",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "eas-build-post-install": "bash scripts/godot-prebuilt.sh"
   },
   "dependencies": {
     "@borndotcom/react-native-godot": "1.0.1",
