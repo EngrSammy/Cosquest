@@ -1,0 +1,9 @@
+# Forge drop-in proof (cq 056), smoke: sign in, open the game, the map.
+appId: com.dammy0227.cosquest
+name: F00 smoke
+---
+- runFlow:
+    file: ../../maestro/common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: ../../maestro/common/game.yaml
+- takeScreenshot: f00-map

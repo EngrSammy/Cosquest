@@ -1,0 +1,18 @@
+# J18 Error boundary (task 059): a screen that throws shows the restart
+# screen instead of closing the app, and Restart brings the app back.
+appId: com.dammy0227.cosquest
+name: J18 error boundary
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- openLink: "cosquest://dev/crash"
+- extendedWaitUntil:
+    visible: "Something went wrong"
+    timeout: 15000
+- takeScreenshot: j18-restart-screen
+- tapOn: "Restart CosQuest"
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 30000
+- takeScreenshot: j18-back

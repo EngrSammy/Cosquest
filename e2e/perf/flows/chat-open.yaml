@@ -1,0 +1,17 @@
+# Open the 2,000-message group three times (each open logs "[perf] span chat-open").
+appId: com.dammy0227.cosquest
+---
+- repeat:
+    times: 3
+    commands:
+      - runFlow: ../../maestro/common/chats.yaml
+      - scrollUntilVisible:
+          element: ".*Big Group 2k.*"
+          direction: DOWN
+          timeout: 20000
+      - tapOn: ".*Big Group 2k.*"
+      - extendedWaitUntil:
+          visible: ".*the end of the scroll test.*"
+          timeout: 20000
+      - waitForAnimationToEnd:
+          timeout: 3000

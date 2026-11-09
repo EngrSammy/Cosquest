@@ -1,0 +1,77 @@
+# Forge drop-in proof (cq 056) 1/4, characters: pick a Forge hero as your
+# avatar. It plays idle, walk and celebrate (rigged by the Forge's rig stage),
+# then shows on the HUD chip and the map marker. Nothing in the app names it:
+# it is whatever character the server has published with role "hero".
+appId: com.dammy0227.cosquest
+name: F01 Forge avatar
+---
+- runFlow:
+    file: ../../maestro/common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: coach-away.yaml
+- extendedWaitUntil:
+    visible:
+      id: "forge-hud-chip"
+    timeout: 60000
+- takeScreenshot: f01-map-chip
+- tapOn:
+    id: "forge-hud-chip"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Forge bag"
+    timeout: 10000
+- tapOn:
+    text: "Avatar"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Wear|Take off"
+    timeout: 20000
+# Worn from an earlier run: take it off first, so wearing it is seen.
+- runFlow:
+    when:
+      visible: "Take off"
+    commands:
+      - tapOn:
+          text: "Take off"
+          waitToSettleTimeoutMs: 1500
+      - extendedWaitUntil:
+          visible: "Wear"
+          timeout: 15000
+# The model downloads (once per version) and starts its idle clip.
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 8000
+    optional: true
+- takeScreenshot: f01-avatar-idle
+- tapOn:
+    text: "Walk"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 4000
+    optional: true
+- takeScreenshot: f01-avatar-walk
+- tapOn:
+    text: "Celebrate"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 1500
+    optional: true
+- takeScreenshot: f01-avatar-celebrate
+- tapOn:
+    text: "Wear"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Take off"
+    timeout: 15000
+- takeScreenshot: f01-avatar-worn
+- tapOn:
+    text: "Close"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 3000
+    optional: true
+- takeScreenshot: f01-map-with-avatar

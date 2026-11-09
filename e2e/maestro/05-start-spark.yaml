@@ -1,0 +1,47 @@
+# J05 Start a Spark: ada long-presses a message in her sketch club, starts a
+# Spark about it, writes in it, goes back, and members see the Spark.
+appId: com.dammy0227.cosquest
+name: J05 start a Spark
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Lagos Comic Sketch Club.*" }
+- extendedWaitUntil:
+    visible: "Running 10 mins late on Saturday, save me a bench"
+    timeout: 15000
+- longPressOn: "Running 10 mins late on Saturday, save me a bench"
+- extendedWaitUntil:
+    visible: "Start a Spark"
+    timeout: 5000
+- takeScreenshot: j05-menu
+- tapOn: "Start a Spark"
+- tapOn: "e.g. Spider-Man uniform"
+- inputText: "Saturday bench plan"
+- hideKeyboard
+- tapOn: "Check for matching Sparks"
+- tapOn:
+    text: "Start a separate new Spark"
+    optional: true
+- extendedWaitUntil:
+    visible: "Saturday bench plan"
+    timeout: 15000
+- takeScreenshot: j05-spark-open
+- tapOn: "Reply to this Spark"
+- inputText: "I'll hold two benches by the window"
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "I'll hold two benches by the window"
+    timeout: 10000
+- tapOn: ".*Return to main conversation|Close"
+# Members see the Spark (as Tunde, an admin of the club).
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "tunde|sparks|Lagos Comic Sketch Club" }
+- assertTrue: ${output.peer.stdout.indexOf("Saturday bench plan") >= 0}
+- extendedWaitUntil:
+    visible: "Saturday bench plan"
+    timeout: 10000
+- takeScreenshot: j05-back-in-chat

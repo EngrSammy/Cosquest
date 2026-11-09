@@ -1,0 +1,25 @@
+# Open the chat list (Community tab, Chats pill).
+appId: com.dammy0227.cosquest
+---
+# From anywhere: back out (closing the keyboard counts as one) to the tabs.
+- repeat:
+    while:
+      notVisible: "Profile"
+    times: 6
+    commands:
+      - back
+- tapOn: "Community"
+# The list may still be scrolled down from before (task 059: a second tap on
+# the tab scrolls to the top, but not when the tab was not focused yet).
+- scrollUntilVisible:
+    element:
+      text: "Chats"
+      index: 0
+    direction: UP
+    timeout: 15000
+- tapOn:
+    text: "Chats"
+    index: 0
+- extendedWaitUntil:
+    visible: "YOUR GROUPS"
+    timeout: 15000

@@ -1,0 +1,48 @@
+# J08 Swipe between worlds: from the chats a swipe from the right edge opens
+# the game; the Chats bubble (with the unread count) brings ada back, and so
+# does the phone's back button.
+appId: com.dammy0227.cosquest
+name: J08 swipe from chat into the game and back
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: common/chats.yaml
+- takeScreenshot: j08-chats
+- runFlow: common/game.yaml
+- takeScreenshot: j08-game
+- assertVisible: "Chats, [0-9]+ unread"
+# A message arrives while ada is in the game.
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|send|ada|Are you at the fountains yet?" }
+- tapOn: "Chats.*"
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 10000
+# All chats lists every group first and shows DMs as avatars only (F-51),
+# so open Bolu's DM to read it.
+- scrollUntilVisible:
+    element: "Bolu"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Bolu"
+- extendedWaitUntil:
+    visible: ".*Are you at the fountains yet.*"
+    timeout: 10000
+- takeScreenshot: j08-back-in-chats
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 10000
+- swipe:
+    start: "98%,42%"
+    end: "20%,45%"
+    duration: 400
+- extendedWaitUntil:
+    visible: "Map of the streets around you"
+    timeout: 20000
+- back
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 10000

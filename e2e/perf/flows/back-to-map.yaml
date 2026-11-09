@@ -1,0 +1,40 @@
+# From a game screen back to the map (finish or leave).
+appId: com.dammy0227.cosquest
+---
+# A duel runs on after the measured 15 s: wait for its result. (The map's
+# label stays in the tree under a game screen, so "map visible" is not proof
+# of being back on it.)
+- extendedWaitUntil:
+    visible: "Back to the map|Nice!"
+    timeout: 60000
+    optional: true
+- tapOn:
+    text: "Back to the map"
+    optional: true
+- repeat:
+    while:
+      notVisible: "Map of the streets around you"
+    times: 8
+    commands:
+      - runFlow:
+          when:
+            visible: "Back to the map"
+          commands:
+            - tapOn: "Back to the map"
+      - runFlow:
+          when:
+            visible: "Nice!"
+          commands:
+            - tapOn: "Nice!"
+      - runFlow:
+          when:
+            visible: "Leave.*"
+            notVisible: "Back to the map"
+          commands:
+            - tapOn: "Leave.*"
+            - tapOn:
+                text: "Leave|Yes.*|Give up.*"
+                optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000
+- runFlow: ../../maestro/common/warden-later.yaml

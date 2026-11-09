@@ -1,0 +1,46 @@
+{
+  "name": "cosquest-backend",
+  "version": "1.0.0",
+  "description": "Backend for the CosQuest onboarding flow: profile creation, factions, interests, notification preferences, and bearer-token auth.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/runWithMemoryMongo.js",
+    "test:transcription": "node test/voiceTranscription.test.js",
+    "notify": "node scripts/sendNotification.js",
+    "migrate:username-signup": "node scripts/migrateUsernameSignup.js",
+    "migrate:remove-user-location": "node scripts/removeUserLocationPreferences.js",
+    "seed": "node scripts/seedHomeDashboard.js",
+    "sparks:smoke": "node scripts/sparksSmoke.js",
+    "migrate:message-seq": "node scripts/backfillMessageSeq.js"
+  },
+  "dependencies": {
+    "@cosquest/sparks-backend": "file:vendor/cosquest-sparks-backend-1.2.1.tgz",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.10",
+    "jsonwebtoken": "^9.0.2",
+    "livekit-server-sdk": "^2.19.1",
+    "mongoose": "^8.7.0",
+    "multer": "^2.0.1",
+    "nodemailer": "^10.0.12",
+    "rate-limit-redis": "^4.3.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@hpke/core": "^1.9.0",
+    "@hpke/dhkem-x25519": "^1.8.0",
+    "mongodb-memory-server": "^10.1.2",
+    "redis-memory-server": "^0.17.1",
+    "socket.io-client": "^4.8.4"
+  }
+}

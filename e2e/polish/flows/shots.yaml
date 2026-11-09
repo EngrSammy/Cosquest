@@ -1,0 +1,56 @@
+# The six key screens for docs/polish/PALETTE.md and the token "no visual
+# change" diff (task 059), plus the notification centre. Same seed, same
+# order every run. env: USER, PASS, P (a prefix for the screenshot names)
+appId: com.dammy0227.cosquest
+name: polish key screens
+---
+- runFlow:
+    file: ../../perf/flows/signin.yaml
+- extendedWaitUntil:
+    visible: "Feed post.*|Create a post"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-1-feed
+- runFlow: ../../maestro/common/chats.yaml
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-2-chats
+- scrollUntilVisible:
+    element: ".*Big Group 2k.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: ".*Big Group 2k.*"
+- extendedWaitUntil:
+    visible: ".*the end of the scroll test.*"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-3-chat
+- back
+- tapOn: "Profile"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-4-profile
+- openLink: "cosquest://notifications"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-7-notifications
+# One Back, then wait for the tabs (a second Back before they show closes the app).
+- back
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 15000
+- runFlow: ../../maestro/common/chats.yaml
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: ../../maestro/common/warden-later.yaml
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-5-map
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${P}-6-point-sheet

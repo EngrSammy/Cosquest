@@ -1,0 +1,16 @@
+diff --git a/node_modules/@cosquest/sparks-sdk/sparks-sdk.podspec b/node_modules/@cosquest/sparks-sdk/sparks-sdk.podspec
+index 0216fe1..08846fa 100644
+--- a/node_modules/@cosquest/sparks-sdk/sparks-sdk.podspec
++++ b/node_modules/@cosquest/sparks-sdk/sparks-sdk.podspec
+@@ -57,6 +57,11 @@ Pod::Spec.new do |s|
+     # against onnxruntime-c; without it transcription reports unavailable.
+     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) MOTE_RESERVE_CORES=1 SPARKS_WITH_MOONSHINE=1",
+     "HEADER_SEARCH_PATHS" => "\"$(PODS_TARGET_SRCROOT)/cpp/sparks\" \"$(PODS_TARGET_SRCROOT)/cpp/mote\" \"$(PODS_TARGET_SRCROOT)/ios/RN\"",
++    # No shared header map: another pod in the app (CostQuestGame) carries an
++    # older copy of the mote engine with the same header names (quant.h,
++    # model.h, mote_lib.h), and the Pods project's header map would hand its
++    # quant.h to sparks_engine.c. The search paths above find our own copies.
++    "USE_HEADERMAP" => "NO",
+   }
+ 
+   # Unit tests (crypto vectors, tier policy). Run from a host app with

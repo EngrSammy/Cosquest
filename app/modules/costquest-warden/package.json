@@ -1,0 +1,7 @@
+{
+  "name": "costquest-warden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Warden's on-device model (the mote engine) for the React Native game",
+  "main": "src/index.ts"
+}

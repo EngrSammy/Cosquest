@@ -1,0 +1,4 @@
+.seed.json
+.uploads/
+.peer-state.json
+*.log

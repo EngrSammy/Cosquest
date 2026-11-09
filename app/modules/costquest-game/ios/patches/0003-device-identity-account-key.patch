@@ -1,0 +1,39 @@
+--- a/Game/Net/DeviceIdentity.swift
++++ b/Game/Net/DeviceIdentity.swift
+@@ -32,6 +32,10 @@
+     private var lastNonce: Int = 0
+ 
+     private func key() throws -> Curve25519.Signing.PrivateKey {
++        // [merged-app] Signed in through CosQuest: the account's player key
++        // (Embed/AccountKey.swift, from POST /v1/sso/cosquest) wins over this
++        // phone's own, so the player follows the account across phones.
++        if let account = AccountKey.shared.privateKey { return account }
+         if let cachedKey { return cachedKey }
+         if let stored = try Self.loadFromKeychain() {
+             cachedKey = stored
+@@ -50,7 +54,9 @@
+ 
+     func nextNonce() -> Int {
+         let now = Int(Date().timeIntervalSince1970 * 1000)
+-        lastNonce = max(now, lastNonce + 1)
++        // [merged-app] An account key may have signed from another phone:
++        // start above the highest nonce the server has seen for it.
++        lastNonce = max(now, lastNonce + 1, AccountKey.shared.nonceFloor + 1)
+         return lastNonce
+     }
+ 
+@@ -75,9 +81,12 @@
+         let nonce = nextNonce()
+         let payload = Self.signingPayload(method: method, path: path,
+                                           body: body, nonce: nonce)
+-        let signature = try key().signature(for: payload)
++        // [merged-app] One key for both headers: the account key can be
++        // installed between two key() calls, and a mixed pair is a 401.
++        let signingKey = try key()
++        let signature = try signingKey.signature(for: payload)
+         return [
+-            "X-Device-Key": try publicKeyHex(),
++            "X-Device-Key": signingKey.publicKey.rawRepresentation.hexString,
+             "X-Signature": signature.hexString,
+             "X-Nonce": String(nonce),
+         ]

@@ -1,0 +1,58 @@
+# Sign in from a clean install by the fields' names (works at any screen size
+# and text size). env: USER, PASS, P (profile, for screenshot names)
+appId: com.dammy0227.cosquest
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 30000
+- takeScreenshot: ${P}-01-welcome
+- tapOn: "Continue"
+- takeScreenshot: ${P}-02-signin-options
+- tapOn: "Sign-in"
+- extendedWaitUntil:
+    visible: "Welcome back!"
+    timeout: 10000
+- tapOn:
+    id: "field-email-or-username"
+- inputText: ${USER}
+# The fit evidence: the form with the keyboard up (on a small screen before
+# the keyboard fix, the password field was under it).
+- takeScreenshot: ${P}-03-signin-keyboard
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "field-password"
+    direction: DOWN
+    timeout: 5000
+    optional: true
+- tapOn:
+    id: "field-password"
+- inputText: ${PASS}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Sign in"
+      index: 0
+    direction: DOWN
+    timeout: 5000
+    optional: true
+- tapOn:
+    text: "Sign in"
+    index: 0
+- runFlow:
+    when:
+      visible: "fetch failed.*"
+    commands:
+      - tapOn:
+          text: "Sign in"
+          index: 0
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 30000
+- tapOn:
+    text: "Got it"
+    optional: true

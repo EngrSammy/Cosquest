@@ -1,0 +1,50 @@
+# Forge 3D memory/FPS measurement (cq 056): one model (the bag), opened and
+# closed three times (does memory come back?), then a three-model scene (a
+# dressed point). e2e/forge/measure.sh samples dumpsys meminfo meanwhile.
+appId: com.dammy0227.cosquest
+name: F05 measure
+---
+- launchApp
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: coach-away.yaml
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          id: "forge-hud-chip"
+          waitToSettleTimeoutMs: 1500
+      - extendedWaitUntil:
+          visible: "Forge bag"
+          timeout: 10000
+      - tapOn:
+          text: "Avatar"
+          waitToSettleTimeoutMs: 1500
+      - extendedWaitUntil:
+          visible: "Wear|Take off"
+          timeout: 20000
+      - extendedWaitUntil:
+          visible: "never-on-screen-wait"
+          timeout: 12000
+          optional: true
+      - tapOn:
+          text: "Close"
+          waitToSettleTimeoutMs: 1500
+      - extendedWaitUntil:
+          visible: "never-on-screen-wait"
+          timeout: 6000
+          optional: true
+- openLink: "cosquest://play?shrine=XQ-trafalgar-sequence"
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- tapOn:
+    text: "Play"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Tap the shrine.*"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 20000
+    optional: true
+- takeScreenshot: f05-scene

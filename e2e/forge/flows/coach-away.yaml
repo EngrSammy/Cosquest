@@ -1,0 +1,26 @@
+# Put away the Warden's coach cards (they cover the map until answered):
+# "Got it" when there is one, else the card's own close (= Later).
+appId: com.dammy0227.cosquest
+---
+- waitForAnimationToEnd:
+    timeout: 2000
+- repeat:
+    while:
+      visible: "THE WARDEN"
+    times: 12
+    commands:
+      - runFlow:
+          when:
+            visible: "Got it"
+          commands:
+            - tapOn: "Got it"
+      - runFlow:
+          when:
+            visible: "THE WARDEN"
+            notVisible: "Got it"
+          commands:
+            - tapOn:
+                text: "Close"
+                index: 0
+      - waitForAnimationToEnd:
+          timeout: 1500

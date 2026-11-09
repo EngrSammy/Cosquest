@@ -1,0 +1,15 @@
+# The reward ceremony (one-codebase): the XP counts up, a level up shows its
+# own card ("Nice!"), then the buttons.
+appId: com.dammy0227.cosquest
+---
+- extendedWaitUntil:
+    visible: "Back to the map|Nice!"
+    timeout: 20000
+- runFlow:
+    when:
+      visible: "Nice!"
+    commands:
+      - tapOn: "Nice!"
+- extendedWaitUntil:
+    visible: "Back to the map"
+    timeout: 15000

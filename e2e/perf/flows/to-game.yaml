@@ -1,0 +1,7 @@
+# Into the game, first run and coach cards out of the way.
+appId: com.dammy0227.cosquest
+---
+# From the chat list, like journey J08.
+- runFlow: ../../maestro/common/chats.yaml
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: ../../maestro/common/warden-later.yaml

@@ -1,0 +1,27 @@
+# The Warden's coach cards (one-codebase) come up on the map after a reward,
+# one after another: "Got it" for the plain ones, "Later" for the ones whose
+# "Show me" would open something.
+appId: com.dammy0227.cosquest
+---
+- waitForAnimationToEnd:
+    timeout: 2000
+- repeat:
+    while:
+      visible: "THE WARDEN"
+    times: 15
+    commands:
+      - runFlow:
+          when:
+            visible: "Got it"
+          commands:
+            - tapOn: "Got it"
+      - runFlow:
+          when:
+            visible: "Later"
+            notVisible: "Got it"
+          commands:
+            - tapOn:
+                text: "Later"
+                index: 1
+      - waitForAnimationToEnd:
+          timeout: 2000

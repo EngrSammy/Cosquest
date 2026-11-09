@@ -1,0 +1,83 @@
+# J14 Report (task 059): a person from their profile, one of their messages
+# from its menu, and a post from the feed; each a reason, then Send.
+appId: com.dammy0227.cosquest
+name: J14 report
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+# A person
+- openLink: "cosquest://user/bo"
+- extendedWaitUntil:
+    visible: ".*Bolu Adeyemi.*"
+    timeout: 15000
+- tapOn: "More options"
+- tapOn: "Report @bo"
+- extendedWaitUntil:
+    visible: "Why are you reporting this?"
+    timeout: 10000
+- takeScreenshot: j14-reasons
+- tapOn: "Spam or scam"
+- takeScreenshot: j14-details
+- tapOn:
+    id: "report-send"
+- extendedWaitUntil:
+    visible: "Thanks for telling us"
+    timeout: 15000
+- takeScreenshot: j14-person-reported
+- tapOn: "OK"
+# A message
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "seed" }
+- evalScript: ${output.dm = output.peer.stdout.match(/dm:bo\s+([0-9a-f]{24})/)[1]}
+- openLink: "cosquest://chat/${output.dm}"
+- extendedWaitUntil:
+    visible: ".*Storm cape.*"
+    timeout: 20000
+- longPressOn: ".*Race you to it.*"
+- scrollUntilVisible:
+    element: "Report"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Report"
+- extendedWaitUntil:
+    visible: "Why are you reporting this?"
+    timeout: 10000
+- tapOn: "Bullying or harassment"
+- tapOn:
+    id: "report-send"
+- extendedWaitUntil:
+    visible: "Thanks for telling us"
+    timeout: 15000
+- takeScreenshot: j14-message-reported
+- tapOn: "OK"
+# A post
+- runFlow: common/chats.yaml
+- tapOn: "Feeds"
+- extendedWaitUntil:
+    visible: "Create a post|Feed post.*"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Post options"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Post options"
+- runFlow:
+    when:
+      visible: "Edit post"
+    commands:
+      - tapOn: "Cancel"
+      - scroll
+      - tapOn:
+          text: "Post options"
+          index: 1
+- tapOn: "Report post"
+- tapOn: "Something else"
+- tapOn:
+    id: "report-send"
+- extendedWaitUntil:
+    visible: "Thanks for telling us"
+    timeout: 15000
+- takeScreenshot: j14-post-reported
+- tapOn: "OK"

@@ -1,0 +1,147 @@
+# J06 Messaging: reply quotes, a mention, a reply, an edit, search, a poll
+# with a live vote, a photo with a caption, and a voice note played back.
+# (Recording a voice note needs a microphone; the farm's headless emulator
+# has none, so the journey plays one instead.)
+appId: com.dammy0227.cosquest
+name: J06 mentions, replies, edit, search, polls, media and voice
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+# A seeded reply in the DM with Bolu quotes ada's message (F-22: it showed
+# "Reply" / "Message").
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Bolu" }
+- extendedWaitUntil:
+    visible: ".*Deal. I'll bring the glue gun.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Deal. I'll bring the glue gun"
+    direction: UP
+    timeout: 10000
+- takeScreenshot: j06-reply-quote
+- assertNotVisible: "Reply"
+- back
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Raid Night Crew.*" }
+- extendedWaitUntil:
+    visible: "Pinned by Cyrus"
+    timeout: 15000
+# Mention
+- tapOn: "Mention people"
+- tapOn: "Cyrus Mensah"
+- tapOn: "Confirm.*"
+- assertVisible: "Cyrus Mensah will be notified"
+- inputText: "count me in, I can tank"
+- tapOn: "Send message"
+- extendedWaitUntil:
+    visible: ".*count me in, I can tank"
+    timeout: 10000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "cy|messages|Raid Night|1" }
+- assertTrue: ${output.peer.stdout.indexOf("@cy count me in") >= 0}
+- hideKeyboard
+# Reply
+- longPressOn: "Pinned the plan, scroll up"
+- tapOn: "Reply to quote"
+- assertVisible: "Replying to.*"
+- inputText: "Found it, thanks"
+- tapOn: "Send message"
+- extendedWaitUntil:
+    visible: "Found it, thanks"
+    timeout: 10000
+- hideKeyboard
+- takeScreenshot: j06-reply
+# Edit
+- longPressOn: ".*count me in, I can tank"
+- tapOn: "Edit your message"
+- assertVisible: "Edit message"
+- eraseText: 40
+- inputText: "@cy count me in, I can tank and heal"
+- tapOn: "Save edit"
+- hideKeyboard
+# The edit card shows under the message just edited, and Done closes it
+# (F-26: it used to open under every recent edit, each time).
+- extendedWaitUntil:
+    visible: ".*Changes saved.*"
+    timeout: 10000
+- tapOn: "Done"
+- assertNotVisible: ".*Changes saved.*"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "cy|messages|Raid Night|3" }
+- assertTrue: ${output.peer.stdout.indexOf("I can tank and heal") >= 0}
+- takeScreenshot: j06-edited
+# Poll, and Kofi votes while ada watches
+- tapOn: "Attach"
+- tapOn: "Poll"
+- tapOn: "e.g. Where should we meet.*"
+- inputText: "Raid time tonight?"
+- tapOn: "Option 1"
+- inputText: "8 pm"
+- tapOn: "Option 2"
+- inputText: "9 pm"
+- hideKeyboard
+- tapOn: "Send poll to group"
+- extendedWaitUntil:
+    visible: "Raid time tonight?"
+    timeout: 10000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "kofi|vote|Raid Night|last-poll|2" }
+- extendedWaitUntil:
+    visible: "1 vote"
+    timeout: 10000
+- takeScreenshot: j06-poll
+# Photo with a caption
+- tapOn: "Attach"
+- tapOn: "Photo"
+- tapOn: "Photo taken on.*"
+- tapOn: "Add a caption..."
+- inputText: "Tank build for tonight"
+- hideKeyboard
+# The send button had no name before F-25.
+- tapOn:
+    point: "91%,94%"
+- extendedWaitUntil:
+    visible: "Tank build for tonight"
+    timeout: 20000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "cy|messages|Raid Night|1" }
+- assertTrue: ${output.peer.stdout.indexOf("[image] Tank build for tonight") >= 0}
+- takeScreenshot: j06-photo
+# Search
+- tapOn: "Search in chat"
+- tapOn: "Search messages"
+- inputText: "strat"
+- extendedWaitUntil:
+    visible: "1 result"
+    timeout: 10000
+- tapOn: "Jump to message.*"
+- extendedWaitUntil:
+    visible: "In the conversation"
+    timeout: 10000
+- assertVisible: "Can someone send the strat doc again?"
+- takeScreenshot: j06-search
+# "Open the chat" goes back to this chat at the message (F-47: it pushed a
+# second copy of the chat, so one Back showed the same chat again).
+- tapOn: "Open the chat"
+- extendedWaitUntil:
+    visible: "Can someone send the strat doc again\\?"
+    timeout: 10000
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: "YOUR GROUPS"
+    timeout: 10000
+# Voice note from Tunde: it plays
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Tunde" }
+- extendedWaitUntil:
+    visible: ".*0:0[0-9].*"
+    timeout: 15000
+- takeScreenshot: j06-voice-note

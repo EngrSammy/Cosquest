@@ -1,0 +1,35 @@
+# Forge drop-in proof (cq 056) 3/4, the duel: the equipped Forge weapon is in
+# the hero's hand in the 3D fight and the server fights with its class and
+# damage; a Forge Guardian character (role "guardian") stands for the Guardian.
+# battle-3d-only: the point's Fight opens the 3D fight directly (needs
+# EXPO_PUBLIC_GAME3D_AUTOPLAY=1 for the hero to fight by itself).
+appId: com.dammy0227.cosquest
+name: F03 duel with a Forge weapon
+---
+- launchApp
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: coach-away.yaml
+- openLink: "cosquest://play?duel=XD-trafalgar-duel"
+- extendedWaitUntil:
+    visible: "Test Guardian's Post"
+    timeout: 20000
+- tapOn:
+    text: "Fight"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible:
+      id: "fight3d-card"
+    timeout: 20000
+- takeScreenshot: f03-card
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 4000
+    optional: true
+- takeScreenshot: f03-fight
+- extendedWaitUntil:
+    visible: "Back to the map"
+    timeout: 150000
+- takeScreenshot: f03-result
+- tapOn:
+    text: "Back to the map"
+    waitToSettleTimeoutMs: 1500

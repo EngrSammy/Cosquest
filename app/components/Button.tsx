@@ -1,0 +1,74 @@
+import { Pressable, StyleSheet, Text } from "react-native";
+import { C } from "@/theme/tokens";
+
+type Variant = "light" | "dark" | "brand";
+
+export function Button({
+  label,
+  onPress,
+  variant = "light",
+  prefix,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  variant?: Variant;
+  prefix?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.sso,
+        CONTAINER[variant],
+        pressed && { opacity: 0.6 },
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      {prefix ? <Text style={[styles.prefix]}>{prefix}</Text> : null}
+      <Text style={[styles.ssoLabel, LABEL[variant]]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  buttons: { marginTop: 35, gap: 14 },
+  sso: {
+    flexDirection: "row", // so prefix + label sit in a row
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 30,
+    paddingVertical: 15,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  ssoLight: { backgroundColor: "#FFFFFF" },
+  ssoDark: { backgroundColor: C.ink },
+  ssoBrand: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+  },
+
+  ssoLabel: { fontSize: 16, fontWeight: "700" },
+  labelDark: { color: C.ink },
+  labelLight: { color: "#FFFFFF" },
+  labelBrand: { color: C.brand },
+  prefix: { fontSize: 20, fontWeight: "800", color: "#4285F4" }, // Google blue
+});
+
+const CONTAINER: Record<Variant, object> = {
+  light: styles.ssoLight,
+  dark: styles.ssoDark,
+  brand: styles.ssoBrand,
+};
+const LABEL: Record<Variant, object> = {
+  light: styles.labelDark, // dark text on white
+  dark: styles.labelLight, // white text on near-black
+  brand: styles.labelDark, // white text on magenta
+};

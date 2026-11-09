@@ -1,0 +1,12 @@
+# What modules/costquest-game/ios/Game was copied from. Written by
+# scripts/sync-game-from-ios.sh; do not edit by hand.
+COSTQUEST_IOS_REPO=git@github.com:ubmids/costquest-ios.git
+COSTQUEST_IOS_SHA=94db554a0c836b6cb92a86fdcd103dca0a62e7b4
+COSTQUEST_IOS_SUBJECT=Relicdex shows Forge weapons: "From the Forge" section and a turning 3D card
+SYNCED_AT=2026-10-13T11:25:32Z
+UNITY_COMMIT=47560e40567c5a0c92df1e69706a22bab351f463
+DUEL_COMMIT=af4aa08efb221dddbaeb83a93bfe7337eb2d3ec9
+UNITY_EDITOR=6000.0.84f1
+FRAMEWORK_SHA256=2c504d9fe6ce3f9d8ef9257940fd35792ea77aa0ca345836d9c62aa1578b6d99
+RELEASE_REPO=ubmids/costquest-ios
+RELEASE_TAG=unity-fw-47560e4

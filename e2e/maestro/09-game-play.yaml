@@ -1,0 +1,79 @@
+# J09 Play the game: find a Quest Point and answer its quiz, fight a Guardian
+# duel and a boss raid, and earn XP. Points are the seeded test world at
+# Trafalgar Square (local game backend); links open them, as a chat invite does.
+# Timed taps (start, answer, strike) go through seed/phone.js: Maestro waits
+# for the screen to settle after a tap, and the quiz timer never settles.
+# battle-3d-only: every fight is the 3D fight, opened straight from the sheet
+# (no briefing, no versus card). The build needs EXPO_PUBLIC_GAME3D_AUTOPLAY=1
+# so the hero fights by itself; the server judges the fight and pays.
+appId: com.dammy0227.cosquest
+name: J09 find a point, a quiz, a duel, a raid, rewards
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: common/game.yaml
+- assertVisible: "Test Trivia Stone.*in reach"
+- takeScreenshot: j09-map
+# Tap a pin first, then follow a link: the link's point must open (F-33).
+- tapOn: "Nelson's Column.*"
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone"
+    timeout: 15000
+- assertVisible: "Play"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|quiz", BG: "true" }
+- tapOn: "Play"
+# one-codebase: the shrine wakes when tapped, then the question.
+- tapOn: "Tap the shrine.*"
+- extendedWaitUntil:
+    visible: "Collect"
+    timeout: 30000
+- takeScreenshot: j09-quiz-correct
+- tapOn: "Collect"
+- runFlow: common/reward.yaml
+- takeScreenshot: j09-quiz-reward
+- tapOn: "Back to the map"
+- runFlow: common/warden-later.yaml
+# Guardian duel
+- openLink: "cosquest://play?duel=XD-trafalgar-duel"
+- extendedWaitUntil:
+    visible: "Test Guardian's Post"
+    timeout: 15000
+- tapOn: "Fight"
+# The 3D fight's loading card (who, what kind of fight, what it is worth), then Godot.
+- extendedWaitUntil:
+    visible:
+      id: "fight3d-card"
+    timeout: 20000
+- takeScreenshot: j09-duel-card
+- extendedWaitUntil:
+    visible: "Back to the map"
+    timeout: 120000
+- takeScreenshot: j09-duel-result
+- tapOn: "Back to the map"
+- runFlow: common/warden-later.yaml
+# Boss raid (a duel boss), from the raid banner
+- tapOn: "Fight the boss: .*"
+# The boss's sheet (the banner's own button says the same, so pick the one
+# under the sheet's title): the 3D boss fight opens straight away.
+- tapOn:
+    text: "Fight the boss"
+    below:
+      text: "Test Boss \\(Duel\\)"
+- extendedWaitUntil:
+    visible: "RAID BOSS"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Back to the map"
+    timeout: 150000
+- takeScreenshot: j09-raid-result
+- tapOn: "Back to the map"
+- runFlow: common/warden-later.yaml
+# Rewards: ada is past level 1 now.
+- extendedWaitUntil:
+    visible: "You, ada, level ([2-9]|[1-9][0-9]).*"
+    timeout: 15000
+- takeScreenshot: j09-after

@@ -1,0 +1,196 @@
+import { FONTS } from "@/constants/fonts";
+import { Button } from "@/components/Button";
+import { ErrorText } from "@/components/ErrorText";
+import { Field } from "@/components/Field";
+import { OnboardingProgress } from "@/components/OnboardingProgress";
+import { Terms } from "@/components/Terms";
+import { ONBOARDING_TOTAL, STEP } from "@/constants/onboarding";
+import { useOnboarding } from "@/context/OnboardingContext";
+import { registerUser } from "@/store/thunks/authThunks";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { C } from "@/theme/tokens";
+import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
+
+export default function Signup() {
+  const styles = useThemedStyles(STYLE_PAIR);
+  const { data, update } = useOnboarding();
+
+  const dispatch = useAppDispatch();
+
+  const { loading, error } = useAppSelector((state) => state.auth);
+
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [errors, setErrors] = useState<{
+    [k: string]: string;
+  }>({});
+
+  function validate() {
+    const next: {
+      [k: string]: string;
+    } = {};
+
+    if (!data.email.trim()) {
+      next.email = "Type your email";
+    } else if (!data.email.includes("@")) {
+      next.email = "Enter a valid email";
+    }
+
+    if (!data.password.trim()) {
+      next.password = "Password is required";
+    } else if (data.password.length < 8) {
+      next.password = "Use at least 8 characters";
+    } else if (!/[A-Z]/.test(data.password)) {
+      next.password = "Add an uppercase letter";
+    } else if (!/[0-9]/.test(data.password)) {
+      next.password = "Add a number";
+    } else if (!/[^A-Za-z0-9]/.test(data.password)) {
+      next.password = "Add a special character";
+    }
+
+    if (!confirmPassword.trim()) {
+      next.confirmPassword = "Confirm your password";
+    } else if (confirmPassword !== data.password) {
+      next.confirmPassword = "Passwords do not match";
+    }
+
+    setErrors(next);
+
+    return Object.keys(next).length === 0;
+  }
+
+  async function handleSignup() {
+    if (!validate()) {
+      return;
+    }
+
+    const result = await dispatch(
+      registerUser({
+        email: data.email.trim(),
+        password: data.password,
+        confirmPassword,
+      }),
+    );
+
+    if (!registerUser.fulfilled.match(result)) {
+      return;
+    }
+
+    if (result.payload?.user?.email) {
+      update({
+        email: result.payload.user.email,
+      });
+    }
+
+    router.push("/onboarding/createProfile");
+  }
+
+  return (
+    <OnboardingScreen background="gradient" insetTop={false} topGap={0} contentStyle={styles.screen}>
+          <OnboardingProgress step={STEP.account} total={ONBOARDING_TOTAL} />
+
+          <Text style={styles.headline}>We have a space {"\n"} for you!</Text>
+
+          <Field
+            label="Email Address"
+            leftIcon="mail-outline"
+            textContentType="emailAddress"
+            autoComplete="email"
+            keyboardType="email-address"
+            value={data.email}
+            onChangeText={(t) => update({ email: t })}
+            error={errors.email}
+            autoCapitalize="none"
+          />
+
+          <Field
+            label="Password"
+            leftIcon="lock-closed-outline"
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
+            value={data.password}
+            onChangeText={(t) => update({ password: t })}
+            error={errors.password}
+          />
+
+          <Field
+            label="Confirm Password"
+            leftIcon="lock-closed-outline"
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            error={errors.confirmPassword}
+          />
+
+          <ErrorText>{error || ""}</ErrorText>
+
+          <View style={styles.buttons}>
+            <Button
+              label={loading ? "Creating account…" : "Sign up"}
+              onPress={handleSignup}
+              variant="brand"
+              disabled={loading}
+            />
+          </View>
+
+          <View style={styles.signinRow}>
+            <Text style={styles.signinText}>Already have an account? </Text>
+
+            <Pressable onPress={() => router.push("/onboarding/signin")}>
+              <Text style={styles.signinLink}>Sign in</Text>
+            </Pressable>
+          </View>
+
+          <Terms />
+        </OnboardingScreen>
+  );
+}
+
+const STYLE_PAIR = themedStyles({
+  screen: {
+    flex: 1,
+    paddingHorizontal: 25,
+  },
+
+  headline: {
+    fontFamily: FONTS.bold,
+    fontSize: 35,
+    fontWeight: "800",
+    textAlign: "center",
+    color: C.ink,
+    marginTop: 20,
+    marginBottom: 60,
+  },
+
+  buttons: {
+    marginTop: 32,
+  },
+
+  signinRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 22,
+    marginBottom: 25,
+  },
+
+  signinText: {
+    fontFamily: FONTS.regular,
+    color: "#5e5e5e",
+    fontSize: 14,
+  },
+
+  signinLink: {
+    fontFamily: FONTS.bold,
+    color: "#C5399A",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+});

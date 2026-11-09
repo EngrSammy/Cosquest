@@ -1,0 +1,12 @@
+[configuration]
+
+entry_symbol = "test_cesium_init"
+compatibility_minimum = 4.2
+
+[libraries]
+; Android: the .so files ship in the APK's jniLibs (lib/<abi>/) and are dlopen'ed by file name.
+; One release build serves both debug and release engine builds (as the plugin does on desktop).
+android.debug.x86_64 = "libGodot3DTiles.android.template_release.x86_64.so"
+android.release.x86_64 = "libGodot3DTiles.android.template_release.x86_64.so"
+android.debug.arm64 = "libGodot3DTiles.android.template_release.arm64.so"
+android.release.arm64 = "libGodot3DTiles.android.template_release.arm64.so"

@@ -1,0 +1,48 @@
+# J15 Block from anywhere (task 059): from a profile, and from a group's
+# member list (it was DMs only).
+appId: com.dammy0227.cosquest
+name: J15 block
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- openLink: "cosquest://user/zara"
+- extendedWaitUntil:
+    visible: "More options"
+    timeout: 15000
+- tapOn: "More options"
+- tapOn: "Block @zara"
+- tapOn: "Block"
+- extendedWaitUntil:
+    visible: "You blocked @zara"
+    timeout: 15000
+- takeScreenshot: j15-profile-blocked
+# From a group's members
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "seed" }
+- evalScript: ${output.grp = output.peer.stdout.match(/g:raid\s+([0-9a-f]{24})/)[1]}
+- openLink: "cosquest://chat/${output.grp}"
+- extendedWaitUntil:
+    visible: "Raid Night Crew"
+    timeout: 15000
+# The group's name in the chat header opens Group info, with its members.
+- tapOn:
+    text: "Raid Night Crew"
+    index: 0
+- extendedWaitUntil:
+    visible: "Group info"
+    timeout: 15000
+- scrollUntilVisible:
+    element: ".*Kofi.*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Kofi Boateng.*"
+- tapOn: "Block Kofi.*"
+- takeScreenshot: j15-member-confirm
+- tapOn: "Block"
+- extendedWaitUntil:
+    visible: "Blocked"
+    timeout: 15000
+- takeScreenshot: j15-member-blocked
+- tapOn: "OK"

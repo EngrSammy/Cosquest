@@ -1,0 +1,86 @@
+# J03 DMs and groups: ada reads a DM from Bolu, gets a new message live,
+# answers, then creates a private group with Bolu and Chioma and says hello.
+appId: com.dammy0227.cosquest
+name: J03 DMs and groups
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Bolu" }
+- extendedWaitUntil:
+    visible: ".*Race you to it.*"
+    timeout: 15000
+- takeScreenshot: j03-dm-open
+# Bolu writes while ada is looking.
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|send|ada|Heading out now, see you at the Shrine" }
+- extendedWaitUntil:
+    visible: ".*Heading out now, see you at the Shrine.*"
+    timeout: 15000
+- tapOn: "Message"
+- inputText: "On my way too"
+- tapOn: "Send message"
+- extendedWaitUntil:
+    visible: "On my way too"
+    timeout: 10000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|messages|ada|3" }
+- assertTrue: ${output.peer.stdout.indexOf("On my way too") >= 0}
+- takeScreenshot: j03-dm-sent
+- hideKeyboard
+- back
+# A new private group.
+- scrollUntilVisible:
+    element: "Create a group"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Create a group"
+- tapOn: "Private group"
+- tapOn: "Next.*"
+- tapOn: "e.g. Barrio Logan Ascendants"
+- inputText: "Wig Workshop"
+- tapOn: "What is this group for?"
+- inputText: "Sharing wig tips before the con"
+- hideKeyboard
+- tapOn: "Next.*add contacts"
+- tapOn: "Search by username"
+- inputText: "bo"
+- tapOn: "Bolu Adeyemi, @bo"
+- tapOn: "bo"
+- eraseText: 5
+- inputText: "chioma"
+- tapOn: "Chioma Eze, @chioma"
+- hideKeyboard
+- tapOn: "Next.*contacts selected"
+- extendedWaitUntil:
+    visible: "Set the ground rules"
+    timeout: 10000
+# The subtitle read "Private group group" (F-24).
+- assertNotVisible: "Private group group"
+- scrollUntilVisible:
+    element: "Create Wig Workshop"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Create Wig Workshop"
+- extendedWaitUntil:
+    visible: "Your group is ready"
+    timeout: 15000
+- takeScreenshot: j03-group-ready
+- tapOn: "Open group chat"
+- tapOn: "Message your group"
+- inputText: "Welcome to the wig workshop"
+- tapOn: "Send message"
+- extendedWaitUntil:
+    visible: "Welcome to the wig workshop"
+    timeout: 10000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "chioma|send|Wig Workshop|Thanks for the add!" }
+- extendedWaitUntil:
+    visible: ".*Thanks for the add!.*"
+    timeout: 15000
+- takeScreenshot: j03-group-chat

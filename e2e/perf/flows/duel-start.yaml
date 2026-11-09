@@ -1,0 +1,12 @@
+# Start a Guardian duel (the fight itself is measured by measure.py).
+appId: com.dammy0227.cosquest
+---
+- openLink: "cosquest://play?duel=XD-trafalgar-duel"
+- extendedWaitUntil:
+    visible: "Test Guardian's Post"
+    timeout: 15000
+- tapOn: "Fight"
+- extendedWaitUntil:
+    visible: "Fight"
+    timeout: 15000
+- tapOn: "Fight"

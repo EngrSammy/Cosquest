@@ -1,0 +1,7 @@
+{
+  "name": "costquest-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The CostQuest game as an Expo local module of the CosQuest app",
+  "main": "src/index.ts"
+}

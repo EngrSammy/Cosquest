@@ -1,0 +1,68 @@
+# J07 Calls with Sparks on: Bolu rings ada, she answers and turns Sparks on
+# for the call, mutes, Bolu adds Cyrus (the call becomes a group call),
+# then ada leaves. Then a voice chat in her faction room with Tunde talking.
+# The peers join LiveKit and send a tone when @livekit/rtc-node is set up
+# (e2e/seed/lkmedia.js); otherwise the call stays on "Connecting".
+appId: com.dammy0227.cosquest
+name: J07 1:1 call, group call and voice chat with Sparks on
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|call|ada|--hold|150", BG: "true" }
+- extendedWaitUntil:
+    visible: "Accept call"
+    timeout: 20000
+- assertVisible: "Bolu Adeyemi"
+- takeScreenshot: j07-incoming
+# The caption under the round button answers too (F-41).
+- tapOn:
+    text: "Accept"
+- extendedWaitUntil:
+    notVisible: "Connecting.*"
+    timeout: 20000
+# Sparks for calls: the consent card (builds with Sparks on).
+- tapOn:
+    text: "Turn on Sparks"
+    optional: true
+- takeScreenshot: j07-in-call
+- tapOn: "Mute"
+# Bolu adds Cyrus, who answers: a group call (crashed the app before F-31).
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "cy|accept-call|--wait|30|--hold|90", BG: "true" }
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|call-add|cy" }
+- extendedWaitUntil:
+    visible: "Group call.*"
+    timeout: 20000
+- takeScreenshot: j07-group-call
+- assertVisible: "Leave"
+- tapOn: "Leave"
+- extendedWaitUntil:
+    visible: "Profile|Message"
+    timeout: 15000
+# Voice chat in the faction room, Tunde joins and talks.
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Your faction room.*" }
+- tapOn: "Start or join a voice chat"
+- extendedWaitUntil:
+    visible: "Voice chat.*"
+    timeout: 20000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "tunde|voice-join|faction|--hold|60", BG: "true" }
+- extendedWaitUntil:
+    visible: "Voice chat · 2 on call.*"
+    timeout: 20000
+- takeScreenshot: j07-voice-chat
+# Sparks in a group voice chat was a "coming soon" alert (F-32); since task
+# 059 the button is hidden unless the build turns it on
+# (EXPO_PUBLIC_CALL_SPARKS): never a dead end.
+- assertNotVisible: "Sparks"
+- takeScreenshot: j07-voice-sparks
+- tapOn: "Leave"

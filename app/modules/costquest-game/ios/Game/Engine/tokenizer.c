@@ -1,0 +1,192 @@
+/* tokenizer.c — the byte-pair encoder/decoder.
+ *
+ * Load: the .bin holds a max-token-length header, then for each id a score, a
+ * length, and that many bytes of the token string. Encode: seed with single
+ * bytes (falling back to raw <0xNN> byte tokens for anything not in the vocab),
+ * then merge the best adjacent pair repeatedly. Decode: look up the string,
+ * strip the sentinel leading space after a begin-of-sequence, and expand raw
+ * byte tokens back to their byte.
+ */
+#include "tokenizer.h"
+
+#include "error.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int compare_tokens(const void *a, const void *b)
+{
+    return strcmp(((const TokenIndex *)a)->str, ((const TokenIndex *)b)->str);
+}
+
+int build_tokenizer_from_blob(Tokenizer *tk, const void *blob, size_t size,
+                              int vocab_size)
+{
+    tk->vocab_size = vocab_size;
+    /* calloc, not malloc: on a truncated file this returns early with only some
+     * entries filled, and free_tokenizer walks the whole array. NULL is what
+     * makes that walk safe. */
+    tk->vocab  = calloc((size_t)vocab_size, sizeof(char *));
+    tk->scores = calloc((size_t)vocab_size, sizeof(float));
+    tk->sorted = NULL;
+    if (!tk->vocab || !tk->scores)
+        return mote_fail("out of memory loading the tokenizer");
+    for (int i = 0; i < 256; i++) {
+        tk->byte_pieces[i * 2] = (unsigned char)i;
+        tk->byte_pieces[i * 2 + 1] = '\0';
+    }
+
+    const uint8_t *p = (const uint8_t *)blob;
+    const uint8_t *end = p + size;
+
+    if (p + sizeof(int) > end)
+        return mote_fail("tokenizer is %llu bytes, too small to hold a header",
+                         (unsigned long long)size);
+    memcpy(&tk->max_token_length, p, sizeof(int));
+    p += sizeof(int);
+
+    for (int i = 0; i < vocab_size; i++) {
+        if (p + sizeof(float) + sizeof(int) > end)
+            return mote_fail("tokenizer is truncated — ran out at token %d of %d",
+                             i, vocab_size);
+        memcpy(tk->scores + i, p, sizeof(float));
+        p += sizeof(float);
+        int len;
+        memcpy(&len, p, sizeof(int));
+        p += sizeof(int);
+        if (len < 0 || p + len > end)
+            return mote_fail("tokenizer is truncated — token %d of %d claims "
+                             "%d bytes with %lld left", i, vocab_size, len,
+                             (long long)(end - p));
+        tk->vocab[i] = malloc((size_t)len + 1);
+        if (!tk->vocab[i])
+            return mote_fail("out of memory loading the tokenizer");
+        memcpy(tk->vocab[i], p, len);
+        p += len;
+        tk->vocab[i][len] = '\0';
+    }
+    return 0;
+}
+
+int build_tokenizer(Tokenizer *tk, const char *path, int vocab_size)
+{
+    /* desktop convenience: read the file into memory, then parse the blob */
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return mote_fail("couldn't open tokenizer %s", path);
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *buf = malloc(sz > 0 ? (size_t)sz : 1);
+    if (!buf || sz < 0 || fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
+        free(buf);
+        fclose(f);
+        return mote_fail("couldn't read tokenizer %s", path);
+    }
+    fclose(f);
+    int rc = build_tokenizer_from_blob(tk, buf, (size_t)sz, vocab_size);
+    free(buf);   /* vocab strings were copied out, so the buffer is done */
+    return rc;
+}
+
+void free_tokenizer(Tokenizer *tk)
+{
+    for (int i = 0; i < tk->vocab_size; i++)
+        free(tk->vocab[i]);
+    free(tk->vocab);
+    free(tk->scores);
+    free(tk->sorted);
+}
+
+const char *decode(Tokenizer *tk, int prev_token, int token)
+{
+    const char *piece = tk->vocab[token];
+    /* the first real token after BOS carries a sentinel leading space */
+    if (prev_token == 1 && piece[0] == ' ')
+        piece++;
+    /* raw byte tokens look like "<0x0A>"; map them back to the byte */
+    unsigned char byte;
+    if (sscanf(piece, "<0x%02hhX>", &byte) == 1)
+        piece = (const char *)tk->byte_pieces + byte * 2;
+    return piece;
+}
+
+static int str_lookup(const char *str, TokenIndex *sorted, int n)
+{
+    TokenIndex key = { .str = str };
+    TokenIndex *hit = bsearch(&key, sorted, n, sizeof(TokenIndex), compare_tokens);
+    return hit ? hit->id : -1;
+}
+
+void encode(Tokenizer *tk, const char *text, int bos, int eos,
+            int *tokens, int *n_tokens)
+{
+    /* Encoding nothing is not a reason to take the process down. The one
+     * remaining exit() in this file used to live here. */
+    if (!text) { *n_tokens = 0; return; }
+
+    if (!tk->sorted) {
+        tk->sorted = malloc(tk->vocab_size * sizeof(TokenIndex));
+        for (int i = 0; i < tk->vocab_size; i++)
+            tk->sorted[i] = (TokenIndex){ .str = tk->vocab[i], .id = i };
+        qsort(tk->sorted, tk->vocab_size, sizeof(TokenIndex), compare_tokens);
+    }
+
+    /* scratch big enough for a merged pair plus a UTF-8 run */
+    char *buf = malloc(tk->max_token_length * 2 + 3);
+    size_t len = 0;
+    *n_tokens = 0;
+
+    if (bos) tokens[(*n_tokens)++] = 1;
+
+    /* Llama prepends a space to non-empty input. */
+    if (text[0] != '\0') {
+        int space = str_lookup(" ", tk->sorted, tk->vocab_size);
+        if (space != -1) tokens[(*n_tokens)++] = space;
+    }
+
+    /* first pass: one token per UTF-8 codepoint, byte-fallback if unknown */
+    for (const char *c = text; *c != '\0'; c++) {
+        if ((*c & 0xC0) != 0x80)   /* not a continuation byte: start fresh */
+            len = 0;
+        buf[len++] = *c;
+        buf[len] = '\0';
+        if ((c[1] & 0xC0) == 0x80 && len < 4)
+            continue;              /* more bytes of this codepoint to come */
+
+        int id = str_lookup(buf, tk->sorted, tk->vocab_size);
+        if (id != -1) {
+            tokens[(*n_tokens)++] = id;
+        } else {
+            for (size_t i = 0; i < len; i++)   /* +3: byte tokens live after */
+                tokens[(*n_tokens)++] = (unsigned char)buf[i] + 3;
+        }
+        len = 0;
+    }
+
+    /* merge pass: repeatedly fuse the best-scoring adjacent pair */
+    while (1) {
+        float best_score = -1e10f;
+        int best_id = -1, best_idx = -1;
+        for (int i = 0; i < *n_tokens - 1; i++) {
+            snprintf(buf, tk->max_token_length * 2 + 3, "%s%s",
+                     tk->vocab[tokens[i]], tk->vocab[tokens[i + 1]]);
+            int id = str_lookup(buf, tk->sorted, tk->vocab_size);
+            if (id != -1 && tk->scores[id] > best_score) {
+                best_score = tk->scores[id];
+                best_id = id;
+                best_idx = i;
+            }
+        }
+        if (best_idx == -1) break;
+        tokens[best_idx] = best_id;
+        for (int i = best_idx + 1; i < *n_tokens - 1; i++)
+            tokens[i] = tokens[i + 1];
+        (*n_tokens)--;
+    }
+
+    if (eos) tokens[(*n_tokens)++] = 2;
+    free(buf);
+}

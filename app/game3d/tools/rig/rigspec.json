@@ -1,0 +1,135 @@
+{
+ "_doc": "Per character inputs for fix_rig.py (cq 014): leg radii (m) for telling legs from robe, the skirt/coat chains (count around the hips, bones each, lowest hem height) and the wing chains (how far behind the spine line a point must be). See docs/game3d/RIGS.md.",
+ "elvis": {
+  "r_thigh": 0.1,
+  "r_ankle": 0.065,
+  "r_arm": 0.08,
+  "waist_above": 0.04,
+  "left_sign": 1,
+  "skirt": {
+   "chains": 6,
+   "bones": 3,
+   "hem_min_y": 0.28,
+   "leg_margin": 0.02,
+   "prefix": "Robe",
+   "group": "robe",
+   "shrink": 0.9,
+   "free_margin": 0.06
+  },
+  "wings": {
+   "back": 0.1,
+   "min_y": 0.3,
+   "root": "Spine2",
+   "bones": 3,
+   "prefix": "Wing",
+   "group": "wing"
+  },
+  "smooth_iters": 10,
+  "smooth_alpha": 0.5,
+  "recentre": {
+   "hip_half_width": 0.1
+  },
+  "seed_k": 0.9,
+  "fill_iters": 300,
+  "upper_band": 0.06,
+  "leg_power": 2,
+  "armpit_band": [
+   0.045,
+   0.15
+  ]
+ },
+ "crystalz": {
+  "r_thigh": 0.1,
+  "r_ankle": 0.065,
+  "r_arm": 0.08,
+  "waist_above": 0.04,
+  "left_sign": 1,
+  "skirt": {
+   "chains": 8,
+   "bones": 3,
+   "hem_min_y": 0.22,
+   "leg_margin": 0.02,
+   "prefix": "Coat",
+   "group": "coat",
+   "shrink": 0.9,
+   "free_margin": 0.06
+  },
+  "smooth_iters": 10,
+  "smooth_alpha": 0.5,
+  "recentre": {
+   "hip_half_width": 0.1,
+   "arm_ratio": [
+    0.0,
+    99.0
+   ]
+  },
+  "seed_k": 0.9,
+  "fill_iters": 300,
+  "upper_band": 0.06,
+  "leg_power": 2,
+  "armpit_band": [
+   0.04,
+   0.2
+  ]
+ },
+ "hoof": {
+  "r_thigh": 0.09,
+  "r_ankle": 0.06,
+  "r_arm": 0.08,
+  "waist_above": 0.04,
+  "left_sign": 1,
+  "leg_power": 2,
+  "skirt": {
+   "chains": 8,
+   "bones": 3,
+   "hem_min_y": 0.15,
+   "leg_margin": 0.02,
+   "prefix": "Skirt",
+   "group": "skirt",
+   "shrink": 0.9,
+   "free_margin": 0.06
+  },
+  "armpit_band": [
+   0.045,
+   0.15
+  ],
+  "seed_k": 0.9,
+  "fill_iters": 300,
+  "smooth_iters": 10,
+  "upper_band": 0.06
+ },
+ "bobo": {
+  "r_thigh": 0.11,
+  "r_ankle": 0.07,
+  "r_arm": 0.08,
+  "waist_above": 0.04,
+  "left_sign": 1,
+  "leg_power": 2,
+  "armpit_band": [
+   0.045,
+   0.15
+  ],
+  "seed_k": 0.9,
+  "fill_iters": 300,
+  "smooth_iters": 10,
+  "upper_band": 0.06,
+  "neck_band": 0.12
+ },
+ "armstrong": {
+  "r_thigh": 0.11,
+  "r_ankle": 0.07,
+  "r_arm": 0.08,
+  "waist_above": 0.04,
+  "left_sign": 1,
+  "leg_power": 2,
+  "armpit_band": [
+   0.045,
+   0.15
+  ],
+  "seed_k": 0.9,
+  "fill_iters": 300,
+  "smooth_iters": 10,
+  "upper_band": 0.06,
+  "neck_band": 0.12
+ }
+}

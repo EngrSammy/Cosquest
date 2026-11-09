@@ -1,0 +1,131 @@
+{
+  "expo": {
+    "name": "cosquest",
+    "slug": "cosquest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/cosquest-logo.png",
+    "scheme": "cosquest",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dammy0227.cosquest",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bitcode": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ],
+      "package": "com.dammy0227.cosquest",
+      "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/cosquest-logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "./modules/costquest-game/plugin/withCostQuestGame",
+        {
+          "nfc": false,
+          "serverUrl": "",
+          "unityAndroid": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/cosquest-logo.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#C5399A",
+          "dark": {
+            "image": "./assets/images/cosquest-logo.png",
+            "backgroundColor": "#191922"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CosQuest needs access to your photos so you can set a profile picture.",
+          "cameraPermission": "CosQuest needs access to your camera so you can take a profile picture."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/poppins/400Regular/Poppins_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/poppins/500Medium/Poppins_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/poppins/600SemiBold/Poppins_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/poppins/700Bold/Poppins_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/poppins/800ExtraBold/Poppins_800ExtraBold.ttf"
+          ]
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser",
+      "expo-video",
+      "expo-audio",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "ndkVersion": "27.1.12297006"
+          },
+          "ios": {
+            "deploymentTarget": "18.0"
+          }
+        }
+      ],
+      "expo-asset",
+      "./plugins/withSceneLifecycle",
+      "./plugins/withGodot",
+      [
+        "expo-notifications",
+        {
+          "color": "#C34D9C",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4cb596a0-3a90-4c2d-b8f7-2e090efcd80f"
+      }
+    }
+  }
+}

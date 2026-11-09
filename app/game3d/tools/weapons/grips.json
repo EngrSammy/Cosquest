@@ -1,0 +1,12 @@
+{
+  "_doc": "Hand pose per weapon class (hand-tuned against close-up renders). tip = where the weapon's +Y (blade, haft, barrel) points, edge = where its +Z (edge, head, top, shield face) points, offset = grip shift in metres; all as mixes of the hand's directions f (forward), u (up the forearm), o (away from the body) and w (world up). See features/game3d/attach.ts.",
+  "sword": {"hand": "r", "tip": {"f": 0.9, "u": 0.45}, "edge": {"u": -1.0}, "note": "one-handed blade held forward and a little raised, edge down"},
+  "greatsword": {"hand": "r", "tip": {"f": 0.55, "u": 0.85}, "edge": {"f": 1.0}, "note": "two-handed blade raised in front, edge forward"},
+  "dagger": {"hand": "r", "tip": {"f": 0.75, "o": 0.45, "u": 0.3}, "edge": {"u": -1.0}, "note": "short blade forward and a little out, so a front-on card shows it"},
+  "axe": {"hand": "r", "tip": {"f": 0.55, "u": 0.75, "o": 0.3}, "edge": {"o": 1.0, "f": 0.35}, "note": "haft forward and up, away from the body, head turned out so the blade shows its profile from the front"},
+  "hammer": {"hand": "r", "tip": {"u": 0.9, "f": 0.35, "o": 0.1}, "edge": {"f": 1.0}, "note": "haft up the arm towards the shoulder, face forward"},
+  "staff": {"hand": "r", "tip": {"w": 1.0, "f": 0.15}, "edge": {"f": 1.0}, "note": "upright beside the body, top slightly forward"},
+  "crossbow": {"hand": "r", "tip": {"f": 1.0}, "edge": {"w": 1.0}, "note": "bolt forward, top up, held low"},
+  "rifle": {"hand": "r", "tip": {"f": 0.6, "o": 0.3, "w": -0.75}, "edge": {"w": 1.0}, "note": "low ready: barrel forward, out and down, clear of the leg and seen side-on in a front preview; top up, hand on the pistol grip"},
+  "shield": {"hand": "l", "tip": {"w": 1.0}, "edge": {"o": 1.0, "f": 0.6}, "offset": {"o": 0.05}, "note": "left forearm, face out and forward"}
+}

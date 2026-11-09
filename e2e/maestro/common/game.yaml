@@ -1,0 +1,80 @@
+# Swipe from the chats into the game; the first time, go through the Warden's
+# first-run conversation (one-codebase): the name, a side, the gift, location.
+appId: com.dammy0227.cosquest
+---
+- repeat:
+    while:
+      notVisible: "Profile"
+    times: 6
+    commands:
+      - back
+# From the edge handle (98%, 42%): it sits in the app's gesture-exclusion
+# strip, so with gesture navigation this is not the system Back gesture, and
+# it starts on no chat row (a swipe that starts on a row can open it).
+- swipe:
+    start: "98%,42%"
+    end: "20%,45%"
+    duration: 400
+# A swipe Maestro sends does not always take on the tall screen; the edge
+# handle opens the game too.
+- waitForAnimationToEnd:
+    timeout: 2000
+- runFlow:
+    when:
+      visible: "Open the game"
+    commands:
+      - tapOn: "Open the game"
+- extendedWaitUntil:
+    visible: "That's me|Your name|Choose your side|Map of the streets around you|Continue"
+    timeout: 60000
+- repeat:
+    while:
+      notVisible: "Map of the streets around you"
+    times: 25
+    commands:
+      # The name field submits on Enter. (hideKeyboard is Back when no
+      # keyboard is up, which leaves the game.) The button if still there.
+      - runFlow:
+          when:
+            visible: "That's me"
+          commands:
+            - pressKey: Enter
+            - waitForAnimationToEnd:
+                timeout: 1500
+            - runFlow:
+                when:
+                  visible: "That's me"
+                commands:
+                  - tapOn: "That's me"
+      - runFlow:
+          when:
+            visible: "Anime"
+          commands:
+            - tapOn: "Anime"
+            - tapOn: "Stand with Anime.*"
+      - runFlow:
+          when:
+            visible: "Show me what's near"
+          commands:
+            - tapOn: "Show me what's near"
+      # The older first run (merged-app-sync): pick a side.
+      - runFlow:
+          when:
+            visible: "Choose your side"
+          commands:
+            - tapOn: "Anime.*"
+            - scrollUntilVisible:
+                element: "Let's go"
+                direction: DOWN
+            - tapOn: "Let's go"
+      - runFlow:
+          when:
+            visible: "Continue"
+            notVisible: "That's me|Show me what's near|Anime"
+          commands:
+            - tapOn: "Continue"
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible: "Map of the streets around you"
+    timeout: 60000

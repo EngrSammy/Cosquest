@@ -1,0 +1,57 @@
+# J17 Push tap routing (task 059, local notifications shaped like the
+# backend's pushes): a message push opens its chat, a follow push the
+# person, a game push the game.
+appId: com.dammy0227.cosquest
+name: J17 push tap routing
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "seed" }
+- evalScript: ${output.dm = output.peer.stdout.match(/dm:bo\s+([0-9a-f]{24})/)[1]}
+# A message
+- openLink: "cosquest://dev/push-test?type=message&conversationId=${output.dm}&title=bo&body=Push%20test%20from%20bo"
+- tapOn: "Profile"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|shade" }
+- extendedWaitUntil:
+    visible: "Push test from bo"
+    timeout: 20000
+- takeScreenshot: j17-shade
+- tapOn: "Push test from bo"
+- extendedWaitUntil:
+    visible: ".*Storm cape.*"
+    timeout: 20000
+- takeScreenshot: j17-chat
+- runFlow: common/chats.yaml
+# A follow
+- openLink: "cosquest://dev/push-test?type=follow&username=lena&title=New%20follower&body=lena%20started%20following%20you"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|shade" }
+- extendedWaitUntil:
+    visible: "lena started following you"
+    timeout: 20000
+- tapOn: "lena started following you"
+- extendedWaitUntil:
+    visible: "More options"
+    timeout: 20000
+- assertVisible: ".*@lena.*"
+- takeScreenshot: j17-person
+- runFlow: common/chats.yaml
+# A game event
+- openLink: "cosquest://dev/push-test?type=game&link=cosquest%3A%2F%2Fplay%3Fshrine%3DXQ-trafalgar-trivia&body=A%20shrine%20is%20glowing%20nearby"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|shade" }
+- extendedWaitUntil:
+    visible: "A shrine is glowing nearby"
+    timeout: 20000
+- tapOn: "A shrine is glowing nearby"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone|Choose your side|That's me|Your name|Continue"
+    timeout: 60000
+- takeScreenshot: j17-game

@@ -1,0 +1,43 @@
+# J16 Offline send (task 059): the phone loses its network, the banner says
+# so, a message waits ("Waiting for network"), and goes out when the network
+# is back.
+appId: com.dammy0227.cosquest
+name: J16 offline send
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "seed" }
+- evalScript: ${output.dm = output.peer.stdout.match(/dm:bo\s+([0-9a-f]{24})/)[1]}
+- openLink: "cosquest://chat/${output.dm}"
+- extendedWaitUntil:
+    visible: ".*Storm cape.*"
+    timeout: 20000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|net|off" }
+- extendedWaitUntil:
+    visible: "You're offline.*"
+    timeout: 30000
+- takeScreenshot: j16-offline
+- tapOn: "Message.*|Type a message.*"
+- inputText: "Sent from the tube"
+- tapOn: "Send message"
+- extendedWaitUntil:
+    visible: "Waiting for network"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: ".*1 message will send.*"
+    timeout: 10000
+- takeScreenshot: j16-queued
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|net|on" }
+- extendedWaitUntil:
+    notVisible: "Waiting for network"
+    timeout: 60000
+- assertNotVisible: "You're offline.*"
+- assertVisible: "Sent from the tube"
+- takeScreenshot: j16-sent

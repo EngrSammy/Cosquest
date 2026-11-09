@@ -1,0 +1,6 @@
+# The map, ready for an adb driver: app up, game page, coach cards away.
+appId: com.dammy0227.cosquest
+---
+- launchApp
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: ../flows/coach-away.yaml

@@ -1,0 +1,6 @@
+# Godot editor cache and exported packs
+.godot/
+*.pck
+*.zip
+/export/
+/build/

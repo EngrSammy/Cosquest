@@ -1,0 +1,6 @@
+{
+  "name": "cosquest-expo-chat-integration",
+  "private": true,
+  "type": "module",
+  "description": "Copy these helpers into the existing Expo app; this folder is not a standalone app."
+}

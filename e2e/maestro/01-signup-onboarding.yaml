@@ -1,0 +1,126 @@
+# J01 Sign up and onboarding: a new person makes an account, a profile,
+# a picture, interests, a faction, permissions, and lands in the app.
+appId: com.dammy0227.cosquest
+name: J01 sign up and onboarding
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- evalScript: ${output.n = String(Date.now()).slice(-6)}
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 30000
+- tapOn: "Continue"
+# Apple did nothing at all (F-50), then said "Coming soon"; since task 059 it
+# is hidden unless the build turns it on (EXPO_PUBLIC_APPLE_SIGNIN): never a
+# dead button.
+- assertNotVisible: "Sign up with Apple"
+- tapOn: "Sign up with email"
+- extendedWaitUntil:
+    visible: "We have a space.*"
+    timeout: 10000
+- tapOn:
+    point: "50%,31%"
+- inputText: "nia${output.n}@example.test"
+- tapOn:
+    point: "45%,43%"
+- inputText: "Cosquest-dev-1!"
+- tapOn:
+    point: "45%,55%"
+- inputText: "Cosquest-dev-1!"
+- hideKeyboard
+- tapOn: "Sign up"
+- extendedWaitUntil:
+    visible: "Create Your Profile"
+    timeout: 15000
+- takeScreenshot: j01-profile
+- tapOn:
+    point: "27%,31%"
+- inputText: "Nia"
+- tapOn:
+    point: "73%,31%"
+- inputText: "Okafor"
+- tapOn:
+    point: "50%,42%"
+- inputText: "nia${output.n}"
+- tapOn:
+    point: "20%,54%"
+- inputText: "24"
+- hideKeyboard
+- tapOn: "Female"
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "Upload Profile Picture"
+    timeout: 15000
+- tapOn: "Choose from camera roll"
+- tapOn: "Photo taken on.*"
+- tapOn:
+    text: "CROP"
+    optional: true
+- extendedWaitUntil:
+    visible: "Pink Idol"
+    timeout: 10000
+- tapOn: "Pink Idol"
+# Continue is pinned under the 100 avatars (F-06): no scrolling to reach it.
+- assertVisible: "Continue"
+- tapOn: "Continue"
+- takeScreenshot: j01-after-picture
+# Interests
+- extendedWaitUntil:
+    visible: "Comics"
+    timeout: 15000
+- tapOn: "Comics"
+- tapOn: "Video Games"
+- scrollUntilVisible:
+    element: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+# Permissions: location is required. The toggles had no labels (F-12),
+# so tap where they sit.
+- extendedWaitUntil:
+    visible: "Find CosQuests.*"
+    timeout: 15000
+- tapOn:
+    point: "84%,66%"
+- extendedWaitUntil:
+    notVisible: "Getting your location.*"
+    timeout: 30000
+- takeScreenshot: j01-permissions
+- scrollUntilVisible:
+    element: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+# Faction: the consent modal comes up after 2 s.
+- extendedWaitUntil:
+    visible: "Got it.*"
+    timeout: 15000
+- tapOn: "Got it.*"
+- tapOn: "Continue"
+# Fantasy Fans is Everborn, the one the backend refused before F-13.
+- tapOn: "Fantasy Fans"
+- tapOn: "Join Faction"
+- scrollUntilVisible:
+    element: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "COSQUEST"
+    timeout: 15000
+- takeScreenshot: j01-welcome
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "Welcome to CosQuest!"
+    timeout: 20000
+- tapOn: "CONTINUE"
+- extendedWaitUntil:
+    visible: "Got it"
+    timeout: 20000
+- takeScreenshot: j01-landed
+- tapOn: "Got it"
+# Lands somewhere real, not the Expo starter page (F-02).
+- assertNotVisible: "Edit app/.*"
+- assertVisible: "Community"

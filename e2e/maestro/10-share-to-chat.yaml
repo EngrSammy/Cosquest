@@ -1,0 +1,65 @@
+# J10 Game into chat: from a Quest Point ada invites Raid Night Crew ("meet
+# me here" card), plays the quiz and shares the result with Bolu, then goes
+# back to the chats and sees both; Bolu got the result.
+appId: com.dammy0227.cosquest
+name: J10 share a game result and an invite into a chat
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: common/game.yaml
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone"
+    timeout: 15000
+# Invite a chat to the point
+- tapOn: "Invite a chat to Test Trivia Stone"
+- extendedWaitUntil:
+    visible: "Invite to a chat"
+    timeout: 10000
+- tapOn: "Add a message.*"
+- inputText: "Quiz stone by the fountains, come"
+- hideKeyboard
+- tapOn: "Send to Raid Night Crew"
+- extendedWaitUntil:
+    notVisible: "Invite to a chat"
+    timeout: 15000
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "cy|messages|Raid Night|1" }
+- assertTrue: ${output.peer.stdout.indexOf("game_invite") >= 0}
+# Play, then share the result (F-34: there was no way to)
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "phone|quiz", BG: "true" }
+- tapOn: "Play"
+- tapOn: "Tap the shrine.*"
+- extendedWaitUntil:
+    visible: "Collect"
+    timeout: 30000
+- tapOn: "Collect"
+- runFlow: common/reward.yaml
+- tapOn: "Share to a chat"
+- extendedWaitUntil:
+    visible: ".*Point taken at Test Trivia Stone.*"
+    timeout: 10000
+- takeScreenshot: j10-share-sheet
+- tapOn: "Search chats"
+- inputText: "Bolu"
+- hideKeyboard
+- tapOn: "Send to Bolu.*"
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "bo|messages|ada|1" }
+- assertTrue: ${output.peer.stdout.indexOf("Point taken at Test Trivia Stone") >= 0}
+- tapOn: "Back to the map"
+- runFlow: common/warden-later.yaml
+# Back in the chats: the invite card in Raid Night Crew
+- tapOn: "Chats.*"
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Raid Night Crew.*" }
+- extendedWaitUntil:
+    visible: "Meet at the shrine|.*Test Trivia Stone.*"
+    timeout: 15000
+- takeScreenshot: j10-invite-card

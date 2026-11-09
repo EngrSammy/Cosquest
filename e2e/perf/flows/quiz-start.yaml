@@ -1,0 +1,12 @@
+# Open a quiz and leave its clock running (measured by measure.py).
+appId: com.dammy0227.cosquest
+---
+- openLink: "cosquest://play?shrine=XQ-trafalgar-blitz"
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 15000
+- tapOn: "Play"
+- tapOn: "Tap the shrine.*"
+- extendedWaitUntil:
+    visible: ".*seconds left"
+    timeout: 15000

@@ -1,0 +1,61 @@
+# J13 Delete account (task 059, App Store 5.1.1(v)): Settings > Account
+# Information > Delete account, the password, the confirm; signed out to the
+# welcome screen, and the old login no longer works.
+appId: com.dammy0227.cosquest
+name: J13 delete account
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- tapOn: "Profile"
+- tapOn: "Settings"
+- tapOn: "Account Information"
+- scrollUntilVisible:
+    element:
+      id: "delete-account-row"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: j13-account
+- tapOn:
+    id: "delete-account-row"
+- extendedWaitUntil:
+    visible: "Deleting your account removes:"
+    timeout: 10000
+- takeScreenshot: j13-delete-screen
+- tapOn:
+    id: "delete-password"
+- inputText: cosquest-dev-1
+- pressKey: Enter
+- tapOn:
+    id: "delete-account-confirm"
+- extendedWaitUntil:
+    visible: "Delete your account?"
+    timeout: 5000
+- takeScreenshot: j13-confirm
+- tapOn: "Delete"
+- extendedWaitUntil:
+    visible: "Account deleted"
+    timeout: 20000
+- takeScreenshot: j13-deleted
+- tapOn: "OK"
+# The old login is gone.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 15000
+- tapOn: "Continue"
+- tapOn: "Sign-in"
+- tapOn:
+    point: "50%,42%"
+- inputText: ada
+- tapOn:
+    point: "50%,54%"
+- inputText: cosquest-dev-1
+- hideKeyboard
+- tapOn:
+    text: "Sign in"
+    index: 0
+- extendedWaitUntil:
+    notVisible: "Profile"
+    timeout: 8000
+- assertNotVisible: "Profile"
+- takeScreenshot: j13-cannot-sign-in

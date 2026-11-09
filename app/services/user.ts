@@ -1,0 +1,358 @@
+import { appendFileToFormData } from "@/utils/appendFileToFormData";
+import { apiRequest } from "./api";
+import { fetchJson, isNetworkFailure, OFFLINE_MESSAGE, UPLOAD_TIMEOUT_MS } from "./networkError";
+import { signupToken } from "./signupSession";
+
+export type ProfileCategory = {
+  key: string;
+  name: string;
+};
+
+export type UserProfile = {
+  email: string;
+
+  profile?: {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    age?: number | null;
+    gender?: string;
+    bio?: string;
+    category?: string | null;
+    showCategoryOnProfile?: boolean;
+    avatarKey?: string;
+    avatarPhotoUrl?: string | null;
+  };
+
+  contact?: {
+    email?: string;
+    phone?: string;
+    businessAddress?: string;
+  };
+
+  preferences?: {
+    notificationsEnabled?: boolean;
+    locationEnabled?: boolean;
+    radiusMiles?: number;
+  };
+
+  location?: {
+    lat?: number | null;
+    lng?: number | null;
+    updatedAt?: string | null;
+  };
+
+  faction?: string;
+  interests?: string[];
+  pointsBalance?: number;
+  onboardingComplete?: boolean;
+};
+
+// ============================================
+// CURRENT USER
+// ============================================
+
+// The backend identifies the caller by the session token only. `email` is
+// kept in the signature for existing callers but is not sent.
+export async function getCurrentUser(_email: string, token?: string) {
+  return apiRequest<any>(
+    "/api/users/me",
+    token ? { token } : {},
+  ).then((response) => response?.user || response);
+}
+
+// ============================================
+// USERNAME
+// ============================================
+
+// Public check. With the session token the backend treats your own current
+// username as available; `email` is no longer sent.
+export async function checkUsername(
+  username: string,
+  _email?: string,
+  token?: string,
+) {
+  return apiRequest(
+    `/api/users/check-username?username=${encodeURIComponent(username)}`,
+    token ? { token } : {},
+  );
+}
+
+// ============================================
+// PROFILE
+// ============================================
+
+export async function updateProfile(
+  data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    age: number;
+    gender: string;
+    bio?: string;
+  },
+  token?: string,
+) {
+  return apiRequest<any>("/api/users/me/profile", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// PROFILE CATEGORIES
+// ============================================
+
+export async function getProfileCategories() {
+  return apiRequest<{
+    categories: ProfileCategory[];
+  }>("/api/meta/profile-categories");
+}
+
+export async function updateCategory(
+  data: {
+    email: string;
+    category: string;
+    showCategoryOnProfile: boolean;
+  },
+  token?: string,
+) {
+  return apiRequest<any>("/api/users/me/profile", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// AVATAR
+// ============================================
+
+export async function updateAvatar(
+  data: {
+    email: string;
+    avatar: string;
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/avatar", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// FACTION
+// ============================================
+
+export async function updateFaction(
+  data: {
+    email: string;
+    factionKey: string;
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/faction", {
+    method: "POST",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// INTERESTS
+// ============================================
+
+export async function updateInterests(
+  data: {
+    email: string;
+    interests: string[];
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/interests", {
+    method: "PUT",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+export async function updateNotificationPreference(
+  data: {
+    email: string;
+    notificationsEnabled: boolean;
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/preferences/notifications", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// LOCATION
+// ============================================
+
+export async function updateLocationPreference(
+  data: {
+    email: string;
+    locationEnabled: boolean;
+    radiusMiles: number;
+    lat: number;
+    lng: number;
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/preferences/location", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// CONTACT
+// ============================================
+
+export async function getContact(token?: string) {
+  return apiRequest<{
+    contact: {
+      email: string;
+      phone: string;
+      businessAddress: string;
+    };
+  }>("/api/users/me/contact", {
+    ...(token ? { token } : {}),
+  });
+}
+
+export async function updateContact(
+  token: string | undefined,
+  data: {
+    email: string;
+    phone: string;
+    businessAddress: string;
+  },
+) {
+  console.log("=================================");
+  console.log("UPDATE CONTACT");
+  console.log("HAS AUTH TOKEN:", Boolean(token));
+  console.log("CONTACT DATA:", data);
+  console.log("=================================");
+
+  return apiRequest<{
+    contact: {
+      email: string;
+      phone: string;
+      businessAddress: string;
+    };
+  }>("/api/users/me/contact", {
+    method: "PATCH",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// DEVICE
+// ============================================
+
+export async function registerDevice(
+  data: {
+    email: string;
+    pushToken: string;
+    platform: string;
+  },
+  token?: string,
+) {
+  return apiRequest("/api/users/me/devices", {
+    method: "POST",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// COMPLETE ONBOARDING
+// ============================================
+
+export async function completeOnboarding(data: unknown, token?: string) {
+  return apiRequest("/api/users/me/onboarding/complete", {
+    method: "POST",
+    body: data,
+    ...(token ? { token } : {}),
+  });
+}
+
+// ============================================
+// POINTS
+// ============================================
+
+export async function getPoints(token: string) {
+  return apiRequest("/api/users/me/points", {
+    token,
+  });
+}
+
+// ============================================
+// AVATAR PHOTO
+// ============================================
+
+export async function uploadAvatarPhoto(
+  email: string,
+  photoUri: string,
+  token?: string,
+) {
+  const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+  if (!BASE_URL) {
+    throw new Error("EXPO_PUBLIC_API_URL is not configured");
+  }
+
+  if (!photoUri) {
+    throw new Error("Photo URI is required.");
+  }
+
+  const formData = new FormData();
+
+  await appendFileToFormData(formData, "photo", {
+    uri: photoUri,
+    name: "profile-photo.jpg",
+    type: "image/jpeg",
+  });
+
+  const headers: Record<string, string> = {};
+
+  // Do NOT set Content-Type here.
+  // fetch will create the multipart boundary automatically.
+  // During onboarding: the sign-up token (services/signupSession.ts).
+  const bearer = token || signupToken();
+  if (bearer) {
+    headers.Authorization = `Bearer ${bearer}`;
+  }
+
+  const { response, data } = await fetchJson(
+    `${BASE_URL}/api/users/me/avatar/photo`,
+    { method: "POST", headers, body: formData },
+    UPLOAD_TIMEOUT_MS,
+  ).catch((error) => {
+    throw isNetworkFailure(error) ? new Error(OFFLINE_MESSAGE) : error;
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message || data?.error || "Failed to upload profile photo.",
+    );
+  }
+
+  return data;
+}

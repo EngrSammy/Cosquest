@@ -1,0 +1,3452 @@
+{
+  "info": {
+    "name": "CosQuest Backend API",
+    "description": "CosQuest API. Run Signup (me), save its token automatically, then complete onboarding. The same token enters the app without another login. Community, Spotlight, and Settings additions are in their own folder; see COMMUNITY_SETTINGS_API.md for bodies and behavior. Media fields require choosing a local file.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:6893"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "postId",
+      "value": ""
+    },
+    {
+      "key": "commentId",
+      "value": ""
+    },
+    {
+      "key": "replyCommentId",
+      "value": ""
+    },
+    {
+      "key": "questId",
+      "value": ""
+    },
+    {
+      "key": "communityConversationId",
+      "value": ""
+    },
+    {
+      "key": "factionConversationId",
+      "value": ""
+    },
+    {
+      "key": "dmConversationId",
+      "value": ""
+    },
+    {
+      "key": "messageId",
+      "value": ""
+    },
+    {
+      "key": "forwardedMessageId",
+      "value": ""
+    },
+    {
+      "key": "oauthCode",
+      "value": ""
+    },
+    {
+      "key": "secondMessageId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup (me)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"hero@example.com\",\n  \"password\": \"Quest@1234\",\n  \"confirmPassword\": \"Quest@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates the account and signs in immediately. Save token and use it through onboarding. Resume requires the existing password; completed accounts return 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.token) pm.collectionVariables.set('accessToken', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup (buddy - a second account for follow/DM testing)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"buddy@example.com\",\n  \"password\": \"Quest@1234\",\n  \"confirmPassword\": \"Quest@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "A second account so Follow/DM/Like-from-another-user requests below have someone to target."
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"hero@example.com\",\n  \"password\": \"Quest@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Succeeds with any correct password, even mid-onboarding - check the response’s onboardingRequired to see whether to continue onboarding or use the main app (requireCompletedOnboarding still blocks every real feature until it’s actually finished). On success, automatically saves {{accessToken}} - every other request in this collection inherits it via collection-level Bearer auth, so you never paste a token manually."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.token) pm.collectionVariables.set('accessToken', json.token);",
+                  "  pm.test('token captured', () => pm.expect(json.token).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('login failed - did you run Signup (me) + Complete onboarding (me) first?', () => pm.expect.fail(pm.response.text()));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidates every token issued for this account. Run Login again afterward to keep testing."
+          }
+        },
+        {
+          "name": "OAuth - Google (browser redirect, reference only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "oauth",
+                "google"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Not runnable from Postman - this redirects a real browser to Google’s consent screen. Kept here for reference only."
+          }
+        },
+        {
+          "name": "OAuth - Apple (browser redirect, reference only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/apple",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "oauth",
+                "apple"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Not runnable from Postman - this redirects a real browser to Apple’s consent screen. Kept here for reference only."
+          }
+        },
+        {
+          "name": "OAuth - exchange completion code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/exchange",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "oauth",
+                "exchange"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oauthCode\": \"{{oauthCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "The one field in this whole collection that can’t be a real literal value: oauthCode only exists after a real Google/Apple redirect completes. Paste a real one into the {{oauthCode}} collection variable if you have one - otherwise this request is for reference only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reference data (public)",
+      "item": [
+        {
+          "name": "List avatars",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meta/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meta",
+                "avatars"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List profile categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meta/profile-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meta",
+                "profile-categories"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List factions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/factions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "factions"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Each faction includes a static description/perks list plus live memberCount (onboarded accounts currently in that faction) and activeQuestCount (published live/upcoming quests tagged to it - a label only, never a registration restriction; genuinely 0 until a real quest is tagged, since there’s no quest-creation API yet)."
+          }
+        },
+        {
+          "name": "Get faction members (ascendants)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/factions/ascendants/members?page=1&limit=6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "factions",
+                "ascendants",
+                "members"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "6",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "A small preview page of that faction’s onboarded members, e.g. the avatar row on a faction card. 404 for an invalid key."
+          }
+        },
+        {
+          "name": "List interests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/interests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "interests"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Onboarding (me, before login)",
+      "item": [
+        {
+          "name": "Get my in-progress user (by email)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me?email=hero@example.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "hero@example.com",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Check username availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/check-username?username=Ravencaller&email=hero@example.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "check-username"
+              ],
+              "query": [
+                {
+                  "key": "username",
+                  "value": "Ravencaller",
+                  "disabled": false
+                },
+                {
+                  "key": "email",
+                  "value": "hero@example.com",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Save profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"firstName\": \"Alex\",\n  \"lastName\": \"Rivera\",\n  \"username\": \"Ravencaller\",\n  \"age\": 24,\n  \"gender\": \"Female\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Set preset avatar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/avatar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "avatar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"avatar\": \"green-knight\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Upload avatar photo (multipart, attach a file manually)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/avatar/photo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "avatar",
+                "photo"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "email",
+                  "value": "hero@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Attach a real JPEG/PNG/WEBP/GIF under the \"photo\" field before sending. Coexists with Set preset avatar - the real profile UI shows this photo as the main picture with the preset avatar as a small badge over it; setting one never clears the other. The server also tolerates a mislabeled Content-Type on that file (image/jpg, application/octet-stream, text/plain all pass through) since Cloudinary’s real content check is the actual gatekeeper."
+          }
+        },
+        {
+          "name": "Choose faction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/faction",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "faction"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"factionKey\": \"ascendants\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Set interests",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/interests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "interests"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"interests\": [\n    \"anime\",\n    \"comic\",\n    \"cosplay\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Set notification preference",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/preferences/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "preferences",
+                "notifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"notificationsEnabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Any subset of notificationsEnabled (master switch), eventReminders (a push category), and emailWeeklyNewsletter works in one call - at least one field is required. The category fields are preference storage only; no email sends yet."
+          }
+        },
+        {
+          "name": "Set location (required before onboarding completes)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/preferences/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "preferences",
+                "location"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"locationEnabled\": true,\n  \"radiusMiles\": 50,\n  \"lat\": 6.5244,\n  \"lng\": 3.3792\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "CosQuest is played in the real world, so this is required before onboarding can complete - not optional like notifications. radiusMiles must be 5-100; lat/lng are required whenever locationEnabled is true."
+          }
+        },
+        {
+          "name": "Save contact options (pre-login)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "contact"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"password\": \"Quest@1234\",\n  \"phone\": \"+2348148327836\",\n  \"businessAddress\": \"14 CosQuest Way, Lagos\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Contact holds more sensitive PII (phone, business address) than the other onboarding-step fields above, so unlike those (bare email/username), this pre-login path also requires the account’s real password - wrong identifier or wrong password both return a generic 401."
+          }
+        },
+        {
+          "name": "Get contact options (pre-login, Basic auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "contact"
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "hero@example.com",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "Quest@1234",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "A GET has no body, so the pre-login identifier+password goes in a standard HTTP Basic Auth header instead of a JSON field - Postman fills this in for you from the Authorization tab (already set to Basic Auth with the literal ME_EMAIL/ME_PASSWORD values). This keeps the password out of the URL, where it would otherwise leak into browser history and server logs."
+          }
+        },
+        {
+          "name": "Register a device push token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/devices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "devices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"pushToken\": \"example-device-token-from-your-mobile-app\",\n  \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Complete onboarding (me, one-shot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/onboarding/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "onboarding",
+                "complete"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hero@example.com\",\n  \"profile\": {\n    \"firstName\": \"Alex\",\n    \"lastName\": \"Rivera\",\n    \"username\": \"Ravencaller\",\n    \"age\": 24,\n    \"gender\": \"Female\",\n    \"avatar\": \"green-knight\"\n  },\n  \"faction\": \"ascendants\",\n  \"interests\": [\n    \"anime\",\n    \"comic\",\n    \"cosplay\"\n  ],\n  \"preferences\": {\n    \"notificationsEnabled\": true\n  },\n  \"location\": {\n    \"locationEnabled\": true,\n    \"radiusMiles\": 50,\n    \"lat\": 6.5244,\n    \"lng\": 3.3792\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Submits every required onboarding field at once, including location - all required. Use the token captured at signup. It becomes usable for the main app immediately after completion."
+          }
+        },
+        {
+          "name": "Complete onboarding (buddy, one-shot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/onboarding/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "onboarding",
+                "complete"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"buddy@example.com\",\n  \"profile\": {\n    \"firstName\": \"Jamie\",\n    \"lastName\": \"Cruz\",\n    \"username\": \"Buddy\",\n    \"age\": 29,\n    \"gender\": \"Male\",\n    \"avatar\": \"caped-champion\"\n  },\n  \"faction\": \"icons\",\n  \"interests\": [\n    \"game\",\n    \"scifi\"\n  ],\n  \"preferences\": {\n    \"notificationsEnabled\": true\n  },\n  \"location\": {\n    \"locationEnabled\": true,\n    \"radiusMiles\": 50,\n    \"lat\": 6.5244,\n    \"lng\": 3.3792\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Onboards the second test account used by Follow/DM requests below."
+          }
+        }
+      ]
+    },
+    {
+      "name": "My account (Bearer + completed onboarding)",
+      "item": [
+        {
+          "name": "Get my points",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/points",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "points"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get my contact options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "contact"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Save contact options",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "contact"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"contact.raven@example.com\",\n  \"phone\": \"+2348148327836\",\n  \"businessAddress\": \"14 CosQuest Way, Lagos\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "This one also works pre-login (before Complete onboarding / Login) with identifier+password instead of a Bearer token - see \"Save contact options (pre-login)\" in the Onboarding folder. GET works pre-login too, via HTTP Basic Auth instead - see \"Get contact options (pre-login, Basic auth)\" there."
+          }
+        },
+        {
+          "name": "Get my notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "notifications"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark all notifications read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/notifications/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "notifications",
+                "read"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get my bookmarked posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/bookmarks?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "bookmarks"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Home Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/home/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "home",
+                "dashboard"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get my privacy settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/privacy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "privacy"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Save privacy settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/privacy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "privacy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileVisibility\": \"friends\",\n  \"showActivityFeed\": false,\n  \"allowDirectMessages\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Any subset of the three fields works in one call. profileVisibility: public | friends | private. \"Friends\" = mutual follow (no separate friend-request system exists)."
+          }
+        },
+        {
+          "name": "Get my blocked users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/blocked?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "blocked"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public profiles & follow",
+      "item": [
+        {
+          "name": "Get a public profile (buddy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "profile"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get a user’s quest history (buddy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/quests?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "quests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "registered",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get followers (buddy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/followers?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "followers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "raven",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "search (optional) matches case-insensitively against the follower’s username, first name, or last name."
+          }
+        },
+        {
+          "name": "Get following (buddy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/following?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "following"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "raven",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "search (optional), same matching rules as followers."
+          }
+        },
+        {
+          "name": "Search people (to DM/forward with)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/search?search=budd&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "budd",
+                  "disabled": false
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Username/first/last name, case-insensitive. Not gated by profileVisibility - it’s for finding someone to message, not viewing their profile - but a block hides them from this in both directions. Feeds the DM \"+\" picker and the \"forward to a new person\" flow (POST .../forward with targetUsername instead of targetConversationId)."
+          }
+        },
+        {
+          "name": "Follow buddy",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/follow",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "follow"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unfollow buddy",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/follow",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "follow"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Block buddy",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/block",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "block"
+              ]
+            },
+            "description": "Also removes any existing follow between the two of you, in either direction. A block hides the profile (404) and blocks new follows/DMs in both directions, overriding any visibility setting."
+          }
+        },
+        {
+          "name": "Unblock buddy",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/block",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "block"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get a user’s posts (buddy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Buddy/posts?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Buddy",
+                "posts"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "thought",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get share link (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/Ravencaller/share",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "Ravencaller",
+                "share"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns { url, title, text } ready to hand to a native share sheet (Share.share() on mobile, navigator.share() on web) - the frontend never has to build the link itself."
+          }
+        },
+        {
+          "name": "Open shareable profile page (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/u/Ravencaller",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "u",
+                "Ravencaller"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "The actual link to paste into Instagram/Facebook/WhatsApp/etc - real HTML with Open Graph tags, not JSON, so it shows a rich preview card. Open this URL directly in a browser to see the rendered page (Postman will just show the raw HTML here)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Posts, likes, shares, bookmarks, comments",
+      "item": [
+        {
+          "name": "List public feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                },
+                {
+                  "key": "type",
+                  "value": "thought",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Create a thought",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"thought\",\n  \"content\": \"Getting ready for the next CosQuest!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('postId', pm.response.json().post.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an image post (multipart, attach files manually)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "image",
+                  "type": "text"
+                },
+                {
+                  "key": "content",
+                  "value": "Quest photos",
+                  "type": "text"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Attach 1-8 JPEG/PNG/WEBP/GIF files under \"media\" (add more \"media\" rows for more images) before sending."
+          }
+        },
+        {
+          "name": "Create a reel (multipart, attach a video manually)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "reel",
+                  "type": "text"
+                },
+                {
+                  "key": "content",
+                  "value": "My cosplay reveal",
+                  "type": "text"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Attach exactly one real MP4/MOV/WEBM file, 30 seconds or shorter, under \"media\" before sending. A real Cloudinary account rejects placeholder/fake video bytes as an invalid file - this needs a genuine short video."
+          }
+        },
+        {
+          "name": "Get one post",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Edit my post",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Updated caption or thought text.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete my post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Like a post",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/likes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "likes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unlike a post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/likes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "likes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Share a post",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/shares",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "shares"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unshare a post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/shares",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "shares"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bookmark a post",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/bookmarks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "bookmarks"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove a bookmark",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/bookmarks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "bookmarks"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Top-level comments only (omit parentComment). Each one includes replyCount."
+          }
+        },
+        {
+          "name": "Create a comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "comments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"This cosplay looks amazing!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('commentId', pm.response.json().comment.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reply to a comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "comments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Thanks, glad you like it!\",\n  \"parentComment\": \"{{commentId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "parentComment must reference a top-level comment - replying to a reply is 400 (replies stay within the original thread). The emoji \"reactions\" shown under comments in some mockups are frontend-only quick replies, not a real endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('replyCommentId', pm.response.json().comment.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get replies to a comment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments?parentComment={{commentId}}&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "parentComment",
+                  "value": "{{commentId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Delete my comment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments/{{commentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}",
+                "comments",
+                "{{commentId}}"
+              ]
+            },
+            "description": "Deleting a top-level comment cascades to delete its replies too."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chats (community, faction rooms, DMs)",
+      "item": [
+        {
+          "name": "List my chats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats"
+              ]
+            },
+            "description": "Auto-captures {{communityConversationId}} and {{factionConversationId}} for the requests below."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const chats = pm.response.json().chats || [];",
+                  "  const community = chats.find(c => c.type === 'community');",
+                  "  const faction = chats.find(c => c.type === 'faction');",
+                  "  if (community) pm.collectionVariables.set('communityConversationId', community.id);",
+                  "  if (faction) pm.collectionVariables.set('factionConversationId', faction.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start/find a DM with buddy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/dm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "dm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Buddy\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "404 if either of you has blocked the other; 403 if buddy has turned off allowDirectMessages in their privacy settings."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('dmConversationId', pm.response.json().chat.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get chat detail (community)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get messages (community)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages?page=1&limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "30",
+                  "disabled": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send a text message (community)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Yooo, anyone at Waterfront?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('messageId', pm.response.json().message.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reply to a message (community)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"I can see you\",\n  \"replyTo\": \"{{messageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Send an image/voice note (multipart, attach a file manually)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Attach a real JPEG/PNG/WEBP/GIF for an image message, or a real MP3/M4A/WEBM/OGG/WAV for a voice note. A real Cloudinary account rejects placeholder/fake bytes."
+          }
+        },
+        {
+          "name": "Edit my message",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Yooo, anyone at Waterfront? (edited)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete my message - for me only",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}?scope=me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}"
+              ],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "me",
+                  "disabled": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete my message - for everyone (within 5 min)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}?scope=everyone",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}"
+              ],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "everyone",
+                  "disabled": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "React to a message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/reactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}",
+                "reactions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emoji\": \"😂\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove my reaction",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/reactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}",
+                "reactions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pin a message",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/pinned-message",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "pinned-message"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"{{messageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unpin the message",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/pinned-message",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "pinned-message"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mark a chat read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "read"
+              ]
+            }
+          }
+        },
+        {
+          "name": "See who has read a message",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/seen?page=1&limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}",
+                "seen"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "30",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Who has read up to (and including) this message, excluding the sender - naturally 0-1 people in a DM, potentially many in Community/faction rooms. Long-press \"Copy text\" is frontend-only (clipboard copy of the already-loaded content) and Stories aren’t implemented yet - neither has an endpoint here."
+          }
+        },
+        {
+          "name": "Forward a message to my DM with buddy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/forward",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}",
+                "forward"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetConversationId\": \"{{dmConversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "targetConversationId must be a conversation you already belong to (Community, your faction room, or a DM you’re in) - anywhere else is 403, same as posting there directly. Copies content/media into a new message flagged forwarded: true; the original is untouched. Exactly one of targetConversationId or targetUsername is required - see the next request for the other form."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('forwardedMessageId', pm.response.json().message.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forward a message to a new person by name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/forward",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chats",
+                "{{communityConversationId}}",
+                "messages",
+                "{{messageId}}",
+                "forward"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUsername\": \"Buddy\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "targetUsername works even with no prior DM - finds it via Search people, or creates one on the spot (same as tapping \"+\" then forwarding), subject to the same block/allowDirectMessages rules as Start/find a DM. Sending both targetConversationId and targetUsername, or neither, is 400."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quests",
+      "item": [
+        {
+          "name": "List quests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quests?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "live",
+                  "disabled": true
+                },
+                {
+                  "key": "faction",
+                  "value": "ascendants",
+                  "disabled": true
+                },
+                {
+                  "key": "lat",
+                  "value": "6.5244",
+                  "disabled": true
+                },
+                {
+                  "key": "lng",
+                  "value": "3.3792",
+                  "disabled": true
+                },
+                {
+                  "key": "radiusMiles",
+                  "value": "30",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "faction is optional - filters to quests tagged with that faction (a label only, never a registration restriction)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const quests = pm.response.json().quests || []; if (quests.length) pm.collectionVariables.set('questId', quests[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get one quest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quests/{{questId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quests",
+                "{{questId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Register for a quest",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quests/{{questId}}/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quests",
+                "{{questId}}",
+                "registrations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel my registration",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quests/{{questId}}/registrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quests",
+                "{{questId}}",
+                "registrations"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Community, Spotlight and Settings additions",
+      "item": [
+        {
+          "name": "Like comment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments/{{commentId}}/likes"
+          }
+        },
+        {
+          "name": "Unlike comment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments/{{commentId}}/likes"
+          }
+        },
+        {
+          "name": "Like reply",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments/{{replyCommentId}}/likes"
+          }
+        },
+        {
+          "name": "Unlike reply",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments/{{replyCommentId}}/likes"
+          }
+        },
+        {
+          "name": "Reply to a reply",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Replying in this thread\",\n  \"parentComment\": \"{{replyCommentId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Post share link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/posts/{{postId}}/share"
+          }
+        },
+        {
+          "name": "Chat share link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/share"
+          }
+        },
+        {
+          "name": "Message copy link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}/share"
+          }
+        },
+        {
+          "name": "Open one linked message",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/{{messageId}}"
+          }
+        },
+        {
+          "name": "Spotlight leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/spotlight/leaderboard?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Spotlight Anime board",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/spotlight/leaderboard?interest=anime&page=1&limit=20"
+          }
+        },
+        {
+          "name": "Spotlight realms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/spotlight/realms"
+          }
+        },
+        {
+          "name": "Settings overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/settings"
+          }
+        },
+        {
+          "name": "Account information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/account"
+          }
+        },
+        {
+          "name": "Save account information",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/account",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"CosplayQueen\",\n  \"phone\": \"+15552345678\",\n  \"dateOfBirth\": \"1998-10-12\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Quest@1234\",\n  \"newPassword\": \"NewQuest@1234\",\n  \"confirmPassword\": \"NewQuest@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.token) pm.collectionVariables.set('accessToken', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Privacy settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/privacy"
+          }
+        },
+        {
+          "name": "Save privacy settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/privacy",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileVisibility\": \"public\",\n  \"showOnlineStatus\": false,\n  \"showActivityFeed\": true,\n  \"allowFriendRequests\": true,\n  \"allowDirectMessages\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Notification settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/preferences/notifications"
+          }
+        },
+        {
+          "name": "Save notification settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/preferences/notifications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationsEnabled\": true,\n  \"eventReminders\": true,\n  \"questUpdates\": true,\n  \"factionNews\": false,\n  \"friendActivity\": true,\n  \"rankChanges\": true,\n  \"emailWeeklyNewsletter\": false,\n  \"emailPromotionalEvents\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Appearance settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/appearance"
+          }
+        },
+        {
+          "name": "Save appearance settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/appearance",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"themeMode\": \"dark\",\n  \"accentColor\": \"#ca4aa0\",\n  \"fontSize\": \"medium\",\n  \"reduceMotion\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Data usage settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/data-usage"
+          }
+        },
+        {
+          "name": "Save data usage settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/data-usage",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"downloadOverWifiOnly\": true,\n  \"autoPlayVideos\": false,\n  \"imageQuality\": \"high\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Help and support links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me/help"
+          }
+        },
+        {
+          "name": "Submit bug report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/support-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"bug\",\n  \"subject\": \"Playback issue\",\n  \"message\": \"Describe the problem and reproduction steps.\",\n  \"platform\": \"android\",\n  \"appVersion\": \"2.4.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Send chat document (select file)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "content",
+                  "type": "text",
+                  "value": "Shared document"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attachments, timed pins and bulk actions",
+      "description": "See CHAT_ATTACHMENTS_API.md. Set both messageId and secondMessageId from messages in this source conversation. Bulk endpoints return per-item status; inspect HTTP 207 results. Select files manually for upload requests.",
+      "item": [
+        {
+          "name": "Pin for 24h",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/pinned-message",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"{{messageId}}\",\n  \"duration\": \"24h\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Pin for 7d",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/pinned-message",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"{{messageId}}\",\n  \"duration\": \"7d\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Pin for 30d",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/pinned-message",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"{{messageId}}\",\n  \"duration\": \"30d\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete selected for me",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/bulk-delete",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageIds\": [\n    \"{{messageId}}\",\n    \"{{secondMessageId}}\"\n  ],\n  \"scope\": \"me\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete selected for everyone",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/bulk-delete",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageIds\": [\n    \"{{messageId}}\",\n    \"{{secondMessageId}}\"\n  ],\n  \"scope\": \"everyone\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Forward selected to a chat",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/bulk-forward",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageIds\": [\n    \"{{messageId}}\",\n    \"{{secondMessageId}}\"\n  ],\n  \"targetConversationId\": \"{{dmConversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Forward selected to multiple destinations",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages/bulk-forward",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageIds\": [\n    \"{{messageId}}\",\n    \"{{secondMessageId}}\"\n  ],\n  \"targets\": [\n    {\n      \"targetConversationId\": \"{{dmConversationId}}\"\n    },\n    {\n      \"targetConversationId\": \"{{factionConversationId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Send image (select file)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "type": "text",
+                  "value": "image"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send video (select file)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "type": "text",
+                  "value": "video"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send file (select file)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "type": "text",
+                  "value": "file"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send audio (select file)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "type": "text",
+                  "value": "audio"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "waveform",
+                  "type": "text",
+                  "value": "[0.1,0.5,0.9,0.2]",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send sticker (select file)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chats/{{communityConversationId}}/messages",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "type": "text",
+                  "value": "sticker"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

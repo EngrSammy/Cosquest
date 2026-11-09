@@ -1,0 +1,43 @@
+# Sign in from a clean install. env: USER, PASS
+appId: com.dammy0227.cosquest
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 30000
+- tapOn: "Continue"
+- tapOn: "Sign-in"
+- extendedWaitUntil:
+    visible: "Welcome back!"
+    timeout: 10000
+# The fields had no accessible names before F-07, so tap where they are.
+- tapOn:
+    point: "50%,42%"
+- inputText: ${USER}
+- tapOn:
+    point: "50%,54%"
+- inputText: ${PASS}
+- hideKeyboard
+- tapOn:
+    text: "Sign in"
+    index: 0
+# After the local backend restarts (a fresh seed), the phone's first request
+# can fail on a dead pooled connection ("fetch failed ... unexpected end of
+# stream"): try once more.
+- runFlow:
+    when:
+      visible: "fetch failed.*"
+    commands:
+      - tapOn:
+          text: "Sign in"
+          index: 0
+# Signed in once the tab bar shows (the sign-in page says "Cosquest" too).
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 30000
+- tapOn:
+    text: "Got it"
+    optional: true

@@ -1,0 +1,26 @@
+--- a/Game/Roam/RoamHomeView.swift
++++ b/Game/Roam/RoamHomeView.swift
+@@ -367,6 +367,8 @@
+             }
+         }
+         .onChange(of: store.me?.holds_lost ?? []) { _, lost in noticeLost(lost) }
++        // [merged-app] A chat invite or a cosquest://play link: open its point.
++        .modifier(GameHostOpenHook(store: store, selected: $selected, banner: banner))
+         .onChange(of: showProfile) { _, open in
+             if !open { Task { await store.refreshMe() } }
+         }
+@@ -1230,6 +1232,14 @@
+                             .foregroundStyle(GamePalette.ink.opacity(0.7))
+                     }
+                     Spacer()
++                    // [merged-app] Invite people from a chat to this point.
++                    if GameHost.shared.embedded {
++                        Button { GameHost.shared.shareToChat(point) } label: {
++                            Image(systemName: "bubble.left.and.bubble.right.fill")
++                        }
++                        .buttonStyle(.gameIcon(GamePalette.skyDeep, diameter: 36))
++                        .accessibilityLabel("Invite to a chat")
++                    }
+                     Button(action: onClose) { Image(systemName: "xmark") }
+                         .buttonStyle(.gameIcon(GamePalette.ink.opacity(0.55), diameter: 36))
+                         .accessibilityLabel("Close")

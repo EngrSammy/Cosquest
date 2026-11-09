@@ -1,0 +1,10 @@
+{
+ "_doc": "cq 239 retex.py settings per character (_default first, then the character's overrides). recolor: palette fixes toward the deck picture, measured by k-means of the texture vs the deck (REPORT / docs/game3d/CHARACTERS.md).",
+ "_default": {"smooth_iters": 2, "sigma_lab": 5.0, "metal_clean": true},
+ "elvis": {"recolor": [
+   {"ab": [2.4, -1.6], "radius": 9, "L": [38, 58], "L_mul": 0.62, "chroma_mul": 0.5, "to_ab": [1.5, 0.5], "exclude_bones": ["Wing"]},
+   {"ab": [1.2, -7.4], "radius": 8, "L": [18, 42], "L_mul": 0.8, "chroma_mul": 0.4, "to_ab": [1.0, -1.0], "exclude_bones": ["Wing"]},
+   {"ab": [12.5, 18.0], "radius": 7, "L": [45, 82], "L_mul": 0.74, "chroma_mul": 1.0, "exclude_bones": ["Wing"], "_why": "skin: the deck's Elvis is dark brown (Lab L 44), the A-pose concept and the lift light tan (L 52 to 62)"},
+   {"ab": [7.5, 6.2], "radius": 4, "L": [42, 60], "L_mul": 0.85, "chroma_mul": 1.0, "to_ab": [10.0, 15.0], "exclude_bones": ["Wing"], "_why": "his fingers and ears: a greyed pink (Lab 47 to 50, 7.5, 6) that reads lavender in the arena light"}
+ ]}
+}

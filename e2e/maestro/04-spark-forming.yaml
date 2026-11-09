@@ -1,0 +1,45 @@
+# J04 A Spark forms and is opened: while ada is in Cosplay Con, Chioma and
+# Kofi start talking about a costume repair kit and it becomes a Spark.
+# ada sees it appear, opens it and replies inside it.
+appId: com.dammy0227.cosquest
+name: J04 a Spark forms and is opened
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow:
+    file: common/open-chat.yaml
+    env: { CHAT: ".*Cosplay Con 2026.*" }
+- extendedWaitUntil:
+    visible: "Badge pre-sale"
+    timeout: 15000
+- takeScreenshot: j04-before
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "chioma|spark-create|Cosplay Con|Costume repair kit|Who is bringing a costume repair kit?|--msg|I have glue and safety pins|--msg|kofi: I can bring a mini sewing kit" }
+- extendedWaitUntil:
+    visible: "Costume repair kit"
+    timeout: 20000
+- takeScreenshot: j04-spark-formed
+- tapOn:
+    text: "Costume repair kit"
+    index: 0
+- extendedWaitUntil:
+    visible: "Active · .*"
+    timeout: 10000
+- assertVisible: "I can bring a mini sewing kit"
+- tapOn: "Reply to this Spark"
+- inputText: "I'll bring a hot glue gun"
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "I'll bring a hot glue gun"
+    timeout: 10000
+- takeScreenshot: j04-spark-reply
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "chioma|sparks|Cosplay Con" }
+- assertTrue: ${output.peer.stdout.indexOf("Costume repair kit") >= 0}
+- tapOn: "Close"
+- extendedWaitUntil:
+    visible: "Message your group"
+    timeout: 10000

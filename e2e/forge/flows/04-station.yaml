@@ -1,0 +1,46 @@
+# Forge drop-in proof (cq 056) 4/4, stations and environments: a point the
+# server dressed (a free Forge station and a Forge environment, chosen by its
+# own rules; XQ-trafalgar-sequence in the Trafalgar test world) shows the
+# station model where the shrine stood, the environment around it and your
+# avatar beside it. Points the server did not dress keep their shrine.
+appId: com.dammy0227.cosquest
+name: F04 Forge station at a point
+---
+- launchApp
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: coach-away.yaml
+- openLink: "cosquest://play?shrine=XQ-trafalgar-sequence"
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- takeScreenshot: f04-point-sheet
+- tapOn:
+    text: "Play"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Tap the shrine.*"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 10000
+    optional: true
+- takeScreenshot: f04-station-scene
+- tapOn:
+    text: "Leave"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "never-on-screen-wait"
+    timeout: 2000
+    optional: true
+# A point the server left plain keeps the built-in shrine.
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- tapOn:
+    text: "Play"
+    waitToSettleTimeoutMs: 1500
+- extendedWaitUntil:
+    visible: "Tap the shrine.*"
+    timeout: 20000
+- takeScreenshot: f04-plain-shrine

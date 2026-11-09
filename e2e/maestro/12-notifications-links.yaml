@@ -1,0 +1,58 @@
+# J12 Notifications and deep links: a follow arrives live, the notifications
+# list opens a mention's chat; links open a profile, a chat, and a game point.
+appId: com.dammy0227.cosquest
+name: J12 notifications and deep links
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- runFlow: common/chats.yaml
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "lena|follow|ada" }
+# The bell (it had no name before F-35)
+- tapOn:
+    point: "91%,9%"
+- extendedWaitUntil:
+    visible: "Notifications"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: ".*lena.*|.*Lena.*"
+    timeout: 15000
+- takeScreenshot: j12-notifications
+- tapOn: ".*mentioned you.*"
+- extendedWaitUntil:
+    visible: "Message.*"
+    timeout: 15000
+- takeScreenshot: j12-from-notification
+# Deep links
+- openLink: "cosquest://user/bo"
+- extendedWaitUntil:
+    visible: ".*Bolu Adeyemi.*"
+    timeout: 15000
+- takeScreenshot: j12-link-user
+- runScript:
+    file: scripts/peer.js
+    env: { ARGS: "seed" }
+- evalScript: ${output.raid = output.peer.stdout.match(/g:raid\s+([0-9a-f]{24})/)[1]}
+- openLink: "cosquest://chat/${output.raid}"
+- extendedWaitUntil:
+    visible: "Raid Night Crew"
+    timeout: 15000
+- takeScreenshot: j12-link-chat
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone|Choose your side|That's me|Your name|Continue"
+    timeout: 60000
+- takeScreenshot: j12-link-game
+# A link with no screen (the message link fallback) gets a way out, not
+# expo-router's developer page (F-46).
+- openLink: "cosquest://chat/${output.raid}/message/000000000000000000000000"
+- extendedWaitUntil:
+    visible: "This link doesn.t go anywhere"
+    timeout: 15000
+- takeScreenshot: j12-link-unknown
+- tapOn: "Go to your chats"
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 15000

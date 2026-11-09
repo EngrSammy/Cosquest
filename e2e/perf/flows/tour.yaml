@@ -1,0 +1,70 @@
+# The fit tour: every kind of screen the audit names, screenshotted, on the
+# current profile (e2e/perf/profile.sh). Recorded by e2e/journey.sh.
+# env: USER, PASS, P
+appId: com.dammy0227.cosquest
+name: polish fit tour
+---
+- runFlow:
+    file: signin.yaml
+- extendedWaitUntil:
+    visible: "Feed post.*|Create a post"
+    timeout: 20000
+- takeScreenshot: ${P}-04-feed
+- scroll
+- takeScreenshot: ${P}-05-feed-scrolled
+# Back to the top of the feed, where the Chats pill is.
+- scrollUntilVisible:
+    element:
+      text: "Chats"
+      index: 0
+    direction: UP
+    timeout: 20000
+- runFlow: ../../maestro/common/chats.yaml
+- takeScreenshot: ${P}-06-chats
+- scrollUntilVisible:
+    element: ".*Big Group 2k.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: ".*Big Group 2k.*"
+- extendedWaitUntil:
+    visible: ".*the end of the scroll test.*"
+    timeout: 20000
+- takeScreenshot: ${P}-07-chat
+- tapOn:
+    text: "Message.*|Type a message.*"
+    optional: true
+- takeScreenshot: ${P}-08-chat-keyboard
+- hideKeyboard
+- back
+- tapOn: "Profile"
+- takeScreenshot: ${P}-09-profile
+- tapOn: "Community"
+# Into the game from the chat list, as journey J08 does.
+- runFlow: ../../maestro/common/chats.yaml
+- runFlow: ../../maestro/common/game.yaml
+- runFlow: ../../maestro/common/warden-later.yaml
+- takeScreenshot: ${P}-10-map
+- openLink: "cosquest://play?shrine=XQ-trafalgar-trivia"
+- extendedWaitUntil:
+    visible: "Test Trivia Stone"
+    timeout: 15000
+- takeScreenshot: ${P}-11-point-sheet
+- tapOn: "Play"
+- tapOn: "Tap the shrine.*"
+- extendedWaitUntil:
+    visible: ".*seconds left"
+    timeout: 15000
+- takeScreenshot: ${P}-12-quiz
+- tapOn: "Leave"
+- tapOn:
+    text: "Leave|Yes.*|Give up.*"
+    optional: true
+- openLink: "cosquest://play?duel=XD-trafalgar-duel"
+- extendedWaitUntil:
+    visible: "Test Guardian's Post"
+    timeout: 15000
+- tapOn: "Fight"
+- extendedWaitUntil:
+    visible: "Fight"
+    timeout: 15000
+- takeScreenshot: ${P}-13-duel-versus

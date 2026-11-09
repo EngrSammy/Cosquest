@@ -1,0 +1,9 @@
+# Open a chat from the list. env: CHAT (regex for the row, e.g. ".*Bolu")
+appId: com.dammy0227.cosquest
+---
+- runFlow: chats.yaml
+- scrollUntilVisible:
+    element: ${CHAT}
+    direction: DOWN
+    timeout: 20000
+- tapOn: ${CHAT}

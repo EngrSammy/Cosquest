@@ -1,0 +1,63 @@
+# J02 Profile and avatar: ada renames herself, changes her picture to a
+# preset avatar, and sees both on her profile.
+appId: com.dammy0227.cosquest
+name: J02 profile and avatar
+---
+- runFlow:
+    file: common/signin.yaml
+    env: { USER: ada, PASS: cosquest-dev-1 }
+- tapOn: "Profile"
+- extendedWaitUntil:
+    visible: "@ada.*"
+    timeout: 15000
+- takeScreenshot: j02-profile
+- tapOn: "Settings"
+- tapOn: "Account Information"
+- tapOn: "Ada (Nwosu|Okoro)"
+- eraseText: 20
+- inputText: "Ada Okoro"
+- hideKeyboard
+- tapOn: "Save Changes"
+- extendedWaitUntil:
+    visible: "Changes Saved"
+    timeout: 10000
+- tapOn: "OK"
+- tapOn: "Account Information"
+- tapOn: "Change Profile Photo"
+- tapOn: "Photo taken on.*"
+- tapOn:
+    text: "CROP"
+    optional: true
+- extendedWaitUntil:
+    visible: "Profile Photo Updated"
+    timeout: 20000
+- tapOn: "OK"
+- back
+- back
+# Now a preset avatar instead of the photo.
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "Edit Profile"
+    direction: DOWN
+- tapOn: "Edit Profile"
+- tapOn: "Change profile photo"
+- extendedWaitUntil:
+    visible: "Or choose an avatar"
+    timeout: 15000
+- takeScreenshot: j02-avatar-grid
+# The tiles had no names before F-14: tap the first one (top left).
+- tapOn:
+    point: "18%,55%"
+- tapOn: "Save Profile Photo|Save"
+- extendedWaitUntil:
+    visible: "Profile Photo Updated"
+    timeout: 20000
+- tapOn: "OK"
+# Back on Edit Profile; back again to the profile.
+- tapOn: "Back"
+# The profile is still scrolled down to Edit Profile: scroll back to the name.
+- scrollUntilVisible:
+    element: "Ada Okoro"
+    direction: UP
+    timeout: 15000
+- takeScreenshot: j02-profile-after
