@@ -4,7 +4,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
@@ -45,6 +45,12 @@ export default function MyTickets() {
       setError(e?.status ? e?.message || "Couldn't load your tickets." : "You're offline: showing the tickets saved on this phone.");
     }
   }, [token, scope, owner]);
+
+  // A ticket just confirmed (e.g. paid on the website): show it.
+  const lastIssued = useAppSelector((state) => state.payment.lastIssued?.at);
+  useEffect(() => {
+    if (lastIssued) load();
+  }, [lastIssued, load]);
 
   useFocusEffect(
     useCallback(() => {
