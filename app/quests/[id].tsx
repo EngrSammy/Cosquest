@@ -137,7 +137,7 @@ export default function QuestDetail() {
   const button =
     !cancelled && !ended ? (
       <Pressable
-        disabled={!quest.isRegistered && (full || live)}
+        disabled={!quest.isRegistered && (full || (live && !(quest.kind === "quest" && !!quest.requireAtVenue)))}
         onPress={() => (quest.isRegistered ? router.push("/tickets" as any) : setSheet(true))}
         style={({ hovered }: any) => ({
           height: 54,
@@ -150,7 +150,7 @@ export default function QuestDetail() {
           backgroundColor: quest.isRegistered ? "#1D9A6C" : full ? "#B9BECB" : hovered ? "#A93F86" : PINK,
         })}>
         <Text style={{ fontFamily: FONTS.bold, fontSize: 16, color: "#FFFFFF" }}>
-          {quest.isRegistered ? "✓ You're in · See my ticket" : full ? "Full" : live ? "Sales closed" : quest.entryFee?.amount ? `Get ticket · ${formatMoney(quest.entryFee as any)}` : "Get free ticket"}
+          {quest.isRegistered ? "✓ You're in · See my ticket" : full ? "Full" : live ? ((quest.kind === "quest" && !!quest.requireAtVenue) ? "Join now" : "Sales closed") : quest.entryFee?.amount ? `Get ticket · ${formatMoney(quest.entryFee as any)}` : "Get free ticket"}
         </Text>
       </Pressable>
     ) : null;
