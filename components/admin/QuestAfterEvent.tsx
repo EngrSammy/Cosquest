@@ -56,9 +56,9 @@ export default function QuestAfterEvent({ questId, status }: { questId: string; 
   return (
     <View style={{ gap: 12 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Text style={{ flex: 1, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Attendance</Text>
-        {att ? <Pill label={`${att.checkedIn} checked in`} tone="green" /> : null}
-        {att?.ended ? <Pill label={`${att.noShows.length} no-shows`} tone={att.noShows.length ? "amber" : "blue"} /> : null}
+        <Text style={{ flex: 1, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>{att?.virtual ? "Ticket holders" : "Attendance"}</Text>
+        {att ? <Pill label={att.virtual ? `${att.attendees.length} with a ticket` : `${att.checkedIn} checked in`} tone="green" /> : null}
+        {att?.ended && !att.virtual ? <Pill label={`${att.noShows.length} no-shows`} tone={att.noShows.length ? "amber" : "blue"} /> : null}
       </View>
       {att && att.ended && att.noShows.length ? (
         <View style={{ gap: 4 }}>
@@ -67,6 +67,8 @@ export default function QuestAfterEvent({ questId, status }: { questId: string; 
             <Text key={r.ticketId} style={{ fontFamily: FONTS.regular, fontSize: 13, color: t.text }}>· {nameOf(r.person)}</Text>
           ))}
         </View>
+      ) : att?.virtual ? (
+        <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Virtual: there's no door, so everyone with a ticket counts (until the game reports who actually played).</Text>
       ) : att && !att.ended ? (
         <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>{att.notYetIn.length} not checked in yet. After the end, they show as no-shows.</Text>
       ) : null}
@@ -86,10 +88,10 @@ export default function QuestAfterEvent({ questId, status }: { questId: string; 
           </Text>
         ))
       ) : !att?.attendees.length ? (
-        <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Nobody was checked in, so there are no winners to choose.</Text>
+        <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>{att?.virtual ? "Nobody has a ticket, so there are no winners to choose." : "Nobody was checked in, so there are no winners to choose."}</Text>
       ) : (
         <View style={{ gap: 8 }}>
-          <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Give a place (1, 2, 3…) to each winner. Only people who were checked in can win. Prize money is handed out by the team.</Text>
+          <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Give a place (1, 2, 3…) to each winner. {att.virtual ? "Anyone with a ticket can win." : "Only people who were checked in can win."} Prize money is handed out by the team.</Text>
           {att.attendees.map((r) => (
             <View key={r.ticketId} style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
               <Text style={{ flex: 1, minWidth: 140, fontFamily: FONTS.regular, fontSize: 13, color: t.text }}>{nameOf(r.person)}</Text>
