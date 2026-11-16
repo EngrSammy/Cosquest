@@ -5,6 +5,9 @@
 // (debits = credits); corrections are reversals (never edits); CSV export.
 // Regions: where paid quests are allowed (US states); changes are requests.
 // Approvals: money settings change only when a SECOND admin approves.
+// Finance approvers (the second person) see the ledger, regions and
+// approvals, and approve or reject; they can't request or correct anything.
+// Approvers (super admins): who the finance approvers are.
 import { useCallback, useEffect, useState } from "react";
 import { Platform, Text, TextInput, View } from "react-native";
 
@@ -12,6 +15,7 @@ import { ConfirmBox, Field, ReasonBox, Select, Tabs } from "@/components/admin/c
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Card, CardHeader, Loading, Notice, PageHeader, Pill } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
+import { type FinanceApprover, addFinanceApprover, listFinanceApprovers, removeFinanceApprover, useAdminRole } from "@/services/adminFinance";
 import {
   type ApprovalRequest,
   type ApprovalStatus,
@@ -31,13 +35,19 @@ import {
   withdrawApproval,
 } from "@/services/adminMoney";
 
-type TabKey = "ledger" | "regions" | "approvals";
+type TabKey = "ledger" | "regions" | "approvals" | "approvers";
 const STATUS_LABEL: Record<RegionStatus, string> = { allowed: "Allowed", blocked: "Blocked", needs_license: "Needs licence" };
 const STATUS_TONE: Record<RegionStatus, "green" | "red" | "amber"> = { allowed: "green", blocked: "red", needs_license: "amber" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default function MoneyAdmin() {
+  const role = useAdminRole();
+  const finance = role === "finance";
   const [tab, setTab] = useState<TabKey>("ledger");
+  // A finance approver arrives for the approvals.
+  useEffect(() => {
+    if (finance) setTab("approvals");
+  }, [finance]);
   const [pending, setPending] = useState<number | null>(null);
   useEffect(() => {
     listApprovals("pending").then((r) => setPending(r.pending)).catch(() => setPending(null));
@@ -50,18 +60,27 @@ export default function MoneyAdmin() {
           { key: "ledger", label: "Ledger" },
           { key: "regions", label: "Regions" },
           { key: "approvals", label: "Approvals", count: pending },
+          ...(role === "admin" ? [{ key: "approvers" as TabKey, label: "Approvers" }] : []),
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === "ledger" ? <LedgerTab /> : tab === "regions" ? <RegionsTab onRequested={() => setTab("approvals")} /> : <ApprovalsTab onChanged={() => listApprovals("pending").then((r) => setPending(r.pending)).catch(() => {})} />}
+      {tab === "ledger" ? (
+        <LedgerTab canCorrect={!finance} />
+      ) : tab === "regions" ? (
+        <RegionsTab canRequest={!finance} onRequested={() => setTab("approvals")} />
+      ) : tab === "approvers" ? (
+        <ApproversTab />
+      ) : (
+        <ApprovalsTab onChanged={() => listApprovals("pending").then((r) => setPending(r.pending)).catch(() => {})} />
+      )}
     </View>
   );
 }
 
 // ---------- Ledger ----------
 
-function LedgerTab() {
+function LedgerTab({ canCorrect }: { canCorrect: boolean }) {
   const t = useAdminTheme();
   const [book, setBook] = useState<"money" | "costcoin">("money");
   const [offset, setOffset] = useState(0);
@@ -138,7 +157,7 @@ function LedgerTab() {
                     {l.debit ? `Debit  ${l.account}  ${amount(l.debit, tx.currency)}` : `Credit ${l.account}  ${amount(l.credit, tx.currency)}`}
                   </Text>
                 ))}
-                {tx.kind !== "reversal" ? (
+                {canCorrect && tx.kind !== "reversal" ? (
                   <View style={{ flexDirection: "row" }}>
                     <Button label="Correct (reverse)…" variant="ghost" icon="return-up-back-outline" onPress={() => { setPicked(tx); setReason(""); setDone(""); }} />
                   </View>
@@ -180,7 +199,7 @@ function LedgerTab() {
 
 // ---------- Regions ----------
 
-function RegionsTab({ onRequested }: { onRequested: () => void }) {
+function RegionsTab({ canRequest, onRequested }: { canRequest: boolean; onRequested: () => void }) {
   const t = useAdminTheme();
   const [data, setData] = useState<{ mode: "test" | "live"; regions: RegionRule[] } | null>(null);
   const [error, setError] = useState("");
@@ -240,8 +259,9 @@ function RegionsTab({ onRequested }: { onRequested: () => void }) {
           </View>
         )}
       </Card>
+      {canRequest ? (
       <Card>
-        <CardHeader title="Request a change" subtitle="Another admin must approve it before it applies. You can't approve your own request." />
+        <CardHeader title="Request a change" subtitle="Another admin or a finance approver must approve it before it applies. You can't approve your own request." />
         <View style={{ marginTop: 14, gap: 12 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             <View style={{ width: 160 }}>
@@ -269,6 +289,7 @@ function RegionsTab({ onRequested }: { onRequested: () => void }) {
           </View>
         </View>
       </Card>
+      ) : null}
     </View>
   );
 }
@@ -345,7 +366,7 @@ function ApprovalsTab({ onChanged }: { onChanged: () => void }) {
               {r.status === "pending" ? (
                 mine ? (
                   <View style={{ marginTop: 14, gap: 10 }}>
-                    <Notice icon="people-outline" text="Another admin must approve this. You can withdraw it." />
+                    <Notice icon="people-outline" text="Another admin or a finance approver must approve this. You can withdraw it." />
                     <View style={{ flexDirection: "row" }}>
                       <Button label="Withdraw" loading={busy === r.id + "withdraw"} onPress={() => act(r, "withdraw")} />
                     </View>
@@ -364,6 +385,119 @@ function ApprovalsTab({ onChanged }: { onChanged: () => void }) {
           );
         })
       )}
+    </View>
+  );
+}
+
+// ---------- Approvers (super admins) ----------
+
+function ApproversTab() {
+  const t = useAdminTheme();
+  const [rows, setRows] = useState<FinanceApprover[] | null>(null);
+  const [username, setUsername] = useState("");
+  const [reason, setReason] = useState("");
+  const [removing, setRemoving] = useState<FinanceApprover | null>(null);
+  const [removeReason, setRemoveReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+
+  const load = useCallback(() => {
+    listFinanceApprovers().then((r) => setRows(r.approvers)).catch((e) => setError(e?.message || "Couldn't load the approvers."));
+  }, []);
+  useEffect(load, [load]);
+
+  const input = { height: 44, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.cardSoft, fontFamily: FONTS.regular, fontSize: 14, color: t.text, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) };
+
+  const add = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await addFinanceApprover(username.trim(), reason.trim());
+      setDone(`@${r.approver.username || username} is now a finance approver. Recorded as ${r.auditEvent}.`);
+      setUsername("");
+      setReason("");
+      load();
+    } catch (e: any) {
+      setError(e?.message || "Couldn't add them.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!removing) return;
+    setBusy(true);
+    try {
+      const r = await removeFinanceApprover(removing.id, removeReason.trim());
+      setDone(`${removing.name} is no longer a finance approver. Recorded as ${r.auditEvent}.`);
+      setRemoving(null);
+      setRemoveReason("");
+      load();
+    } catch (e: any) {
+      setError(e?.message || "Couldn't remove them.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 16 }}>
+      <Notice
+        icon="people-outline"
+        title="Two people for every money change"
+        text="Whoever asks for a money change can't approve it. A finance approver is a trusted second person (for example from the payment task force or the accountant) who signs in to the dashboard but only sees Ledger & approvals: they approve or reject, and can't change anything else."
+      />
+      {done ? <Notice icon="checkmark-circle-outline" tone="green" text={done} /> : null}
+      {error ? <Notice icon="alert-circle-outline" tone="red" text={error} /> : null}
+      <Card>
+        <CardHeader title="Finance approvers" subtitle="They sign in with their own CosQuest account." />
+        {!rows ? (
+          <Loading />
+        ) : !rows.length ? (
+          <Text style={{ marginTop: 14, fontFamily: FONTS.regular, fontSize: 14, color: t.muted }}>None yet. With only one admin, nothing can be approved: add one below.</Text>
+        ) : (
+          <View style={{ marginTop: 14, gap: 8 }}>
+            {rows.map((r) => (
+              <View key={r.id} style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: t.border, backgroundColor: t.cardSoft }}>
+                <Text style={{ flex: 1, minWidth: 160, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>
+                  {r.name}{r.username ? ` · @${r.username}` : ""}
+                </Text>
+                {r.since ? <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Since {new Date(r.since).toLocaleDateString()}</Text> : null}
+                <Button label="Remove…" variant="ghost" onPress={() => { setRemoving(r); setRemoveReason(""); }} />
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+      {removing ? (
+        <Card>
+          <ReasonBox value={removeReason} onChange={setRemoveReason} placeholder="e.g. Left the task force." />
+          <View style={{ marginTop: 12 }}>
+            <ConfirmBox
+              title={`Remove ${removing.name}?`}
+              text="Their dashboard session ends at once. Requests they already decided stay decided."
+              confirmLabel="Remove"
+              onConfirm={remove}
+              onCancel={() => setRemoving(null)}
+              busy={busy}
+              disabled={removeReason.trim().length < 3}
+            />
+          </View>
+        </Card>
+      ) : null}
+      <Card>
+        <CardHeader title="Add a finance approver" subtitle="Their CosQuest username. They must already have an account." />
+        <View style={{ marginTop: 14, gap: 12 }}>
+          <Field label="Username">
+            <TextInput value={username} onChangeText={setUsername} placeholder="@adewale" autoCapitalize="none" placeholderTextColor={t.faint} style={input} />
+          </Field>
+          <ReasonBox value={reason} onChange={setReason} placeholder="e.g. Second approver for money changes, agreed with Mark." />
+          <View style={{ flexDirection: "row" }}>
+            <Button label="Add finance approver" variant="primary" icon="person-add-outline" loading={busy && !removing} disabled={username.trim().replace(/^@/, "").length < 3 || reason.trim().length < 3} onPress={add} />
+          </View>
+        </View>
+      </Card>
     </View>
   );
 }

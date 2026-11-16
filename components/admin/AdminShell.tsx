@@ -8,7 +8,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
-import { type ReactNode, useState, useSyncExternalStore } from "react";
+import { forgetAdminRole, useAdminRole } from "@/services/adminFinance";
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
@@ -72,6 +73,9 @@ function current(path: string) {
 
 function Sidebar({ onPick }: { onPick?: () => void }) {
   const t = useAdminTheme();
+  // Finance approvers (the second person for money changes): Ledger & approvals only.
+  const role = useAdminRole();
+  const shown = (item: Item) => role !== "finance" || item.key === "money";
   const path = usePathname() || "/admin";
   const active = current(path);
   const badge = useOpenReportsBadge();
@@ -127,9 +131,9 @@ function Sidebar({ onPick }: { onPick?: () => void }) {
 
       <ScrollView style={{ flex: 1, marginTop: 22 }} showsVerticalScrollIndicator={false}>
         <Text style={{ marginBottom: 8, paddingHorizontal: 12, fontFamily: FONTS.medium, fontSize: 10.5, letterSpacing: 0.6, color: t.faint }}>WORKSPACE</Text>
-        <View style={{ gap: 4 }}>{WORKSPACE.map(row)}</View>
+        <View style={{ gap: 4 }}>{WORKSPACE.filter(shown).map(row)}</View>
         <Text style={{ marginTop: 22, marginBottom: 8, paddingHorizontal: 12, fontFamily: FONTS.medium, fontSize: 10.5, letterSpacing: 0.6, color: t.faint }}>ADMINISTRATION</Text>
-        <View style={{ gap: 4 }}>{ADMINISTRATION.map(row)}</View>
+        <View style={{ gap: 4 }}>{ADMINISTRATION.filter(shown).map(row)}</View>
       </ScrollView>
 
       <View style={{ padding: 14, borderRadius: 12, backgroundColor: t.blueSoft, gap: 6 }}>
@@ -194,6 +198,7 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
                 label: "Sign out of admin",
                 icon: "log-out-outline" as const,
                 onPress: async () => {
+                  forgetAdminRole();
                   await signOutAdmin();
                   router.replace("/admin/login" as any);
                 },
@@ -223,6 +228,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions();
   const narrow = width < 960;
   const [open, setOpen] = useState(false);
+  // A finance approver can only use Ledger & approvals: take them there.
+  const adminRole = useAdminRole();
+  const here = usePathname() || "/admin";
+  useEffect(() => {
+    if (adminRole === "finance" && !here.startsWith("/admin/money")) router.replace("/admin/money" as any);
+  }, [adminRole, here]);
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.page }} {...glass("page")}>
