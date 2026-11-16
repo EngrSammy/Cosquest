@@ -65,6 +65,8 @@ const EMPTY = (): QuestInput => {
   return {
     title: "",
     kind: "event",
+    format: "in_person",
+    placeLabel: "",
     description: "",
     coverImageUrl: "",
     startsAt: start.toISOString(),
@@ -83,6 +85,8 @@ function fromQuest(q: AdminQuest): QuestInput {
   return {
     title: q.title,
     kind: q.kind,
+    format: q.format || "in_person",
+    placeLabel: q.placeLabel || "",
     description: q.description || "",
     coverImageUrl: q.coverImageUrl || "",
     startsAt: q.startsAt,
@@ -186,7 +190,8 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
   };
 
   const hasPin = Number.isFinite(form.location.lat) && Number.isFinite(form.location.lng);
-  const ready = form.title.trim().length >= 3 && form.location.name.trim() && hasPin && form.startsAt && form.endsAt && (form.entryFee.amount === 0 || form.entryFee.amount >= 0.5);
+  const virtual = form.format === "virtual";
+  const ready = form.title.trim().length >= 3 && (virtual ? (form.placeLabel || "").trim().length >= 2 : form.location.name.trim() && hasPin) && form.startsAt && form.endsAt && (form.entryFee.amount === 0 || form.entryFee.amount >= 0.5);
 
   return (
     <Card style={{ marginBottom: 20 }}>
@@ -199,6 +204,20 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
           </Pressable>
         ))}
       </View>
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+        {(["in_person", "virtual"] as const).map((f) => (
+          <Pressable key={f} onPress={() => setForm((cur) => ({ ...cur, format: f }))} style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: (form.format || "in_person") === f ? t.pink : t.border, backgroundColor: (form.format || "in_person") === f ? t.pinkSoft : t.card }}>
+            <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>{f === "virtual" ? "Virtual" : "In person"}</Text>
+            <Text style={{ marginTop: 2, fontFamily: FONTS.regular, fontSize: 11.5, color: t.muted }}>{f === "virtual" ? "Online, joined from anywhere (shown to everyone)" : "At a venue on the map (shown to people nearby)"}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {virtual ? (
+        <View style={{ marginTop: 10 }}>
+          {label("Place label (shown on the card)")}
+          <TextInput value={form.placeLabel || ""} onChangeText={(v) => setForm((cur) => ({ ...cur, placeLabel: v.slice(0, 80) }))} placeholder="Tokyo · Hanuma" placeholderTextColor={t.faint} style={input} />
+        </View>
+      ) : null}
 
       {label("Title")}
       <TextInput value={form.title} onChangeText={(v) => set("title", v)} maxLength={120} placeholder="e.g. Waterfront Glow Hunt" placeholderTextColor={t.faint} style={input} />
@@ -232,6 +251,8 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
         </View>
       </View>
 
+      {!virtual ? (
+      <>
       <Divider />
       <Text style={{ fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Venue</Text>
       <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
@@ -314,6 +335,8 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
           {label("Venue radius (metres)")}
           <TextInput value={String(form.venueRadiusMeters)} onChangeText={(v) => set("venueRadiusMeters", Number(v) || 0)} style={input} />
         </View>
+      ) : null}
+      </>
       ) : null}
 
       <Divider />

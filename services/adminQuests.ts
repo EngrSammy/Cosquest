@@ -16,6 +16,8 @@ export type AdminQuest = {
   coverImageUrl: string;
   hostName: string;
   kind: "quest" | "event";
+  format?: "in_person" | "virtual";
+  placeLabel?: string;
   status: QuestStatus;
   isPublished: boolean;
   isSeedData: boolean;
@@ -38,6 +40,8 @@ export type AdminQuest = {
 export type QuestInput = {
   title: string;
   kind: "quest" | "event";
+  format?: "in_person" | "virtual";
+  placeLabel?: string;
   description: string;
   coverImageUrl: string;
   startsAt: string;

@@ -116,7 +116,9 @@ export default function QuestDetail() {
         `Until ${new Date(end).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", ...(end - start > 86400e3 ? { month: "short", day: "numeric" } : {}) })}`,
       )}
       <Pressable onPress={directions}>
-        {row("location-outline", quest.location?.name || "Venue", [quest.location?.address, typeof quest.distanceMiles === "number" ? `${quest.distanceMiles} mi away` : null, "Directions ›"].filter(Boolean).join(" · "))}
+        {quest.format === "virtual"
+          ? row("globe-outline", quest.placeLabel || quest.location?.name || "Online", "Virtual · join from anywhere")
+          : row("location-outline", quest.location?.name || "Venue", [quest.location?.address, typeof quest.distanceMiles === "number" ? `${quest.distanceMiles} mi away` : null, "Directions ›"].filter(Boolean).join(" · "))}
       </Pressable>
       <View style={{ flexDirection: "row", gap: 10 }}>
         {[
