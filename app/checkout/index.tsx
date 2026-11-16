@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { chooseTicketType } from "@/store/slices/paymentSlice";
 import { payNow, redeemCheckout } from "@/store/thunks/paymentThunks";
 import { Message, backToApp } from "@/components/checkout/CheckoutParts";
+import SalesCountdown from "@/components/tickets/SalesCountdown";
 
 const PINK = "#C34D9C";
 const LOGO = require("@/assets/images/cosquest-logo.png");
@@ -105,6 +106,7 @@ export default function WebCheckout() {
           <Message icon="time-outline" title="This checkout has closed" text="Go back to CosQuest and tap Pay again." action="Back to CosQuest" onAction={backToApp} compact />
         ) : (
           <View style={{ gap: 10 }}>
+            <SalesCountdown closesAt={type?.salesClosesAt} />
             {web.error ? <Text style={{ fontFamily: FONTS.regular, fontSize: 13.5, color: "#D9364F", textAlign: "center" }}>{web.error.message}</Text> : null}
             <Pressable
               onPress={() => dispatch(payNow())}

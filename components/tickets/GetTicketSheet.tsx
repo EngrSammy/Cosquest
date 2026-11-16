@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { checkEligibility, openWebCheckout } from "@/store/thunks/paymentThunks";
 
 import { currentPosition } from "./currentPosition";
+import SalesCountdown, { salesClosed } from "./SalesCountdown";
 
 const PINK = "#C34D9C";
 
@@ -70,6 +71,10 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
 
   const go = async () => {
     if (!token || !type || busy) return;
+    if (salesClosed(type.salesClosesAt)) {
+      setError("Ticket sales have closed: it has started.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -175,6 +180,7 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
           {quest.requireAtVenue ? (
             <Text style={styles.sub}>📍 Joining while it's live works at {quest.location?.name || "the venue"} only.</Text>
           ) : null}
+          <SalesCountdown closesAt={type?.salesClosesAt} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {eligibility && !eligibility.allowed && !type?.free ? <Text style={styles.error}>{eligibility.message || "Paid quests aren't available for you right now."}</Text> : null}
 

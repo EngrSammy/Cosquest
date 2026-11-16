@@ -11,6 +11,7 @@ import { Image } from "expo-image";
 import { createElement, useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 
+import QuestAfterEvent from "@/components/admin/QuestAfterEvent";
 import { ConfirmBox, Divider, DoneNote, Field, Pager, ReasonBox, SearchBox, Select, Tabs, Toggle } from "@/components/admin/controls";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Card, CardHeader, Initials, Loading, Notice, PageHeader, Pill, StatCard, formatNumber, timeAgo } from "@/components/admin/ui";
@@ -95,6 +96,13 @@ function fromQuest(q: AdminQuest): QuestInput {
   };
 }
 
+// Under 30 minutes: probably a typo in the end time (it disappears at the end).
+function shortMinutes(form: { startsAt?: string | null; endsAt?: string | null }) {
+  if (!form.startsAt || !form.endsAt) return null;
+  const minutes = Math.round((new Date(form.endsAt).getTime() - new Date(form.startsAt).getTime()) / 60000);
+  return minutes > 0 && minutes < 30 ? minutes : null;
+}
+
 function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; onClose: () => void; onSaved: (quest: AdminQuest, message: string) => void }) {
   const t = useAdminTheme();
   const [form, setForm] = useState<QuestInput>(editing ? fromQuest(editing) : EMPTY());
@@ -157,6 +165,8 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
   };
 
   const save = async (mode: "draft" | "publish" | "save") => {
+    const short = shortMinutes(form);
+    if (short !== null && typeof window !== "undefined" && !window.confirm(`This lasts only ${short} minutes, then it disappears from the app. Save it anyway?`)) return;
     setSaving(mode);
     setError("");
     try {
@@ -216,6 +226,9 @@ function QuestForm({ editing, onClose, onSaved }: { editing: AdminQuest | null; 
         <View>
           {label("Ends")}
           {dateInput(form.endsAt, (v) => set("endsAt", v))}
+          {shortMinutes(form) !== null ? (
+            <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 12.5, color: t.amber }}>This lasts only {shortMinutes(form)} minutes. Check the end time.</Text>
+          ) : null}
         </View>
       </View>
 
@@ -613,6 +626,13 @@ function QuestPanel({ questId, onEdit, onChanged, onDeleted }: { questId: string
 
       <Divider />
       <QuestTickets questId={quest.id} editable={editable && quest.status !== "completed"} />
+
+      {quest.status === "live" || quest.status === "completed" ? (
+        <>
+          <Divider />
+          <QuestAfterEvent questId={quest.id} status={quest.status} />
+        </>
+      ) : null}
 
       <Divider />
       <View style={{ flexDirection: "row", alignItems: "center" }}>

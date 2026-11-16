@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   "quest.update": "Edited a quest",
   "quest.duplicate": "Duplicated a quest",
   "quest.cancel": "Cancelled a quest",
+  "quest.results": "Published results",
   "ledger.reverse": "Corrected a ledger entry",
   "ledger.export": "Exported the ledger",
   "approval.request": "Requested a money change",

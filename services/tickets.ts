@@ -52,6 +52,8 @@ export type TicketType = {
   remaining: number;
   soldOut: boolean;
   onSale: boolean;
+  /** When sales close (the quest's start, or sooner): the countdown. */
+  salesClosesAt?: string | null;
 };
 
 export type OrderStatus = "pending" | "paid" | "free" | "expired" | "failed" | "refunded" | "cancelled";
@@ -79,6 +81,8 @@ export type MyTicket = {
   order: { id: string; number: string; amount: Money; status: OrderStatus; paidAt: string | null } | null;
   checkedInAt: string | null;
   canGiveBack: boolean;
+  /** The place, once the quest's results are published. */
+  result?: { place: number; placeLabel: string; prizeNote: string } | null;
   giveBackUntil: string | null;
 };
 

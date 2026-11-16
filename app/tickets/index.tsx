@@ -112,7 +112,7 @@ export default function MyTickets() {
                   fontSize: 11.5,
                   color: t.status === "valid" ? "#1D9A6C" : t.status === "checked_in" ? PINK : "#7A8296",
                 }}>
-                {t.status === "valid" ? "Valid" : t.status === "checked_in" ? "Checked in" : t.status === "refunded" ? "Refunded" : "Cancelled"}
+                {t.result ? `🏆 ${t.result.placeLabel} place` : t.status === "valid" ? "Valid" : t.status === "checked_in" ? "Checked in" : t.status === "refunded" ? "Refunded" : "Cancelled"}
               </Text>
             </Pressable>
           ))
