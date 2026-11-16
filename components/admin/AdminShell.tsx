@@ -16,6 +16,7 @@ import { signOutAdmin, useAdminSession } from "@/services/admin";
 
 import AdminAlerts from "./AdminAlerts";
 import AdminSearch from "./AdminSearch";
+import { glass, useGlassStyles } from "./glass";
 import { useAdminTheme } from "./theme";
 import { initials } from "./ui";
 
@@ -106,7 +107,9 @@ function Sidebar({ onPick }: { onPick?: () => void }) {
   };
 
   return (
-    <View style={{ width: 216, height: "100%", paddingHorizontal: 16, paddingTop: 22, paddingBottom: 18, borderRightWidth: 1, borderRightColor: t.border, backgroundColor: t.sidebar }}>
+    <View
+      style={{ width: 232, alignSelf: "stretch", margin: 16, marginRight: 0, paddingHorizontal: 14, paddingTop: 22, paddingBottom: 18, borderRadius: 24, borderWidth: 1, borderColor: t.border, backgroundColor: t.sidebar }}
+      {...glass("nav")}>
       <View style={{ paddingHorizontal: 6 }}>
         <Image source={COSQUEST_LOGO} style={{ width: 150, height: 150 / LOGO_RATIO }} contentFit="contain" accessibilityLabel="CosQuest" />
       </View>
@@ -150,7 +153,9 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
   const name = session?.admin.name || "Admin";
 
   return (
-    <View style={{ height: 70, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 28, borderBottomWidth: 1, borderBottomColor: t.border, backgroundColor: t.card, zIndex: 10 }}>
+    <View
+      style={{ height: 64, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 20, margin: 16, marginBottom: 0, borderRadius: 20, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, zIndex: 10 }}
+      {...glass("bar")}>
       {narrow ? (
         <Pressable onPress={onMenu} hitSlop={8} accessibilityLabel="Menu">
           <Ionicons name="menu-outline" size={24} color={t.text} />
@@ -181,7 +186,7 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
           <Ionicons name="chevron-down" size={15} color={t.muted} />
         </Pressable>
         {menu ? (
-          <View style={{ position: "absolute", right: 0, top: 46, width: 200, padding: 6, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } }}>
+          <View style={{ position: "absolute", right: 0, top: 46, width: 200, padding: 6, borderRadius: 14, borderWidth: 1, borderColor: t.border, backgroundColor: t.popover }} {...glass("pop")}>
             {[
               { label: "Open CosQuest", icon: "open-outline" as const, onPress: () => router.navigate("/community" as any) },
               {
@@ -213,12 +218,13 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const t = useAdminTheme();
+  useGlassStyles();
   const { width } = useWindowDimensions();
   const narrow = width < 960;
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.page }}>
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.page }} {...glass("page")}>
       {!narrow ? <Sidebar /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <TopBar narrow={narrow} onMenu={() => setOpen(true)} />

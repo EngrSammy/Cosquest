@@ -7,13 +7,16 @@
 // Show / hide the password, and "Remember me" (the email, in this browser).
 // Invited to be a super admin? Signed in to CosQuest here, the invitation
 // shows on this page: accept it (then the dashboard opens) or decline it.
+// Glass design: the logo and a welcome on the left, the sign-in card on the
+// right (stacked on a phone).
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { COSQUEST_LOGO, LOGO_RATIO } from "@/components/admin/AdminShell";
+import { glass, useGlassStyles } from "@/components/admin/glass";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Button, Notice } from "@/components/admin/ui";
 import { FONTS } from "@/constants/fonts";
@@ -34,6 +37,7 @@ function messageFor(error: unknown) {
 
 export default function AdminLogin() {
   const t = useAdminTheme();
+  useGlassStyles();
   const appToken = useAppSelector((state) => state.auth.token);
   const appUser = useAppSelector((state) => (state.user.user || state.auth.user) as any);
   const username = appUser?.profile?.username || appUser?.username || null;
@@ -122,24 +126,44 @@ export default function AdminLogin() {
   };
 
   const input = {
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    height: 50,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.border,
     backgroundColor: t.cardSoft,
     fontFamily: FONTS.regular,
-    fontSize: 14,
+    fontSize: 15,
     color: t.text,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
   };
 
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: t.page }}>
-      <View style={{ width: "100%", maxWidth: 420, padding: 32, borderRadius: 20, borderWidth: 1, borderColor: t.border, backgroundColor: t.card }}>
-        <Image source={COSQUEST_LOGO} style={{ width: 170, height: 170 / LOGO_RATIO }} contentFit="contain" accessibilityLabel="CosQuest" />
-        <Text style={{ marginTop: 22, fontFamily: FONTS.regular, fontSize: 24, color: t.text }}>Admin dashboard</Text>
-        <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 13, color: t.muted }}>For CosQuest super admins. Signing in here keeps your phone signed in.</Text>
+    <View style={{ flex: 1, backgroundColor: t.page }} {...glass("page")}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}>
+      <View style={{ width: "100%", maxWidth: 1120, alignSelf: "center", flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 48 }}>
+      {/* Left: the logo and a welcome */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 420, minWidth: 0, gap: 20 }}>
+        <Image source={COSQUEST_LOGO} style={{ width: 300, height: 300 / LOGO_RATIO, maxWidth: "80%" }} contentFit="contain" accessibilityLabel="CosQuest" />
+        <Text style={{ fontFamily: FONTS.bold, fontSize: 42, lineHeight: 50, color: t.text }}>Admin dashboard</Text>
+        <Text style={{ maxWidth: 460, fontFamily: FONTS.regular, fontSize: 16, lineHeight: 26, color: t.muted }}>
+          Keep the community safe, run quests and events, and look after tickets and payments, all in one place.
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+          {["Moderation", "Quests & events", "Tickets & payments", "Audit log"].map((label) => (
+            <View key={label} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, borderWidth: 1, borderColor: t.border, backgroundColor: t.card }} {...glass("panel")}>
+              <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: t.text }}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Right: the sign-in card */}
+      <View
+        style={{ flexGrow: 1, flexShrink: 1, flexBasis: 380, maxWidth: 460, minWidth: 0, padding: 34, borderRadius: 28, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.1)" }}
+        {...glass("panel")}>
+        <Text style={{ fontFamily: FONTS.semibold, fontSize: 26, color: t.text }}>Sign in</Text>
+        <Text style={{ marginTop: 6, fontFamily: FONTS.regular, fontSize: 14, lineHeight: 20, color: t.muted }}>For CosQuest super admins. Signing in here keeps your phone signed in.</Text>
 
         {invitations.map((invitation) => (
           <View key={invitation.id} style={{ marginTop: 22, padding: 16, borderRadius: 14, backgroundColor: t.pinkSoft }}>
@@ -173,7 +197,7 @@ export default function AdminLogin() {
           <View style={{ height: 22 }} />
         )}
 
-        <Text style={{ marginBottom: 6, fontFamily: FONTS.medium, fontSize: 12.5, color: t.text }}>Email</Text>
+        <Text style={{ marginBottom: 8, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Email</Text>
         <TextInput
           value={email}
           onChangeText={setEmail}
@@ -187,7 +211,7 @@ export default function AdminLogin() {
           placeholderTextColor={t.faint}
           style={input}
         />
-        <Text style={{ marginTop: 14, marginBottom: 6, fontFamily: FONTS.medium, fontSize: 12.5, color: t.text }}>Password</Text>
+        <Text style={{ marginTop: 16, marginBottom: 8, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Password</Text>
         <View style={{ justifyContent: "center" }}>
           <TextInput
             value={password}
@@ -215,12 +239,12 @@ export default function AdminLogin() {
           <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: remember ? t.pink : t.faint, backgroundColor: remember ? t.pink : "transparent", alignItems: "center", justifyContent: "center" }}>
             {remember ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
           </View>
-          <Text style={{ flex: 1, fontFamily: FONTS.regular, fontSize: 12.5, color: t.text }}>Remember me on this computer</Text>
+          <Text style={{ flex: 1, fontFamily: FONTS.regular, fontSize: 14, color: t.text }}>Remember me on this computer</Text>
         </Pressable>
 
         {error ? <Text style={{ marginTop: 12, fontFamily: FONTS.regular, fontSize: 12.5, color: t.red }}>{error}</Text> : null}
 
-        <View style={{ marginTop: 18 }}>
+        <View style={{ marginTop: 20 }}>
           <Button label="Sign in" variant={appToken ? "secondary" : "primary"} onPress={withPassword} loading={busy === "password"} />
         </View>
 
@@ -228,9 +252,11 @@ export default function AdminLogin() {
           <Notice icon="shield-checkmark-outline" text="Admin access is assigned by a super admin. Faction rank never grants admin access." />
         </View>
         <Pressable onPress={() => router.navigate("/community" as any)} style={{ marginTop: 16, alignSelf: "center" }}>
-          <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Back to CosQuest</Text>
+          <Text style={{ fontFamily: FONTS.regular, fontSize: 14, color: t.muted }}>Back to CosQuest</Text>
         </Pressable>
       </View>
+      </View>
+      </ScrollView>
     </View>
   );
 }
