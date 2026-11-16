@@ -16,6 +16,7 @@ import projectReducer from "./slices/projectSlice";
 import settingsReducer from "./slices/settingsSlice";
 import spotlightReducer from "./slices/spotlightSlice";
 import userReducer from "./slices/userSlice";
+import paymentReducer from "./slices/paymentSlice";
 
 export const store = configureStore({
   reducer: {
@@ -35,6 +36,7 @@ export const store = configureStore({
     settings: settingsReducer,
     scheduledCalls: scheduledCallReducer,
     projects: projectReducer,
+    payment: paymentReducer,
   },
 });
 

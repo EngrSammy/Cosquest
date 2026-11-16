@@ -159,6 +159,12 @@ export default function Settings() {
             label="Notification Preferences"
             href="/notification-preferences"
           />
+
+          <SettingRow
+            icon="pulse-outline"
+            label="Notifications check"
+            href="/notifications-check"
+          />
         </View>
 
         {/* APP PREFERENCES */}

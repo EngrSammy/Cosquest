@@ -38,6 +38,13 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   "quest.update": "Edited a quest",
   "quest.duplicate": "Duplicated a quest",
   "quest.cancel": "Cancelled a quest",
+  "quest.results": "Published results",
+  "ledger.reverse": "Corrected a ledger entry",
+  "ledger.export": "Exported the ledger",
+  "approval.request": "Requested a money change",
+  "approval.approve": "Approved a money change",
+  "approval.reject": "Rejected a money change",
+  "approval.withdraw": "Withdrew a money change",
   "quest.delete": "Deleted a quest",
   "ticket_type.create": "Added a ticket type",
   "ticket_type.update": "Changed a ticket type",
@@ -56,6 +63,7 @@ export const AUDIT_AREAS: Record<string, string> = {
   settings: "Settings",
   auth: "Sign-ins",
   quests: "Quests & Events",
+  payments: "Payments",
 };
 
 export const actionLabel = (action: string) => AUDIT_ACTIONS[action] || action.replace(/[._]/g, " ");

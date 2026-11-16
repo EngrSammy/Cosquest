@@ -116,7 +116,9 @@ export default function QuestDetail() {
         `Until ${new Date(end).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", ...(end - start > 86400e3 ? { month: "short", day: "numeric" } : {}) })}`,
       )}
       <Pressable onPress={directions}>
-        {row("location-outline", quest.location?.name || "Venue", [quest.location?.address, typeof quest.distanceMiles === "number" ? `${quest.distanceMiles} mi away` : null, "Directions ›"].filter(Boolean).join(" · "))}
+        {quest.format === "virtual"
+          ? row("globe-outline", quest.placeLabel || quest.location?.name || "Online", "Virtual · join from anywhere")
+          : row("location-outline", quest.location?.name || "Venue", [quest.location?.address, typeof quest.distanceMiles === "number" ? `${quest.distanceMiles} mi away` : null, "Directions ›"].filter(Boolean).join(" · "))}
       </Pressable>
       <View style={{ flexDirection: "row", gap: 10 }}>
         {[
@@ -137,7 +139,7 @@ export default function QuestDetail() {
   const button =
     !cancelled && !ended ? (
       <Pressable
-        disabled={!quest.isRegistered && full}
+        disabled={!quest.isRegistered && (full || (live && !(quest.kind === "quest" && !!quest.requireAtVenue)))}
         onPress={() => (quest.isRegistered ? router.push("/tickets" as any) : setSheet(true))}
         style={({ hovered }: any) => ({
           height: 54,
@@ -150,7 +152,7 @@ export default function QuestDetail() {
           backgroundColor: quest.isRegistered ? "#1D9A6C" : full ? "#B9BECB" : hovered ? "#A93F86" : PINK,
         })}>
         <Text style={{ fontFamily: FONTS.bold, fontSize: 16, color: "#FFFFFF" }}>
-          {quest.isRegistered ? "✓ You're in · See my ticket" : full ? "Full" : live ? "Join now" : quest.entryFee?.amount ? `Get ticket · ${formatMoney(quest.entryFee as any)}` : "Get free ticket"}
+          {quest.isRegistered ? "✓ You're in · See my ticket" : full ? "Full" : live ? ((quest.kind === "quest" && !!quest.requireAtVenue) ? "Join now" : "Sales closed") : quest.entryFee?.amount ? `Get ticket · ${formatMoney(quest.entryFee as any)}` : "Get free ticket"}
         </Text>
       </Pressable>
     ) : null;

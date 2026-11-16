@@ -86,6 +86,11 @@ export default function NativeCalls() {
       Calls.addCallAnsweredListener(async ({ id, requestId }) => {
         const session = await Calls.getActiveCallSession().catch(() => null);
         const serverId = serverIds.current.get(id) || session?.incomingCallEvent?.serverCallId;
+        // A test call from Settings > Notifications check: nothing to tell the server.
+        if (serverId?.startsWith("test-")) {
+          Calls.failIncomingCallConnected(id, requestId).catch(() => {});
+          return;
+        }
         const auth = await sessionToken();
         if (!serverId || !auth) {
           Calls.failIncomingCallConnected(id, requestId).catch(() => {});
@@ -107,7 +112,7 @@ export default function NativeCalls() {
       // Decline, or hang up, on the phone's call screen.
       Calls.addCallEndedListener(async ({ id, session }) => {
         const serverId = serverIds.current.get(id) || session?.incomingCallEvent?.serverCallId;
-        if (!serverId) return;
+        if (!serverId || serverId.startsWith("test-")) return;
         clearNativeCall(serverId);
         if (endedHere.current.has(id)) return; // CosQuest ended it already
         const auth = await sessionToken();

@@ -8,7 +8,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
-import { type ReactNode, useState, useSyncExternalStore } from "react";
+import { forgetAdminRole, useAdminRole } from "@/services/adminFinance";
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { FONTS } from "@/constants/fonts";
@@ -16,6 +17,7 @@ import { signOutAdmin, useAdminSession } from "@/services/admin";
 
 import AdminAlerts from "./AdminAlerts";
 import AdminSearch from "./AdminSearch";
+import { glass, useGlassStyles } from "./glass";
 import { useAdminTheme } from "./theme";
 import { initials } from "./ui";
 
@@ -29,6 +31,7 @@ export const WORKSPACE: Item[] = [
   { key: "overview", label: "Overview", icon: "grid-outline", path: "/admin" },
   { key: "quests", label: "Quests & Events", icon: "map-outline", path: "/admin/quests" },
   { key: "payments", label: "Tickets & Payments", icon: "card-outline", path: "/admin/payments" },
+  { key: "money", label: "Ledger & approvals", icon: "wallet-outline", path: "/admin/money" },
   { key: "checkin", label: "Check-in", icon: "qr-code-outline", path: "/admin/checkin" },
   { key: "moderation", label: "Moderation", icon: "shield-checkmark-outline", path: "/admin/moderation" },
   { key: "members", label: "Members", icon: "people-outline", path: "/admin/members" },
@@ -70,6 +73,9 @@ function current(path: string) {
 
 function Sidebar({ onPick }: { onPick?: () => void }) {
   const t = useAdminTheme();
+  // Finance approvers (the second person for money changes): Ledger & approvals only.
+  const role = useAdminRole();
+  const shown = (item: Item) => role !== "finance" || item.key === "money";
   const path = usePathname() || "/admin";
   const active = current(path);
   const badge = useOpenReportsBadge();
@@ -106,7 +112,9 @@ function Sidebar({ onPick }: { onPick?: () => void }) {
   };
 
   return (
-    <View style={{ width: 216, height: "100%", paddingHorizontal: 16, paddingTop: 22, paddingBottom: 18, borderRightWidth: 1, borderRightColor: t.border, backgroundColor: t.sidebar }}>
+    <View
+      style={{ width: 232, alignSelf: "stretch", margin: 16, marginRight: 0, paddingHorizontal: 14, paddingTop: 22, paddingBottom: 18, borderRadius: 24, borderWidth: 1, borderColor: t.border, backgroundColor: t.sidebar }}
+      {...glass("nav")}>
       <View style={{ paddingHorizontal: 6 }}>
         <Image source={COSQUEST_LOGO} style={{ width: 150, height: 150 / LOGO_RATIO }} contentFit="contain" accessibilityLabel="CosQuest" />
       </View>
@@ -123,9 +131,9 @@ function Sidebar({ onPick }: { onPick?: () => void }) {
 
       <ScrollView style={{ flex: 1, marginTop: 22 }} showsVerticalScrollIndicator={false}>
         <Text style={{ marginBottom: 8, paddingHorizontal: 12, fontFamily: FONTS.medium, fontSize: 10.5, letterSpacing: 0.6, color: t.faint }}>WORKSPACE</Text>
-        <View style={{ gap: 4 }}>{WORKSPACE.map(row)}</View>
+        <View style={{ gap: 4 }}>{WORKSPACE.filter(shown).map(row)}</View>
         <Text style={{ marginTop: 22, marginBottom: 8, paddingHorizontal: 12, fontFamily: FONTS.medium, fontSize: 10.5, letterSpacing: 0.6, color: t.faint }}>ADMINISTRATION</Text>
-        <View style={{ gap: 4 }}>{ADMINISTRATION.map(row)}</View>
+        <View style={{ gap: 4 }}>{ADMINISTRATION.filter(shown).map(row)}</View>
       </ScrollView>
 
       <View style={{ padding: 14, borderRadius: 12, backgroundColor: t.blueSoft, gap: 6 }}>
@@ -150,7 +158,9 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
   const name = session?.admin.name || "Admin";
 
   return (
-    <View style={{ height: 70, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 28, borderBottomWidth: 1, borderBottomColor: t.border, backgroundColor: t.card, zIndex: 10 }}>
+    <View
+      style={{ height: 64, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 20, margin: 16, marginBottom: 0, borderRadius: 20, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, zIndex: 10 }}
+      {...glass("bar")}>
       {narrow ? (
         <Pressable onPress={onMenu} hitSlop={8} accessibilityLabel="Menu">
           <Ionicons name="menu-outline" size={24} color={t.text} />
@@ -181,13 +191,14 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
           <Ionicons name="chevron-down" size={15} color={t.muted} />
         </Pressable>
         {menu ? (
-          <View style={{ position: "absolute", right: 0, top: 46, width: 200, padding: 6, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } }}>
+          <View style={{ position: "absolute", right: 0, top: 46, width: 200, padding: 6, borderRadius: 14, borderWidth: 1, borderColor: t.border, backgroundColor: t.popover }} {...glass("pop")}>
             {[
               { label: "Open CosQuest", icon: "open-outline" as const, onPress: () => router.navigate("/community" as any) },
               {
                 label: "Sign out of admin",
                 icon: "log-out-outline" as const,
                 onPress: async () => {
+                  forgetAdminRole();
                   await signOutAdmin();
                   router.replace("/admin/login" as any);
                 },
@@ -213,12 +224,19 @@ function TopBar({ narrow, onMenu }: { narrow: boolean; onMenu: () => void }) {
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const t = useAdminTheme();
+  useGlassStyles();
   const { width } = useWindowDimensions();
   const narrow = width < 960;
   const [open, setOpen] = useState(false);
+  // A finance approver can only use Ledger & approvals: take them there.
+  const adminRole = useAdminRole();
+  const here = usePathname() || "/admin";
+  useEffect(() => {
+    if (adminRole === "finance" && !here.startsWith("/admin/money")) router.replace("/admin/money" as any);
+  }, [adminRole, here]);
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.page }}>
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.page }} {...glass("page")}>
       {!narrow ? <Sidebar /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <TopBar narrow={narrow} onMenu={() => setOpen(true)} />

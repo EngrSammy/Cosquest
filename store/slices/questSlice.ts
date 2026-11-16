@@ -6,6 +6,7 @@ import {
   unregisterQuest,
 } from "../thunks/questThunks";
 import type { Quest } from "@/services/quests";
+import { ticketIssued } from "./paymentSlice";
 
 type QuestState = {
   quests: Quest[];
@@ -36,6 +37,12 @@ const questSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    // Paid (e.g. on the CosQuest website): the quest shows "You're in" at once.
+    builder.addCase(ticketIssued, (state, action) => {
+      const id = action.payload.questId;
+      for (const quest of state.quests) if (quest.id === id) quest.isRegistered = true;
+      if (state.selectedQuest?.id === id) state.selectedQuest.isRegistered = true;
+    });
     builder
       .addCase(fetchQuests.pending, (state) => {
         state.loading = true;

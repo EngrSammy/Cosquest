@@ -10,6 +10,7 @@ import { Pressable, Text, View } from "react-native";
 import { FONTS } from "@/constants/fonts";
 import { type AlertItem, getAlerts } from "@/services/adminExtras";
 
+import { glass } from "./glass";
 import { useAdminTheme } from "./theme";
 import { timeAgo } from "./ui";
 
@@ -80,7 +81,7 @@ export default function AdminAlerts() {
         ) : null}
       </Pressable>
       {open ? (
-        <View style={{ position: "absolute", right: -10, top: 34, width: 360, maxHeight: 480, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } }}>
+        <View style={{ position: "absolute", right: -10, top: 34, width: 360, maxHeight: 480, padding: 8, borderRadius: 16, borderWidth: 1, borderColor: t.border, backgroundColor: t.popover }} {...glass("pop")}>
           <Text style={{ padding: 10, fontFamily: FONTS.medium, fontSize: 14, color: t.text }}>Alerts</Text>
           {items.length ? (
             items.slice(0, 12).map((item) => {

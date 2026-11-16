@@ -4,7 +4,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import TicketScreenHeader from "@/components/tickets/TicketScreenHeader";
@@ -45,6 +45,12 @@ export default function MyTickets() {
       setError(e?.status ? e?.message || "Couldn't load your tickets." : "You're offline: showing the tickets saved on this phone.");
     }
   }, [token, scope, owner]);
+
+  // A ticket just confirmed (e.g. paid on the website): show it.
+  const lastIssued = useAppSelector((state) => state.payment.lastIssued?.at);
+  useEffect(() => {
+    if (lastIssued) load();
+  }, [lastIssued, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -106,7 +112,7 @@ export default function MyTickets() {
                   fontSize: 11.5,
                   color: t.status === "valid" ? "#1D9A6C" : t.status === "checked_in" ? PINK : "#7A8296",
                 }}>
-                {t.status === "valid" ? "Valid" : t.status === "checked_in" ? "Checked in" : t.status === "refunded" ? "Refunded" : "Cancelled"}
+                {t.result ? `🏆 ${t.result.placeLabel} place` : t.status === "valid" ? "Valid" : t.status === "checked_in" ? "Checked in" : t.status === "refunded" ? "Refunded" : "Cancelled"}
               </Text>
             </Pressable>
           ))

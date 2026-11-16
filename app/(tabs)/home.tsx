@@ -29,6 +29,7 @@ import {
   UPCOMING_WIDTH,
   UpcomingCard,
 } from "@/components/dashboard/QuestCards";
+import { useAutoScroll } from "@/components/dashboard/useAutoScroll";
 import { isLiveQuest, isUpcomingQuest, questCity } from "@/components/dashboard/questFormat";
 import {
   DARK_SCREEN_GRADIENT,
@@ -161,13 +162,18 @@ export default function HomeScreen() {
     // The big pin is for a quest in the user's city (live first, then the
     // next to start); other cities only when there's nothing local.
     const here = (quest: Quest) => !!city && questCity(quest).toLowerCase() === city.toLowerCase();
-    const featured = live.find(here) || soon.find(here) || live[0] || soon[0] || null;
+    // The big pin is a place to GO: in-person quests only. Ongoing: live
+    // virtual quests (from anywhere) first, then other live ones. Upcoming: both.
+    const inPerson = (quest: Quest) => quest.format !== "virtual";
+    const featured = live.filter(inPerson).find(here) || soon.filter(inPerson).find(here) || live.find(inPerson) || soon.find(inPerson) || null;
     return {
       featured,
-      ongoing: live.filter((quest) => quest !== featured),
+      ongoing: [...live.filter((quest) => !inPerson(quest)), ...live.filter((quest) => inPerson(quest) && quest !== featured)],
       upcoming: soon.filter((quest) => quest !== featured),
     };
   }, [quests, city]);
+  // Ongoing slides by itself (pauses when touched; still with Reduce Motion).
+  const ongoingScroll = useAutoScroll(ongoing.length, ONGOING_WIDTH + 14);
 
   // Register / Join / ENTER: "Get a ticket" (paid, through Stripe); once
   // you have one, My tickets.
@@ -269,6 +275,9 @@ export default function HomeScreen() {
         {/* ONGOING */}
         {ongoing.length ? (
           <FlatList
+            ref={ongoingScroll.ref}
+            onScrollBeginDrag={ongoingScroll.pause}
+            onMomentumScrollEnd={ongoingScroll.settle}
             horizontal
             data={ongoing}
             keyExtractor={(quest) => quest.id}

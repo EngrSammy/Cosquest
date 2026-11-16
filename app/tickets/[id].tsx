@@ -113,7 +113,14 @@ export default function TicketScreen() {
             {ticket.status === "valid" ? (
               <Text style={{ marginTop: 12, textAlign: "center", fontFamily: FONTS.regular, fontSize: 12.5, color: ink.text("#66738A") }}>Show this at the entrance. It works once.</Text>
             ) : ticket.checkedInAt ? (
-              <Text style={{ marginTop: 12, fontFamily: FONTS.regular, fontSize: 12.5, color: ink.text("#66738A") }}>Checked in {new Date(ticket.checkedInAt).toLocaleString()}</Text>
+              <View style={{ marginTop: 12, alignItems: "center", gap: 6 }}>
+                {ticket.result ? (
+                  <Text style={{ fontFamily: FONTS.bold, fontSize: 17, color: "#C34D9C" }}>
+                    🏆 {ticket.result.placeLabel} place{ticket.result.prizeNote ? ` · ${ticket.result.prizeNote}` : ""}
+                  </Text>
+                ) : null}
+                <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: ink.text("#66738A") }}>Checked in {new Date(ticket.checkedInAt).toLocaleString()}</Text>
+              </View>
             ) : null}
 
             <View style={{ marginTop: 18, alignSelf: "stretch", gap: 6 }}>

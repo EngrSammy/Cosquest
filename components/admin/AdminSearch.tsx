@@ -8,6 +8,7 @@ import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import { FONTS } from "@/constants/fonts";
 import { type SearchResults, searchAdmin } from "@/services/adminExtras";
 
+import { glass } from "./glass";
 import { useAdminTheme } from "./theme";
 
 type Hit = { key: string; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; go: () => void };
@@ -85,7 +86,7 @@ export default function AdminSearch() {
         <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: t.faint }}>{Platform.OS === "web" && /Mac/.test(String((globalThis as any).navigator?.platform || "")) ? "⌘ K" : "Ctrl K"}</Text>
       </View>
       {open && q.trim().length >= 2 ? (
-        <View style={{ position: "absolute", top: 44, left: 0, right: -120, maxHeight: 460, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.card, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } }}>
+        <View style={{ position: "absolute", top: 44, left: 0, right: -120, maxHeight: 460, padding: 8, borderRadius: 16, borderWidth: 1, borderColor: t.border, backgroundColor: t.popover }} {...glass("pop")}>
           {loading && !results ? (
             <Text style={{ padding: 12, fontFamily: FONTS.regular, fontSize: 12.5, color: t.muted }}>Searching…</Text>
           ) : sections.length ? (

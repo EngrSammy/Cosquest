@@ -5,6 +5,7 @@ import { onScheduledAdmission, onScheduledWaiting } from "@/components/calls/sch
 import { scheduledCallUpdated } from "@/store/slices/scheduledCallSlice";
 import { applyPrivateUpdate, receivePrivateIncoming } from "@/components/calls/privateCall";
 import { useEffect, useRef } from "react";
+import { ticketIssued } from "@/store/slices/paymentSlice";
 import { AppState } from "react-native";
 
 import { normalizeCall } from "@/services/calls";
@@ -262,6 +263,13 @@ export function useSocketConnection() {
     // Scheduled group calls: created / edited / cancelled / RSVP (the call
     // without passcode or invite link; the slice keeps the ones it has).
     // Projects: someone changed one (files, subjects, Sparks, archive).
+    // Paid (e.g. on the CosQuest website): the server confirmed the ticket.
+    const handleTicketIssued = (payload: { orderId?: string; ticketId?: string; questId?: string }) => {
+      if (payload?.ticketId && payload.questId) {
+        dispatch(ticketIssued({ orderId: String(payload.orderId || ""), ticketId: payload.ticketId, questId: payload.questId }));
+      }
+    };
+
     const handleProjectUpdated = (payload: { projectId?: string }) => {
       if (payload?.projectId) dispatch(refreshProject(payload.projectId));
     };
@@ -339,6 +347,7 @@ export function useSocketConnection() {
     socket.on("call:updated", handleCallUpdated);
     socket.on("scheduled-call:updated", handleScheduledCallUpdated);
     socket.on("project:updated", handleProjectUpdated);
+    socket.on("ticket:issued", handleTicketIssued);
     socket.on("scheduled-call:waiting", onScheduledWaiting);
     socket.on("scheduled-call:admission", onScheduledAdmission);
     socket.on("connect", handleConnect);
@@ -356,6 +365,7 @@ export function useSocketConnection() {
       socket.off("call:updated", handleCallUpdated);
       socket.off("scheduled-call:updated", handleScheduledCallUpdated);
       socket.off("project:updated", handleProjectUpdated);
+      socket.off("ticket:issued", handleTicketIssued);
       socket.off("scheduled-call:waiting", onScheduledWaiting);
       socket.off("scheduled-call:admission", onScheduledAdmission);
       socket.off("connect", handleConnect);

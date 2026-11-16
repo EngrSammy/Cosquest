@@ -35,10 +35,17 @@ const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
   { value: "private", label: "Private" },
 ];
 
+// What each option means (the server enforces it). "Friends" = people who follow each other.
+const VISIBILITY_TEXT: Record<Visibility, string> = {
+  public: "Public: everyone can see your profile and posts, find you in search, and message you.",
+  friends: "Friends: only friends (people who follow each other) see your posts and online status, and can message you.",
+  private: "Private: only you see your posts. You don't appear in search, and only people already chatting with you can message you.",
+};
+
 const TOGGLES: { key: ToggleKey; label: string; hint?: string }[] = [
   { key: "showOnlineStatus", label: "Show Online Status" },
   { key: "showActivityFeed", label: "Show Activity Feed" },
-  { key: "allowFriendRequests", label: "Allow Friend Requests" },
+  { key: "allowFriendRequests", label: "Allow New Followers", hint: "Off: nobody new can follow you. People who already follow you stay." },
   { key: "allowDirectMessages", label: "Allow Direct Messages" },
   {
     key: "readReceipts",
@@ -231,22 +238,36 @@ export default function PrivacyVisibility() {
               );
             })}
           </View>
+
+          <Text style={[styles.rowHint, { marginTop: 10 }]}>{VISIBILITY_TEXT[privacy.profileVisibility as Visibility] || ""}</Text>
         </View>
 
         {/* PREFERENCES */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>PREFERENCES</Text>
 
-          {TOGGLES.map((toggle) => (
-            <PrivacyToggleRow
-              key={toggle.key}
-              label={toggle.label}
-              hint={toggle.hint}
-              value={privacy[toggle.key]}
-              disabled={loading || saving === toggle.key}
-              onChange={(value) => save(toggle.key, value)}
-            />
-          ))}
+          {TOGGLES.map((toggle) => {
+            // Private: online status and the activity feed are hidden, whatever the switch says.
+            const visibility = privacy.profileVisibility;
+            const locked = visibility === "private" && (toggle.key === "showOnlineStatus" || toggle.key === "showActivityFeed");
+            const hint = locked
+              ? "Hidden while your profile is private."
+              : visibility === "friends" && toggle.key === "showOnlineStatus"
+                ? "Only friends see it."
+                : visibility === "friends" && toggle.key === "showActivityFeed"
+                  ? "Only friends see your activity."
+                  : toggle.hint;
+            return (
+              <PrivacyToggleRow
+                key={toggle.key}
+                label={toggle.label}
+                hint={hint}
+                value={locked ? false : privacy[toggle.key]}
+                disabled={locked || loading || saving === toggle.key}
+                onChange={(value) => save(toggle.key, value)}
+              />
+            );
+          })}
         </View>
 
         {/* BLOCKED LIST */}

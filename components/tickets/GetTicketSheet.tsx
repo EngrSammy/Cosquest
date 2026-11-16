@@ -3,7 +3,7 @@
 // ==========================================
 // Shows the ticket types (price, places left), then:
 //   free  -> the ticket at once
-//   paid  -> Stripe's payment page (see openPayment)
+//   paid  -> the CosQuest website (payment brief, decision 2)
 // A second tap after a network drop gets the SAME order back (the server
 // keeps one open checkout per person), so nobody pays twice.
 import { Ionicons } from "@expo/vector-icons";
@@ -16,13 +16,12 @@ import { themedStyles, useInk, useThemedStyles } from "@/constants/chatTheme";
 import { FONTS } from "@/constants/fonts";
 import { useIsDesktop } from "@/hooks/useDesktop";
 import type { Quest } from "@/services/quests";
-import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes, paymentSheet } from "@/services/tickets";
-import { useAppSelector } from "@/store/hooks";
+import { type TicketType, TicketError, checkout, formatMoney, getTicketTypes } from "@/services/tickets";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { checkEligibility, openWebCheckout } from "@/store/thunks/paymentThunks";
 
 import { currentPosition } from "./currentPosition";
-import { openPayment } from "./openPayment";
-import StripeRoot from "./StripeRoot";
-import { usePayInApp } from "./usePayInApp";
+import SalesCountdown, { salesClosed } from "./SalesCountdown";
 
 const PINK = "#C34D9C";
 
@@ -30,13 +29,11 @@ type SheetProps = { quest: Quest | null; onClose: () => void; onTicket: (questId
 
 // Phones pay inside the app (Stripe's payment sheet: card, Google Pay);
 // the website uses Stripe's page.
+// Payment brief, decision 2: paid tickets are bought on the CosQuest website
+// (this sheet opens it); free tickets are issued right here.
 export default function GetTicketSheet(props: SheetProps) {
   if (!props.quest) return null;
-  return (
-    <StripeRoot>
-      <TicketSheet {...props} />
-    </StripeRoot>
-  );
+  return <TicketSheet {...props} />;
 }
 
 function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
@@ -46,9 +43,9 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
   // Computers: a centered window instead of a bottom sheet.
   const desktop = useIsDesktop();
   const token = useAppSelector((state) => state.auth.token);
-  const email = useAppSelector((state) => (state.auth.user as any)?.email || null);
-  // null on the website (or without a Stripe key): Stripe's page instead.
-  const payInApp = usePayInApp();
+  const dispatch = useAppDispatch();
+  // Can I pay for this? (18+, region; the server checks again before paying.)
+  const eligibility = useAppSelector((state) => (quest ? state.payment.eligibility[quest.id] : undefined));
   const [types, setTypes] = useState<TicketType[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,13 +63,18 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
         setChosen(firstOnSale?.id || null);
       })
       .catch((e) => setError(e?.message || "Couldn't load tickets."));
-  }, [quest]);
+    if (token) dispatch(checkEligibility({ questId: quest.id, token }));
+  }, [quest, token, dispatch]);
 
   if (!quest) return null;
   const type = types?.find((t) => t.id === chosen) || null;
 
   const go = async () => {
     if (!token || !type || busy) return;
+    if (salesClosed(type.salesClosesAt)) {
+      setError("Ticket sales have closed: it has started.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -81,29 +83,15 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
       const live = !!quest.startsAt && !!quest.endsAt && new Date(quest.startsAt).getTime() <= now && new Date(quest.endsAt).getTime() > now;
       const position = quest.requireAtVenue && live ? await currentPosition() : null;
 
-      // Paid, on a phone: Stripe's payment sheet inside the app.
-      if (payInApp && !type.free) {
-        const sheet = await paymentSheet(quest.id, type.id, token, position);
-        if (sheet.ticket) {
-          onTicket(quest.id, sheet.ticket.id);
-          onClose();
-          router.push({ pathname: "/tickets/[id]", params: { id: sheet.ticket.id } } as any);
+      // Paid: on the CosQuest website. The ticket arrives in the app by itself
+      // (the server's "ticket:issued", a push, or the next refresh).
+      if (!type.free) {
+        const opened = await dispatch(openWebCheckout({ questId: quest.id, ticketTypeId: type.id, token }));
+        if (openWebCheckout.rejected.match(opened)) {
+          setError(opened.payload?.message || "Couldn't open the checkout. Please try again.");
           return;
         }
-        if (!sheet.paymentIntentClientSecret) throw new TicketError("Couldn't start the payment. Please try again.", 0);
-        const orderId = sheet.order.id;
-        // Stripe's sheet can't open over another pop-up: close this one first.
         onClose();
-        await new Promise((resolve) => setTimeout(resolve, Platform.OS === "ios" ? 450 : 250));
-        const paid = await payInApp(sheet.paymentIntentClientSecret, type.price.currency, email);
-        if (paid.status === "paid") {
-          // The server confirms it with Stripe; this screen waits for that.
-          router.push({ pathname: "/tickets/return", params: { order: orderId } } as any);
-        } else if (paid.status === "canceled") {
-          Alert.alert("Payment not finished", "Nothing was charged. Your place is held for a few minutes if you want to try again.");
-        } else {
-          Alert.alert("Payment failed", `${paid.message} Nothing was charged.`);
-        }
         return;
       }
 
@@ -114,10 +102,6 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
         onClose();
         router.push({ pathname: "/tickets/[id]", params: { id: result.ticket.id } } as any);
         return;
-      }
-      if (result.checkoutUrl) {
-        onClose();
-        await openPayment(result.checkoutUrl, result.order.id);
       }
     } catch (e) {
       const err = e as TicketError;
@@ -196,15 +180,17 @@ function TicketSheet({ quest, onClose, onTicket }: SheetProps) {
           {quest.requireAtVenue ? (
             <Text style={styles.sub}>📍 Joining while it's live works at {quest.location?.name || "the venue"} only.</Text>
           ) : null}
+          <SalesCountdown closesAt={type?.salesClosesAt} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {eligibility && !eligibility.allowed && !type?.free ? <Text style={styles.error}>{eligibility.message || "Paid quests aren't available for you right now."}</Text> : null}
 
-          <Pressable style={[styles.button, (!type || busy) && { opacity: 0.5 }]} disabled={!type || busy} onPress={go} accessibilityRole="button">
-            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{!type ? "Choose a ticket" : type.free ? "Get free ticket" : `Pay ${formatMoney(type.price)}`}</Text>}
+          <Pressable style={[styles.button, (!type || busy || eligibility && !eligibility.allowed && !type?.free) && { opacity: 0.5 }]} disabled={!type || busy || !!(eligibility && !eligibility.allowed && !type?.free)} onPress={go} accessibilityRole="button">
+            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{!type ? "Choose a ticket" : type.free ? "Get free ticket" : `Pay ${formatMoney(type.price)} on the website`}</Text>}
           </Pressable>
           {type && !type.free ? (
             <View style={styles.secure}>
               <Ionicons name="lock-closed" size={12} color={ink.text("#7A8296")} />
-              <Text style={styles.secureText}>Secure payment by Stripe. Your card details never reach CosQuest.</Text>
+              <Text style={styles.secureText}>You pay on the CosQuest website (secure payment by Stripe), then come back here.</Text>
             </View>
           ) : null}
         </Pressable>

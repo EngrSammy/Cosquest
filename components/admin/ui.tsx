@@ -10,6 +10,7 @@ import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } 
 
 import { FONTS } from "@/constants/fonts";
 
+import { glass } from "./glass";
 import { type AdminTheme, useAdminTheme } from "./theme";
 
 // ---------- formatting ----------
@@ -39,7 +40,7 @@ export function initials(name?: string | null) {
 export function Card({ children, style, padded = true }: { children: ReactNode; style?: ViewStyle; padded?: boolean }) {
   const t = useAdminTheme();
   return (
-    <View style={[{ backgroundColor: t.card, borderRadius: 16, borderWidth: 1, borderColor: t.border, ...(padded ? { padding: 20 } : null) }, style]}>
+    <View style={[{ backgroundColor: t.card, borderRadius: 22, borderWidth: 1, borderColor: t.border, ...(padded ? { padding: 20 } : null) }, style]} {...glass("panel")}>
       {children}
     </View>
   );

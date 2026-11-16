@@ -29,6 +29,10 @@ export type Quest = {
   // Signed in: whether you're registered (from the server).
   isRegistered?: boolean;
   kind?: "quest" | "event";
+  /** In person (a venue) or virtual (online, from anywhere; no pin). */
+  format?: "in_person" | "virtual";
+  /** Virtual: where it's "set", e.g. "Tokyo · Hanuma" (also in location.name). */
+  placeLabel?: string;
   distanceMiles?: number;
   requireAtVenue?: boolean;
 };
